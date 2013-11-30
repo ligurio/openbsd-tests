@@ -20,4 +20,4 @@ run-regress-isic-udp:
 run-regress-isic-icmp:
 	@icmpsic -s rand -d localhost -i 6 -p 20
 
-.include <../infrastructure/bsd.autotest.mk>
+.include <../infrastructure/mk/bsd.autotest.mk>

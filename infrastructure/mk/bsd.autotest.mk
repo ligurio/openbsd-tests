@@ -56,7 +56,7 @@ REPORT_LIST+=${REGRESS_LOG}
 cleanup:
 . if defined(PKG_REQUIRED)
 	@for package in ${PKG_REQUIRED}; do \
-		(set -e; pkg_delete $${package} || exit 1); \
+		(set -e; pkg_delete -D dependencies $${package} || exit 1); \
 	done;
 . endif
 	make clean
