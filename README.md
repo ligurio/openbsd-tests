@@ -1,16 +1,14 @@
-Additional regression tests for OpenBSD 
----------------------------------------
+# Additional regression tests for OpenBSD 
 
 Sergey Bronnikov, BSD License
 
-HOWTO
------
+## HOWTO
 
 * ftp -o - http://github.com/ligurio/openbsd-tests/openbsd-tests-latest.tar.gz
 		| tar xvzf - && cd openbsd-tests && make
 
-TODO
------
+## TODO
+
 * installation on node with Linux (depinguinator for OpenBSD?)
 * openup http://www.mtier.org/solutions/apps/openup/
 * add support of ONLY_FOR_ARCHS and NOT_FOR_ARCHS
