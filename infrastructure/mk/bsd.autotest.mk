@@ -12,7 +12,7 @@ REPORT_LIST+=/var/run/dmesg.boot
 .if exists(${X11BASE}/share/mk/bsd.xconf.mk)
 	REPORT_LIST+=/var/log/Xorg.0.log
 .endif
-REPORT_NAME=report_${DATE}_${ARCH}_${HOSTNAME}.tar.gz
+REPORT_NAME ?= ${.CURDIR}/report_${DATE}_${ARCH}_${HOSTNAME}.log
 
 .MAIN: all
 all: preparation upgrade regress report cleanup
@@ -31,15 +31,14 @@ upgrade:
 . if !defined(NO_UPDATE)
 	@${_SHSCRIPT}/sysupgrade full;
 . elif
-	echo "Run tests on installed OpenBSD version"
+	echo "Run tests on installed OpenBSD version wo update"
 . endif
 
 report:
 .if defined(REGRESS_LOG) && exists(${REGRESS_LOG})
-REPORT_LIST+=${REGRESS_LOG}
-.endif
 	@echo "Make report"
-	@tar cvzf ${REPORT_NAME} ${REPORT_LIST} > /dev/null 2>&1
+	@${_SHSCRIPT}/tapperize ${REGRESS_LOG} > ${REPORT_NAME}
+.endif
 . if defined(REPORT_FTP)
 	@ftp put ${REPORT_NAME} ${REPORT_FTP}
 	@echo "Send report"
@@ -59,6 +58,5 @@ cleanup:
 		(set -e; pkg_delete -D dependencies $${package} || exit 1); \
 	done;
 . endif
-	make clean
-	
+
 .include <bsd.regress.mk>
