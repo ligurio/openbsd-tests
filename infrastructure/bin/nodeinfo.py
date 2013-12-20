@@ -1,4 +1,7 @@
-import sys, os, pprint, yaml
+import sys, os, pprint
+import yaml
+
+# TODO: usbdevs(8), pcidump(8), acpidump(8)
 
 def get_cpu_topology():
 
@@ -49,12 +52,21 @@ def get_platforminfo():
 
 	return ret
 
+#def get_dmesg():
+#	ret = {}
+#	f = open('/var/run/dmesg.boot', 'r')
+#	ret['hw_dmesg'] = f.readlines()
+#	f.close()
+#
+#	return ret
+
 def get_nodeinfo():
 	ret = get_platforminfo()
 	ret.update(get_cpuinfo())
 	ret.update(get_cpufreq())
 	ret.update(get_cpu_topology())
 	ret.update(get_meminfo())
+	#ret.update(get_dmesg())
 	return ret
 
 if __name__ == "__main__":
