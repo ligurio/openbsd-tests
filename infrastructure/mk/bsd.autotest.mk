@@ -20,7 +20,7 @@ all: preparation upgrade regress report cleanup
 preparation:
 . if defined(PKG_REQUIRED)
 	@for package in ${PKG_REQUIRED}; do \
-		(set -e; pkg_add $${package} || exit 1); \
+		(set -e; echo -n "install $${package} "; pkg_add $${package} && echo "done" || exit 1); \
 	done;
 . endif
 . if defined(REPORT_HTTP)

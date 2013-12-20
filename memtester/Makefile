@@ -1,9 +1,9 @@
-COMMENT= test for memory faults
+TEST = memtester
 
 PKG_REQUIRED = memtester
 LOOP = 1
 AMOUNT != sysctl -n hw.physmem
-REGRESS_LOG = ${.CURDIR}/memtester.log
+REGRESS_LOG = ${.CURDIR}/${TEST}-`date +%Y-%m-%d`.log
 REGRESS_TARGETS = run-regress-test-memtester
 
 run-regress-test-memtester:

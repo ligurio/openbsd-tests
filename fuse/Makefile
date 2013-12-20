@@ -6,7 +6,7 @@ LDFLAGS = -lfuse
 PKG_REQUIRED = fsx fsstress
 
 TEST = fuse
-REGRESS_LOG = ${.CURDIR}/fuse-`date +%Y-%m-%d`.log
+REGRESS_LOG = ${.CURDIR}/${TEST}-`date +%Y-%m-%d`.log
 REGRESS_TARGETS = run-regress-fuse-hdd
 REGRESS_ROOT_TARGETS=   run-regress-fuse-hdd
 
@@ -40,4 +40,4 @@ run-regress-fuse-tmpfs: fusexmp
 	@fusexmp
 	fsx /mnt/fuse
 
-.include <../infrastructure/bsd.autotest.mk>
+.include <../infrastructure/mk/bsd.autotest.mk>
