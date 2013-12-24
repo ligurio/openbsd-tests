@@ -2,7 +2,7 @@ TEST = x11perf
 
 X11_REQUIRED = Yes
 
-REGRESS_LOG = ${.CURDIR}/${TEST}-`date +%Y-%m-%d`.log
+REGRESS_LOG = ${.CURDIR}/${TEST}-`date +%Y-%m-%d-%MM-%SS`.log
 REGRESS_TARGETS = run-regress-test-${TEST}
 REGRESS_MAX_TIME ?= 3600
 

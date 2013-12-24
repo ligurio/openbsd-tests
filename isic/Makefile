@@ -3,7 +3,7 @@
 TEST = isic
 PKG_REQUIRED = isic
 
-REGRESS_LOG = ${.CURDIR}/${TEST}-`date +%Y-%m-%d`.log
+REGRESS_LOG = ${.CURDIR}/${TEST}-`date +%Y-%m-%d-%MM-%SS`.log
 REGRESS_ROOT_TARGETS  = run-regress-isic-tcp
 REGRESS_ROOT_TARGETS += run-regress-isic-udp
 REGRESS_ROOT_TARGETS += run-regress-isic-icmp

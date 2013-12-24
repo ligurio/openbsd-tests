@@ -6,7 +6,7 @@ LDFLAGS = -lfuse
 PKG_REQUIRED = fsx fsstress
 
 TEST = fuse
-REGRESS_LOG = ${.CURDIR}/${TEST}-`date +%Y-%m-%d`.log
+REGRESS_LOG = ${.CURDIR}/${TEST}-`date +%Y-%m-%d-%MM-%SS`.log
 REGRESS_TARGETS = run-regress-fuse-hdd
 REGRESS_ROOT_TARGETS=   run-regress-fuse-hdd
 

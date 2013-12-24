@@ -1,6 +1,6 @@
 TEST =	openssl
 
-REGRESS_LOG = ${.CURDIR}/${TEST}-`date +%Y-%m-%d`.log
+REGRESS_LOG = ${.CURDIR}/${TEST}-`date +%Y-%m-%d-%MM-%SS`.log
 REGRESS_TARGETS = run-regress-${TEST}-md5 run-regress-${TEST}-rand
 
 run-regress-${TEST}-md5:
