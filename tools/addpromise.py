@@ -6,6 +6,7 @@ import sys
 
 DEFAULT_PROMISE = ["wpath", "cpath", "rpath"]
 
+
 def main():
     if len(sys.argv) == 2:
         filename = sys.argv[1]
