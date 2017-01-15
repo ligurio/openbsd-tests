@@ -3,7 +3,8 @@
 # Monitor new OpenBSD snapshots
 # Run: python ./snapmon.py
 
-# FIX: requests.exceptions.ConnectionError: ('Connection aborted.', error(50, 'Network is down'))
+# FIX: requests.exceptions.ConnectionError: ('Connection aborted.',
+# error(50, 'Network is down'))
 
 from datetime import datetime, date, time, timedelta
 import logging
@@ -32,8 +33,9 @@ snap = {"alpha": "", "amd64": "", "armish": "", "armv7": "",
         "luna88k": "", "macppc": "", "octeon": "", "sgi": "",
         "socppc": "", "sparc": "", "sparc64": "", "zaurus": ""}
 
+
 def ptime(time):
-   return datetime.strptime(time, "%a, %d %b %Y %X GMT")
+    return datetime.strptime(time, "%a, %d %b %Y %X GMT")
 
 pp = pprint.PrettyPrinter(indent=4)
 while True:
@@ -53,7 +55,8 @@ while True:
 
         if snap[arch] == "":
             snap[arch] = mtime
-            logging.info("[NEW SNAPSHOT] %s, builded %s ago" % (arch, ptime(ctime) - ptime(mtime)))
+            logging.info("[NEW SNAPSHOT] %s, builded %s ago" %
+                         (arch, ptime(ctime) - ptime(mtime)))
         else:
             logging.debug(snap[arch])
             logging.debug(mtime)
