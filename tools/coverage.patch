@@ -1,0 +1,354 @@
+diff --git a/sys/arch/amd64/conf/Makefile.amd64 b/sys/arch/amd64/conf/Makefile.amd64
+index 6d99b22..8e902cd 100644
+--- a/sys/arch/amd64/conf/Makefile.amd64
++++ b/sys/arch/amd64/conf/Makefile.amd64
+@@ -41,6 +41,9 @@ CMACHFLAGS+=	-Wa,-n
+ 
+ DEBUG?=		-g
+ COPTS?=		-O2
++.if ${COVERAGE}
++COPTS+=         -fprofile-arcs -ftest-coverage -O0
++.end
+ CFLAGS=		${DEBUG} ${CWARNFLAGS} ${CMACHFLAGS} ${COPTS} ${PIPE}
+ AFLAGS=		-D_LOCORE -x assembler-with-cpp ${CWARNFLAGS} ${CMACHFLAGS}
+ LDSCRIPT=	${_machdir}/conf/ld.script
+diff --git a/sys/arch/amd64/conf/ld.script b/sys/arch/amd64/conf/ld.script
+index b184a75..2a7bf68 100644
+--- a/sys/arch/amd64/conf/ld.script
++++ b/sys/arch/amd64/conf/ld.script
+@@ -92,6 +92,7 @@ SECTIONS
+ 		__data_size = SIZEOF(.data);
+ 		__data_load = LOADADDR(.data);
+ 		*(.data .data.*)
++		SORT(CONSTRUCTORS)
+ 	} :data
+ 	. = ALIGN(0x1000);
+ 	PROVIDE (edata = .);
+@@ -124,4 +125,38 @@ SECTIONS
+ 		*(.note.GNU-stack)
+ 		*(.eh_frame)
+ 	}
++
++        _start_ctors = .;
++        PROVIDE (start_ctors = .);
++	.ctors          :
++	{
++	  /* gcc uses crtbegin.o to find the start of
++	     the constructors, so we make sure it is
++	     first.  Because this is a wildcard, it
++	     doesn't matter if the user does not
++	     actually link against crtbegin.o; the
++	     linker won't look for a file to match a
++	     wildcard.  The wildcard also means that it
++	     doesn't matter which directory crtbegin.o
++	     is in.  */
++	  KEEP (*crtbegin.o(.ctors))
++	  KEEP (*crtbegin?.o(.ctors))
++	  /* We don't want to include the .ctor section from
++	     the crtend.o file until after the sorted ctors.
++	     The .ctor section from the crtend file contains the
++	     end of ctors marker and it must be last */
++	  KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .ctors))
++	  KEEP (*(SORT(.ctors.*)))
++	  KEEP (*(.ctors))
++	}
++	_stop_ctors = .;
++	PROVIDE (stop_ctors = .);
++	.dtors          :
++	{
++	  KEEP (*crtbegin.o(.dtors))
++	  KEEP (*crtbegin?.o(.dtors))
++	  KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .dtors))
++	  KEEP (*(SORT(.dtors.*)))
++	  KEEP (*(.dtors))
++	}
+ }
+diff --git a/sys/conf/files b/sys/conf/files
+index 400bdbb..f36919c 100644
+--- a/sys/conf/files
++++ b/sys/conf/files
+@@ -689,6 +689,7 @@ file kern/subr_autoconf.c
+ file kern/subr_disk.c
+ file kern/subr_evcount.c
+ file kern/subr_extent.c
++file kern/subr_gcov.c
+ file kern/subr_hibernate.c		hibernate
+ file kern/subr_log.c
+ file kern/subr_percpu.c
+diff --git a/sys/kern/subr_gcov.c b/sys/kern/subr_gcov.c
+new file mode 100644
+index 0000000..475fe83
+--- /dev/null
++++ b/sys/kern/subr_gcov.c
+@@ -0,0 +1,208 @@
++/*-
++ * Copyright (c) 1982, 1986, 1993
++ *  The Regents of the University of California.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. All advertising materials mentioning features or use of this software
++ *    must display the following acknowledgement:
++ *  This product includes software developed by the University of
++ *  California, Berkeley and its contributors.
++ * 4. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ *
++ *  @(#)subr_prof.c 8.3 (Berkeley) 9/23/93
++ */
++
++/*
++ * Support for "--test-coverage --profile-arcs" in GCC.
++ *
++ * We need to call all the functions in the .ctor section, in order
++ * to get all the counter-arrays strung into a list.
++ *
++ * XXX: Worrisome perspective: Calling the .ctors may make C++ in the
++ * XXX: kernel feasible.  Don't.
++ */
++
++#include <sys/cdefs.h>
++#include <sys/param.h>
++#include <sys/systm.h>
++#include <sys/types.h>
++#include <sys/lock.h>
++#include <sys/malloc.h>
++#include <sys/gcov.h>
++#include <sys/kernel.h>
++
++/*
++static void
++linker_file_register_profile(linker_file_t lf)
++{
++  ctor_t *start, *stop;
++
++  if (linker_file_lookup_set(lf, "ctors_set", &start, &stop, NULL) != 0)
++	return;
++
++  gcov_register_ctors(lf, start, stop);
++}
++
++static void
++linker_file_unregister_profile(linker_file_t lf)
++{
++  gcov_unregister_ctors(lf);
++}
++*/
++
++//static MALLOC_DEFINE(M_GCOV, "gcov", "GCC profile-arcs and code-coverage");
++
++static struct mutex gcov_mutex;
++//MTX_SYSINIT(gcov_lock, &gcov_mutex, "gcov data lock", MTX_DEF);
++//mtx_init(&gcov_mutex, MTX_DEF);
++
++/* This structure is used to keep track of all struct bbs associated with a
++ * module. */
++struct gcov_context
++{
++  LIST_ENTRY(gcov_context) gcov_link;
++  struct linker_file *lf;
++  unsigned long count;
++  struct bb** bb;
++};
++
++static LIST_HEAD(, gcov_context) gcov_list = LIST_HEAD_INITIALIZER(&gcov_list);
++static struct gcov_context *current_context = NULL;
++
++/* same as src/contrib/gcc/libgcc2.c
++ * change gcov_type *counts to void *
++ */
++/* Structure emitted by --profile-arcs  */
++struct bb
++{
++  long zero_word;
++  const char *filename;
++  void *counts;
++  long ncounts;
++  struct bb *next;
++};
++
++static struct bb *bb_head = NULL;
++
++/*
++ * GCC contains magic to recognize calls to for instance execve() and
++ * puts in calls to this function to preserve the profile counters.
++ * XXX: Put zinging punchline here.
++ */
++void
++__bb_fork_func(void)
++{
++}
++
++void
++__bb_init_func(struct bb *blocks)
++{
++  if (blocks->zero_word)
++	return;
++
++  printf("bb: Adding %s\n", blocks->filename);
++
++  /* save to current_context */
++  if (current_context)
++	current_context->bb[current_context->count++] = blocks;
++
++  /* Setup linked lisk. */
++  blocks->zero_word = 1;
++  blocks->next = bb_head;
++  bb_head = blocks;
++}
++
++/*
++ * Register the profiling files into the bb_head list.
++ * use context to trace the files so that we can remove them later.
++ */
++void
++gcov_register_ctors(struct linker_file *lf, ctor_t *start, ctor_t *stop)
++{
++  int bbcount;
++  struct gcov_context *context;
++  ctor_t* ctor;
++  
++  bbcount = stop - start;
++  
++/*
++  MALLOC(context, struct gcov_context *,
++		 sizeof(struct gcov_context) + bbcount * sizeof(struct bb *),
++		 M_GCOV, M_WAITOK);
++*/
++  //mtx_lock(&gcov_mutex);
++  mtx_enter(&gcov_mutex);
++  //KASSERT(current_context == NULL, ("current gcov context is not NULL"));
++  current_context = context;
++  current_context->lf = lf;
++  current_context->count = 0;
++  current_context->bb = (struct bb **)(current_context + 1);
++  LIST_INSERT_HEAD(&gcov_list, current_context, gcov_link);
++
++  /* call ctors */
++  for (ctor = start; ctor < stop; ctor++)
++	if (*ctor != NULL)
++	  (*ctor)();
++  
++  current_context = NULL;
++  mtx_leave(&gcov_mutex);
++}
++
++/*
++ * Unregister the profiling list
++ */
++void
++gcov_unregister_ctors(struct linker_file *lf)
++{
++  struct gcov_context *context;
++  mtx_enter(&gcov_mutex);
++  LIST_FOREACH(context, &gcov_list, gcov_link) {
++	if (context->lf == lf) {
++	  /* remove the each bb from the bb_head list */
++	  struct bb *prev = NULL, *bb;
++	  int i;
++	  
++	  for (bb = bb_head; bb ; bb = bb->next) {
++		for (i = 0; i < context->count; i++) {
++		  if (context->bb[i] == bb) {
++			printf("bb: Deleting %s\n", bb->filename);
++			/* Detach bb from bb_head. */
++			if (prev)
++			  prev->next = bb->next;
++			else
++			  bb_head = bb->next;
++			break;
++		  }
++		}
++		if (i == context->count)
++		  prev = bb;
++	  }
++	  LIST_REMOVE(context, gcov_link);
++	  mtx_leave(&gcov_mutex);
++	  return;
++	}
++  }
++  
++  mtx_leave(&gcov_mutex);
++}
+diff --git a/sys/sys/gcov.h b/sys/sys/gcov.h
+new file mode 100644
+index 0000000..854be47
+--- /dev/null
++++ b/sys/sys/gcov.h
+@@ -0,0 +1,57 @@
++/*-
++ * Copyright (c) 1995 
++ * All rights reserved.
++ *
++ * Copyright (c) 1990, 1993
++ *  The Regents of the University of California.  All rights reserved.
++ * (c) UNIX System Laboratories, Inc.
++ * All or some portions of this file are derived from material licensed
++ * to the University of California by American Telephone and Telegraph
++ * Co. or Unix System Laboratories, Inc. and are reproduced herein with
++ * the permission of UNIX System Laboratories, Inc.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. All advertising materials mentioning features or use of this software
++ *    must display the following acknowledgement:
++ *  This product includes software developed by the University of
++ *  California, Berkeley and its contributors.
++ * 4. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ *
++ * $FreeBSD$
++ */
++
++#ifndef _GCOV_H_
++#define _GCOV_H_
++
++struct bb;
++
++typedef void (*ctor_t)(void);
++
++extern void __bb_init_func(struct bb *);
++extern void __bb_fork_func(void);
++
++struct linker_file;
++extern void gcov_register_ctors(struct linker_file *, ctor_t *, ctor_t *);
++extern void gcov_unregister_ctors(struct linker_file *);
++#endif
