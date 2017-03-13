@@ -15,3 +15,7 @@ def addpkg(package, version=DEF_VERSION, pkg_path=DEF_PKG_PATH):
     proc = subprocess(['pkg_add', package])
     proc.wait()
     assert proc.returncode == 0
+
+
+def osname():
+    return subprocess.check_output(["uname", "-s"])
