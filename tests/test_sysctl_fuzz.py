@@ -40,10 +40,14 @@ def rnd_string(length):
 def rnd_integer(maxval):
     return random.randrange(0, maxval, 1)
 
+
 @pytest.mark.parametrize("key, keytype", [
     ("kern.sugid_coredump", "iteger"),
     ("kern.corefile", "string"),
 ])
+
+
+@pytest.mark.skip(reason="it's not ready yet")
 def test_sysctl_fuzz(key, keytype):
     loops = 10
     orig_value = subprocess.check_output(["sysctl", "-n", key]).rstrip()

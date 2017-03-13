@@ -1,14 +1,8 @@
-
-
 import subprocess
+import pytest
 
-@pytest.mark.slowtest
-def test_x11perf():
-    openssl_cmd = ["openssl", "speed"]
-    proc = subprocess.Popen(openssl_cmd)
-    proc.wait()
-    assert proc.returncode == 0
 
+"""
 IMAGE=$(mktemp -t imageXXXXXXXXXX);
 MNT=./stress
 
@@ -45,3 +39,4 @@ echo -n "Validation: "
 validate && echo "OK"
 
 rm -rf ${IMAGE} ${MNT}
+"""

@@ -1,29 +1,42 @@
-#!/bin/ksh
+import pytest
 
+"""
+RAID 0
+RAID 1
+RAID 5
+CRYPTO
+CONCAT
+"""
+
+@pytest.mark.skip(reason="it's not ready")
+def test_softraid():
+    pass
+
+"""
 level=$1
 chunks=$2
 mnt=stress
 
 if [ -z $level ] || [ -z $chunks ]; then exit 1; fi
 
-if [ ! -e /usr/local/bin/fsstress ]; 
-then 
+if [ ! -e /usr/local/bin/fsstress ];
+then
         echo "fsstress not found, you can install it by 'pkg_add fsstress'";
-        exit 1; 
+        exit 1;
 fi
 
 trap 'cleanup' INT
 
 prepare_chunks()
 {
-	for i in `jot 4 1 4`; 
+	for i in `jot 4 1 4`;
 	do
 		echo -n "Chunk $i: "
 		dd if=/dev/zero of=disk$i bs=1m count=10 > /dev/null 2>&1 &&
 		vnconfig vnd$(($i-1)) disk$i > /dev/null 2>&1 &&
 		fdisk -iy vnd$(($i-1)) > /dev/null 2>&1 &&
 		printf "a\n\n\n\nRAID\nw\nq\n\n" | disklabel -E vnd$(($i-1)) > /dev/null 2>&1;
-		if [ $? -ne 0 ]; then echo "Success"; else echo "Failed"; fi  
+		if [ $? -ne 0 ]; then echo "Success"; else echo "Failed"; fi
 	done;
 }
 
@@ -31,7 +44,7 @@ stress()
 {
 	echo "Stress..."
 	#mkdir stress && mount /dev/$sd stress && fsstress -d stress -v -p 5 -n 50 -S || exit;
-	mkdir stress 
+	mkdir stress
 	mount -t ffs /dev/${sd}i stress
 	fsstress -d stress -v -p 5 -n 50 -S || exit;
 	umount /dev/${sd}i
@@ -91,3 +104,4 @@ newfs /dev/r${sd}i
 
 stress;
 cleanup;
+"""

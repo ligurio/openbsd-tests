@@ -1,15 +1,16 @@
 import pytest
 import subprocess
 
-@pytest.mark.slowtest
-def test_x11perf():
+
+@pytest.mark.skip(reason="it's not ready")
+def test_tmux():
     openssl_cmd = ["openssl", "speed"]
     proc = subprocess.Popen(openssl_cmd)
     proc.wait()
     assert proc.returncode == 0
 
-##################################################
 
+"""
 TMUX=`whereis tmux`
 sessions=5
 windows=4
@@ -166,3 +167,4 @@ do
 done
 
 $TMUX kill-server && echo "Successfull terminate tmux server"
+"""
