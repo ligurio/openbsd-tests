@@ -1,8 +1,10 @@
 import pytest
 import subprocess
 from conftest import service
+from conftest import osname
 
 
+@pytest.markers.skipif(osname != "OpenBSD")
 def test_adjtime():
     service("ntpd", "start")
     print "Sync time"
