@@ -1,6 +1,7 @@
 import pytest
 import subprocess
 
+
 @pytest.mark.slowtest
 def test_openssl():
     openssl_cmd = ["openssl", "speed"]

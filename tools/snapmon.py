@@ -6,13 +6,11 @@
 # FIX: requests.exceptions.ConnectionError: ('Connection aborted.',
 # error(50, 'Network is down'))
 
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, time
 import logging
 import os
 import pprint
 import requests
-import sys
-import time
 
 # https://www.openbsd.org/ftp.html
 # http://spacehopper.org/mirmon/
@@ -41,12 +39,12 @@ pp = pprint.PrettyPrinter(indent=4)
 while True:
     for arch in snap.keys():
         url = os.path.join(MIRROR, arch)
-        if requests.get(url).status_code <> 200:
+        if requests.get(url).status_code != 200:
             logging.error("Directory not found %s")
             continue
         url = os.path.join(url, "BUILDINFO")
         r = requests.get(url)
-        if r.status_code <> 200:
+        if r.status_code != 200:
             logging.error("BUILDINFO not found")
             continue
 
