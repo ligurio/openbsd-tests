@@ -19,6 +19,7 @@ def test_bind(benchmark):
 def test_mmap(benchmark):
     with open("test_mmap.txt", "wb") as f:
         f.write("Hello, OpenBSD!\n")
+
     def mmap_call():
         with open("test_mmap.txt", "r+b") as f:
             mm = mmap.mmap(f.fileno(), 0)
