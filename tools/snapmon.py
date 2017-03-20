@@ -6,11 +6,12 @@
 # FIX: requests.exceptions.ConnectionError: ('Connection aborted.',
 # error(50, 'Network is down'))
 
-from datetime import datetime, time
+from datetime import datetime
 import logging
 import os
 import pprint
 import requests
+import time
 
 # https://www.openbsd.org/ftp.html
 # http://spacehopper.org/mirmon/
@@ -34,6 +35,7 @@ snap = {"alpha": "", "amd64": "", "armish": "", "armv7": "",
 
 def ptime(time):
     return datetime.strptime(time, "%a, %d %b %Y %X GMT")
+
 
 pp = pprint.PrettyPrinter(indent=4)
 while True:

@@ -5,7 +5,7 @@ import socket
 
 def test_socket(benchmark):
     def socket_call():
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     benchmark.pedantic(socket_call, iterations=1000, rounds=100)
 
 
