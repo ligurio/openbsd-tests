@@ -14,7 +14,7 @@ def test_adjtime():
     print("Move time forward for 5 minutes")
     # time=`date "+ %M"`
     # date $(($time+5)) > /dev/null 2>&1 && date "+ %H:%M"
-    print "Validate adjustment"
+    print("Validate adjustment")
     # ntpd -s && sleep 60 && pkill -TERM ntpd
     # date "+ %H:%M"
     # [ `date "+ %M"` -eq $(($time+1)) ]; then
