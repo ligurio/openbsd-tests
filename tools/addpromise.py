@@ -30,7 +30,7 @@ def main():
             line = line.rstrip()
             pledge_match = re.findall(".*pledge\(\"(.*)\",.*\)", line)
             pledge_num = len(pledge_match)
-            print filename, ":", pledge_match
+            print(filename, ":", pledge_match)
             if pledge_num > 0:
                 for p in promise:
                     promise_match = re.findall(

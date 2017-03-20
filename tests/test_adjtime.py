@@ -7,11 +7,11 @@ from conftest import osname
 @pytest.mark.skipif(osname != "OpenBSD")
 def test_adjtime():
     service("ntpd", "start")
-    print "Sync time"
+    print("Sync time")
     proc = subprocess.Popen(["ntpd", "-s"])
     proc.wait()
     service("ntpd", "stop")
-    print "Move time forward for 5 minutes"
+    print("Move time forward for 5 minutes")
     # time=`date "+ %M"`
     # date $(($time+5)) > /dev/null 2>&1 && date "+ %H:%M"
     print "Validate adjustment"
