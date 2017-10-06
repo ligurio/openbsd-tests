@@ -4,7 +4,7 @@ import os
 import re
 import sys
 
-DEFAULT_PROMISE = ["wpath", "cpath", "rpath"]
+DEFAULT_PROMISE = ["wpath", "cpath", "rpath", "flock"]
 
 
 def main():
