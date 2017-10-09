@@ -1,18 +1,10 @@
 #include "benchmark/benchmark.h"
 #include <openssl/sha.h>
 
-#define BASIC_BENCHMARK_TEST(x) BENCHMARK(x)->Arg(8)->Arg(512)->Arg(8192)
-
-void BM_hello(benchmark::State& state) {
-	  while (state.KeepRunning()) {
-		      benchmark::DoNotOptimize(state.iterations());
-	  }
-}
-BENCHMARK(BM_hello);
-BENCHMARK(BM_hello)->ThreadPerCpu();
-
-bool BM_SHA256(void* input, unsigned long length, unsigned char* md)
+bool sha256(void* input, unsigned long length)
 {
+    unsigned char *md;
+
     SHA256_CTX context;
     if(!SHA256_Init(&context))
         return false;
@@ -26,7 +18,13 @@ bool BM_SHA256(void* input, unsigned long length, unsigned char* md)
     return true;
 }
 
+void BM_SHA256(benchmark::State& state) {
+	  while (state.KeepRunning()) {
+		      benchmark::DoNotOptimize(sha256);
+	  }
+}
+
 BENCHMARK(BM_SHA256);
-BENCHMARK(BM_SHA256("sergeyb", 8))->ThreadPerCpu();
+//BENCHMARK(BM_SHA256("sergeyb", 8))->ThreadPerCpu();
 
 BENCHMARK_MAIN()
