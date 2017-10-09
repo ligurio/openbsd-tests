@@ -15,7 +15,7 @@
 
 #define ITERATIONS	1000000
 
-void BM_syscall_ohead(void) {
+void syscall_overhead(void) {
 
 	struct timeval before, after;
 	unsigned long overhead, elapsed;
@@ -41,12 +41,16 @@ void BM_syscall_ohead(void) {
 	    (1000*(elapsed-overhead))/ITERATIONS);
 }
 
-void BM_syscall_ohead(benchmark::State& state) {
+void BM_syscall_overhead(benchmark::State& state) {
 	  while (state.KeepRunning()) {
-		      benchmark::DoNotOptimize(state.iterations());
+		      benchmark::DoNotOptimize(syscall_overhead);
 	  }
 }
-BENCHMARK(BM_syscall_ohead);
-BENCHMARK(BM_syscall_ohead)->ThreadPerCpu();
+
+BENCHMARK(BM_syscall_overhead);
+BENCHMARK(BM_syscall_overhead)->Threads(8);
+BENCHMARK(BM_syscall_overhead)->ThreadRange(1, 32);
+BENCHMARK(BM_syscall_overhead)->ThreadPerCpu();
+BENCHMARK(BM_syscall_overhead)->ThreadPerCpu();
 
 BENCHMARK_MAIN()

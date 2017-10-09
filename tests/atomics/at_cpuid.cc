@@ -28,13 +28,14 @@ void cpuid() {
 
 }
 
-void BM_cpuid(benchmark::State& state) {
-	  while (state.KeepRunning()) {
-		      benchmark::DoNotOptimize(state.iterations());
-	  }
+static void BM_cpuid(benchmark::State& state) {
+    while (state.KeepRunning()) {
+		benchmark::DoNotOptimize(cpuid);
+    }
 }
 
-BENCHMARK(BM_cpuid);
+BENCHMARK(BM_cpuid)->Threads(8);
+BENCHMARK(BM_cpuid)->ThreadRange(1, 32);
 BENCHMARK(BM_cpuid)->ThreadPerCpu();
 
 BENCHMARK_MAIN()
