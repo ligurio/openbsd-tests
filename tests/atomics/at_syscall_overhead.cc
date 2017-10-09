@@ -1,8 +1,4 @@
 #include "benchmark/benchmark.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/time.h>
-#include <err.h>
 #include <unistd.h> 
 
 /*
@@ -17,28 +13,12 @@
 
 void syscall_overhead(void) {
 
-	struct timeval before, after;
-	unsigned long overhead, elapsed;
 	int i;
 	pid_t pid;
 
-	gettimeofday(&before, NULL);
-	for (i=0; i<ITERATIONS; i++) {
-	}
-	gettimeofday(&after, NULL);
-	overhead = 1000000 * (after.tv_sec - before.tv_sec);
-	overhead += after.tv_usec - before.tv_usec;
-
-	gettimeofday(&before, NULL);
 	for (i=0; i<ITERATIONS; i++) {
 		pid = getpid();
 	}
-	gettimeofday(&after, NULL);
-	elapsed = 1000000 * (after.tv_sec - before.tv_sec);
-	elapsed += after.tv_usec - before.tv_usec;
-
-	printf("syscall time: %ld nanoseconds\n",
-	    (1000*(elapsed-overhead))/ITERATIONS);
 }
 
 void BM_syscall_overhead(benchmark::State& state) {
@@ -50,7 +30,6 @@ void BM_syscall_overhead(benchmark::State& state) {
 BENCHMARK(BM_syscall_overhead);
 BENCHMARK(BM_syscall_overhead)->Threads(8);
 BENCHMARK(BM_syscall_overhead)->ThreadRange(1, 32);
-BENCHMARK(BM_syscall_overhead)->ThreadPerCpu();
 BENCHMARK(BM_syscall_overhead)->ThreadPerCpu();
 
 BENCHMARK_MAIN()
