@@ -13,7 +13,7 @@ void handler(int v)
 	iterations--;
 }
 
-static void sigbench(int argc, char *argv[])
+static void sigbench()
 {
 	int cur, i;
 	pid_t pid;
