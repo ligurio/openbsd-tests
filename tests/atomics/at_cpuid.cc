@@ -25,7 +25,6 @@ void cpuid() {
 #endif
         : "=a"(regs[0]), [ebx] "=r"(regs[1]), "=c"(regs[2]), "=d"(regs[3])
         : "a"(index));
-
 }
 
 static void BM_cpuid(benchmark::State& state) {

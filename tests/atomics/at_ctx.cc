@@ -14,12 +14,12 @@
 // https://github.com/tsuna/contextswitch
 // http://blog.tsunanet.net/2010/11/how-long-does-it-take-to-make-context.html
 
-void BM_hello(benchmark::State& state) {
+void BM_ctx(benchmark::State& state) {
 	  while (state.KeepRunning()) {
 		      benchmark::DoNotOptimize(state.iterations());
 	  }
 }
-BENCHMARK(BM_hello);
-BENCHMARK(BM_hello)->ThreadPerCpu();
+BENCHMARK(BM_ctx);
+BENCHMARK(BM_ctx)->ThreadPerCpu();
 
 BENCHMARK_MAIN()
