@@ -10,7 +10,6 @@
  *  architectural design of the scheduler.
  */
 
-
 void fork(int nforks) {
 	int i, brksize;
 	char *cp;
