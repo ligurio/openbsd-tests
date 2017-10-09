@@ -11,6 +11,9 @@
  * process to services access to the pipe. 
  */
 
+// https://github.com/tsuna/contextswitch
+// http://blog.tsunanet.net/2010/11/how-long-does-it-take-to-make-context.html
+
 void BM_hello(benchmark::State& state) {
 	  while (state.KeepRunning()) {
 		      benchmark::DoNotOptimize(state.iterations());
