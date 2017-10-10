@@ -1,14 +1,18 @@
 #include "benchmark/benchmark.h"
 #include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/time.h>
 #include <sys/wait.h>
 
-/*  Benchmark considers the process creation and termination times as the
- *  number of system processes increases. This benchmark measures the
- *  architectural design of the scheduler.
+/* Benchmark considers the process creation and termination times as the
+ * number of system processes increases. This benchmark measures the
+ * architectural design of the scheduler.
+ *
+ * This benchmark creates a pipe and then opens many child processes, which
+ * each write one byte into the pipe and then hang around until they are
+ * killed. After creating each child, the benchmark waits until it can read the
+ * one byte from the new child process from the pipe and takes the time from
+ * the fork until having read the byte.
  */
+
 
 void fork(int nforks) {
 	int i, brksize;
@@ -20,7 +24,7 @@ void fork(int nforks) {
 	brksize = 4;
 	cp = (char *)sbrk(brksize);
 	if (cp == (void *)-1) {
-		perror("sbrk");
+		//perror("sbrk");
 		exit(4);
 	}
 	for (i = 0; i < brksize; i += 1024)
@@ -29,7 +33,7 @@ void fork(int nforks) {
 	for (i=0; i<nforks; i++) {
 		child = fork();
 		if (child == -1) {
-			perror("fork");
+			//perror("fork");
 			exit(-1);
 		}
 		if (child == 0)
