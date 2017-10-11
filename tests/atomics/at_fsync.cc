@@ -2,17 +2,20 @@
 
 #include <fcntl.h>
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 #define B_SIZE    2048
 #define B_NUM     100
 #define MAX_FILES 10000
 
+/*
+ * https://github.com/hostmaster/POC_fsyncperf/
+ */
+
 extern int errno ;
 
 void fsync_perf() {
+
     int fdo, i, j;
     ssize_t len;
     unsigned long long total = 0;
@@ -28,28 +31,24 @@ void fsync_perf() {
             buffer[j] = (char)(rand() & 0xFF);
         }
 
-        char filename[] = "fsync-bench-XXXXXX";
+        char filename[] = "at_fsync-XXXXXX";
 
         if ((fdo = mkstemp(filename)) == -1) {
-            perror("mkstemp");
-            // exit(errno);
+            exit(errno);
         }
 
         for (j = 0; j < B_NUM; j++) {
             if (write(fdo, buffer, sizeof(buffer)) == -1) {
-                perror("write");
-                // exit(errno);
+                exit(errno);
             }
         }
 
         if (fsync(fdo) == -1) {
-            perror("fsync");
-            // exit(errno);
+            exit(errno);
         }
 
         if (close(fdo) == -1) {
-            perror("close");
-            // exit(errno);
+            exit(errno);
         }
         unlink(filename);
     }

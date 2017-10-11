@@ -24,7 +24,6 @@ void fork(int nforks) {
 	brksize = 4;
 	cp = (char *)sbrk(brksize);
 	if (cp == (void *)-1) {
-		//perror("sbrk");
 		exit(4);
 	}
 	for (i = 0; i < brksize; i += 1024)
@@ -33,7 +32,6 @@ void fork(int nforks) {
 	for (i=0; i<nforks; i++) {
 		child = fork();
 		if (child == -1) {
-			//perror("fork");
 			exit(-1);
 		}
 		if (child == 0)

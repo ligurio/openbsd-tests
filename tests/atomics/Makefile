@@ -1,25 +1,36 @@
 BINDIR = bin
+CFLAGS = -lbenchmark -lpthread
+OPTIONS = --benchmark_repetitions=10
+SOURCES = at_fork.cc at_lock.cc
 
-build:
+build: $(BIN_FILES)
 	@mkdir -p ${BINDIR}
-	g++ at_bcrypt.cc -o ${BINDIR}/at_bcrypt -lbenchmark -lpthread -lcrypto -lssl
-	g++ at_cpuid.cc -o ${BINDIR}/at_cpuid -lbenchmark -lpthread
-	g++ at_ctx.cc -o ${BINDIR}/at_ctx -lbenchmark -lpthread
-	g++ at_fork.cc -o ${BINDIR}/at_fork -lbenchmark -lpthread
-	g++ at_fsync.cc -o ${BINDIR}/at_fsync -lbenchmark -lpthread
-	g++ at_mmap.cc -o ${BINDIR}/at_mmap -lbenchmark -lpthread
-	g++ at_sigbench.cc -o ${BINDIR}/at_sigbench -lbenchmark -lpthread
-	g++ at_sha256.cc -o ${BINDIR}/at_sha256 -lbenchmark -lpthread -lssl -lcrypto
+	g++ at_bpf.cc -o ${BINDIR}/at_bpf ${CFLAGS} -lcrypto -lssl
+	g++ at_connect.cc -o ${BINDIR}/at_connect ${CFLAGS}
+	g++ at_cpuid.cc -o ${BINDIR}/at_cpuid ${CFLAGS}
+	g++ at_crypto.cc -o ${BINDIR}/at_crypto ${CFLAGS} -lssl -lcrypto
+	g++ at_ctx.cc -o ${BINDIR}/at_ctx ${CFLAGS}
+	g++ at_fork.cc -o ${BINDIR}/at_fork ${CFLAGS}
+	g++ at_fsync.cc -o ${BINDIR}/at_fsync ${CFLAGS}
+	g++ at_ipc.cc -o ${BINDIR}/at_ipc ${CFLAGS}
+	g++ at_lock.cc -o ${BINDIR}/at_lock ${CFLAGS}
+	g++ at_mmap.cc -o ${BINDIR}/at_mmap ${CFLAGS}
+	g++ at_malloc.cc -o ${BINDIR}/at_malloc ${CFLAGS}
+	g++ at_sigbench.cc -o ${BINDIR}/at_sigbench ${CFLAGS}
 
-run:
-	${BINDIR}/at_bcrypt
-	${BINDIR}/at_cpuid
-	${BINDIR}/at_ctx
-	${BINDIR}/at_fork
-	${BINDIR}/at_fsync
-	${BINDIR}/at_mmap
-	${BINDIR}/at_sigbench
-	${BINDIR}/at_sha256
+run: ${TEST}
+	${BINDIR}/at_bpf ${OPTIONS}
+	${BINDIR}/at_connect ${OPTIONS}
+	${BINDIR}/at_cpuid ${OPTIONS}
+	${BINDIR}/at_crypto ${OPTIONS}
+	${BINDIR}/at_ctx ${OPTIONS}
+	${BINDIR}/at_fork ${OPTIONS}
+	${BINDIR}/at_fsync ${OPTIONS}
+	${BINDIR}/at_ipc ${OPTIONS}
+	${BINDIR}/at_lock ${OPTIONS}
+	${BINDIR}/at_mmap ${OPTIONS}
+	${BINDIR}/at_malloc ${OPTIONS}
+	${BINDIR}/at_sigbench ${OPTIONS}
 
 clean:
 	rm -rf ${BINDIR}
