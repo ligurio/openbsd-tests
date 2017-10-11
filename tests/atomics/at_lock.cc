@@ -1,0 +1,29 @@
+#include "benchmark/benchmark.h"
+#include <unistd.h>
+#include <sys/wait.h>
+
+// https://github.com/kmcallister/seqloq
+// https://github.com/lcapaldo/futexexamples
+// ftp://ftp.netbsd.org/pub/NetBSD/misc/gmcgarry/bench/lockprof.tar.gz
+// https://git.kernel.org/pub/scm/linux/kernel/git/dvhart/futextest.git
+
+void rwlock(int) {
+}
+
+void BM_rwlock(benchmark::State& state) {
+	while (state.KeepRunning()) rwlock(state.range(0));
+}
+
+BENCHMARK_RANGE(BM_rwlock, 1, 10 * 10);
+
+void futex(int) {
+
+}
+
+void BM_futex(benchmark::State& state) {
+	while (state.KeepRunning()) futex(state.range(0));
+}
+
+BENCHMARK_RANGE(BM_futex, 1, 10 * 10);
+
+BENCHMARK_MAIN()
