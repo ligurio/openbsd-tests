@@ -47,14 +47,8 @@
 void mmap_perf() {
 
     int fdo, i, j;
-    ssize_t len;
-    unsigned long long total = 0;
-
     char buffer[B_SIZE];
-    unsigned long long times[MAX_FILES];
-
     struct stat s;
-    int status;
     size_t size;
 
     srand(time(NULL));
@@ -80,7 +74,9 @@ void mmap_perf() {
 	// https://www.lemoda.net/c/mmap-example/
 	// https://gist.github.com/marcetcheverry/991042
 
-	status = fstat(fdo, &s);
+	if (fstat(fdo, &s) !=0 ) {
+		perror("fstat error");
+	}
 	size = s.st_size;
 
 	if ((mmap(0, size, PROT_READ, MAP_SHARED, fdo, 0)) == (caddr_t) -1) {
@@ -95,7 +91,7 @@ void mmap_perf() {
 }
 
 static void BM_mmap(benchmark::State& state) {
-    while (state.KeepRunning()) mmap_perf;
+    while (state.KeepRunning()) mmap_perf();
 }
 
 BENCHMARK_RANGE(BM_mmap, 1, 1000 * 1000);

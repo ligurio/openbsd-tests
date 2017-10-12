@@ -12,12 +12,10 @@
  */
  
 void bpf() {
-
-	exit(4);
 }
 
 void BM_bpf(benchmark::State& state) {
-	while (state.KeepRunning()) bpf;
+	while (state.KeepRunning()) bpf();
 }
 
 BENCHMARK(BM_bpf);

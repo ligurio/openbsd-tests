@@ -39,17 +39,12 @@
 void time_syscall(void) {
 
 	int i;
-	pid_t pid;
-
 	if (syscall(SYS_gettid) <= 1) {
-	exit(2);
+		exit(2);
 	}
-
-/*
 	for (i=0; i<ITERATIONS; i++) {
-		pid = getpid();
+		getpid();
 	}
-*/
 }
 
 void BM_time_syscall(benchmark::State& state) {

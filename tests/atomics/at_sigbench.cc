@@ -40,12 +40,9 @@ static void sigbench()
 }
 
 void BM_sigbench(benchmark::State& state) {
-	  while (state.KeepRunning()) {
-		      benchmark::DoNotOptimize(sigbench);
-	  }
+	  while (state.KeepRunning()) sigbench();
 }
 
 BENCHMARK(BM_sigbench);
-BENCHMARK(BM_sigbench)->ThreadPerCpu();
 
 BENCHMARK_MAIN()

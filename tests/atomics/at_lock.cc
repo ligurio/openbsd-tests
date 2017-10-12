@@ -1,6 +1,10 @@
 #include "benchmark/benchmark.h"
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/time.h>
+#ifdef __OpenBSD__
+#include <sys/futex.h>
+#endif
 
 // https://github.com/kmcallister/seqloq
 // https://github.com/lcapaldo/futexexamples
@@ -17,11 +21,16 @@ void BM_rwlock(benchmark::State& state) {
 BENCHMARK_RANGE(BM_rwlock, 1, 10 * 10);
 
 void futex(int) {
-
+#ifdef __OpenBSD__
+#endif
 }
 
 void BM_futex(benchmark::State& state) {
+#ifdef __OpenBSD__
 	while (state.KeepRunning()) futex(state.range(0));
+#else
+	        state.SkipWithError("Unsupported");
+#endif
 }
 
 BENCHMARK_RANGE(BM_futex, 1, 10 * 10);

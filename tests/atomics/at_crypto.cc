@@ -6,7 +6,7 @@
 
 bool sha256(void* input, unsigned long length)
 {
-    unsigned char *md;
+    unsigned char *md = 0;
 
     SHA256_CTX context;
     if(!SHA256_Init(&context))
@@ -42,7 +42,7 @@ void rand_string(char *dest, size_t length) {
 }
 
 #ifdef __OpenBSD__
-void bcrypt(int length) {
+void bcrypt_perf(int length) {
 	char buffer[50];
 	const char *pref;
 	char string[1024];
@@ -55,7 +55,7 @@ void bcrypt(int length) {
 
 void BM_bcrypt(benchmark::State& state) {
 #ifdef __OpenBSD__
-    while (state.KeepRunning()) bcrypt(state.range(0));
+    while (state.KeepRunning()) bcrypt_perf(state.range(0));
 #else
     state.SkipWithError("Unsupported");
 #endif

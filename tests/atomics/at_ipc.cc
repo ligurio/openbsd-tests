@@ -12,8 +12,7 @@ void pipe_lat() {
 	int ofds[2], ifds[2];
 	int size;
 	char *buf;
-	int64_t i, delta;
-	int64_t count;
+	int64_t i, count;
 
 	size = 22222222; // message size: octets
 	count = 333; // roundtrip count
@@ -73,37 +72,37 @@ void tcp_thr() {
 }
 
 void BM_pipe_lat(benchmark::State& state) {
-	while (state.KeepRunning()) pipe_lat;
+	while (state.KeepRunning()) pipe_lat();
 }
 
 BENCHMARK(BM_pipe_lat);
 
 void BM_pipe_thr(benchmark::State& state) {
-	while (state.KeepRunning()) pipe_thr;
+	while (state.KeepRunning()) pipe_thr();
 }
 
 BENCHMARK_RANGE(BM_pipe_thr, 1, 10 * 10);
 
 void BM_unix_lat(benchmark::State& state) {
-	while (state.KeepRunning()) unix_lat;
+	while (state.KeepRunning()) unix_lat();
 }
 
 BENCHMARK_RANGE(BM_unix_lat, 1, 10 * 10);
 
 void BM_unix_thr(benchmark::State& state) {
-	while (state.KeepRunning()) unix_thr;
+	while (state.KeepRunning()) unix_thr();
 }
 
 BENCHMARK_RANGE(BM_unix_thr, 1, 10 * 10);
 
 void BM_tcp_lat(benchmark::State& state) {
-	while (state.KeepRunning()) tcp_lat;
+	while (state.KeepRunning()) tcp_lat();
 }
 
 BENCHMARK_RANGE(BM_tcp_lat, 1, 10 * 10);
 
 void BM_tcp_thr(benchmark::State& state) {
-	while (state.KeepRunning()) tcp_thr;
+	while (state.KeepRunning()) tcp_thr();
 }
 
 BENCHMARK_RANGE(BM_tcp_thr, 1, 10 * 10);

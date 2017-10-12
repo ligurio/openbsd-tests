@@ -18,8 +18,6 @@ void fork(int nforks) {
 	int i, brksize;
 	char *cp;
 	int pid, child, status;
-	struct timeval before, after;
-	unsigned elapsed;
 
 	brksize = 4;
 	cp = (char *)sbrk(brksize);

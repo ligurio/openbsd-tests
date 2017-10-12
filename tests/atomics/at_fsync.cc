@@ -17,11 +17,7 @@ extern int errno ;
 void fsync_perf() {
 
     int fdo, i, j;
-    ssize_t len;
-    unsigned long long total = 0;
-
     char buffer[B_SIZE];
-    unsigned long long times[MAX_FILES];
 
     srand(time(NULL));
 
@@ -55,7 +51,7 @@ void fsync_perf() {
 }
 
 void BM_fsync(benchmark::State& state) {
-	  while (state.KeepRunning()) fsync_perf;
+	  while (state.KeepRunning()) fsync_perf();
 }
 
 BENCHMARK(BM_fsync);

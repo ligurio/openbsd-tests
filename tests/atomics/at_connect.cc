@@ -20,14 +20,13 @@
  *
  */
 
-void connect(int nforks) {
+void connect_perf() {
 
-	int i, brksize;
+	int i, brksize, nforks;
 	char *cp;
 	int pid, child, status;
-	struct timeval before, after;
-	unsigned elapsed;
 
+	nforks = 2;
 	brksize = 4;
 	cp = (char *)sbrk(brksize);
 	if (cp == (void *)-1) {
@@ -51,7 +50,7 @@ void connect(int nforks) {
 }
 
 void BM_connect(benchmark::State& state) {
-	while (state.KeepRunning()) connect;
+	while (state.KeepRunning()) connect_perf();
 }
 
 BENCHMARK(BM_connect);
