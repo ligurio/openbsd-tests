@@ -6,22 +6,19 @@
  * https://github.com/vext01/openbsd-libc-benchmarks
  */
 
-void mmalloc() {
+void malloc_perf(unsigned long long bufsz) {
 
-	char	*buf;
-	unsigned long long	bufsz;
+	char *buf;
 
-	bufsz = 32;
-	if (!malloc(bufsz))
-		exit(4);
+	if ((buf = (char*)malloc(bufsz)) == 0)
+		perror("malloc error");
+	free(buf);
 }
 
 static void BM_malloc(benchmark::State& state) {
-    while (state.KeepRunning()) {
-		benchmark::DoNotOptimize(mmalloc);
-    }
+    while (state.KeepRunning()) malloc_perf(state.range(0));
 }
 
-BENCHMARK(BM_malloc);
+BENCHMARK_RANGE(BM_malloc, 0, 10000 * 100000);
 
 BENCHMARK_MAIN()

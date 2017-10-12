@@ -1,8 +1,60 @@
 #include "benchmark/benchmark.h"
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 // https://github.com/rigtorp/ipc-bench
 
 void pipe_lat() {
+
+	int ofds[2], ifds[2];
+	int size;
+	char *buf;
+	int64_t i, delta;
+	int64_t count;
+
+	size = 22222222; // message size: octets
+	count = 333; // roundtrip count
+
+	buf = (char*)malloc(size);
+	if (buf == NULL) {
+	  perror("malloc");
+	}
+
+	if (pipe(ofds) == -1) {
+	  perror("pipe");
+	}
+
+	if (pipe(ifds) == -1) {
+	  perror("pipe");
+	}
+
+	if (!fork()) { /* child */
+	  for (i = 0; i < count; i++) {
+
+	    if (read(ifds[0], buf, size) != size) {
+	      perror("read");
+	    }
+
+	    if (write(ofds[1], buf, size) != size) {
+	      perror("write");
+	    }
+	  }
+	} else { /* parent */
+
+		for (i = 0; i < count; i++) {
+
+		  if (write(ifds[1], buf, size) != size) {
+		    perror("write");
+		  }
+
+		  if (read(ofds[0], buf, size) != size) {
+		    perror("read");
+		  }
+		}
+	}
 }
 
 void pipe_thr() {
@@ -24,7 +76,7 @@ void BM_pipe_lat(benchmark::State& state) {
 	while (state.KeepRunning()) pipe_lat;
 }
 
-BENCHMARK_RANGE(BM_pipe_lat, 1, 10 * 10);
+BENCHMARK(BM_pipe_lat);
 
 void BM_pipe_thr(benchmark::State& state) {
 	while (state.KeepRunning()) pipe_thr;

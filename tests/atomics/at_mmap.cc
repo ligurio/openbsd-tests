@@ -84,7 +84,7 @@ void mmap_perf() {
 	size = s.st_size;
 
 	if ((mmap(0, size, PROT_READ, MAP_SHARED, fdo, 0)) == (caddr_t) -1) {
-		printf ("mmap error for input");
+		perror("mmap error");
 	}
 
         if (close(fdo) == -1) {
@@ -95,13 +95,9 @@ void mmap_perf() {
 }
 
 static void BM_mmap(benchmark::State& state) {
-    while (state.KeepRunning()) {
-		benchmark::DoNotOptimize(mmap_perf);
-    }
+    while (state.KeepRunning()) mmap_perf;
 }
 
-BENCHMARK(BM_mmap)->Threads(8);
-BENCHMARK(BM_mmap)->ThreadRange(1, 32);
-BENCHMARK(BM_mmap)->ThreadPerCpu();
+BENCHMARK_RANGE(BM_mmap, 1, 1000 * 1000);
 
 BENCHMARK_MAIN()
