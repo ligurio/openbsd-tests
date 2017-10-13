@@ -19,6 +19,6 @@ static void BM_malloc(benchmark::State& state) {
     while (state.KeepRunning()) malloc_perf(state.range(0));
 }
 
-BENCHMARK_RANGE(BM_malloc, 0, 10000 * 100000);
+BENCHMARK_RANGE(BM_malloc, 10000, 10000 * 100000);
 
 BENCHMARK_MAIN()

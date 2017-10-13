@@ -14,31 +14,31 @@ void pipe_lat() {
 	char *buf;
 	int64_t i, count;
 
-	size = 22222222; // message size: octets
+	size = 22; // message size: octets
 	count = 333; // roundtrip count
 
 	buf = (char*)malloc(size);
 	if (buf == NULL) {
-	  perror("malloc");
+		perror("malloc");
 	}
 
 	if (pipe(ofds) == -1) {
-	  perror("pipe");
+		perror("pipe");
 	}
 
 	if (pipe(ifds) == -1) {
-	  perror("pipe");
+		perror("pipe");
 	}
 
 	if (!fork()) { /* child */
 	  for (i = 0; i < count; i++) {
 
 	    if (read(ifds[0], buf, size) != size) {
-	      perror("read");
+	    	perror("read");
 	    }
 
 	    if (write(ofds[1], buf, size) != size) {
-	      perror("write");
+	    	perror("write");
 	    }
 	  }
 	} else { /* parent */
@@ -46,11 +46,11 @@ void pipe_lat() {
 		for (i = 0; i < count; i++) {
 
 		  if (write(ifds[1], buf, size) != size) {
-		    perror("write");
+		  	perror("write");
 		  }
 
 		  if (read(ofds[0], buf, size) != size) {
-		    perror("read");
+		  	perror("read");
 		  }
 		}
 	}

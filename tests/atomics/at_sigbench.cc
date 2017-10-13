@@ -1,6 +1,7 @@
 #include "benchmark/benchmark.h"
 #include <unistd.h>
 #include <signal.h>
+#include <stdio.h>
 #include <err.h>
 
 #define ITERATIONS	1000000
@@ -21,19 +22,19 @@ static void sigbench()
 	pid = getpid();
 
 	if (signal(SIGNAL, SIG_IGN) < 0)
-		errx(1, "cannot set signal handler");
+		perror("cannot set signal handler");
 
 	for (i=0; i<ITERATIONS; i++) {
 		if (kill(pid, SIGNAL) < 0)
-			errx(1, "kill not possible");
+			perror("kill not possible");
 	}
 
 	if (signal(SIGNAL, handler) < 0)
-		errx(1, "cannot set signal handler");
+		perror("cannot set signal handler");
 
 	while ((cur = iterations) != 0) {
 		if (kill(pid, SIGNAL) < 0)
-			errx(1, "kill not possible");
+			perror("kill not possible");
 		while (cur == iterations)
 			;
 	}
