@@ -4,6 +4,19 @@
 #include <stdlib.h>
 #include <err.h>
 
+/*
+    https://www.openbsd.org/innovations.html
+
+    arc4random(3)
+    bcrypt(3)
+    strlcpy(3), strlcat(3)
+    strtonum(3)
+    ohash
+    getentropy(2)
+    timingsafe_memcmp(3)
+    getpwnam_shadow(3), getpwuid_shadow(3)
+*/
+
 bool sha256(void* input, unsigned long length)
 {
     unsigned char *md = 0;

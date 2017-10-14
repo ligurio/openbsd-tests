@@ -10,6 +10,7 @@
 // https://github.com/lcapaldo/futexexamples
 // ftp://ftp.netbsd.org/pub/NetBSD/misc/gmcgarry/bench/lockprof.tar.gz
 // https://git.kernel.org/pub/scm/linux/kernel/git/dvhart/futextest.git
+// http://demin.ws/blog/english/2012/05/05/atomic-spinlock-mutex/
 
 void rwlock(int) {
 }

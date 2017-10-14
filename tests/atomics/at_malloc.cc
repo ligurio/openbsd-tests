@@ -1,6 +1,15 @@
 #include "benchmark/benchmark.h"
 #include <stdlib.h>
 
+/*
+    https://www.openbsd.org/innovations.html
+
+    reallocarray(3)
+    recallocarray(3)
+    freezero(3)
+    explicit_bzero(3)
+*/
+
 void malloc_perf() {
 
 	void *p;
