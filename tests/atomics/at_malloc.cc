@@ -1,24 +1,21 @@
 #include "benchmark/benchmark.h"
 #include <stdlib.h>
 
-/*
- * https://people.freebsd.org/%7Ejkim/mmap_test.c
- * https://github.com/vext01/openbsd-libc-benchmarks
- */
+void malloc_perf() {
 
-void malloc_perf(unsigned long long bufsz) {
+	void *p;
+	int size = 1 * 1024 * 1024;
 
-	char *buf;
-
-	if ((buf = (char*)malloc(bufsz)) == 0)
+    p = malloc(size);
+	if (!p)
 		perror("malloc error");
-	free(buf);
+	free(p);
 }
 
 static void BM_malloc(benchmark::State& state) {
-    while (state.KeepRunning()) malloc_perf(state.range(0));
+    while (state.KeepRunning()) malloc_perf();
 }
 
-BENCHMARK_RANGE(BM_malloc, 10000, 10000 * 100000);
+BENCHMARK(BM_malloc);
 
 BENCHMARK_MAIN()

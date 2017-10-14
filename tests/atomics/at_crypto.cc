@@ -22,9 +22,7 @@ bool sha256(void* input, unsigned long length)
 }
 
 void BM_SHA256(benchmark::State& state) {
-	  while (state.KeepRunning()) {
-		      benchmark::DoNotOptimize(sha256);
-	  }
+	  while (state.KeepRunning()) sha256;
 }
 
 BENCHMARK(BM_SHA256);

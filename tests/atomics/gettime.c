@@ -14,10 +14,9 @@ int main(int argc, char** argv)
    struct timeval tv;
    gettimeofday(&tv, NULL);
    printf("%25s\t%15s\t%15ld\t", "gettimeofday","1,000", tv.tv_sec);
-   printf("%15ld\n", tv.tv_usec*1000);
+   printf("%15ul\n", tv.tv_usec*1000);
 
-
-#if _POSIX_TIMERS > 0   
+#if _POSIX_TIMERS > 0
 
    struct timespec x;
 
@@ -62,7 +61,7 @@ int main(int argc, char** argv)
    clock_gettime(CLOCK_MONOTONIC_COARSE, &x);
    printf("\t%15ld\t%15ld\n", x.tv_sec, x.tv_nsec);
    #endif
-   
+
 #endif
 
    return 0;

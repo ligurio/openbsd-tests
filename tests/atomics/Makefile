@@ -11,7 +11,7 @@ build:
 	${CC} at_bpf.cc -o ${BINDIR}/at_bpf ${LDFLAGS} ${CFLAGS} -lcrypto -lssl
 	${CC} at_connect.cc -o ${BINDIR}/at_connect ${LDFLAGS} ${CFLAGS}
 	${CC} at_cpuid.cc -o ${BINDIR}/at_cpuid ${LDFLAGS} ${CFLAGS}
-	${CC} at_crypto.cc -o ${BINDIR}/at_crypto ${LDFLAGS} ${CFLAGS} -lssl -lcrypto
+	#${CC} at_crypto.cc -o ${BINDIR}/at_crypto ${LDFLAGS} ${CFLAGS} -lssl -lcrypto
 	${CC} at_ctx.cc -o ${BINDIR}/at_ctx ${LDFLAGS} ${CFLAGS}
 	${CC} at_fork.cc -o ${BINDIR}/at_fork ${LDFLAGS} ${CFLAGS}
 	${CC} at_fsync.cc -o ${BINDIR}/at_fsync ${LDFLAGS} ${CFLAGS}
@@ -21,6 +21,7 @@ build:
 	${CC} at_mmap.cc -o ${BINDIR}/at_mmap ${LDFLAGS} ${CFLAGS}
 	${CC} at_malloc.cc -o ${BINDIR}/at_malloc ${LDFLAGS} ${CFLAGS}
 	${CC} at_sigbench.cc -o ${BINDIR}/at_sigbench ${LDFLAGS} ${CFLAGS}
+	${CC} at_sigfpe.cc -o ${BINDIR}/at_sigfpe ${LDFLAGS} ${CFLAGS}
 	${CC} at_socket.cc -o ${BINDIR}/at_socket ${LDFLAGS} ${CFLAGS}
  
 run: build
@@ -38,6 +39,7 @@ run: build
 	${BINDIR}/at_mmap ${OPTIONS}
 	${BINDIR}/at_malloc ${OPTIONS}
 	${BINDIR}/at_sigbench ${OPTIONS}
+	${BINDIR}/at_sigfpe ${OPTIONS}
 	${BINDIR}/at_socket ${OPTIONS}
 
 clean:

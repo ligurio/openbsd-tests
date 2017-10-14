@@ -72,6 +72,7 @@ void mmap_perf() {
         }
 
 	// https://www.lemoda.net/c/mmap-example/
+	// https://people.freebsd.org/%7Ejkim/mmap_test.c
 	// https://gist.github.com/marcetcheverry/991042
 
 	if (fstat(fdo, &s) !=0 ) {

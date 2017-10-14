@@ -13,20 +13,9 @@
  * the fork until having read the byte.
  */
 
+void fork_perf(int nforks) {
 
-void fork(int nforks) {
-	int i, brksize;
-	char *cp;
-	int pid, child, status;
-
-	brksize = 4;
-	cp = (char *)sbrk(brksize);
-	if (cp == (void *)-1) {
-		exit(4);
-	}
-	for (i = 0; i < brksize; i += 1024)
-		cp[i] = i;
-
+	int i, pid, child, status;
 	for (i=0; i<nforks; i++) {
 		child = fork();
 		if (child == -1) {
@@ -40,7 +29,7 @@ void fork(int nforks) {
 }
 
 void BM_fork(benchmark::State& state) {
-	while (state.KeepRunning()) fork(state.range(0));
+	while (state.KeepRunning()) fork_perf(state.range(0));
 }
 
 BENCHMARK_RANGE(BM_fork, 1, 10 * 10);

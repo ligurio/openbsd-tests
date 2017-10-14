@@ -16,26 +16,16 @@
  *  special event notification APIs scale O(1) (Linux 2.4: SIGIO, Linux 2.6:
  *  epoll, FreeBSD+OpenBSD: kqueue) and the rest to scale O(n) (NetBSD). My
  *  benchmark http server is called gatling and it makes use of SIGIO, epoll
- *  and kqueue if available, but falls back to poll if not. 
+ *  and kqueue if available, but falls back to poll if not.
  *
  */
 
 void connect_perf() {
 
-	int i, brksize, nforks;
-	char *cp;
+	int i, nforks;
 	int pid, child, status;
 
 	nforks = 2;
-	brksize = 4;
-	cp = (char *)sbrk(brksize);
-	if (cp == (void *)-1) {
-		perror("sbrk");
-		exit(4);
-	}
-	for (i = 0; i < brksize; i += 1024)
-		cp[i] = i;
-
 	for (i=0; i<nforks; i++) {
 		child = fork();
 		if (child == -1) {
@@ -43,7 +33,7 @@ void connect_perf() {
 			exit(-1);
 		}
 		if (child == 0)
-			_exit(-1);
+			exit(-1);
 		while ((pid = wait(&status)) != -1 && pid != child)
 			;
 	}
