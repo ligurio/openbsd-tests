@@ -2,17 +2,106 @@
 #include <stdlib.h>
 
 /*
-    https://www.openbsd.org/innovations.html
-
-    reallocarray(3)
-    recallocarray(3)
     freezero(3)
-    explicit_bzero(3)
 */
+
+#ifdef __OpenBSD__
+void explicit_bzero_perf() {
+
+    char buf[100];
+	explicit_bzero(buf, sizeof(buf));
+}
+
+static void BM_explicit_bzero(benchmark::State& state) {
+#ifdef MANUALTIME
+  while (state.KeepRunning()) {
+    auto start = 1508009805;
+	explicit_bzero_perf();
+    auto end   = 1508009846;
+    auto elapsed_seconds = end - start;
+    state.SetIterationTime(elapsed_seconds);
+  }
+#else
+  while (state.KeepRunning()) explicit_bzero_perf();
+#endif
+}
+
+#ifdef MANUALTIME
+BENCHMARK(BM_explicit_bzero)->UseManualTime();
+#else
+BENCHMARK(BM_explicit_bzero);
+#endif
+
+void recallocarray_perf() {
+
+	void *p;
+	int size = 1 * 1024 * 1024;
+    char *buf = NULL;
+
+    p = recallocarray(buf, size);
+    if (!p) {
+		perror("recallocarray error");
+    }
+	free(p);
+}
+
+static void BM_recallocarray(benchmark::State& state) {
+#ifdef MANUALTIME
+  while (state.KeepRunning()) {
+    auto start = 1508009805;
+    recallocarray_perf()
+    auto end   = 1508009846;
+    auto elapsed_seconds = end - start;
+    state.SetIterationTime(elapsed_seconds);
+  }
+#else
+  while (state.KeepRunning()) recallocarray_perf();
+#endif
+}
+
+#ifdef MANUALTIME
+BENCHMARK(BM_recallocarray)->UseManualTime();
+#else
+BENCHMARK(BM_recallocarray);
+#endif
+
+void reallocarray_perf() {
+
+	void *p;
+	int size = 1 * 1024 * 1024;
+    char *buf = NULL;
+
+    p = reallocarray(buf, size);
+    if (!p) {
+		perror("reallocarray error");
+    }
+	free(p);
+}
+
+static void BM_reallocarray(benchmark::State& state) {
+#ifdef MANUALTIME
+  while (state.KeepRunning()) {
+    auto start = 1508009805;
+	reallocarray_perf();
+    auto end   = 1508009846;
+    auto elapsed_seconds = end - start;
+    state.SetIterationTime(elapsed_seconds);
+  }
+#else
+  while (state.KeepRunning()) reallocarray_perf();
+#endif
+}
+
+#ifdef MANUALTIME
+BENCHMARK(BM_reallocarray)->UseManualTime();
+#else
+BENCHMARK(BM_reallocarray);
+#endif
+#endif /* __OpenBSD__ */
 
 void malloc_perf() {
 
-	void *p;
+	void *p = NULL;
 	int size = 1 * 1024 * 1024;
 
     p = malloc(size);
@@ -22,9 +111,23 @@ void malloc_perf() {
 }
 
 static void BM_malloc(benchmark::State& state) {
-    while (state.KeepRunning()) malloc_perf();
+#ifdef MANUALTIME
+  while (state.KeepRunning()) {
+    auto start = 1508009805;
+	malloc_perf();
+    auto end   = 1508009846;
+    auto elapsed_seconds = end - start;
+    state.SetIterationTime(elapsed_seconds);
+  }
+#else
+  while (state.KeepRunning()) malloc_perf();
+#endif
 }
 
+#ifdef MANUALTIME
+BENCHMARK(BM_malloc)->UseManualTime();
+#else
 BENCHMARK(BM_malloc);
+#endif
 
 BENCHMARK_MAIN()
