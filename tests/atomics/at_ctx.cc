@@ -36,22 +36,24 @@
 // http://blog.tsunanet.net/2010/11/how-long-does-it-take-to-make-context.html
 // ftp://ftp.netbsd.org/pub/NetBSD/misc/gmcgarry/bench/ctxbench.tar.gz
 
-void time_syscall(void) {
+void syscall_perf(void) {
 
-	int i;
 	if (syscall(SYS_gettid) <= 1) {
 		exit(2);
 	}
-	for (i=0; i<ITERATIONS; i++) {
+	for (int i = 0; i<ITERATIONS; i++) {
 		getpid();
 	}
 }
 
-void BM_time_syscall(benchmark::State& state) {
+void BM_syscall_perf(benchmark::State& state) {
 	  while (state.KeepRunning()) {
-		      benchmark::DoNotOptimize(time_syscall);
+		      benchmark::DoNotOptimize(syscall_perf);
 	  }
 }
+
+
+BENCHMARK(BM_syscall_perf);
 
 /* 
  * futex is the low level Linux-specific primitive used by most threading
@@ -73,6 +75,15 @@ void time_ctxswws(void) {
 }
 
 
+void BM_time_ctxswws(benchmark::State& state) {
+	  while (state.KeepRunning()) {
+		      benchmark::DoNotOptimize(time_ctxswws);
+	  }
+}
+
+
+BENCHMARK(BM_time_ctxswws);
+
 void timet_ctxsw(void) {
 
 	// https://github.com/tsuna/contextswitch/blob/master/timetctxsw.c
@@ -87,10 +98,5 @@ void timet_ctxsw2(void) {
 
 	// https://github.com/tsuna/contextswitch/blob/master/timetctxsw2.c
 }
-
-BENCHMARK(BM_time_syscall);
-BENCHMARK(BM_time_syscall)->Threads(8);
-BENCHMARK(BM_time_syscall)->ThreadRange(1, 32);
-BENCHMARK(BM_time_syscall)->ThreadPerCpu();
 
 BENCHMARK_MAIN()

@@ -34,4 +34,23 @@ void BM_fork(benchmark::State& state) {
 
 BENCHMARK_RANGE(BM_fork, 1, 10 * 10);
 
+int forkwait_perf() {
+
+	for (int i = 0; i < 40000; i++) {
+	  int pid = fork();
+	  int *wstatus = 0;
+	  if (pid < 0) return -1;
+	  if (pid == 0) return 0;
+	  waitpid(pid, wstatus, 0);
+	}
+
+	return 0;
+}
+
+void BM_forkwait(benchmark::State& state) {
+	while (state.KeepRunning()) forkwait_perf();
+}
+
+BENCHMARK(BM_forkwait);
+
 BENCHMARK_MAIN()
