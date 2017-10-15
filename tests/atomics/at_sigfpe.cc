@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <setjmp.h>
 #include <signal.h>
+#include <string.h>
 #include <unistd.h>
 
 /*
@@ -17,9 +18,9 @@ void sig_fpe_handler(int signo) {
 
 void sig_fpe(void) {
 
-		int a = 0, b = 0;
-
+	int a = 0, b = 0;
         struct sigaction sa;
+
         memset(&sa, 0, sizeof(sa));
         sa.sa_handler = sig_fpe_handler;
         sa.sa_flags = SA_NODEFER;
