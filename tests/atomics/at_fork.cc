@@ -48,7 +48,7 @@ int forkwait_perf() {
 }
 
 void BM_forkwait(benchmark::State& state) {
-	while (state.KeepRunning()) forkwait_perf();
+	while (state.KeepRunning()) benchmark::DoNotOptimize(forkwait_perf());
 }
 
 BENCHMARK(BM_forkwait);
