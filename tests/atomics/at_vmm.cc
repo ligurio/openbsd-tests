@@ -126,13 +126,26 @@ BENCHMARK(BM_divzero);
  */
 
 void ptemod() {
-
 }
 
 void BM_ptemod(benchmark::State& state) {
-	  while (state.KeepRunning()) ptemod();
+	while (state.KeepRunning()) ptemod();
 }
 
 BENCHMARK(BM_ptemod);
+
+extern __inline__ unsigned long long int rdtsc() {
+	unsigned long long int x;
+	__asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+	return x;
+}
+
+void BM_rdtsc(benchmark::State& state) {
+	while (state.KeepRunning())
+		for (int i = 0; i < 10000; i++)
+			rdtsc();
+}
+
+BENCHMARK(BM_rdtsc);
 
 BENCHMARK_MAIN()
