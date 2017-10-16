@@ -8,10 +8,10 @@ CC := g++
 build:
 	@mkdir -p ${BINDIR}
 	${CC} at_bind.cc -o ${BINDIR}/at_bind ${LDFLAGS} ${CFLAGS}
-	${CC} at_bpf.cc -o ${BINDIR}/at_bpf ${LDFLAGS} ${CFLAGS} -lcrypto -lssl
+	${CC} at_bpf.cc -o ${BINDIR}/at_bpf ${LDFLAGS} ${CFLAGS}
 	${CC} at_connect.cc -o ${BINDIR}/at_connect ${LDFLAGS} ${CFLAGS}
 	${CC} at_cpuid.cc -o ${BINDIR}/at_cpuid ${LDFLAGS} ${CFLAGS}
-	#${CC} at_crypto.cc -o ${BINDIR}/at_crypto ${LDFLAGS} ${CFLAGS} -lssl -lcrypto
+	${CC} at_crypto.cc -o ${BINDIR}/at_crypto ${LDFLAGS} ${CFLAGS}
 	${CC} at_ctx.cc -o ${BINDIR}/at_ctx ${LDFLAGS} ${CFLAGS}
 	${CC} at_fork.cc -o ${BINDIR}/at_fork ${LDFLAGS} ${CFLAGS}
 	${CC} at_fsync.cc -o ${BINDIR}/at_fsync ${LDFLAGS} ${CFLAGS}
