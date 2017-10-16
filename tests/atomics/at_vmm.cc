@@ -1,4 +1,7 @@
 #include "benchmark/benchmark.h"
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/io.h>
 
 /*
  * syscall. This test measures round-trip transitions from userlevel to
@@ -31,10 +34,25 @@ BENCHMARK(BM_syscall);
 
 void in() {
 
+	#define BASEPORT 0x378 /* lp1 */
+
+	if (ioperm(BASEPORT, 3, 1))
+		perror("ioperm");
+
+	/* Set the data signals (D0-7) of the port to all low (0) */
+	outb(0, BASEPORT);
+	if (ioperm(BASEPORT, 3, 0))
+		perror("ioperm");
 }
 
 void BM_in(benchmark::State& state) {
-	  while (state.KeepRunning()) in();
+	uid_t uid=getuid(), euid=geteuid();
+	while (state.KeepRunning())
+		if (euid != 0 || uid != 0) {
+			state.SkipWithError("root is required");
+		} else {
+			in();
+		}
 }
 
 BENCHMARK(BM_in);
@@ -102,10 +120,61 @@ BENCHMARK(BM_pgfault);
  * caused by faults from the overheads introduced by the virtual MMU. As
  * expected, the hardware VMM (1014 cycles) delivers near native performance
  * (889 cycles), decisively beating the software VMM (3223 cycles).
+ *
+ * The main idea of this test is to generate hardware "division by zero"
+ * exception, and measure how long it will be proceeded.
  */
 
-void divzero() {
+#include <sys/socket.h>
+#include <setjmp.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
 
+jmp_buf context;
+
+void sig_fpe_handler(int signo) {
+        longjmp(context, 1);
+}
+
+void sig_fpe(void) {
+
+	int a = 0, b = 0;
+        struct sigaction sa;
+
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = sig_fpe_handler;
+        sa.sa_flags = SA_NODEFER;
+        sigaction(SIGFPE, &sa, NULL);
+
+        try {
+#ifdef __UNIX__
+                if (!setjmp(context))
+#endif
+                        a = a / b;
+        } catch(...) {
+                /* */
+        }
+}
+
+#include <iostream>
+using namespace std;
+
+double division(int a, int b)
+{
+   if ( b == 0 )
+   {
+      return 0.0;
+   }
+   return (a/b);
+}
+
+void divzero() {
+   try {
+     division(1, 0);
+   } catch (const char* msg) {
+     cerr << msg << endl;
+   }
 }
 
 void BM_divzero(benchmark::State& state) {
