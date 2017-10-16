@@ -1,11 +1,32 @@
 #include "benchmark/benchmark.h"
 #include <stdlib.h>
 
-/*
-    freezero(3)
-*/
-
 #ifdef __OpenBSD__
+void freezero_perf() {
+	char buf[100];
+	freezero(buf, sizeof(buf));
+}
+
+static void BM_freezero(benchmark::State& state) {
+#ifdef MANUALTIME
+  while (state.KeepRunning()) {
+    auto start = 1508009805;
+	freezero_perf();
+    auto end   = 1508009846;
+    auto elapsed_seconds = end - start;
+    state.SetIterationTime(elapsed_seconds);
+  }
+#else
+  while (state.KeepRunning()) freezero_perf();
+#endif
+}
+
+#ifdef MANUALTIME
+BENCHMARK(BM_freezero)->UseManualTime();
+#else
+BENCHMARK(BM_freezero);
+#endif
+
 void explicit_bzero_perf() {
 
     char buf[100];
@@ -104,7 +125,7 @@ void malloc_perf() {
 	void *p = NULL;
 	int size = 1 * 1024 * 1024;
 
-    p = malloc(size);
+	p = malloc(size);
 	if (!p)
 		perror("malloc error");
 	free(p);

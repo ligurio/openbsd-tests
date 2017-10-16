@@ -1,10 +1,12 @@
 #include "benchmark/benchmark.h"
+#include <sys/io.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/io.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
 
-/*
- * syscall. This test measures round-trip transitions from userlevel to
+/* syscall. This test measures round-trip transitions from userlevel to
  * supervisor-level via the syscall and sysret instructions.  The software VMM
  * introduces a layer of code and an extra privilege transition, requiring
  * approximately 2000 more cycles than a native system call. In the hardware
@@ -85,7 +87,7 @@ BENCHMARK(BM_cr8wr);
  */
 
 void callret() {
-
+	// https://stackoverflow.com/questions/2842751/call-ret-in-x86-assembly-embedded-in-c
 }
 
 void BM_callret(benchmark::State& state) {
@@ -125,56 +127,20 @@ BENCHMARK(BM_pgfault);
  * exception, and measure how long it will be proceeded.
  */
 
-#include <sys/socket.h>
-#include <setjmp.h>
-#include <signal.h>
-#include <string.h>
-#include <unistd.h>
-
-jmp_buf context;
-
-void sig_fpe_handler(int signo) {
-        longjmp(context, 1);
-}
-
-void sig_fpe(void) {
-
-	int a = 0, b = 0;
-        struct sigaction sa;
-
-        memset(&sa, 0, sizeof(sa));
-        sa.sa_handler = sig_fpe_handler;
-        sa.sa_flags = SA_NODEFER;
-        sigaction(SIGFPE, &sa, NULL);
-
-        try {
-#ifdef __UNIX__
-                if (!setjmp(context))
-#endif
-                        a = a / b;
-        } catch(...) {
-                /* */
-        }
-}
-
-#include <iostream>
-using namespace std;
-
-double division(int a, int b)
+void sigfpe_sigaction(int signal, siginfo_t *si, void *arg)
 {
-   if ( b == 0 )
-   {
-      return 0.0;
-   }
-   return (a/b);
+	exit(0);
 }
 
-void divzero() {
-   try {
-     division(1, 0);
-   } catch (const char* msg) {
-     cerr << msg << endl;
-   }
+void divzero(void)
+{
+	struct sigaction sa;
+
+	memset(&sa, 0, sizeof(struct sigaction));
+	sigemptyset(&sa.sa_mask);
+	sa.sa_sigaction = sigfpe_sigaction;
+	sa.sa_flags = SA_NODEFER;
+	sigaction(SIGFPE, &sa, NULL);
 }
 
 void BM_divzero(benchmark::State& state) {
@@ -184,11 +150,11 @@ void BM_divzero(benchmark::State& state) {
 BENCHMARK(BM_divzero);
 
 /* ptemod. Both VMMs use the shadowing technique described in Section 2.4 to
- * implement guest paging with trace-based coherency.  The traces induce
+ * implement guest paging with trace-based coherency. The traces induce
  * significant overheads for PTE writes, causing very high penalties relative
  * to the native single cycle store. The software VMM adaptively discovers the
  * PTE write and translates it into a small program that is cheaper than a trap
- * but still quite costly.  This small program consumes 391 cycles on each
+ * but still quite costly. This small program consumes 391 cycles on each
  * iteration. The hardware VMM enters and exits guest mode repeatedly, causing
  * it to perform approximately thirty times worse than the software VMM,
  * requiring 12733 cycles.
