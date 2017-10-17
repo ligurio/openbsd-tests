@@ -4,6 +4,7 @@
 
 void socket_perf() {
 
+	/* FIXME */
 }
 
 void BM_socket(benchmark::State& state) {

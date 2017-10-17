@@ -4,40 +4,35 @@
 #include <stdio.h>
 #include <err.h>
 
-#define ITERATIONS	1000000
-#define SIGNAL		SIGUSR1
-
-volatile int iterations = ITERATIONS;
-
-void handler(int v)
-{
-	iterations--;
+void sigusr1_sigaction(int v) {
+	printf("");
 }
 
-static void sigbench()
-{
-	int cur, i;
+static void sigbench() {
 	pid_t pid;
 
 	pid = getpid();
-
-	if (signal(SIGNAL, SIG_IGN) < 0)
+	if (signal(SIGUSR1, SIG_IGN) < 0)
 		perror("cannot set signal handler");
 
-	for (i=0; i<ITERATIONS; i++) {
-		if (kill(pid, SIGNAL) < 0)
-			perror("kill not possible");
-	}
+	if (kill(pid, SIGUSR1) < 0)
+		perror("kill not possible");
 
-	if (signal(SIGNAL, handler) < 0)
+	if (signal(SIGUSR1, sigusr1_sigaction) < 0)
 		perror("cannot set signal handler");
 
-	while ((cur = iterations) != 0) {
-		if (kill(pid, SIGNAL) < 0)
-			perror("kill not possible");
-		while (cur == iterations)
-			;
-	}
+	if (kill(pid, SIGUSR1) < 0)
+		perror("kill not possible");
+
+	/*
+	struct sigaction sa;
+
+	memset(&sa, 0, sizeof(struct sigaction));
+	sigemptyset(&sa.sa_mask);
+	sa.sa_sigaction = sigfpe_sigaction;
+	sa.sa_flags = SA_NODEFER;
+	sigaction(SIGFPE, &sa, NULL);
+	*/
 }
 
 void BM_sigbench(benchmark::State& state) {

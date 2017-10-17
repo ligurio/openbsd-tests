@@ -1,21 +1,9 @@
 #include "benchmark/benchmark.h"
 
-/*
- * http://wiki.osdev.org/CPUID
- * https://en.wikipedia.org/wiki/CPUID
- */
-
-void cpuid() {
-
-    int a, b;
-
-    for (a = 0; a < 5; a++)
-    {
-      __asm__("cpuid"
-              :"=a"(b)                 // EAX into b (output)
-              :"0"(a)                  // a into EAX (input)
-              :"%ebx","%ecx","%edx");  // clobbered registers
-    }
+static void cpuid(void)
+{
+    asm volatile ("push %%" "bx; cpuid; pop %%" "bx"
+                  : : : "eax", "ecx", "edx");
 }
 
 static void BM_cpuid(benchmark::State& state) {

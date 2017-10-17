@@ -69,8 +69,29 @@ BENCHMARK(BM_in);
  * faster than native.
  */
 
-void cr8wr() {
+void cr8wr(void) {
+	
+	// https://git.kernel.org/pub/scm/virt/kvm/kvm-unit-tests.git/tree/x86/emulator.c#n177
+/*
+        unsigned long src, dst;
 
+        dst = 777;
+        src = 3;
+        asm volatile("mov %[src], %%cr8; mov %%cr8, %[dst]"
+                     : [dst]"+r"(dst), [src]"+r"(src));
+        //report("mov %%cr8", dst == 3 && src == 3);
+*/
+
+#ifdef __x86_64__
+//https://git.kernel.org/pub/scm/virt/kvm/kvm-unit-tests.git/tree/x86/vmexit.c#n44
+        unsigned long cr8;
+
+        asm volatile ("mov %%cr8, %0" : "=r"(cr8));
+
+        //unsigned long cr8 = 0;
+
+        //asm volatile ("mov %0, %%cr8" : : "r"(cr8));
+#endif
 }
 
 void BM_cr8wr(benchmark::State& state) {
@@ -129,18 +150,19 @@ BENCHMARK(BM_pgfault);
 
 void sigfpe_sigaction(int signal, siginfo_t *si, void *arg)
 {
-	exit(0);
+	printf("");
 }
 
 void divzero(void)
 {
 	struct sigaction sa;
-
 	memset(&sa, 0, sizeof(struct sigaction));
 	sigemptyset(&sa.sa_mask);
 	sa.sa_sigaction = sigfpe_sigaction;
 	sa.sa_flags = SA_NODEFER;
 	sigaction(SIGFPE, &sa, NULL);
+
+	int i = 1/0;
 }
 
 void BM_divzero(benchmark::State& state) {

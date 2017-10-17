@@ -4,6 +4,7 @@
 
 void bind_perf() {
 
+	/* FIXME */
 }
 
 void BM_bind(benchmark::State& state) {

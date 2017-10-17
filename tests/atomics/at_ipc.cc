@@ -56,26 +56,17 @@ void pipe_lat() {
 	}
 }
 
-void pipe_thr() {
-}
-
-void unix_lat() {
-}
-
-void unix_thr() {
-}
-
-void tcp_lat() {
-}
-
-void tcp_thr() {
-}
-
 void BM_pipe_lat(benchmark::State& state) {
 	while (state.KeepRunning()) pipe_lat();
 }
 
 BENCHMARK(BM_pipe_lat);
+
+
+void pipe_thr() {
+
+	/* FIXME */
+}
 
 void BM_pipe_thr(benchmark::State& state) {
 	while (state.KeepRunning()) pipe_thr();
@@ -83,11 +74,23 @@ void BM_pipe_thr(benchmark::State& state) {
 
 BENCHMARK_RANGE(BM_pipe_thr, 1, 10 * 10);
 
+
+void unix_lat() {
+
+	/* FIXME */
+}
+
 void BM_unix_lat(benchmark::State& state) {
 	while (state.KeepRunning()) unix_lat();
 }
 
 BENCHMARK_RANGE(BM_unix_lat, 1, 10 * 10);
+
+
+void unix_thr() {
+
+	/* FIXME */
+}
 
 void BM_unix_thr(benchmark::State& state) {
 	while (state.KeepRunning()) unix_thr();
@@ -95,11 +98,21 @@ void BM_unix_thr(benchmark::State& state) {
 
 BENCHMARK_RANGE(BM_unix_thr, 1, 10 * 10);
 
+void tcp_lat() {
+
+	/* FIXME */
+}
+
 void BM_tcp_lat(benchmark::State& state) {
 	while (state.KeepRunning()) tcp_lat();
 }
 
 BENCHMARK_RANGE(BM_tcp_lat, 1, 10 * 10);
+
+void tcp_thr() {
+
+	/* FIXME */
+}
 
 void BM_tcp_thr(benchmark::State& state) {
 	while (state.KeepRunning()) tcp_thr();

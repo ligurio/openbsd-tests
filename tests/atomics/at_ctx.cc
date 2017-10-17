@@ -72,6 +72,8 @@ BENCHMARK(BM_syscall_perf);
 void time_ctxswws(void) {
 
 	// https://github.com/tsuna/contextswitch/blob/master/timectxswws.c
+
+	/* FIXME */
 }
 
 
@@ -87,16 +89,22 @@ BENCHMARK(BM_time_ctxswws);
 void timet_ctxsw(void) {
 
 	// https://github.com/tsuna/contextswitch/blob/master/timetctxsw.c
+
+	/* FIXME */
 }
 
 void time_ctxsw(void) {
 
 	// https://github.com/tsuna/contextswitch/blob/master/timectxsw.c
+
+	/* FIXME */
 }
 
 void timet_ctxsw2(void) {
 
 	// https://github.com/tsuna/contextswitch/blob/master/timetctxsw2.c
+
+	/* FIXME */
 }
 
 BENCHMARK_MAIN()
