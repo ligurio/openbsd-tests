@@ -1,10 +1,11 @@
 #include "benchmark/benchmark.h"
-#include <unistd.h>
-#include <sys/wait.h>
+#include <sys/socket.h>
+#include <stdio.h>
 
 void socket_perf() {
 
-	/* FIXME */
+    int socket_desc;
+    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
 }
 
 void BM_socket(benchmark::State& state) {
