@@ -15,9 +15,9 @@ BENCHMARK(BM_arc4random);
 void bcrypt_perf() {
 	char buffer[50];
 	const char *pref;
-	char string[1024];
+	const char string = "OpenBSD is freely available from our download sites."
 
-	if (crypt_newhash("sergeyb", pref, buffer, sizeof(buffer)) != 0)
+	if (crypt_newhash(string, pref, buffer, sizeof(buffer)) != 0)
 		perror("bcrypt error");
 }
 #endif
