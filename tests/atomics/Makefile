@@ -1,15 +1,15 @@
 BINDIR := bin
-OPTIONS := --benchmark_repetitions=10
-TARGETS := at_fork at_lock
-CFLAGS := $(CFLAGS) -Wall
-LDFLAGS := $(LDFLAGS) -lbenchmark -lpthread
+OPTIONS += --benchmark_repetitions=10
+CFLAGS += -Wall
+LDFLAGS += -lbenchmark -lpthread
 CC := g++
+TARGETS := at_fork at_lock
 
 build:
 	@mkdir -p ${BINDIR}
-	${CC} at_bind.cc -o ${BINDIR}/at_bind ${LDFLAGS} ${CFLAGS}
+	#${CC} at_bind.cc -o ${BINDIR}/at_bind ${LDFLAGS} ${CFLAGS}
 	${CC} at_bpf.cc -o ${BINDIR}/at_bpf ${LDFLAGS} ${CFLAGS}
-	${CC} at_busyloop.cc -o ${BINDIR}/at_busyloop ${LDFLAGS} ${CFLAGS}
+	#${CC} at_busyloop.cc -o ${BINDIR}/at_busyloop ${LDFLAGS} ${CFLAGS}
 	${CC} at_connect.cc -o ${BINDIR}/at_connect ${LDFLAGS} ${CFLAGS}
 	${CC} at_cpuid.cc -o ${BINDIR}/at_cpuid ${LDFLAGS} ${CFLAGS}
 	${CC} at_crypto.cc -o ${BINDIR}/at_crypto ${LDFLAGS} ${CFLAGS}
@@ -24,7 +24,7 @@ build:
 	${CC} at_sigbench.cc -o ${BINDIR}/at_sigbench ${LDFLAGS} ${CFLAGS}
 	${CC} at_socket.cc -o ${BINDIR}/at_socket ${LDFLAGS} ${CFLAGS}
 	${CC} at_vmm.cc -o ${BINDIR}/at_vmm ${LDFLAGS} ${CFLAGS}
- 
+
 run: build
 	${BINDIR}/at_bind ${OPTIONS}
 	${BINDIR}/at_bpf ${OPTIONS}

@@ -1,8 +1,13 @@
+## OpenBSD microbenchmarks
+
+### Build
+
+- 64-bit: ```make```
+- 32-bit: ```make CFLAGS=-m32```
 
 ### TODO
 
 - CPU affinity
-- build 32/64-bit binaries
 - SNTP time source
 
 ### License
