@@ -4,8 +4,7 @@
 
 void socket_perf() {
 
-    int socket_desc;
-    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+    socket(AF_INET , SOCK_STREAM , 0);
 }
 
 void BM_socket(benchmark::State& state) {

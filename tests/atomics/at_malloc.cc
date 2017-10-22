@@ -1,5 +1,6 @@
 #include "benchmark/benchmark.h"
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef __OpenBSD__
 void freezero_perf() {

@@ -95,6 +95,6 @@ static void BM_mmap(benchmark::State& state) {
     while (state.KeepRunning()) mmap_perf();
 }
 
-BENCHMARK_RANGE(BM_mmap, 1, 1000 * 1000);
+BENCHMARK_RANGE(BM_mmap, 1, 10 * 1000);
 
 BENCHMARK_MAIN()

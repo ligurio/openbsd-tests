@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <strings.h>
 
 void bind_perf() {
 
@@ -27,7 +28,7 @@ void bind_perf() {
 
      listen(sockfd,5);
      clilen = sizeof(cli_addr);
-     newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+     newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, (socklen_t *) &clilen);
      if (newsockfd < 0)
           perror("error on accept");
 

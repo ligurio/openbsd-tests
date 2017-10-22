@@ -2,6 +2,7 @@
 #include <sys/io.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <setjmp.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -95,7 +96,8 @@ void cr8wr(void) {
 }
 
 void BM_cr8wr(benchmark::State& state) {
-	  while (state.KeepRunning()) cr8wr();
+	state.SkipWithError("not implemented");
+	// while (state.KeepRunning()) cr8wr();
 }
 
 BENCHMARK(BM_cr8wr);
@@ -127,7 +129,10 @@ BENCHMARK(BM_callret);
  */
 
 void pgfault() {
-
+    long pagesize = sysconf(_SC_PAGESIZE);
+    unsigned char *p = (unsigned char *) malloc(pagesize + 1);
+    p[0] = 0;        /* Page fault. */
+    p[pagesize] = 1; /* Page fault. */
 }
 
 void BM_pgfault(benchmark::State& state) {
@@ -148,22 +153,28 @@ BENCHMARK(BM_pgfault);
  * exception, and measure how long it will be proceeded.
  */
 
-void sigfpe_sigaction(int signal, siginfo_t *si, void *arg)
-{
-	printf("");
+jmp_buf fpe;
+
+void sigfpe_sigaction(int signal, siginfo_t *si, void *arg) {
+	longjmp(fpe, 1);
 }
 
 void divzero(void)
 {
 	struct sigaction sa;
+	int c;
+
 	memset(&sa, 0, sizeof(struct sigaction));
 	sigemptyset(&sa.sa_mask);
 	sa.sa_sigaction = sigfpe_sigaction;
 	sa.sa_flags = SA_NODEFER;
 	sigaction(SIGFPE, &sa, NULL);
 
-	int i = 1/0;
+        if (0 == setjmp(fpe)) {
+            c = 1 / 0;
+	}
 }
+
 
 void BM_divzero(benchmark::State& state) {
 	  while (state.KeepRunning()) divzero();
@@ -198,9 +209,7 @@ extern __inline__ unsigned long long int rdtsc() {
 }
 
 void BM_rdtsc(benchmark::State& state) {
-	while (state.KeepRunning())
-		for (int i = 0; i < 10000; i++)
-			rdtsc();
+	while (state.KeepRunning()) rdtsc();
 }
 
 BENCHMARK(BM_rdtsc);
