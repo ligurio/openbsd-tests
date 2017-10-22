@@ -2,6 +2,7 @@
 
 ### Build
 
+- [Google benchmark](https://github.com/google/benchmark)
 - 64-bit: ```make```
 - 32-bit: ```make CFLAGS=-m32```
 
@@ -9,6 +10,7 @@
 
 - CPU affinity
 - SNTP time source
+- compare tool with plots ([compare_bench](https://github.com/google/benchmark/tree/master/tools)?)
 
 ### License
 
