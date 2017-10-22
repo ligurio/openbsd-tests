@@ -23,7 +23,7 @@ build:
 	${CC} at_mmap.cc -o ${BINDIR}/at_mmap ${LDFLAGS} ${CFLAGS}
 	${CC} at_sigbench.cc -o ${BINDIR}/at_sigbench ${LDFLAGS} ${CFLAGS}
 	${CC} at_socket.cc -o ${BINDIR}/at_socket ${LDFLAGS} ${CFLAGS}
-	${CC} at_vmm.cc -o ${BINDIR}/at_vmm ${LDFLAGS} ${CFLAGS}
+	${CC} at_vmm.cc -o ${BINDIR}/at_vmm ${LDFLAGS} ${CFLAGS} -Wno-unused-but-set-variable -Wno-div-by-zero
 
 run: build
 	${BINDIR}/at_bind ${OPTIONS}
