@@ -1,4 +1,5 @@
+PYTEST_OPT += --junit-xml=report-`date +%Y-%m-%d`.xml
 
 run:
 	make -C ../tools
-	pytest --junit-xml=report-`date +%Y-%m-%d`.xml
+	pytest ${PYTEST_OPT}
