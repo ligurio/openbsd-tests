@@ -74,6 +74,7 @@ void mmap_perf() {
 	// https://www.lemoda.net/c/mmap-example/
 	// https://people.freebsd.org/%7Ejkim/mmap_test.c
 	// https://gist.github.com/marcetcheverry/991042
+	// https://github.com/linux-test-project/ltp/tree/master/testcases/open_posix_testsuite/conformance/interfaces/mmap
 
 	if (fstat(fdo, &s) !=0 ) {
 		perror("fstat error");

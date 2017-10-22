@@ -7,7 +7,7 @@ TARGETS := at_fork at_lock
 
 build:
 	@mkdir -p ${BINDIR}
-	#${CC} at_bind.cc -o ${BINDIR}/at_bind ${LDFLAGS} ${CFLAGS}
+	${CC} at_bind.cc -o ${BINDIR}/at_bind ${LDFLAGS} ${CFLAGS}
 	${CC} at_bpf.cc -o ${BINDIR}/at_bpf ${LDFLAGS} ${CFLAGS}
 	#${CC} at_busyloop.cc -o ${BINDIR}/at_busyloop ${LDFLAGS} ${CFLAGS}
 	${CC} at_connect.cc -o ${BINDIR}/at_connect ${LDFLAGS} ${CFLAGS}

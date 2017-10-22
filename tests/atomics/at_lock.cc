@@ -11,6 +11,7 @@
 // ftp://ftp.netbsd.org/pub/NetBSD/misc/gmcgarry/bench/lockprof.tar.gz
 // https://git.kernel.org/pub/scm/linux/kernel/git/dvhart/futextest.git
 // http://demin.ws/blog/english/2012/05/05/atomic-spinlock-mutex/
+// https://github.com/linux-test-project/ltp/blob/master/testcases/open_posix_testsuite/conformance/interfaces/pthread_rwlock_init/1-1.c
 
 void rwlock(int) {
 }
