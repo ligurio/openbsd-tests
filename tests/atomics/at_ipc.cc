@@ -8,7 +8,7 @@
 // https://github.com/rigtorp/ipc-bench
 
 void pipe_lat() {
-
+/*
 	int ofds[2], ifds[2];
 	int size;
 	char *buf;
@@ -30,7 +30,7 @@ void pipe_lat() {
 		perror("pipe");
 	}
 
-	if (!fork()) { /* child */
+	if (!fork())
 	  for (i = 0; i < count; i++) {
 
 	    if (read(ifds[0], buf, size) != size) {
@@ -41,7 +41,7 @@ void pipe_lat() {
 	    	perror("write");
 	    }
 	  }
-	} else { /* parent */
+	} else {
 
 		for (i = 0; i < count; i++) {
 
@@ -54,6 +54,7 @@ void pipe_lat() {
 		  }
 		}
 	}
+*/
 }
 
 void BM_pipe_lat(benchmark::State& state) {

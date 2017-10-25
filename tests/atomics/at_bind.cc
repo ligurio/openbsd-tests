@@ -8,6 +8,7 @@
 
 void bind_perf() {
 
+/*
      int sockfd, newsockfd, portno, clilen;
      char buffer[256];
      struct sockaddr_in serv_addr, cli_addr;
@@ -37,6 +38,7 @@ void bind_perf() {
      if (n < 0) perror("error reading from socket");
      n = write(newsockfd, "I got your message", 18);
      if (n < 0) perror("error writing to socket");
+*/
 }
 
 void BM_bind(benchmark::State& state) {

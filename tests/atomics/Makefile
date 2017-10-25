@@ -28,7 +28,7 @@ build:
 run: build
 	${BINDIR}/at_bind ${OPTIONS}
 	${BINDIR}/at_bpf ${OPTIONS}
-	${BINDIR}/at_busyloop ${OPTIONS}
+	#${BINDIR}/at_busyloop ${OPTIONS}
 	${BINDIR}/at_connect ${OPTIONS}
 	${BINDIR}/at_cpuid ${OPTIONS}
 	${BINDIR}/at_crypto ${OPTIONS}
