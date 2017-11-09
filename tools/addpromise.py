@@ -15,7 +15,7 @@ def main():
         filename = sys.argv[1]
         promise = sys.argv[2].split(" ")
     else:
-        sys.exit("ERROR: Please specify a source file and promise.")
+        sys.exit("ERROR: Please specify a source file and promise. Default: [\"wpath\", \"cpath\", \"rpath\", \"flock\"].")
 
     if not os.path.exists(filename):
         sys.exit('ERROR: %s was not found.' % sys.argv[1])
@@ -25,13 +25,15 @@ def main():
 
     buf = ""
     # Example: pledge("stdio rpath proc exec", NULL)
+    pledged = False
     with open(filename, 'r') as source:
         for line in source:
             line = line.rstrip()
-            pledge_match = re.findall(".*pledge\(\"(.*)\",.*\)", line)
+            pledge_match = re.findall(".*pledge\(\"(.*)\",.*", line)
             pledge_num = len(pledge_match)
-            print(filename, ":", pledge_match)
             if pledge_num > 0:
+                print(filename, ":", pledge_match)
+                pledged = True
                 for p in promise:
                     promise_match = re.findall(
                         ".*pledge\(\"(.*%s.*)\",.*\)" % p, line)
@@ -40,6 +42,9 @@ def main():
                         line = line.replace(
                             pledge_match[0], "%s %s" % (pledge_match[0], p))
             buf = "{}{}\n".format(buf, line)
+
+    if not pledged:
+        print(filename, ":", "None")
 
     source = open(filename, 'w')
     source.write(buf)
