@@ -4,9 +4,9 @@
 
 import os
 import random
+from pycobertura import Cobertura
 
 display_prog = 'display'  # Command to execute to display images.
-
 
 class Scene:
     def __init__(self, name="svg", height=400, width=400):
@@ -85,25 +85,30 @@ def test():
     width = 700
     start_x = 0
     start_y = 0
+    fill = ""
+    offset = 0
 
     scene = Scene('coverage', height, width)
     scene.add(Rectangle((start_x, start_y), start_x +
                         width, start_y + height, (255, 255, 255)))
 
-    fill = ""
-    # line_width = (rectangle width)/(number of files)
-    line_width = 3
-    line_numbers = width
-    for l in range(1, line_numbers):
-        color = random.randint(0, 2)
-        if color == 0:
-            fill = "red"
-        elif color == 1:
+    cobertura = Cobertura('coverage.xml')
+    line_width = round(width/len(cobertura.files()))
+
+    for f in cobertura.files():
+        rate = cobertura.line_rate(f)
+
+        # low: < 0.75, medium: >= 0.75, high: >= 0.9
+        if rate >= 0.9:
             fill = "green"
-        elif color == 2:
-            fill = "white"
-        scene.add(Line((start_x + l, start_y), (start_x + l,
+        elif rate <= 0.75:
+            fill = "red"
+        else:
+            fill = "yellow"
+        scene.add(Line((start_x + offset, start_y), (start_x + offset,
                                                 start_y + height), "red", line_width, fill))
+        print f, rate, fill, offset
+        offset = offset + line_width
 
     scene.write_svg()
     try:
