@@ -85,8 +85,6 @@ def test():
     width = 700
     start_x = 0
     start_y = 0
-    fill = ""
-    offset = 0
 
     scene = Scene('coverage', height, width)
     scene.add(Rectangle((start_x, start_y), start_x +
@@ -95,6 +93,8 @@ def test():
     cobertura = Cobertura('coverage.xml')
     line_width = round(width/len(cobertura.files()))
 
+    fill = ""
+    offset = 0
     for f in cobertura.files():
         rate = cobertura.line_rate(f)
 
