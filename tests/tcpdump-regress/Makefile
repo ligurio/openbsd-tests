@@ -1,0 +1,48 @@
+ARGS !=			cd ${.CURDIR} && ls proto_*.py
+TARGETS ?=		${ARGS}
+REGRESS_TARGETS =	${TARGETS:S/^/run-regress-/}
+CLEANFILES +=		*.log
+
+.for a in ${ARGS}
+run-regress-$a: $a
+	@echo '\n======== $@ ========'
+	SUDO=${SUDO} python $a
+.endfor
+
+.include <bsd.regress.mk>
+
+# TODO:
+#
+# 802_11 
+# atalk
+# atm
+# cnfp
+# decnet
+# dvmrp
+# enc
+# fddi
+# frag6
+# iapp
+# igrp
+# ip6
+# ip6opts
+# ipsec
+# ipx
+# isoclns
+# krb
+# lwres
+# netbios
+# nfs
+# null
+# ofp
+# ospf6
+# pflog
+# pfsync
+# pim
+# rt6
+# sl
+# slow
+# sunrpc
+# timed
+# udpencap
+# wb
