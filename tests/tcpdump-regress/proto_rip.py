@@ -6,6 +6,7 @@ logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
 logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
 
+
 def main():
 
         print "rip"
@@ -16,4 +17,3 @@ def main():
 
 if __name__ == "__main__":
         main()
-
