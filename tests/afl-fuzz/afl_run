@@ -28,23 +28,29 @@
 # chio
 # syslogd - no option check_config
 
-set -e
+set -eu
 
 SRC_BASE="/usr/src"
 CONF_PATH="/root/openbsd-tests/tools/afl"
+DATE="2017-11-23"
 
 type afl-fuzz || pkg_add afl
+type git || pkg_add git
 
 afl_exec ()
 {
-	path=$1
-	cmd=$2
+	_path=$1
+	_cmd=$2
+	_changes=$(git log --since=$DATE "$_path")
+	if [ -z "$_changes" ]; then
+		echo "No changes in the $_path!";
+		exit 0;
+	fi
 
-	# TODO: check commits in git before run
-	run_cmd="cd $path; CC=afl-gcc make; mkdir in out; $cmd"
-	tmux new-session -c /usr/src/ -s afl-run
-	tmux new-window -n "$path" $run_cmd
-	tmux set-window-option -t "$path" remain-on-exit on
+	_run_cmd="cd ($_path); CC=afl-gcc make; mkdir in out; $_cmd"
+	tmux new-session -c $SRC_BASE -s afl-run
+	tmux new-window -n "$_path" "$_run_cmd"
+	tmux set-window-option -t "$_path" remain-on-exit on
 }
 
 afl_exec "bin/ed" "afl-fuzz -i in -o out -f commands -- ./ed @@"
