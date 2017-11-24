@@ -1,0 +1,60 @@
+#!/bin/ksh
+#
+# Copyright (c) 2017 Sergey Bronnikov <sergeyb@bronevichok.ru>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# marc.info (23.11.2017):
+# sed last kdump nm bc lex libc fold tcpdump
+# ssh mandoc ksh ctags make m4 yacc deroff cwm
+# radiusd ctfdump ctfconf sasyncd libutil pfctl
+#
+# TODO:
+# iked ipsecctl bgpd dvmrpd eigrpd hostapd ifstated
+# iscsictl ldapd ldomctl ldpd npppd/npppd ntpd ospf6d
+# ospfd relayd ripd smtpd snmpd switchd vmd ypldap ed
+
+# libfuzzer candidates:
+# chio
+# syslogd - no option check_config
+
+set -e
+
+SRC_BASE="/usr/src"
+CONF_PATH="/root/openbsd-tests/tools/afl"
+
+type afl-fuzz || pkg_add afl
+
+afl_exec ()
+{
+	path=$1
+	cmd=$2
+
+	# TODO: check commits in git before run
+	run_cmd="cd $path; CC=afl-gcc make; mkdir in out; $cmd"
+	tmux new-session -c /usr/src/ -s afl-run
+	tmux new-window -n "$path" $run_cmd
+	tmux set-window-option -t "$path" remain-on-exit on
+}
+
+afl_exec "bin/ed" "afl-fuzz -i in -o out -f commands -- ./ed @@"
+afl_exec "sbin/dhclient" "afl-fuzz -i in -o out -f dhclient.conf -- ./dhclient -n -c @@ em0"
+afl_exec "usr.bin/cap_mkdb" "afl-fuzz -i in -o out -f termcap -- ./cap_mkdb -f outfile @@"
+afl_exec "usr.bin/doas" "afl-fuzz -i in -o out -f doas.conf -- ./doas -C @@ ls"
+afl_exec "usr.bin/kdump" "afl-fuzz -i in -o out -f ktrace.out ./kdump -f @@"
+afl_exec "usr.sbin/acme-client" "acme-client -f acme-client.conf example.com"
+afl_exec "usr.sbin/httpd" "afl-fuzz -i in -o out -- ./httpd -n -f @@"
+afl_exec "usr.sbin/ifstated" "afl-fuzz -i in -o out -f ifstated.conf ./ifstated -n -f @@"
+afl_exec "usr.sbin/mtree" "afl-fuzz -i in -o out -f special -- ./mtree -f @@ -p /"
+afl_exec "usr.sbin/tcpdump" "afl-fuzz -i in -o out -f red.pcap ./tcpdump -r @@"
+afl_exec "usr.sbin/tcpdump" "afl-fuzz -i in -o out -f expression ./tcpdump -r $CONF_PATH/red.pcap -F @@"
