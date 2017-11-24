@@ -15,6 +15,7 @@ logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
 
 DEF_IFACE = 'em0'
 
+
 def chck(pkt, re_output, debug=False):
 
         #if os.getuid() != 0:
