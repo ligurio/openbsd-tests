@@ -3,10 +3,10 @@ OPTIONS += --benchmark_repetitions=10
 CFLAGS += -Wall
 LDFLAGS += -lbenchmark -lpthread
 CC := g++
-TARGETS := at_fork at_lock
 
 build:
 	@mkdir -p ${BINDIR}
+	${CC} sample.c -o ${BINDIR}/sample ${LDFLAGS} ${CFLAGS}
 	${CC} at_bind.cc -o ${BINDIR}/at_bind ${LDFLAGS} ${CFLAGS}
 	${CC} at_bpf.cc -o ${BINDIR}/at_bpf ${LDFLAGS} ${CFLAGS}
 	#${CC} at_busyloop.cc -o ${BINDIR}/at_busyloop ${LDFLAGS} ${CFLAGS}
@@ -14,6 +14,7 @@ build:
 	${CC} at_cpuid.cc -o ${BINDIR}/at_cpuid ${LDFLAGS} ${CFLAGS}
 	${CC} at_crypto.cc -o ${BINDIR}/at_crypto ${LDFLAGS} ${CFLAGS}
 	${CC} at_ctx.cc -o ${BINDIR}/at_ctx ${LDFLAGS} ${CFLAGS}
+	${CC} at_execv.cc -o ${BINDIR}/at_execv ${LDFLAGS} ${CFLAGS}
 	${CC} at_fork.cc -o ${BINDIR}/at_fork ${LDFLAGS} ${CFLAGS}
 	${CC} at_fsync.cc -o ${BINDIR}/at_fsync ${LDFLAGS} ${CFLAGS}
 	${CC} at_getifaddrs.cc -o ${BINDIR}/at_getifaddrs ${LDFLAGS} ${CFLAGS}
@@ -33,6 +34,7 @@ run: build
 	${BINDIR}/at_cpuid ${OPTIONS}
 	${BINDIR}/at_crypto ${OPTIONS}
 	${BINDIR}/at_ctx ${OPTIONS}
+	${BINDIR}/at_execv ${OPTIONS}
 	${BINDIR}/at_fork ${OPTIONS}
 	${BINDIR}/at_fsync ${OPTIONS}
 	${BINDIR}/at_getifaddrs ${OPTIONS}
