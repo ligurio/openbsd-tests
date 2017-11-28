@@ -1,0 +1,103 @@
+#!/bin/ksh
+#
+# Copyright (c) 2017 Sergey Bronnikov <sergeyb@bronevichok.ru>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# marc.info (23.11.2017):
+# sed last kdump nm bc lex libc fold tcpdump
+# ssh mandoc ksh ctags make m4 yacc deroff cwm
+# radiusd ctfdump ctfconf sasyncd libutil pfctl
+#
+# TODO:
+# ldomd ypldap sed nm lex fold ssh mandoc ksh ctags yacc cwm ctfdump ctfconf pfctl
+
+# libfuzzer candidates:
+# chio
+# syslogd - no option -n
+
+set -eu
+
+SRC_BASE="/usr/src"
+CONF_PATH="/root/openbsd-tests/tools/afl"
+DATE="2016-11-23"
+
+type afl-fuzz || pkg_add afl
+type git || pkg_add git
+
+afl_exec ()
+{
+	_path=$1
+	_cmd=$2
+	_changes=$(git log --since=$DATE "$_path")
+	if [ -z "$_changes" ]; then
+		echo "No changes in the $_path!"
+		return
+	fi
+
+	_app_name=$(basename "$_path")
+	_run_cmd="cd $_path; CC=afl-gcc make; rm -rf in out; mkdir in out; cp /root/afl-static/$_app_name/* in/; cp /root/afl-static/$_app_name.dict .; $_cmd"
+	tmux new-window -d -n "$_path" "$_run_cmd"
+	tmux set-window-option -t "$_path" remain-on-exit on
+	echo "$_app_name started"
+}
+
+tmux new-session -d -c $SRC_BASE -s afl-run || true
+
+afl_exec "bin/ed"		"afl-fuzz -i in -o out ./ed @@ < POSIX"
+afl_exec "sbin/dhclient"	"afl-fuzz -i in -o out ./dhclient -n -c @@ em0"
+afl_exec "sbin/dhclient"	"afl-fuzz -i in -o out -x dhclient.dict ./dhclient -n -c @@ em0"
+afl_exec "sbin/isakmpd"		"afl-fuzz -i in -o out ./isakmpd -n -f @@"		# FIXME: dict
+afl_exec "sbin/iked"		"afl-fuzz -i in -o out ./iked -n -f @@"			# FIXME: dict
+afl_exec "usr.bin/cap_mkdb"	"afl-fuzz -i in -o out ./cap_mkdb -f outfile @@"
+afl_exec "usr.bin/dc"		"afl-fuzz -i in -o out ./dc -x @@"			# FIXME: dict
+afl_exec "usr.bin/deroff"	"afl-fuzz -i in -o out ./deroff @@"			# FIXME: dict
+afl_exec "usr.bin/last"		"afl-fuzz -i in -o out ./last -f @@"			# FIXME: dict
+afl_exec "usr.bin/m4"		"afl-fuzz -i in -o out ./m4 @@"				# FIXME: dict
+# FIXME: afl_exec "usr.bin/bc"		"afl-fuzz -i in -o out ./bc -d < @@"
+afl_exec "usr.bin/doas"		"afl-fuzz -i in -o out ./doas -C @@ ls"
+afl_exec "usr.bin/doas"		"afl-fuzz -i in -o out -x doas.dict ./doas -C @@ ls"
+afl_exec "usr.bin/make"		"afl-fuzz -i in -o out ./make -q -f @@"
+#afl_exec "usr.bin/patch"	"afl-fuzz -i in -o out ./patch -p1 -R README @@"
+afl_exec "usr.bin/kdump"	"afl-fuzz -i in -o out ./kdump -f @@"
+afl_exec "usr.bin/keynote"	"afl-fuzz -i in -o out ./keynote verify -e @@"		# FIXME: corpus
+afl_exec "usr.bin/keynote"	"afl-fuzz -i in -o out ./keynote verify -l @@"		# FIXME: corpus
+afl_exec "usr.bin/keynote"	"afl-fuzz -i in -o out ./keynote verify -k @@"		# FIXME: corpus
+afl_exec "usr.bin/keynote"	"afl-fuzz -i in -o out ./keynote verify @@"		# FIXME: corpus
+# FIXME: afl_exec "usr.sbin/acme-client" "acme-client -f acme-client.conf example.com"
+afl_exec "usr.sbin/bgpd"	"afl-fuzz -i in -o out ./bgpd -n -f @@"			# FIXME: dict
+afl_exec "usr.sbin/dvmrpd"	"afl-fuzz -i in -o out ./dvmrpd -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/eigrpd"	"afl-fuzz -i in -o out ./eigrpd -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/hostapd"	"afl-fuzz -i in -o out ./hostapd -f @@"			# NOTE: there is no option -n
+afl_exec "usr.sbin/httpd"	"afl-fuzz -i in -o out ./httpd -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/ifstated"	"afl-fuzz -i in -o out ./ifstated -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/ldapd"	"afl-fuzz -i in -o out ./ldapd -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/ldpd"	"afl-fuzz -i in -o out ./ldpd -n -f @@"			# FIXME: dict
+afl_exec "usr.sbin/mtree"	"afl-fuzz -i in -o out ./mtree -f @@ -p /"
+afl_exec "usr.sbin/mtree"	"afl-fuzz -i in -o out -x mtree.dict ./mtree -f @@ -p /"
+afl_exec "usr.sbin/npppd"	"afl-fuzz -i in -o out ./npppd/npppd -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/ntpd"	"afl-fuzz -i in -o out ./ntpd -n -f @@"			# FIXME: dict
+afl_exec "usr.sbin/ospfd"	"afl-fuzz -i in -o out ./ospfd -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/ospf6d"	"afl-fuzz -i in -o out ./ospf6d -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/radiusd"	"afl-fuzz -i in -o out ./radiusd/radiusd -n -f @@"	# FIXME: dict
+afl_exec "usr.sbin/relayd"	"afl-fuzz -i in -o out ./relayd -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/ripd"	"afl-fuzz -i in -o out ./ripd -n -f @@"			# FIXME: dict
+afl_exec "usr.sbin/sasyncd"	"afl-fuzz -i in -o out ./sasyncd -n -c @@"		# FIXME: dict
+afl_exec "usr.sbin/smtpd"	"afl-fuzz -i in -o out ./smtpd/smtpd -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/snmpd"	"afl-fuzz -i in -o out ./snmpd -n -f @@"		# FIXME: dict
+afl_exec "usr.sbin/switchd"	"afl-fuzz -i in -o out ./switchd -n -f @@"
+afl_exec "usr.sbin/switchd"	"afl-fuzz -i in -o out -x switchd.dict ./switchd -n -f @@"
+afl_exec "usr.sbin/tcpdump"	"afl-fuzz -i in -o out ./tcpdump -r @@"
+afl_exec "usr.sbin/tcpdump"	"afl-fuzz -i in -o out -f tcpdump.expression -- ./tcpdump -r in/sample.pcap -F @@"	# FIXME: dict
+afl_exec "usr.sbin/vmd"		"afl-fuzz -i in -o out ./vmd -n -f @@"
+afl_exec "usr.sbin/vmd"		"afl-fuzz -i in -o out -x vmd.dict ./vmd -n -f @@"
