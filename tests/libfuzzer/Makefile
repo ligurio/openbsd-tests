@@ -1,3 +1,3 @@
 
 build:
-	clang -fsanitize=fuzzer,address sample.cc -o sample
+	clang -g -O1 -fsanitize=fuzzer,address sample.cc -o sample
