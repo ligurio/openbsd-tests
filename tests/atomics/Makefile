@@ -3,10 +3,10 @@ OPTIONS += --benchmark_repetitions=10
 CFLAGS += -Wall
 LDFLAGS += -lbenchmark -lpthread
 CC := g++
-TARGETS := at_fork at_lock
 
 build:
 	@mkdir -p ${BINDIR}
+	${CC} at_2d.cc -o 2d -L/usr/X11R6/lib/ -lGL -lGLU -lglut
 	${CC} at_bind.cc -o ${BINDIR}/at_bind ${LDFLAGS} ${CFLAGS}
 	${CC} at_bpf.cc -o ${BINDIR}/at_bpf ${LDFLAGS} ${CFLAGS}
 	#${CC} at_busyloop.cc -o ${BINDIR}/at_busyloop ${LDFLAGS} ${CFLAGS}
@@ -25,7 +25,8 @@ build:
 	${CC} at_socket.cc -o ${BINDIR}/at_socket ${LDFLAGS} ${CFLAGS}
 	${CC} at_vmm.cc -o ${BINDIR}/at_vmm ${LDFLAGS} ${CFLAGS} -Wno-unused-but-set-variable -Wno-div-by-zero
 
-run: build
+run:
+	${BINDIR}/at_2d ${OPTIONS}
 	${BINDIR}/at_bind ${OPTIONS}
 	${BINDIR}/at_bpf ${OPTIONS}
 	#${BINDIR}/at_busyloop ${OPTIONS}
