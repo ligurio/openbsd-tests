@@ -8,6 +8,7 @@ from pycobertura import Cobertura
 
 display_prog = 'display'  # Command to execute to display images.
 
+
 class Scene:
     def __init__(self, name="svg", height=400, width=400):
         self.name = name
@@ -16,7 +17,8 @@ class Scene:
         self.width = width
         return
 
-    def add(self, item): self.items.append(item)
+    def add(self, item):
+        self.items.append(item)
 
     def strarray(self):
         var = ["<?xml version=\"1.0\"?>\n",
@@ -77,7 +79,8 @@ class Rectangle:
                 (self.width, colorstr(self.color))]
 
 
-def colorstr(rgb): return "#%x%x%x" % (rgb[0] / 16, rgb[1] / 16, rgb[2] / 16)
+def colorstr(rgb):
+    return "#%x%x%x" % (rgb[0] / 16, rgb[1] / 16, rgb[2] / 16)
 
 
 def test():
@@ -91,7 +94,7 @@ def test():
                         width, start_y + height, (255, 255, 255)))
 
     cobertura = Cobertura('coverage.xml')
-    line_width = round(width/len(cobertura.files()))
+    line_width = round(width / len(cobertura.files()))
 
     fill = ""
     offset = 0
@@ -105,9 +108,8 @@ def test():
             fill = "red"
         else:
             fill = "yellow"
-        scene.add(Line((start_x + offset, start_y), (start_x + offset,
-                                                start_y + height), "red", line_width, fill))
-        print f, rate, fill, offset
+        scene.add(Line((start_x + offset, start_y), (start_x + offset, start_y + height), "red", line_width, fill))
+        print(f, rate, fill, offset)
         offset = offset + line_width
 
     scene.write_svg()
