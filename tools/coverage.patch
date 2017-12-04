@@ -1,73 +1,35 @@
+diff --git a/share/man/man9/malloc.9 b/share/man/man9/malloc.9
+index 6c0e71959dd..cb6177dfa00 100644
+--- a/share/man/man9/malloc.9
++++ b/share/man/man9/malloc.9
+@@ -312,6 +312,8 @@ UDF file ID.
+ AGP memory.
+ .It Dv M_DRM
+ Direct Rendering Manager.
++.It Dv M_GCOV
++Code coverage.
+ .El
+ .Sh CONTEXT
+ .Fn malloc
 diff --git a/sys/arch/amd64/conf/Makefile.amd64 b/sys/arch/amd64/conf/Makefile.amd64
-index 6d99b22..8e902cd 100644
+index d709d434b1f..065625ae1f1 100644
 --- a/sys/arch/amd64/conf/Makefile.amd64
 +++ b/sys/arch/amd64/conf/Makefile.amd64
-@@ -41,6 +41,9 @@ CMACHFLAGS+=	-Wa,-n
+@@ -47,6 +47,9 @@ NO_INTEGR_AS=  -no-integrated-as
  
  DEBUG?=		-g
  COPTS?=		-O2
 +.if ${COVERAGE}
 +COPTS+=         -fprofile-arcs -ftest-coverage -O0
-+.end
++.endif
  CFLAGS=		${DEBUG} ${CWARNFLAGS} ${CMACHFLAGS} ${COPTS} ${PIPE}
  AFLAGS=		-D_LOCORE -x assembler-with-cpp ${CWARNFLAGS} ${CMACHFLAGS}
- LDSCRIPT=	${_machdir}/conf/ld.script
-diff --git a/sys/arch/amd64/conf/ld.script b/sys/arch/amd64/conf/ld.script
-index b184a75..2a7bf68 100644
---- a/sys/arch/amd64/conf/ld.script
-+++ b/sys/arch/amd64/conf/ld.script
-@@ -92,6 +92,7 @@ SECTIONS
- 		__data_size = SIZEOF(.data);
- 		__data_load = LOADADDR(.data);
- 		*(.data .data.*)
-+		SORT(CONSTRUCTORS)
- 	} :data
- 	. = ALIGN(0x1000);
- 	PROVIDE (edata = .);
-@@ -124,4 +125,38 @@ SECTIONS
- 		*(.note.GNU-stack)
- 		*(.eh_frame)
- 	}
-+
-+        _start_ctors = .;
-+        PROVIDE (start_ctors = .);
-+	.ctors          :
-+	{
-+	  /* gcc uses crtbegin.o to find the start of
-+	     the constructors, so we make sure it is
-+	     first.  Because this is a wildcard, it
-+	     doesn't matter if the user does not
-+	     actually link against crtbegin.o; the
-+	     linker won't look for a file to match a
-+	     wildcard.  The wildcard also means that it
-+	     doesn't matter which directory crtbegin.o
-+	     is in.  */
-+	  KEEP (*crtbegin.o(.ctors))
-+	  KEEP (*crtbegin?.o(.ctors))
-+	  /* We don't want to include the .ctor section from
-+	     the crtend.o file until after the sorted ctors.
-+	     The .ctor section from the crtend file contains the
-+	     end of ctors marker and it must be last */
-+	  KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .ctors))
-+	  KEEP (*(SORT(.ctors.*)))
-+	  KEEP (*(.ctors))
-+	}
-+	_stop_ctors = .;
-+	PROVIDE (stop_ctors = .);
-+	.dtors          :
-+	{
-+	  KEEP (*crtbegin.o(.dtors))
-+	  KEEP (*crtbegin?.o(.dtors))
-+	  KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .dtors))
-+	  KEEP (*(SORT(.dtors.*)))
-+	  KEEP (*(.dtors))
-+	}
- }
+ LINKFLAGS=	-T ld.script -X --warn-common -nopie
 diff --git a/sys/conf/files b/sys/conf/files
-index 400bdbb..f36919c 100644
+index e948086e270..2ad000124e0 100644
 --- a/sys/conf/files
 +++ b/sys/conf/files
-@@ -689,6 +689,7 @@ file kern/subr_autoconf.c
+@@ -695,6 +695,7 @@ file kern/subr_autoconf.c
  file kern/subr_disk.c
  file kern/subr_evcount.c
  file kern/subr_extent.c
@@ -77,10 +39,10 @@ index 400bdbb..f36919c 100644
  file kern/subr_percpu.c
 diff --git a/sys/kern/subr_gcov.c b/sys/kern/subr_gcov.c
 new file mode 100644
-index 0000000..475fe83
+index 00000000000..40963c65839
 --- /dev/null
 +++ b/sys/kern/subr_gcov.c
-@@ -0,0 +1,208 @@
+@@ -0,0 +1,210 @@
 +/*-
 + * Copyright (c) 1982, 1986, 1993
 + *  The Regents of the University of California.  All rights reserved.
@@ -135,7 +97,6 @@ index 0000000..475fe83
 +#include <sys/gcov.h>
 +#include <sys/kernel.h>
 +
-+/*
 +static void
 +linker_file_register_profile(linker_file_t lf)
 +{
@@ -152,16 +113,15 @@ index 0000000..475fe83
 +{
 +  gcov_unregister_ctors(lf);
 +}
-+*/
 +
 +//static MALLOC_DEFINE(M_GCOV, "gcov", "GCC profile-arcs and code-coverage");
++// FreeBSD: static struct mutex gcov_mutex;
++// FreeBSD: MTX_SYSINIT(gcov_lock, &gcov_mutex, "gcov data lock", MTX_DEF);
++struct mutex gcov_mutex = MUTEX_INITIALIZER(IPL_NONE);
++mtx_init(&gcov_mutex, MTX_DEF);
 +
-+static struct mutex gcov_mutex;
-+//MTX_SYSINIT(gcov_lock, &gcov_mutex, "gcov data lock", MTX_DEF);
-+//mtx_init(&gcov_mutex, MTX_DEF);
-+
-+/* This structure is used to keep track of all struct bbs associated with a
-+ * module. */
++/* This structure is used to keep track
++ * of all struct bbs associated with a module. */
 +struct gcov_context
 +{
 +  LIST_ENTRY(gcov_context) gcov_link;
@@ -177,6 +137,7 @@ index 0000000..475fe83
 + * change gcov_type *counts to void *
 + */
 +/* Structure emitted by --profile-arcs  */
++
 +struct bb
 +{
 +  long zero_word;
@@ -226,17 +187,20 @@ index 0000000..475fe83
 +  int bbcount;
 +  struct gcov_context *context;
 +  ctor_t* ctor;
-+  
++
 +  bbcount = stop - start;
-+  
++
 +/*
++  FreeBSD:
 +  MALLOC(context, struct gcov_context *,
 +		 sizeof(struct gcov_context) + bbcount * sizeof(struct bb *),
 +		 M_GCOV, M_WAITOK);
 +*/
-+  //mtx_lock(&gcov_mutex);
++  // FreeBSD: mtx_lock(&gcov_mutex);
++  // FreeBSD: KASSERT(current_context == NULL, ("current gcov context is not NULL"));
++  malloc(sizeof(struct gcov_context) + bbcount * sizeof(struct bb *), M_GCOV | M_WAITOK)
 +  mtx_enter(&gcov_mutex);
-+  //KASSERT(current_context == NULL, ("current gcov context is not NULL"));
++  KASSERT(current_context == NULL);
 +  current_context = context;
 +  current_context->lf = lf;
 +  current_context->count = 0;
@@ -247,7 +211,7 @@ index 0000000..475fe83
 +  for (ctor = start; ctor < stop; ctor++)
 +	if (*ctor != NULL)
 +	  (*ctor)();
-+  
++
 +  current_context = NULL;
 +  mtx_leave(&gcov_mutex);
 +}
@@ -265,7 +229,7 @@ index 0000000..475fe83
 +	  /* remove the each bb from the bb_head list */
 +	  struct bb *prev = NULL, *bb;
 +	  int i;
-+	  
++
 +	  for (bb = bb_head; bb ; bb = bb->next) {
 +		for (i = 0; i < context->count; i++) {
 +		  if (context->bb[i] == bb) {
@@ -286,17 +250,17 @@ index 0000000..475fe83
 +	  return;
 +	}
 +  }
-+  
++
 +  mtx_leave(&gcov_mutex);
 +}
 diff --git a/sys/sys/gcov.h b/sys/sys/gcov.h
 new file mode 100644
-index 0000000..854be47
+index 00000000000..a5fc28dc987
 --- /dev/null
 +++ b/sys/sys/gcov.h
 @@ -0,0 +1,57 @@
 +/*-
-+ * Copyright (c) 1995 
++ * Copyright (c) 1995
 + * All rights reserved.
 + *
 + * Copyright (c) 1990, 1993
@@ -352,3 +316,26 @@ index 0000000..854be47
 +extern void gcov_register_ctors(struct linker_file *, ctor_t *, ctor_t *);
 +extern void gcov_unregister_ctors(struct linker_file *);
 +#endif
+diff --git a/sys/sys/malloc.h b/sys/sys/malloc.h
+index e5fb2caa906..be1f7573c5b 100644
+--- a/sys/sys/malloc.h
++++ b/sys/sys/malloc.h
+@@ -181,7 +181,9 @@
+ 
+ #define M_DRM		145	/* Direct Rendering Manager */
+ 
+-#define	M_LAST		146	/* Must be last type + 1 */
++#define	M_GCOV		146	/* Code coverage */
++
++#define	M_LAST		147	/* Must be last type + 1 */
+ 
+ #define	INITKMEMNAMES { \
+ 	"free",		/* 0 M_FREE */ \
+@@ -314,6 +316,7 @@
+ 	NULL,	/* 143 free */ \
+ 	"AGP Memory",	/* 144 M_AGP */ \
+ 	"DRM",	/* 145 M_DRM */ \
++	"GCOV",	/* 146 M_GCOV */ \
+ }
+ 
+ struct kmemstats {
