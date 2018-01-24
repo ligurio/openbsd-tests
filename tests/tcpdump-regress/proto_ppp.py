@@ -5,13 +5,14 @@ import logging
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
 logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
+import sys
 
 def main():
 
-        print "ppp"
         packet = PPP()
         re_output = ""
-        helper.chck(packet, re_output)
+        exitcode = helper.chck(packet, re_output)
+        sys.exit(exitcode)
 
 
 if __name__ == "__main__":

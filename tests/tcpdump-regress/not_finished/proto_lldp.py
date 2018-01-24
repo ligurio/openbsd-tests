@@ -8,11 +8,12 @@ logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
 
 def main():
 
-        # https://github.com/secdev/Scapy/blob/master/scapy/contrib/bgp.py
-	print "bgp"
-	#packet = IP()/TCP()/BGPUpdate()
-	#re_output = ""
-	#helper.chck(packet, re_output)
+        # https://github.com/secdev/scapy/blob/master/scapy/contrib/lldp.py
+        #load_contrib('lldp')
+        #packet = LLDP()
+        #re_output = ""
+        #chck(packet, re_output)
+
 
 if __name__ == "__main__":
         main()

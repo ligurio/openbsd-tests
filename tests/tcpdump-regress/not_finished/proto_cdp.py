@@ -9,7 +9,6 @@ logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
 def main():
 
         # https://github.com/secdev/Scapy/blob/master/scapy/contrib/cdp.py
-        print "cdp"
         #packet = CDP()
         #re_output = ""
         #helper.chck(packet, re_output)

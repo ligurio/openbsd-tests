@@ -8,12 +8,10 @@ logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
 
 def main():
 
-        # https://github.com/secdev/scapy/blob/master/scapy/contrib/lldp.py
-        #load_contrib('lldp')
-        print "lldp"
-        #packet = LLDP()
+        # https://github.com/secdev/Scapy/blob/master/scapy/contrib/etherip.py
+        #packet = EtherIP()
         #re_output = ""
-        #chck(packet, re_output)
+        #helper.chck(packet, re_output)
 
 
 if __name__ == "__main__":
