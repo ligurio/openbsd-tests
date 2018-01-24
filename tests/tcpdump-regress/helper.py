@@ -15,7 +15,6 @@ logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
 
 DEF_IFACE = 'em0'
 
-
 def chck(pkt, re_output, debug=False):
 
         #if os.getuid() != 0:
@@ -30,7 +29,7 @@ def chck(pkt, re_output, debug=False):
         pcap_name = 'sample.pcap'
 
         wrpcap(pcap_name, pkt)
-        tcpdump_cmd = [ 'doas', 'tcpdump', '-r', pcap_name ]
+        tcpdump_cmd = [ 'tcpdump', '-r', pcap_name ]
         # tcpdump_cmd = [ 'doas', 'tcpdump', '-i', DEF_IFACE, '-c', str(packet_count) ]
         p = sub.Popen(tcpdump_cmd, stdout=sub.PIPE, stderr=sub.PIPE)
 
