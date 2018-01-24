@@ -8,9 +8,10 @@ logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
 
 def main():
 
-        # https://github.com/secdev/Scapy/blob/master/scapy/contrib/etherip.py
-        print "etherip"
-        #packet = EtherIP()
+        #packet = Ether(src="00:0C:07:AC:02", dst="00:5E:00:00:02")  /
+        #            IP(dst="224.0.0.2", src='attacerIP', ttl=1)     / 
+        #            UDP()                                           /
+        #            HSRP(priority=230, virtualIP='virtualIP')
         #re_output = ""
         #helper.chck(packet, re_output)
 

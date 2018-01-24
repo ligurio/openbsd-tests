@@ -8,9 +8,8 @@ logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
 
 def main():
 
-	# https://github.com/secdev/Scapy/blob/master/scapy/contrib/carp.py
-	print "carp"
-	#packet = CARP()
+        # https://github.com/secdev/Scapy/blob/master/scapy/contrib/bgp.py
+	#packet = IP()/TCP()/BGPUpdate()
 	#re_output = ""
 	#helper.chck(packet, re_output)
 

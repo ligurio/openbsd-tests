@@ -8,11 +8,11 @@ logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
 
 def main():
 
-        # https://github.com/secdev/scapy/blob/master/scapy/contrib/gtp.py
-        print "gtp"
-        #packet = GTP()
+        # https://github.com/secdev/scapy/blob/master/scapy/contrib/mpls.py
+        #packet = MPLS()
         #re_output = ""
-        #helper.chck(packet, re_output)
+        #chck(packet, re_output)
+
 
 if __name__ == "__main__":
         main()
