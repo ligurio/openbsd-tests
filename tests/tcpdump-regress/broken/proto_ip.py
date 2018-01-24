@@ -9,10 +9,11 @@ import sys
 
 def main():
 
-        packet = DHCP(options=[("message-type", "discover"), "end"])
-        re_output = "[|ether]\n"
+        packet = IP()
+        re_output = ""
         exitcode = helper.chck(packet, re_output)
         sys.exit(exitcode)
+
 
 if __name__ == "__main__":
         main()

@@ -9,8 +9,9 @@ import sys
 
 def main():
 
-        packet = DHCP(options=[("message-type", "discover"), "end"])
-        re_output = "[|ether]\n"
+        packet = TCP()
+        re_output = "00:00:00:00:00:00 00:14:00:50:00:00 5002 20:\n" \
+                    " .....\n"
         exitcode = helper.chck(packet, re_output)
         sys.exit(exitcode)
 

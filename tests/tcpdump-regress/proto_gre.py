@@ -9,8 +9,9 @@ import sys
 
 def main():
 
-        packet = GRE()
-        re_output = ""
+        #packet = GRE()
+        packet = IP(dst="")/GRE(proto=254)/"\x83\x1b \x01\x06\x12\x01\xff\x07\xff\xff\xff\xff\xff\xff\xff \xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x01\x07 \x00\x00"
+        re_output = "[|ether]\n"
         exitcode = helper.chck(packet, re_output)
         sys.exit(exitcode)
 

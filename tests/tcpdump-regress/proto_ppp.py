@@ -10,7 +10,7 @@ import sys
 def main():
 
         packet = PPP()
-        re_output = ""
+        re_output = "[|ether]\n"
         exitcode = helper.chck(packet, re_output)
         sys.exit(exitcode)
 

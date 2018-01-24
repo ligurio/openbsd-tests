@@ -10,7 +10,8 @@ import sys
 def main():
 
         packet = STP()
-        re_output = ""
+        re_output = "00:00:00:00:00:00 > 00:00:00:00:00:00 null I (s=0,r=0,C) len=17\n" \
+                    ".....................\n"
         exitcode = helper.chck(packet, re_output)
         sys.exit(exitcode)
 

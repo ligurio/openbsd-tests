@@ -9,8 +9,8 @@ import sys
 
 def main():
 
-        packet = DHCP(options=[("message-type", "discover"), "end"])
-        re_output = "[|ether]\n"
+        packet = Ether()
+        re_output = "08:00:27:e6:42:5a Broadcast loopback 14:\n\n"
         exitcode = helper.chck(packet, re_output)
         sys.exit(exitcode)
 
