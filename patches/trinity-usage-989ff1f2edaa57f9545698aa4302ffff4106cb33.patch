@@ -1,0 +1,214 @@
+diff --git a/include/compat.h b/include/compat.h
+index 2f16ed2..dfd8714 100644
+--- a/include/compat.h
++++ b/include/compat.h
+@@ -332,6 +332,10 @@ enum kcmp_type {
+ #define SO_BUSY_POLL		46
+ #endif
+ 
++#ifndef SO_MAX_PACING_RATE
++#define SO_MAX_PACING_RATE	47
++#endif
++
+ /* linux/tcp.h */
+ #ifndef TCP_COOKIE_TRANSACTIONS
+ #define TCP_COOKIE_TRANSACTIONS	15
+@@ -794,6 +798,15 @@ struct kvm_get_htab_fd {
+ #endif
+ 
+ /* if_ether.h */
++#ifndef ETH_P_CANFD
++#define ETH_P_CANFD	0x000D
++#endif
++#ifndef ETH_P_CAIF
++#define ETH_P_CAIF	0x00F7
++#endif
++#ifndef ETH_P_802_3_MIN
++#define ETH_P_802_3_MIN	0x0600
++#endif
+ #ifndef ETH_P_BATMAN
+ #define ETH_P_BATMAN	0x4305
+ #endif
+@@ -812,6 +825,9 @@ struct kvm_get_htab_fd {
+ #ifndef ETH_P_MVRP
+ #define ETH_P_MVRP	0x88F5
+ #endif
++#ifndef ETH_P_PRP
++#define ETH_P_PRP	0x88FB
++#endif
+ #ifndef ETH_P_QINQ1
+ #define ETH_P_QINQ1	0x9100
+ #endif
+@@ -821,14 +837,5 @@ struct kvm_get_htab_fd {
+ #ifndef ETH_P_QINQ3
+ #define ETH_P_QINQ3	0x9300
+ #endif
+-#ifndef ETH_P_802_3_MIN
+-#define ETH_P_802_3_MIN	0x0600
+-#endif
+-#ifndef ETH_P_CANFD
+-#define ETH_P_CANFD	0x000D
+-#endif
+-#ifndef ETH_P_CAIF
+-#define ETH_P_CAIF	0x00F7
+-#endif
+ 
+ #endif	/* _TRINITY_COMPAT_H */
+diff --git a/net/caif_setsockopt.c b/net/caif_setsockopt.c
+index fcc42c0..c829521 100644
+--- a/net/caif_setsockopt.c
++++ b/net/caif_setsockopt.c
+@@ -17,7 +17,9 @@ static const unsigned int caif_opts[] = { CAIFSO_LINK_SELECT, CAIFSO_REQ_PARAM }
+ 
+ void caif_setsockopt(struct sockopt *so)
+ {
++#ifdef USE_CAIF
+ 	unsigned char val;
++#endif
+ 
+ 	so->level = SOL_CAIF;
+ 
+diff --git a/net/ether.c b/net/ether.c
+index 58e2598..1ccb67f 100644
+--- a/net/ether.c
++++ b/net/ether.c
+@@ -19,7 +19,7 @@ static const int ether_types[] = {
+ 	ETH_P_ATMMPOA, ETH_P_LINK_CTL, ETH_P_ATMFATE,
+ 
+ 	ETH_P_PAE, ETH_P_AOE, ETH_P_8021AD, ETH_P_802_EX1,
+-	ETH_P_TIPC, ETH_P_8021AH, ETH_P_MVRP, ETH_P_1588,
++	ETH_P_TIPC, ETH_P_8021AH, ETH_P_MVRP, ETH_P_1588, ETH_P_PRP,
+ 	ETH_P_FCOE, ETH_P_TDLS, ETH_P_FIP, ETH_P_QINQ1,
+ 	ETH_P_QINQ2, ETH_P_QINQ3, ETH_P_EDSA, ETH_P_AF_IUCV,
+ 
+diff --git a/net/rds_setsockopt.c b/net/rds_setsockopt.c
+index 25b6c8b..6ad6e2a 100644
+--- a/net/rds_setsockopt.c
++++ b/net/rds_setsockopt.c
+@@ -20,7 +20,9 @@ static const unsigned int rds_opts[] = {
+ 
+ void rds_setsockopt(struct sockopt *so)
+ {
++#ifdef USE_RDS
+ 	unsigned char val;
++#endif
+ 
+ 	so->level = SOL_RDS;
+ #ifdef USE_RDS
+diff --git a/net/socket_setsockopt.c b/net/socket_setsockopt.c
+index 641fd59..e903a9a 100644
+--- a/net/socket_setsockopt.c
++++ b/net/socket_setsockopt.c
+@@ -17,7 +17,7 @@ static const unsigned int socket_opts[] = { SO_DEBUG, SO_REUSEADDR, SO_TYPE, SO_
+ 	SO_PASSSEC, SO_TIMESTAMPNS, SO_MARK, SO_TIMESTAMPING,
+ 	SO_PROTOCOL, SO_DOMAIN, SO_RXQ_OVFL, SO_WIFI_STATUS,
+ 	SO_PEEK_OFF, SO_NOFCS, SO_LOCK_FILTER, SO_SELECT_ERR_QUEUE,
+-	SO_BUSY_POLL };
++	SO_BUSY_POLL, SO_MAX_PACING_RATE };
+ 
+ void socket_setsockopt(struct sockopt *so)
+ {
+diff --git a/random-page.c b/random-page.c
+index 4691c78..da5c803 100644
+--- a/random-page.c
++++ b/random-page.c
+@@ -109,11 +109,11 @@ void generate_random_page(char *page)
+ 		switch (rand() % 3) {
+ 		case 0:
+ 			switch (rand() % 3) {
+-			case 0:	p = sprintf(page_rand, "%lu", rand64());
++			case 0:	p = sprintf(page_rand, "%lu", (unsigned long) rand64());
+ 				break;
+-			case 1:	p = sprintf(page_rand, "%ld", rand64());
++			case 1:	p = sprintf(page_rand, "%ld", (unsigned long) rand64());
+ 				break;
+-			case 2:	p = sprintf(page_rand, "%lx", rand64());
++			case 2:	p = sprintf(page_rand, "%lx", (unsigned long) rand64());
+ 				break;
+ 			default: break;
+ 			}
+diff --git a/sockets.c b/sockets.c
+index c711b31..a4a0a48 100644
+--- a/sockets.c
++++ b/sockets.c
+@@ -219,12 +219,18 @@ void close_sockets(void)
+ 	struct linger ling = { .l_onoff = FALSE, };
+ 
+ 	for (i = 0; i < nr_sockets; i++) {
++
++		//FIXME: This is a workaround for a weird bug where we hang forevre
++		// waiting for bluetooth sockets when we setsockopt.
++		// Hopefully at some point we can remove this when someone figures out what's going on.
++		if (shm->sockets[i].triplet.family == PF_BLUETOOTH)
++			continue;
++
+ 		/* Grab an fd, and nuke it before someone else uses it. */
+ 		fd = shm->sockets[i].fd;
+ 		shm->sockets[i].fd = 0;
+ 
+ 		/* disable linger */
+-		ling.l_onoff = FALSE;	/* linger active */
+ 		r = setsockopt(fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(struct linger));
+ 		if (r)
+ 			perror("setsockopt");
+diff --git a/syscall.c b/syscall.c
+index baa96a6..4b5a8e8 100644
+--- a/syscall.c
++++ b/syscall.c
+@@ -34,9 +34,9 @@
+ 	return (type) (res); \
+ } while (0)
+ 
++#ifdef ARCH_IS_BIARCH
+ /*
+- * This routine is for biarch architectures.
+- * It does 32 bit syscalls on 64 bit kernel.
++ * This routine does 32 bit syscalls on 64 bit kernel.
+  * 32-on-32 will just use syscall() directly from do_syscall() because shm->do32bit is biarch only.
+  */
+ long syscall32(unsigned int call,
+@@ -63,13 +63,14 @@ long syscall32(unsigned int call,
+ 
+ #else
+ 	/* non-x86 implementations go here. */
+-	#ifdef ARCH_IS_BIARCH
+ 	#error Implement 32-on-64 syscall in syscall.c:syscall32() for this architecture.
+-	#endif
+ 
+ #endif
+ 	return __res;
+ }
++#else
++#define syscall32(a,b,c,d,e,f,g) 0
++#endif /* ARCH_IS_BIARCH */
+ 
+ static void check_uid(uid_t olduid)
+ {
+diff --git a/syscalls/perf_event_open.c b/syscalls/perf_event_open.c
+index 2ff004e..516172a 100644
+--- a/syscalls/perf_event_open.c
++++ b/syscalls/perf_event_open.c
+@@ -723,9 +723,20 @@ static long long random_event_config(__u32 *event_type,
+ 		break;
+ 	case PERF_TYPE_TRACEPOINT:
+ 		/* Actual values to use can be found under */
+-		/* debugfs tracing/events// *//*/id        */
+-		/* usually a small < 1024 number           */
+-		config = rand64();
++		/* debugfs tracing/events/?*?/?*?/id       */
++		/* usually a small < 4096 number           */
++		switch(rand()%2) {
++		case 0:
++			/* Try a value < 4096 */
++			config = rand()&0xfff;
++			break;
++		case 1:
++			config = rand64();
++			break;
++		default:
++			config = rand64();
++			break;
++		}
+ 		break;
+ 	case PERF_TYPE_HW_CACHE:
+ 		config = random_cache_config();

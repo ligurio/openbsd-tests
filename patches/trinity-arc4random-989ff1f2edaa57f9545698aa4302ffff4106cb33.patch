@@ -1,0 +1,2432 @@
+diff --git a/child.c b/child.c
+index 061ec62..9dd5494 100644
+--- a/child.c
++++ b/child.c
+@@ -113,11 +113,7 @@ void init_child(int childno)
+ 
+ 	set_make_it_fail();
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	if (arc4random() % 100 < 50)
+-#else
+ 	if (rand() % 100 < 50)
+-#endif
+ 		use_fpu();
+ }
+ 
+@@ -179,11 +175,7 @@ int child_process(int childno)
+ 	int ret;
+ 	unsigned int i;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	i = arc4random() % ARRAY_SIZE(child_functions);
+-#else
+ 	i = rand() % ARRAY_SIZE(child_functions);
+-#endif
+ 
+ #ifdef DEBUG_MULTI
+ 	output(0, "Chose %s.\n", child_functions[i].name);
+diff --git a/children/random-syscalls.c b/children/random-syscalls.c
+index e1fad76..610a6c6 100644
+--- a/children/random-syscalls.c
++++ b/children/random-syscalls.c
+@@ -50,11 +50,7 @@ static void choose_syscall_table(int childno)
+ 			 */
+ 			shm->do32bit[childno] = FALSE;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-			if (arc4random() % 100 < 10)
+-#else
+ 			if (rand() % 100 < 10)
+-#endif
+ 				shm->do32bit[childno] = TRUE;
+ 		}
+ 
+@@ -145,11 +141,7 @@ int child_random_syscalls(int childno)
+ 			goto out;
+ 		}
+ 
+-#ifdef HAVE_ARC4RANDOM
+-		syscallnr = arc4random() % nr_active_syscalls;
+-#else
+ 		syscallnr = rand() % nr_active_syscalls;
+-#endif
+ 		/* If we got a syscallnr which is not actvie repeat the attempt, since another child has switched that syscall off already.*/
+ 		if (active_syscalls[syscallnr] == 0)
+ 			continue;
+diff --git a/configure.sh b/configure.sh
+index ccfeaf9..91916ba 100755
+--- a/configure.sh
++++ b/configure.sh
+@@ -188,32 +188,6 @@ fi
+ 
+ #############################################################################################
+ 
+-# Do libc headers provides arc4random
+-
+-echo -n "[*] Checking if libc headers provides arc4random... "
+-rm -f "$TMP" || exit 1
+-
+-cat >"$TMP.c" << EOF
+-#include <stdlib.h>
+-
+-int main()
+-{
+-	arc4random();
+-}
+-EOF
+-
+-${CC} "$TMP.c" -o "$TMP" &>"$TMP.log"
+-
+-if [ ! -x "$TMP" ]; then
+-	echo $RED "[NO]" $COL_RESET
+-	MISSING_DEFS=1
+-else
+-	echo $GREEN "[YES]" $COL_RESET
+-	echo "#define HAVE_ARC4RANDOM" >> config.h
+-fi
+-
+-#############################################################################################
+-
+ check_header linux/caif/caif_socket.h USE_CAIF
+ check_header linux/if_alg.h USE_IF_ALG
+ check_header linux/rds.h USE_RDS
+diff --git a/fds.c b/fds.c
+index f322fec..c7510b9 100644
+--- a/fds.c
++++ b/fds.c
+@@ -15,7 +15,6 @@
+ #include "log.h"
+ #include "sanitise.h"
+ #include "params.h"
+-#include "config.h"	// arc4random
+ 
+ /* Pipe FD related functions. */
+ static void open_pipes(void)
+@@ -38,21 +37,13 @@ static void open_pipes(void)
+ 
+ static int rand_pipe_fd(void)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	return shm->pipe_fds[arc4random() % MAX_PIPE_FDS];
+-#else
+ 	return shm->pipe_fds[rand() % MAX_PIPE_FDS];
+-#endif
+ }
+ 
+ /* perf related fds (see also perf.c & syscalls/perf_event_open.c) */
+ static int rand_perf_fd(void)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	return shm->perf_fds[arc4random() % MAX_PERF_FDS];
+-#else
+ 	return shm->perf_fds[rand() % MAX_PERF_FDS];
+-#endif
+ }
+ 
+ /* epoll related fds */
+@@ -115,11 +106,7 @@ static int rand_file_fd(void)
+ {
+ 	unsigned int fd_index;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	fd_index = arc4random() % nr_file_fds;
+-#else
+ 	fd_index = rand() % nr_file_fds;
+-#endif
+ 	return shm->file_fds[fd_index];
+ }
+ 
+@@ -130,11 +117,7 @@ static int get_new_random_fd(void)
+ 	int fd = 0;
+ 
+ retry:
+-#ifdef HAVE_ARC4RANDOM
+-	i = arc4random() % 6;
+-#else
+ 	i = rand() % 6;
+-#endif
+ 
+ 	if (do_specific_proto == TRUE)
+ 		i = 1;
+@@ -170,11 +153,7 @@ retry:
+ 				fd = rand_pipe_fd();
+ 			return fd;
+ 		}
+-#ifdef HAVE_ARC4RANDOM
+-		fd = shm->sockets[arc4random() % nr_sockets].fd;
+-#else
+ 		fd = shm->sockets[rand() % nr_sockets].fd;
+-#endif
+ 		break;
+ 
+ 	case 2:
+@@ -206,22 +185,14 @@ retry:
+ int get_random_fd(void)
+ {
+ 	/* 25% chance of returning something new. */
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 4) == 0)
+-#else
+ 	if ((rand() % 4) == 0)
+-#endif
+ 		return get_new_random_fd();
+ 
+ 	/* the rest of the time, return the same fd as last time. */
+ regen:
+ 	if (shm->fd_lifetime == 0) {
+ 		shm->current_fd = get_new_random_fd();
+-#ifdef HAVE_ARC4RANDOM
+-		shm->fd_lifetime = (arc4random() % shm->max_children) + 5;
+-#else
+ 		shm->fd_lifetime = (rand() % shm->max_children) + 5;
+-#endif
+ 	} else
+ 		shm->fd_lifetime--;
+ 
+diff --git a/files.c b/files.c
+index f3cb369..8f4ff2d 100644
+--- a/files.c
++++ b/files.c
+@@ -333,9 +333,5 @@ const char * get_filename(void)
+ 	if (files_in_index == 0)	/* This can happen if we run with -n. Should we do something else ? */
+ 		return NULL;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	return fileindex[arc4random() % files_in_index];
+-#else
+ 	return fileindex[rand() % files_in_index];
+-#endif
+ }
+diff --git a/generic-sanitise.c b/generic-sanitise.c
+index 36ddf25..db61bb3 100644
+--- a/generic-sanitise.c
++++ b/generic-sanitise.c
+@@ -18,26 +18,8 @@
+ static unsigned int get_cpu(void)
+ {
+ 	int i;
+-#ifdef HAVE_ARC4RANDOM
+-	i = arc4random() % 100;
+-#else
+ 	i = rand() % 100;
+-#endif
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (i) {
+-	case 0: return -1;
+-	case 1: return arc4random() % 4095;
+-	case 2: return arc4random() % 15;
+-
+-	case 3 ... 99:
+-		return arc4random() % num_online_cpus;
+-
+-	default:
+-		BUG("unreachable!\n");
+-		break;
+-	}
+-#else
+ 	switch (i) {
+ 	case 0: return -1;
+ 	case 1: return rand() % 4095;
+@@ -50,7 +32,6 @@ static unsigned int get_cpu(void)
+ 		BUG("unreachable!\n");
+ 		break;
+ 	}
+-#endif
+ 	return 0;
+ }
+ 
+@@ -66,11 +47,7 @@ static unsigned long handle_arg_address(int childno, int call, int argnum)
+ 
+ 	addr = find_previous_arg_address(argnum, call, childno);
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 4) {
+-#else
+ 	switch (rand() % 4) {
+-#endif
+ 	case 0:	break;	/* return unmodified */
+ 	case 1:	addr++;
+ 		break;
+@@ -162,11 +139,7 @@ static unsigned long handle_arg_op(unsigned long call, unsigned long argnum)
+ 	if (values == NULL)
+ 		BUG("ARG_OP with no values.\n");
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	mask |= values[arc4random() % num];
+-#else
+ 	mask |= values[rand() % num];
+-#endif
+ 	return mask;
+ }
+ 
+@@ -206,17 +179,9 @@ static unsigned long handle_arg_list(unsigned long call, unsigned long argnum)
+ 	if (values == NULL)
+ 		BUG("ARG_LIST with no values.\n");
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	bits = arc4random() % (num + 1);	/* num of bits to OR */
+-#else
+ 	bits = rand() % (num + 1);	/* num of bits to OR */
+-#endif
+ 	for (i = 0; i < bits; i++)
+-#ifdef HAVE_ARC4RANDOM
+-		mask |= values[arc4random() % num];
+-#else
+ 		mask |= values[rand() % num];
+-#endif
+ 	return mask;
+ }
+ 
+@@ -235,11 +200,7 @@ static unsigned long handle_arg_iovec(int childno, unsigned long call, unsigned
+ {
+ 	unsigned long i;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	i = (arc4random() % 5) + 1;
+-#else
+ 	i = (rand() % 5) + 1;
+-#endif
+ 
+ 	switch (argnum) {
+ 	case 1:	if (syscalls[call].entry->arg2type == ARG_IOVECLEN)
+@@ -315,24 +276,12 @@ static unsigned long handle_arg_mode_t(void)
+ 	unsigned int i, j, count, bit;
+ 	mode_t mode = 0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	count = arc4random() % 9;
+-#else
+ 	count = rand() % 9;
+-#endif
+ 
+ 	for (i = 0; i < count; i++) {
+-#ifdef HAVE_ARC4RANDOM
+-		bit = arc4random() % 3;
+-#else
+ 		bit = rand() % 3;
+-#endif
+ 		mode |= 1 << bit;
+-#ifdef HAVE_ARC4RANDOM
+-		j = arc4random() % 12;
+-#else
+ 		j = rand() % 12;
+-#endif
+ 		switch (j) {
+ 		case 0: mode |= S_IRUSR; break;
+ 		case 1: mode |= S_IWUSR; break;
+diff --git a/interesting-numbers.c b/interesting-numbers.c
+index bb6bda7..d639605 100644
+--- a/interesting-numbers.c
++++ b/interesting-numbers.c
+@@ -8,26 +8,14 @@
+ 
+ unsigned int get_interesting_32bit_value(void)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 11) {
+-#else
+ 	switch (rand() % 11) {
+-#endif
+ 
+ 	/* common case, return small values*/
+ 	case 0 ... 7:
+-#ifdef HAVE_ARC4RANDOM
+-		switch (arc4random() % 9) {
+-#else
+ 		switch (rand() % 9) {
+-#endif
+ 		case 0:	return 0x00000000;
+ 		case 1:	return 0x00000001;
+-#ifdef HAVE_ARC4RANDOM
+-		case 2:	return arc4random() % 256;
+-#else
+ 		case 2:	return rand() % 256;
+-#endif
+ 		case 3:	return 0x00000fff;	// 4095
+ 		case 4:	return 0x00001000;	// 4096
+ 		case 5:	return 0x00001001;	// 4097
+@@ -42,11 +30,7 @@ unsigned int get_interesting_32bit_value(void)
+ 
+ 	/* less common case, go crazy */
+ 	case 8 ... 10:
+-#ifdef HAVE_ARC4RANDOM
+-		switch (arc4random() % 15) {
+-#else
+ 		switch (rand() % 15) {
+-#endif
+ 		case 0:	return 0x00010000;
+ 		case 1:	return 0x0fffffff;
+ 		case 2:	return 0x40000000;
+@@ -59,11 +43,7 @@ unsigned int get_interesting_32bit_value(void)
+ 		case 9:	return 0xff000000;
+ 		case 10: return 0xffff0000;
+ 		case 11: return 0xffffe000;
+-#ifdef HAVE_ARC4RANDOM
+-		case 12: return 0xffffff00 | (arc4random() % 256);
+-#else
+ 		case 12: return 0xffffff00 | (rand() % 256);
+-#endif
+ 		case 13: return 0xffffffff;
+ 		case 14: return 0xffffffff - page_size;
+ 		default:
+@@ -87,11 +67,7 @@ static unsigned long per_arch_interesting_addr(unsigned long low)
+ 	int i = 0;
+ 
+ #if defined(__x86_64__)
+-#ifdef HAVE_ARC4RANDOM
+-	i = arc4random() % 4;
+-#else
+ 	i = rand() % 4;
+-#endif
+ 
+ 	switch (i) {
+ 	case 0: return 0x00007fffffffffffUL;			// x86-64 canonical addr end.
+@@ -120,22 +96,14 @@ unsigned long get_interesting_value(void)
+ 	if (rand_bool())
+ 		low = get_interesting_32bit_value();
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 13) {
+-#else
+ 	switch (rand() % 13) {
+-#endif
+ 	case 0: return 0;
+ 	case 1: return low;
+ 	case 2: return 0x0000000100000000UL | low;
+ 	case 3: return 0x7fffffff00000000UL | low;
+ 	case 4: return 0x8000000000000000UL | low;
+ 	case 5: return 0xffffffff00000000UL | low;
+-#ifdef HAVE_ARC4RANDOM
+-	case 6: return 0xffffffffffffff00UL | (arc4random() % 256);
+-#else
+ 	case 6: return 0xffffffffffffff00UL | (rand() % 256);
+-#endif
+ 	case 7: return 0xffffffffffffffffUL - page_size;
+ 	case 8: return PAGE_OFFSET | (low << 4);
+ 	case 9: return KERNEL_ADDR | (low & 0xffffff);
+diff --git a/ioctls/ioctls.c b/ioctls/ioctls.c
+index 7921b74..e43bc3c 100644
+--- a/ioctls/ioctls.c
++++ b/ioctls/ioctls.c
+@@ -8,7 +8,6 @@
+ #include "files.h"
+ #include "shm.h"
+ #include "ioctls.h"
+-#include "config.h"	// arc4random
+ 
+ #define IOCTL_GROUPS_MAX 48
+ 
+@@ -83,22 +82,14 @@ const struct ioctl_group *get_random_ioctl_group(void)
+ 	if (grps_cnt == 0)
+ 		return NULL;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	return grps[arc4random() % grps_cnt];
+-#else
+ 	return grps[rand() % grps_cnt];
+-#endif
+ }
+ 
+ void pick_random_ioctl(const struct ioctl_group *grp, int childno)
+ {
+ 	int ioctlnr;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	ioctlnr = arc4random() % grp->ioctls_cnt;
+-#else
+ 	ioctlnr = rand() % grp->ioctls_cnt;
+-#endif
+ 
+ 	shm->a2[childno] = grp->ioctls[ioctlnr].request;
+ }
+diff --git a/maps.c b/maps.c
+index bf068fc..c5d739b 100644
+--- a/maps.c
++++ b/maps.c
+@@ -13,7 +13,6 @@
+ #include "maps.h"
+ #include "log.h"
+ #include "shm.h"
+-#include "config.h"	// arc4random
+ 
+ static unsigned int num_mappings = 0;
+ static struct map *maps_list;
+@@ -76,11 +75,7 @@ static void * alloc_zero_map(struct map *map, int prot, const char *name)
+ 	}
+ 
+ 	/* Pick a random sized mmap. */
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 4) {
+-#else
+ 	switch (rand() % 4) {
+-#endif
+ 	case 0:	size = page_size;
+ 		break;
+ 	case 1:	size = 1024*1024;
+@@ -149,11 +144,7 @@ void * get_map(void)
+ 	struct map *tmpmap = maps_list;
+ 	unsigned int i, j;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	i = arc4random() % num_mappings;
+-#else
+ 	i = rand() % num_mappings;
+-#endif
+ 	for (j = 0; j < i; j++)
+ 		tmpmap = tmpmap->next;
+ 
+diff --git a/net/ipv4.c b/net/ipv4.c
+index 6f67c41..2f25ca9 100644
+--- a/net/ipv4.c
++++ b/net/ipv4.c
+@@ -5,18 +5,13 @@
+ #include <stdlib.h>
+ #include "net.h"
+ #include "random.h"
+-#include "config.h"	// arc4random
+ 
+ in_addr_t random_ipv4_address(void)
+ {
+ 	int addr = 0;
+ 	int class = 0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 9) {
+-#else
+ 	switch (rand() % 9) {
+-#endif
+ 	case 0:	addr = 0;		/* 0.0.0.0 */
+ 		break;
+ 	case 1:	addr = 0x0a000000;	/* 10.0.0.0/8 */
+@@ -46,23 +41,6 @@ in_addr_t random_ipv4_address(void)
+ 		break;
+ 	}
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	if (arc4random() % 100 < 50) {
+-		switch (class) {
+-		case 4:	addr |= arc4random() % 0xfffffff;
+-			break;
+-		case 8:	addr |= arc4random() % 0xffffff;
+-			break;
+-		case 12: addr |= arc4random() % 0xfffff;
+-			break;
+-		case 16: addr |= arc4random() % 0xffff;
+-			break;
+-		case 24: addr |= arc4random() % 0xff;
+-			break;
+-		default: break;
+-		}
+-	}
+-#else
+ 	if (rand() % 100 < 50) {
+ 		switch (class) {
+ 		case 8:	addr |= rand() % 0xffffff;
+@@ -76,7 +54,6 @@ in_addr_t random_ipv4_address(void)
+ 		default: break;
+ 		}
+ 	}
+-#endif
+ 	return htonl(addr);
+ }
+ 
+@@ -90,22 +67,14 @@ void ipv4_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ 
+ 	ipv4->sin_family = PF_INET;
+ 	ipv4->sin_addr.s_addr = random_ipv4_address();
+-#ifdef HAVE_ARC4RANDOM
+-	ipv4->sin_port = arc4random() % 65535;
+-#else
+ 	ipv4->sin_port = rand() % 65535;
+-#endif
+ 	*addr = (unsigned long) ipv4;
+ 	*addrlen = sizeof(struct sockaddr_in);
+ }
+ 
+ void inet_rand_socket(struct socket_triplet *st)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 3) {
+-#else
+ 	switch (rand() % 3) {
+-#endif
+ 	case 0: st->type = SOCK_STREAM;     // TCP
+ 		if (rand_bool())
+ 			st->protocol = 0;
+@@ -121,11 +90,7 @@ void inet_rand_socket(struct socket_triplet *st)
+ 		break;
+ 
+ 	case 2: st->type = SOCK_RAW;
+-#ifdef HAVE_ARC4RANDOM
+-		st->protocol = arc4random() % PROTO_MAX;
+-#else
+ 		st->protocol = rand() % PROTO_MAX;
+-#endif
+ 		break;
+ 
+ 	default:break;
+diff --git a/net/ipv6.c b/net/ipv6.c
+index 3b8d0c4..7f12240 100644
+--- a/net/ipv6.c
++++ b/net/ipv6.c
+@@ -8,7 +8,6 @@
+ #include <stdlib.h>
+ #include "net.h"
+ #include "random.h"
+-#include "config.h"	// arc4random
+ 
+ void ipv6_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ {
+@@ -23,23 +22,14 @@ void ipv6_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ 	ipv6->sin6_addr.s6_addr32[1] = 0;
+ 	ipv6->sin6_addr.s6_addr32[2] = 0;
+ 	ipv6->sin6_addr.s6_addr32[3] = htonl(1);
+-#ifdef HAVE_ARC4RANDOM
+-	ipv6->sin6_port = arc4random() % 65535;
+-#else
+ 	ipv6->sin6_port = rand() % 65535;
+-#endif
+-
+ 	*addr = (unsigned long) ipv6;
+ 	*addrlen = sizeof(struct sockaddr_in6);
+ }
+ 
+ void inet6_rand_socket(struct socket_triplet *st)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 3) {
+-#else
+ 	switch (rand() % 3) {
+-#endif
+ 	case 0: st->type = SOCK_STREAM;     // TCP
+ 		st->protocol = 0;
+ 		break;
+@@ -52,11 +42,7 @@ void inet6_rand_socket(struct socket_triplet *st)
+ 		break;
+ 
+ 	case 2: st->type = SOCK_RAW;
+-#ifdef HAVE_ARC4RANDOM
+-		st->protocol = arc4random() % PROTO_MAX;
+-#else
+ 		st->protocol = rand() % PROTO_MAX;
+-#endif
+ 		break;
+ 
+ 	default:break;
+diff --git a/net/pppox.c b/net/pppox.c
+index 95b214e..11d9098 100644
+--- a/net/pppox.c
++++ b/net/pppox.c
+@@ -19,11 +19,7 @@ void pppox_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ 	unsigned int proto;
+ 	unsigned int i;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	proto = arc4random() % 3;
+-#else
+ 	proto = rand() % 3;
+-#endif
+ 
+ 	switch (proto) {
+ 
+@@ -35,19 +31,11 @@ void pppox_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ 		pppox->sa_family = PF_PPPOX;
+ 		pppox->sa_protocol = proto;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-		pppox->sa_addr.pppoe.sid = arc4random();
+-		for (i = 0; i < ETH_ALEN; i++)
+-			pppox->sa_addr.pppoe.remote[i] = arc4random();
+-		for (i = 0; i < IFNAMSIZ; i++)
+-			pppox->sa_addr.pppoe.dev[i] = arc4random();
+-#else
+ 		pppox->sa_addr.pppoe.sid = rand();
+ 		for (i = 0; i < ETH_ALEN; i++)
+ 			pppox->sa_addr.pppoe.remote[i] = rand();
+ 		for (i = 0; i < IFNAMSIZ; i++)
+ 			pppox->sa_addr.pppoe.dev[i] = rand();
+-#endif
+ 
+ #ifdef USE_PPPOX_PPTP
+ 		pppox->sa_addr.pptp.call_id = rand();
+diff --git a/net/protocols.c b/net/protocols.c
+index 9431330..0ebeff0 100644
+--- a/net/protocols.c
++++ b/net/protocols.c
+@@ -9,7 +9,6 @@
+ #include "params.h"
+ #include "net.h"
+ #include "log.h"
+-#include "config.h"
+ 
+ struct protocol {
+ 	const char *name;
+diff --git a/net/rds_setsockopt.c b/net/rds_setsockopt.c
+index b7537ce..6ad6e2a 100644
+--- a/net/rds_setsockopt.c
++++ b/net/rds_setsockopt.c
+@@ -26,11 +26,7 @@ void rds_setsockopt(struct sockopt *so)
+ 
+ 	so->level = SOL_RDS;
+ #ifdef USE_RDS
+-#ifdef HAVE_ARC4RANDOM
+-	val = arc4random() % NR_SOL_RDS_OPTS;
+-#else
+ 	val = rand() % NR_SOL_RDS_OPTS;
+-#endif
+ 	so->optname = rds_opts[val];
+ #endif
+ }
+diff --git a/net/rose.c b/net/rose.c
+index bf9b39a..8e36799 100644
+--- a/net/rose.c
++++ b/net/rose.c
+@@ -17,27 +17,15 @@ void rose_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ 		return;
+ 
+ 	rose->srose_family = PF_ROSE;
+-#ifdef HAVE_ARC4RANDOM
+-	rose->srose_addr.rose_addr[0] = arc4random();
+-	rose->srose_addr.rose_addr[1] = arc4random();
+-	rose->srose_addr.rose_addr[2] = arc4random();
+-	rose->srose_addr.rose_addr[3] = arc4random();
+-	rose->srose_addr.rose_addr[4] = arc4random();
+-#else
+ 	rose->srose_addr.rose_addr[0] = rand();
+ 	rose->srose_addr.rose_addr[1] = rand();
+ 	rose->srose_addr.rose_addr[2] = rand();
+ 	rose->srose_addr.rose_addr[3] = rand();
+ 	rose->srose_addr.rose_addr[4] = rand();
+-#endif
+ 
+ 	memcpy(rose->srose_call.ax25_call, page_rand, 7);
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	rose->srose_ndigis = arc4random();
+-#else
+ 	rose->srose_ndigis = rand();
+-#endif
+ 
+ 	memcpy(rose->srose_digi.ax25_call, page_rand + 7, 7);
+ 
+diff --git a/net/rose_setsockopt.c b/net/rose_setsockopt.c
+index 1802832..f08ed5f 100644
+--- a/net/rose_setsockopt.c
++++ b/net/rose_setsockopt.c
+@@ -18,10 +18,6 @@ void rose_setsockopt(struct sockopt *so)
+ 
+ 	so->level = SOL_ROSE;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	val = arc4random() % NR_SOL_ROSE_OPTS;
+-#else
+ 	val = rand() % NR_SOL_ROSE_OPTS;
+-#endif
+ 	so->optname = rose_opts[val];
+ }
+diff --git a/net/rxrpc_setsockopt.c b/net/rxrpc_setsockopt.c
+index 8d162cc..dd3d207 100644
+--- a/net/rxrpc_setsockopt.c
++++ b/net/rxrpc_setsockopt.c
+@@ -16,10 +16,6 @@ void rxrpc_setsockopt(struct sockopt *so)
+ 
+ 	so->level = SOL_RXRPC;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	val = arc4random() % NR_SOL_RXRPC_OPTS;
+-#else
+ 	val = rand() % NR_SOL_RXRPC_OPTS;
+-#endif
+ 	so->optname = rxrpc_opts[val];
+ }
+diff --git a/net/sctp_setsockopt.c b/net/sctp_setsockopt.c
+index 426d152..ce951da 100644
+--- a/net/sctp_setsockopt.c
++++ b/net/sctp_setsockopt.c
+@@ -26,10 +26,6 @@ void sctp_setsockopt(struct sockopt *so)
+ 
+ 	so->level = SOL_SCTP;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	val = arc4random() % NR_SOL_SCTP_OPTS;
+-#else
+ 	val = rand() % NR_SOL_SCTP_OPTS;
+-#endif
+ 	so->optname = sctp_opts[val];
+ }
+diff --git a/net/sockaddr.c b/net/sockaddr.c
+index 7ff7f39..ce0f4a4 100644
+--- a/net/sockaddr.c
++++ b/net/sockaddr.c
+@@ -72,11 +72,7 @@ void generate_sockaddr(unsigned long *addr, unsigned long *addrlen, int pf)
+ 
+ 	/* If we got no hint passed down, pick a random proto. */
+ 	if (pf == -1)
+-#ifdef HAVE_ARC4RANDOM
+-		pf = arc4random() % TRINITY_PF_MAX;
+-#else
+ 		pf = rand() % TRINITY_PF_MAX;
+-#endif
+ 
+ 	for (i = 0; i < ARRAY_SIZE(sa_funcs); i++) {
+ 		if (sa_funcs[i].pf == (unsigned int) pf)
+diff --git a/net/socket_setsockopt.c b/net/socket_setsockopt.c
+index 89541b9..e903a9a 100644
+--- a/net/socket_setsockopt.c
++++ b/net/socket_setsockopt.c
+@@ -25,11 +25,7 @@ void socket_setsockopt(struct sockopt *so)
+ 
+ 	so->level = SOL_SOCKET;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	val = arc4random() % NR_SOL_SOCKET_OPTS;
+-#else
+ 	val = rand() % NR_SOL_SOCKET_OPTS;
+-#endif
+ 	so->optname = socket_opts[val];
+ 
+ 	/* Adjust length according to operation set. */
+diff --git a/net/tcp_setsockopt.c b/net/tcp_setsockopt.c
+index e686280..bee6f14 100644
+--- a/net/tcp_setsockopt.c
++++ b/net/tcp_setsockopt.c
+@@ -21,10 +21,6 @@ void tcp_setsockopt(struct sockopt *so)
+ 
+ 	so->level = SOL_TCP;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	val = arc4random() % NR_SOL_TCP_OPTS;
+-#else
+ 	val = rand() % NR_SOL_TCP_OPTS;
+-#endif
+ 	so->optname = tcp_opts[val];
+ }
+diff --git a/net/tipc.c b/net/tipc.c
+index 3fca227..a6bfb69 100644
+--- a/net/tipc.c
++++ b/net/tipc.c
+@@ -15,18 +15,6 @@ void tipc_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ 	if (tipc == NULL)
+ 		return;
+ 	tipc->family = AF_TIPC;
+-#ifdef HAVE_ARC4RANDOM
+-	tipc->addrtype = arc4random();
+-	tipc->scope = arc4random();
+-	tipc->addr.id.ref = arc4random();
+-	tipc->addr.id.node = arc4random();
+-	tipc->addr.nameseq.type = arc4random();
+-	tipc->addr.nameseq.lower = arc4random();
+-	tipc->addr.nameseq.upper = arc4random();
+-	tipc->addr.name.name.type = arc4random();
+-	tipc->addr.name.name.instance = arc4random();
+-	tipc->addr.name.domain = arc4random();
+-#else
+ 	tipc->addrtype = rand();
+ 	tipc->scope = rand();
+ 	tipc->addr.id.ref = rand();
+@@ -37,7 +25,6 @@ void tipc_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ 	tipc->addr.name.name.type = rand();
+ 	tipc->addr.name.name.instance = rand();
+ 	tipc->addr.name.domain = rand();
+-#endif
+ 	*addr = (unsigned long) tipc;
+ 	*addrlen = sizeof(struct sockaddr_tipc);
+ }
+@@ -46,11 +33,7 @@ void tipc_rand_socket(struct socket_triplet *st)
+ {
+ 	st->protocol = 0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 3) {
+-#else
+ 	switch (rand() % 3) {
+-#endif
+ 	case 0: st->type = SOCK_STREAM;
+ 		break;
+ 	case 1: st->type = SOCK_SEQPACKET;
+diff --git a/net/tipc_setsockopt.c b/net/tipc_setsockopt.c
+index 9e9cbc5..f31ec91 100644
+--- a/net/tipc_setsockopt.c
++++ b/net/tipc_setsockopt.c
+@@ -15,11 +15,7 @@ void tipc_setsockopt(struct sockopt *so)
+ 
+ 	so->level = SOL_TIPC;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	val = arc4random() % NR_SOL_TIPC_OPTS;
+-#else
+ 	val = rand() % NR_SOL_TIPC_OPTS;
+-#endif
+ 	so->optname = tipc_opts[val];
+ 
+ 	so->optval = sizeof(__u32);
+diff --git a/net/udplite_setsockopt.c b/net/udplite_setsockopt.c
+index e4d64e2..3597434 100644
+--- a/net/udplite_setsockopt.c
++++ b/net/udplite_setsockopt.c
+@@ -16,22 +16,14 @@ void udplite_setsockopt(struct sockopt *so)
+ 
+ 	so->level = SOL_UDPLITE;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	val = arc4random() % NR_SOL_UDPLITE_OPTS;
+-#else
+ 	val = rand() % NR_SOL_UDPLITE_OPTS;
+-#endif
+ 	so->optname = udplite_opts[val];
+ 
+ 	switch (so->optname) {
+ 	case UDP_CORK:
+ 		break;
+ 	case UDP_ENCAP:
+-#ifdef HAVE_ARC4RANDOM
+-		page_rand[0] = (arc4random() % 3) + 1;        // Encapsulation types.
+-#else
+ 		page_rand[0] = (rand() % 3) + 1;        // Encapsulation types.
+-#endif
+ 		break;
+ 	case UDPLITE_SEND_CSCOV:
+ 		break;
+diff --git a/net/unix.c b/net/unix.c
+index a6602d3..74576fb 100644
+--- a/net/unix.c
++++ b/net/unix.c
+@@ -6,7 +6,6 @@
+ #include <stdlib.h>
+ #include "maps.h"
+ #include "net.h"
+-#include "config.h"	// arc4random
+ 
+ void unix_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ {
+@@ -18,11 +17,7 @@ void unix_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ 		return;
+ 
+ 	unixsock->sun_family = PF_UNIX;
+-#ifdef HAVE_ARC4RANDOM
+-	len = arc4random() % 20;
+-#else
+ 	len = rand() % 20;
+-#endif
+ 	memset(&page_rand[len], 0, 1);
+ 	strncpy(unixsock->sun_path, page_rand, len);
+ 	*addr = (unsigned long) unixsock;
+@@ -33,11 +28,7 @@ void unix_rand_socket(struct socket_triplet *st)
+ {
+ 	st->protocol = PF_UNIX;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 3) {
+-#else
+ 	switch (rand() % 3) {
+-#endif
+ 	case 0: st->type = SOCK_STREAM;
+ 		break;
+ 	case 1: st->type = SOCK_DGRAM;
+diff --git a/net/x25.c b/net/x25.c
+index 4919c11..26c8888 100644
+--- a/net/x25.c
++++ b/net/x25.c
+@@ -17,11 +17,7 @@ void x25_gen_sockaddr(unsigned long *addr, unsigned long *addrlen)
+ 		return;
+ 
+ 	x25->sx25_family = PF_X25;
+-#ifdef HAVE_ARC4RANDOM
+-	len = arc4random() % 15;
+-#else
+ 	len = rand() % 15;
+-#endif
+ 	memset(&page_rand[len], 0, 1);
+ 	strncpy(x25->sx25_addr.x25_addr, page_rand, len);
+ 	*addr = (unsigned long) x25;
+diff --git a/pids.c b/pids.c
+index d2b060c..afbd15c 100644
+--- a/pids.c
++++ b/pids.c
+@@ -7,7 +7,6 @@
+ #include "pids.h"
+ #include "log.h"
+ #include "sanitise.h"
+-#include "config.h" 	// arc4random
+ 
+ pid_t initpid;
+ 
+@@ -121,17 +120,9 @@ unsigned int get_pid(void)
+ 	if (shm->running_childs == 0)
+ 		return 0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 3) {
+-#else
+ 	switch (rand() % 3) {
+-#endif
+ 	case 0:
+-#ifdef HAVE_ARC4RANDOM
+-retry:		i = arc4random() % shm->max_children;
+-#else
+ retry:		i = rand() % shm->max_children;
+-#endif
+ 		pid = shm->pids[i];
+ 		if (pid == EMPTY_PIDSLOT)
+ 			goto retry;
+diff --git a/random-address.c b/random-address.c
+index c132cc5..52c5366 100644
+--- a/random-address.c
++++ b/random-address.c
+@@ -45,17 +45,10 @@ static void * _get_address(unsigned char null_allowed)
+ 	int i;
+ 	void *addr = NULL;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	if (null_allowed == TRUE)
+-		i = arc4random() % 9;
+-	else
+-		i = (arc4random() % 8) + 1;
+-#else
+ 	if (null_allowed == TRUE)
+ 		i = rand() % 9;
+ 	else
+ 		i = (rand() % 8) + 1;
+-#endif
+ 
+ 
+ 	switch (i) {
+@@ -91,11 +84,7 @@ static void * _get_address(unsigned char null_allowed)
+ 	 * But sometimes, we return an address just before the end of the page.
+ 	 * The idea here is that we might see some bugs that are caused by page boundary failures.
+ 	 */
+-#ifdef HAVE_ARC4RANDOM
+-	i = arc4random() % 100;
+-#else
+ 	i = rand() % 100;
+-#endif
+ 	switch (i) {
+ 	case 0:	addr += (page_size - sizeof(char));
+ 		break;
+diff --git a/random-length.c b/random-length.c
+index 3f607a3..40b2d5f 100644
+--- a/random-length.c
++++ b/random-length.c
+@@ -3,7 +3,6 @@
+ #include "arch.h"	// page_size
+ #include "sanitise.h"
+ #include "random.h"
+-#include "config.h"	// arc4random
+ 
+ unsigned long get_len(void)
+ {
+@@ -15,11 +14,7 @@ unsigned long get_len(void)
+ 	if (i == 0)
+ 		return 0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 6) {
+-#else
+ 	switch (rand() % 6) {
+-#endif
+ 
+ 	case 0:	i &= 0xff;
+ 		break;
+@@ -41,26 +36,9 @@ unsigned long get_len(void)
+ 		return 0;
+ 
+ 	/* we might get lucky if something is counting ints/longs etc. */
+-#ifdef HAVE_ARC4RANDOM
+-	if (arc4random() % 100 < 25) {
+-		int _div = 1 << ((rand() % 4) + 1);      /* 2,4,8 or 16 */
+-		i /= _div;
+-		switch (arc4random() % 3) {
+-#else
+ 	if (rand() % 100 < 25) {
+ 		int _div = 1 << ((rand() % 4) + 1);      /* 2,4,8 or 16 */
+ 		i /= _div;
+-		switch (rand() % 3) {
+-#endif
+-		case 0:	i /= sizeof(int);
+-			break;
+-		case 1:	i /= sizeof(long);
+-			break;
+-		case 2:	i /= sizeof(long long);
+-			break;
+-		default:
+-			break;
+-		}
+ 	}
+ 
+ 	return i;
+diff --git a/random-page.c b/random-page.c
+index 120b368..da5c803 100644
+--- a/random-page.c
++++ b/random-page.c
+@@ -6,7 +6,6 @@
+ #include "sanitise.h"	// get_address
+ #include "maps.h"
+ #include "log.h"	// For BUG
+-#include "config.h"	// arc4random
+ 
+ static void fabricate_onepage_struct(char *page)
+ {
+@@ -15,11 +14,7 @@ static void fabricate_onepage_struct(char *page)
+ 
+ 	for (i = 0; i < page_size; ) {
+ 		ptr = (void*)&page[i];
+-#ifdef HAVE_ARC4RANDOM
+-		switch (arc4random() % 4) {
+-#else
+ 		switch (rand() % 4) {
+-#endif
+ 		case 0:
+ 			i += sizeof(unsigned int);
+ 			if (i > page_size)
+@@ -42,11 +37,7 @@ static void fabricate_onepage_struct(char *page)
+ 			i += sizeof(unsigned int);
+ 			if (i > page_size)
+ 				return;
+-#ifdef HAVE_ARC4RANDOM
+-			*(unsigned int *)ptr = arc4random() % page_size;
+-#else
+ 			*(unsigned int *)ptr = rand() % page_size;
+-#endif
+ 			break;
+ 		default:
+ 			BUG("unreachable!\n");
+@@ -60,29 +51,17 @@ void generate_random_page(char *page)
+ 	unsigned int i;
+ 	unsigned int p = 0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 8) {
+-#else
+ 	switch (rand() % 8) {
+-#endif
+ 	/* return a page of complete trash */
+ 	case 0:	/* bytes */
+ 		for (i = 0; i < page_size; )
+-#ifdef HAVE_ARC4RANDOM
+-			page[i++] = (unsigned char)arc4random();
+-#else
+ 			page[i++] = (unsigned char)rand();
+-#endif
+ 		return;
+ 
+ 	case 1:	/* words */
+ 		for (i = 0; i < (page_size / 2); ) {
+ 			page[i++] = 0;
+-#ifdef HAVE_ARC4RANDOM
+-			page[i++] = (unsigned char)arc4random();
+-#else
+ 			page[i++] = (unsigned char)rand();
+-#endif
+ 		}
+ 		return;
+ 
+@@ -91,11 +70,7 @@ void generate_random_page(char *page)
+ 			page[i++] = 0;
+ 			page[i++] = 0;
+ 			page[i++] = 0;
+-#ifdef HAVE_ARC4RANDOM
+-			page[i++] = (unsigned char)arc4random();
+-#else
+ 			page[i++] = (unsigned char)rand();
+-#endif
+ 		}
+ 		return;
+ 
+@@ -126,11 +101,7 @@ void generate_random_page(char *page)
+ 			}
+ 		}
+ 		page_size = getpagesize();	// Hack for clang 3.3 false positive.
+-#ifdef HAVE_ARC4RANDOM
+-		page[arc4random() % page_size] = 0;
+-#else
+ 		page[rand() % page_size] = 0;
+-#endif
+ 		return;
+ 
+ 	/* ascii representation of a random number */
+diff --git a/random-pathname.c b/random-pathname.c
+index 7dc304f..004996b 100644
+--- a/random-pathname.c
++++ b/random-pathname.c
+@@ -6,7 +6,6 @@
+ #include "maps.h"
+ #include "random.h"
+ #include "sanitise.h"
+-#include "config.h"	// arc4random
+ 
+ const char * generate_pathname(void)
+ {
+@@ -19,13 +18,8 @@ const char * generate_pathname(void)
+ 		return NULL;
+ 
+ 	/* 90% chance of returning an unmangled filename */
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 100) < 90)
+-		return pathname;
+-#else
+ 	if ((rand() % 100) < 90)
+ 		return pathname;
+-#endif
+ 
+ 	/* Create a bogus filename. */
+ 	newpath = malloc(page_size);	// FIXME: We leak this.
+@@ -35,11 +29,7 @@ const char * generate_pathname(void)
+ 	len = strlen(pathname);
+ 
+ 	/* empty string. */
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 100) == 0) {
+-#else
+ 	if ((rand() % 100) == 0) {
+-#endif
+ 		memset(newpath, 0, page_size);
+ 		goto out;
+ 	}
+@@ -64,11 +54,7 @@ const char * generate_pathname(void)
+ 	if (rand_bool()) {
+ 		for (i = 0; i < len; i++) {
+ 			if (newpath[i] == '/')
+-#ifdef HAVE_ARC4RANDOM
+-				newpath[i] = arc4random();
+-#else
+ 				newpath[i] = rand();
+-#endif
+ 		}
+ 	}
+ out:
+diff --git a/random.c b/random.c
+index f404da8..7def9ff 100644
+--- a/random.c
++++ b/random.c
+@@ -10,24 +10,15 @@
+ #include "random.h"
+ #include "sanitise.h"	// interesting_numbers
+ #include "types.h"
+-#include "config.h"	// arc4random
+ 
+ unsigned int rand_bool(void)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	return arc4random() % 2;
+-#else
+ 	return rand() % 2;
+-#endif
+ }
+ 
+ static unsigned int rand_single_bit(unsigned char size)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	return (1L << (arc4random() % size));
+-#else
+ 	return (1L << (rand() % size));
+-#endif
+ }
+ 
+ /*
+@@ -35,20 +26,12 @@ static unsigned int rand_single_bit(unsigned char size)
+  */
+ static unsigned long randbits(int limit)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	unsigned int num = arc4random() % limit / 2;
+-#else
+ 	unsigned int num = rand() % limit / 2;
+-#endif
+ 	unsigned int i;
+ 	unsigned long r = 0;
+ 
+ 	for (i = 0; i < num; i++)
+-#ifdef HAVE_ARC4RANDOM
+-		r |= (1 << (arc4random() % (limit - 1)));
+-#else
+ 		r |= (1 << (rand() % (limit - 1)));
+-#endif
+ 
+ 	return r;
+ }
+@@ -60,48 +43,8 @@ static unsigned long taviso(void)
+ {
+ 	unsigned long r = 0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 4) {
+-	case 0:	r = arc4random() & arc4random();
+-#else
+ 	switch (rand() % 4) {
+ 	case 0:	r = rand() & rand();
+-#endif
+-
+-#ifdef HAVE_ARC4RANDOM
+-#if __WORDSIZE == 64
+-		r <<= 32;
+-		r |= arc4random() & arc4random();
+-#endif
+-		break;
+-
+-	case 1:	r = arc4random() % arc4random();
+-#if __WORDSIZE == 64
+-		r <<= 32;
+-		r |= arc4random() % arc4random();
+-#endif
+-		break;
+-
+-	case 2:	r = arc4random() | arc4random();
+-#if __WORDSIZE == 64
+-		r <<= 32;
+-		r |= arc4random() | arc4random();
+-#endif
+-		break;
+-
+-	case 3:	r = arc4random();
+-#if __WORDSIZE == 64
+-		r <<= 32;
+-		r |= arc4random();
+-#endif
+-		break;
+-
+-	default:
+-		break;
+-	}
+-
+-	return r;
+-#else
+ #if __WORDSIZE == 64
+ 		r <<= 32;
+ 		r |= rand() & rand();
+@@ -135,7 +78,6 @@ static unsigned long taviso(void)
+ 
+ 	return r;
+ }
+-#endif /* HAVE_ARC4RANDOM */
+ 
+ /*
+  * Pick 8 random bytes, and concatenate them into a long.
+@@ -145,13 +87,9 @@ static unsigned long rand8x8(void)
+ 	unsigned long r = 0UL;
+ 	unsigned int i;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	for (i = (arc4random() % 7) + 1; i > 0; --i)
+-		r = (r << 8) | arc4random() % 256;
+-#else
+ 	for (i = (rand() % 7) + 1; i > 0; --i)
+ 		r = (r << 8) | rand() % 256;
+-#endif
++
+ 	return r;
+ }
+ 
+@@ -164,15 +102,9 @@ static unsigned long rept8(unsigned int num)
+ 	unsigned int i;
+ 	unsigned char c;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	c = arc4random() % 256;
+-	for (i = arc4random() % (num - 1) ; i > 0; --i)
+-		r = (r << 8) | c;
+-#else
+ 	c = rand() % 256;
+ 	for (i = rand() % (num - 1) ; i > 0; --i)
+ 		r = (r << 8) | c;
+-#endif
+ 
+ 	return r;
+ }
+@@ -185,20 +117,12 @@ static unsigned int __rand32(void)
+ {
+ 	unsigned long r = 0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 7) {
+-#else
+ 	switch (rand() % 7) {
+-#endif
+ 	case 0: r = rand_single_bit(32);
+ 		break;
+ 	case 1:	r = randbits(32);
+ 		break;
+-#ifdef HAVE_ARC4RANDOM
+-	case 2: r = arc4random();
+-#else
+ 	case 2: r = rand();
+-#endif
+ 		break;
+ 	case 3:	r = taviso();
+ 		break;
+@@ -228,11 +152,7 @@ unsigned int rand32(void)
+ 		unsigned int rounds;
+ 
+ 		/* mangle it. */
+-#ifdef HAVE_ARC4RANDOM
+-		rounds = arc4random() % 3;
+-#else
+ 		rounds = rand() % 3;
+-#endif
+ 		for (i = 0; i < rounds; i++) {
+ 			switch (rand_bool()) {
+ 			case 0: r |= __rand32();
+@@ -260,11 +180,7 @@ unsigned int rand32(void)
+ 	}
+ 
+ 	/* limit the size */
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 4) {
+-#else
+ 	switch (rand() % 4) {
+-#endif
+ 	case 0: r &= 0xff;
+ 		break;
+ 	case 1: r &= 0xffff;
+@@ -291,11 +207,7 @@ u64 rand64(void)
+ 
+ 	} else {
+ 		/* 33:64-bit ranges. */
+-#ifdef HAVE_ARC4RANDOM
+-		switch (arc4random() % 7) {
+-#else
+ 		switch (rand() % 7) {
+-#endif
+ 		case 0:	r = rand_single_bit(64);
+ 			break;
+ 		case 1:	r = randbits(64);
+@@ -315,11 +227,7 @@ u64 rand64(void)
+ 		}
+ 
+ 		/* limit the size */
+-#ifdef HAVE_ARC4RANDOM
+-		switch (arc4random() % 4) {
+-#else
+ 		switch (rand() % 4) {
+-#endif
+ 		case 0: r &= 0x000000ffffffffffULL;
+ 			break;
+ 		case 1: r &= 0x0000ffffffffffffULL;
+@@ -336,25 +244,13 @@ u64 rand64(void)
+ 		r = ~r;
+ 
+ 	/* increase distribution in MSB */
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 10)) {
+-#else
+ 	if ((rand() % 10)) {
+-#endif
+ 		unsigned int i;
+ 		unsigned int rounds;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-		rounds = arc4random() % 4;
+-#else
+ 		rounds = rand() % 4;
+-#endif
+ 		for (i = 0; i < rounds; i++)
+-#ifdef HAVE_ARC4RANDOM
+-			r |= (1L << ((__WORDSIZE - 1) - (arc4random() % 8)));
+-#else
+ 			r |= (1L << ((__WORDSIZE - 1) - (rand() % 8)));
+-#endif
+ 	}
+ 
+ 	/* randomly flip sign bit. */
+diff --git a/seed.c b/seed.c
+index 4f50f40..a9e7458 100644
+--- a/seed.c
++++ b/seed.c
+@@ -12,7 +12,6 @@
+ #include "pids.h"
+ #include "log.h"
+ #include "random.h"
+-#include "config.h"	// arc4random
+ 
+ /* The actual seed lives in the shm. This variable is used
+  * to store what gets passed in from the command line -s argument */
+@@ -34,11 +33,7 @@ unsigned int new_seed(void)
+ 
+ 	if ((fd = open("/dev/urandom", O_RDONLY)) < 0 ||
+ 	    read(fd, &r, sizeof(r)) != sizeof(r)) {
+-#ifdef HAVE_ARC4RANDOM
+-		r = arc4random();
+-#else
+ 		r = rand();
+-#endif
+ 		if (!(rand_bool())) {
+ 			gettimeofday(&t, 0);
+ 			r |= t.tv_usec;
+@@ -74,11 +69,7 @@ unsigned int init_seed(unsigned int seedparam)
+  */
+ void set_seed(unsigned int pidslot)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	arc4random_uniform(shm->seed + (pidslot + 1));
+-#else
+ 	srand(shm->seed + (pidslot + 1));
+-#endif
+ 	shm->seeds[pidslot] = shm->seed;
+ }
+ 
+diff --git a/sockets.c b/sockets.c
+index 10b534b..a4a0a48 100644
+--- a/sockets.c
++++ b/sockets.c
+@@ -16,7 +16,6 @@
+ #include "params.h"	// verbose, do_specific_proto
+ #include "random.h"
+ #include "protocols.h"
+-#include "config.h"	// arc4random
+ 
+ unsigned int nr_sockets = 0;
+ 
+@@ -67,11 +66,7 @@ retry_sso:
+ 		else
+ 			debugf("bind: success!\n");
+ */
+-#ifdef HAVE_ARC4RANDOM
+-		ret = listen(fd, (arc4random() % 2) + 1);
+-#else
+ 		ret = listen(fd, (rand() % 2) + 1);
+-#endif
+ /*		if (ret == -1)
+ 			debugf("listen: %s\n", strerror(errno));
+ 		else
+@@ -174,6 +169,7 @@ static void generate_sockets(void)
+ 			BUG_ON(st.family >= ARRAY_SIZE(no_protos));
+ 			if (no_protos[st.family])
+ 				goto skip;
++
+ 			if (sanitise_socket_triplet(&st) == -1)
+ 				rand_proto_type(&st);
+ 
+diff --git a/syscalls/execve.c b/syscalls/execve.c
+index 4f1d240..05f1368 100644
+--- a/syscalls/execve.c
++++ b/syscalls/execve.c
+@@ -21,11 +21,7 @@ static unsigned long ** gen_ptrs_to_crap(void)
+ {
+ 	void **ptr;
+ 	unsigned int i;
+-#ifdef HAVE_ARC4RANDOM
+-	unsigned int count = arc4random() % 32;
+-#else
+ 	unsigned int count = rand() % 32;
+-#endif
+ 
+ 	/* Fabricate argv */
+ 	ptr = malloc(count * sizeof(void *));	// FIXME: LEAK
+diff --git a/syscalls/fanotify_mark.c b/syscalls/fanotify_mark.c
+index 52ec1b6..3d63bb3 100644
+--- a/syscalls/fanotify_mark.c
++++ b/syscalls/fanotify_mark.c
+@@ -38,11 +38,7 @@ static void sanitise_fanotify_mark(int childno)
+ 				    FAN_MARK_IGNORED_MASK, FAN_MARK_IGNORED_SURV_MODIFY };
+ 
+ 	unsigned int i;
+-#ifdef HAVE_ARC4RANDOM
+-	unsigned int numflags = arc4random() % 5;
+-#else
+ 	unsigned int numflags = rand() % 5;
+-#endif
+ 
+ 	// set additional flags
+ 	for (i = 0; i < numflags; i++)
+diff --git a/syscalls/ioctl.c b/syscalls/ioctl.c
+index 11d536e..aa5148c 100644
+--- a/syscalls/ioctl.c
++++ b/syscalls/ioctl.c
+@@ -15,21 +15,12 @@ static void ioctl_mangle_cmd(int childno)
+ 	unsigned int i;
+ 
+ 	/* mangle the cmd by ORing up to 4 random bits */
+-#ifdef HAVE_ARC4RANDOM
+-	for (i=0; i < (unsigned int)(arc4random() % 4); i++)
+-		shm->a2[childno] |= 1L << (arc4random() % 32);
+-
+-	/* mangle the cmd by ANDing up to 4 random bits */
+-	for (i=0; i < (unsigned int)(arc4random() % 4); i++)
+-		shm->a2[childno] &= 1L << (arc4random() % 32);
+-#else
+ 	for (i=0; i < (unsigned int)(rand() % 4); i++)
+ 		shm->a2[childno] |= 1L << (rand() % 32);
+ 
+ 	/* mangle the cmd by ANDing up to 4 random bits */
+ 	for (i=0; i < (unsigned int)(rand() % 4); i++)
+ 		shm->a2[childno] &= 1L << (rand() % 32);
+-#endif
+ }
+ 
+ static void ioctl_mangle_arg(int childno)
+@@ -48,13 +39,8 @@ static void ioctl_mangle_arg(int childno)
+ 
+ static void generic_sanitise_ioctl(int childno)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 50)==0)
+-		ioctl_mangle_cmd(childno);
+-#else
+ 	if ((rand() % 50)==0)
+ 		ioctl_mangle_cmd(childno);
+-#endif
+ 
+ 	ioctl_mangle_arg(childno);
+ }
+@@ -63,11 +49,7 @@ static void sanitise_ioctl(int childno)
+ {
+ 	const struct ioctl_group *grp;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	if (arc4random() % 100 == 0)
+-#else
+ 	if (rand() % 100 == 0)
+-#endif
+ 		grp = get_random_ioctl_group();
+ 	else
+ 		grp = find_ioctl_group(shm->a1[childno]);
+@@ -77,11 +59,7 @@ static void sanitise_ioctl(int childno)
+ 
+ 		grp->sanitise(grp, childno);
+ 
+-#ifdef HAVE_ARC4RANDOM
+-		if (arc4random() % 100 == 0)
+-#else
+ 		if (rand() % 100 == 0)
+-#endif
+ 			ioctl_mangle_cmd(childno);
+ 	} else
+ 		generic_sanitise_ioctl(childno);
+diff --git a/syscalls/linkat.c b/syscalls/linkat.c
+index 06f2224..3487bdc 100644
+--- a/syscalls/linkat.c
++++ b/syscalls/linkat.c
+@@ -7,19 +7,13 @@
+ #include "shm.h"
+ #include "sanitise.h"
+ #include "compat.h"
+-#include "config.h"	// arc4random
+ 
+ static void sanitise_linkat(int childno)
+ {
+ 	/* .. If oldpath is relative and olddirfd is the special value AT_FDCWD, then oldpath is
+ 	 * interpreted relative to the current working directory of the calling process  */
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 100) == 0)
+-		shm->a1[childno] = AT_FDCWD;
+-#else
+ 	if ((rand() % 100) == 0)
+ 		shm->a1[childno] = AT_FDCWD;
+-#endif
+ }
+ 
+ struct syscall syscall_linkat = {
+diff --git a/syscalls/madvise.c b/syscalls/madvise.c
+index cd94424..bf9d8b9 100644
+--- a/syscalls/madvise.c
++++ b/syscalls/madvise.c
+@@ -7,15 +7,10 @@
+ #include "sanitise.h"
+ #include "shm.h"
+ #include "compat.h"
+-#include "config.h"	// arc4random
+ 
+ static void sanitise_madvise(int childno)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	shm->a2[childno] = arc4random() % page_size;
+-#else
+ 	shm->a2[childno] = rand() % page_size;
+-#endif
+ }
+ 
+ struct syscall syscall_madvise = {
+diff --git a/syscalls/mmap.c b/syscalls/mmap.c
+index fa87a6a..3a64fc0 100644
+--- a/syscalls/mmap.c
++++ b/syscalls/mmap.c
+@@ -10,7 +10,6 @@
+ #include "shm.h"
+ #include "arch.h"
+ #include "compat.h"
+-#include "config.h"	// arc4random
+ 
+ #ifdef __x86_64__
+ #define NUM_FLAGS 13
+@@ -32,11 +31,7 @@ void sanitise_mmap(int childno)
+ 			MAP_32BIT,
+ #endif
+ 	};
+-#ifdef HAVE_ARC4RANDOM
+-	unsigned int numflags = arc4random() % NUM_FLAGS;
+-#else
+ 	unsigned int numflags = rand() % NUM_FLAGS;
+-#endif
+ 
+ 	/* Don't actually set a hint right now, in case we give out
+ 	   something that we don't want changed.  One day, we'll recycle
+@@ -52,11 +47,7 @@ void sanitise_mmap(int childno)
+ 
+ 	// set additional flags
+ 	for (i = 0; i < numflags; i++)
+-#ifdef HAVE_ARC4RANDOM
+-		shm->a4[childno] |= flagvals[arc4random() % NUM_FLAGS];
+-#else
+ 		shm->a4[childno] |= flagvals[rand() % NUM_FLAGS];
+-#endif
+ 
+ 	/* no fd if anonymous mapping. */
+ 	if (shm->a4[childno] & MAP_ANONYMOUS)
+diff --git a/syscalls/move_pages.c b/syscalls/move_pages.c
+index e1da6d4..705c6c7 100644
+--- a/syscalls/move_pages.c
++++ b/syscalls/move_pages.c
+@@ -36,11 +36,7 @@ static void sanitise_move_pages(int childno)
+ 	if (page_alloc == NULL)
+ 		return;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	count = arc4random() % (page_size / sizeof(void *));
+-#else
+ 	count = rand() % (page_size / sizeof(void *));
+-#endif
+ 	count = max(1, count);
+ 
+ 	shm->a2[childno] = count;
+@@ -56,11 +52,7 @@ static void sanitise_move_pages(int childno)
+ 
+ 	nodes = malloc(count * sizeof(int));
+ 	for (i = 0; i < count; i++)
+-#ifdef HAVE_ARC4RANDOM
+-		nodes[i] = (int) arc4random() % 2;
+-#else
+ 		nodes[i] = (int) rand() % 2;
+-#endif
+ 	shm->a4[childno] = (unsigned long) nodes;
+ 
+ 	shm->a5[childno] = (unsigned long) malloc(count * sizeof(int));
+diff --git a/syscalls/perf_event_open.c b/syscalls/perf_event_open.c
+index ff66627..516172a 100644
+--- a/syscalls/perf_event_open.c
++++ b/syscalls/perf_event_open.c
+@@ -477,29 +477,17 @@ static long long random_sysfs_config(__u32 *type,
+ 		return rand64();
+ 	}
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	i = arc4random()%num_pmus;
+-#else
+-	i = rand()%num_pmus;
+-#endif
++	i=rand()%num_pmus;
+ 
+ 	*type=pmus[i].type;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch(arc4random()%3) {
+-#else
+ 	switch(rand()%3) {
+-#endif
+ 		/* Random by Format */
+ 		case 0:
+ 			if (pmus[i].num_formats==0) goto out;
+ 			for(j=0;j<pmus[i].num_formats;j++) {
+ 				/* 50% chance of having field set */
+-#ifdef HAVE_ARC4RANDOM
+-				if (arc4random()%2) {
+-#else
+ 				if (rand()%2) {
+-#endif
+ 					if (pmus[i].formats[j].field==FIELD_CONFIG) {
+ 						c|=(rand64()&pmus[i].formats[j].mask);
+ 					} else if (pmus[i].formats[j].field==FIELD_CONFIG1) {
+@@ -515,11 +503,7 @@ static long long random_sysfs_config(__u32 *type,
+ 		/* Random by generic event */
+ 		case 1:
+ 			if (pmus[i].num_generic_events==0) goto out;
+-#ifdef HAVE_ARC4RANDOM
+-			j=arc4random()%pmus[i].num_generic_events;
+-#else
+ 			j=rand()%pmus[i].num_generic_events;
+-#endif
+ 			c=pmus[i].generic_events[j].config;
+ 			c1=pmus[i].generic_events[j].config1;
+ 			c2=pmus[i].generic_events[j].config2;
+@@ -537,13 +521,8 @@ static long long random_sysfs_config(__u32 *type,
+ 	*config2=c2;
+ 	return c;
+ out:
+-#ifdef HAVE_ARC4RANDOM
+-	*config1=arc4random()%64;
+-	return arc4random()%64;
+-#else
+ 	*config1=rand()%64;
+ 	return rand()%64;
+-#endif
+ }
+ 
+ /* arbitrary high number unlikely to be used by perf_event */
+@@ -555,11 +534,7 @@ static long long random_cache_config(void)
+ 
+ 	int cache_id, hw_cache_op_id, hw_cache_op_result_id;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 8) {
+-#else
+ 	switch (rand() % 8) {
+-#endif
+ 	case 0:
+ 		cache_id = PERF_COUNT_HW_CACHE_L1D;
+ 		break;
+@@ -582,22 +557,14 @@ static long long random_cache_config(void)
+ 		cache_id = PERF_COUNT_HW_CACHE_NODE;
+ 		break;
+ 	case 7:
+-#ifdef HAVE_ARC4RANDOM
+-		cache_id = arc4random() % 256;
+-#else
+ 		cache_id = rand() % 256;
+-#endif
+ 		break;
+ 	default:
+ 		cache_id = 0;
+ 		break;
+ 	}
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 4) {
+-#else
+ 	switch (rand() % 4) {
+-#endif
+ 	case 0:
+ 		hw_cache_op_id = PERF_COUNT_HW_CACHE_OP_READ;
+ 		break;
+@@ -608,22 +575,14 @@ static long long random_cache_config(void)
+ 		hw_cache_op_id = PERF_COUNT_HW_CACHE_OP_PREFETCH;
+ 		break;
+ 	case 3:
+-#ifdef HAVE_ARC4RANDOM
+-		hw_cache_op_id = arc4random() % 256;
+-#else
+ 		hw_cache_op_id = rand() % 256;
+-#endif
+ 		break;
+ 	default:
+ 		hw_cache_op_id = 0;
+ 		break;
+ 	}
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 3) {
+-#else
+ 	switch (rand() % 3) {
+-#endif
+ 	case 0:
+ 		hw_cache_op_result_id = PERF_COUNT_HW_CACHE_RESULT_ACCESS;
+ 		break;
+@@ -631,11 +590,7 @@ static long long random_cache_config(void)
+ 		hw_cache_op_result_id = PERF_COUNT_HW_CACHE_RESULT_MISS;
+ 		break;
+ 	case 2:
+-#ifdef HAVE_ARC4RANDOM
+-		hw_cache_op_result_id = arc4random() % 256;
+-#else
+ 		hw_cache_op_result_id = rand() % 256;
+-#endif
+ 		break;
+ 	default:
+ 		hw_cache_op_result_id = 0;
+@@ -650,11 +605,7 @@ static int random_event_type(void)
+ 
+ 	int type=0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 8) {
+-#else
+ 	switch (rand() % 8) {
+-#endif
+ 	case 0:
+ 		type = PERF_TYPE_HARDWARE;
+ 		break;
+@@ -693,11 +644,7 @@ static long long random_event_config(__u32 *event_type,
+ 
+ 	switch (*event_type) {
+ 	case PERF_TYPE_HARDWARE:
+-#ifdef HAVE_ARC4RANDOM
+-		switch (arc4random() % 11) {
+-#else
+ 		switch (rand() % 11) {
+-#endif
+ 		case 0:
+ 			config = PERF_COUNT_HW_CPU_CYCLES;
+ 			break;
+@@ -736,11 +683,7 @@ static long long random_event_config(__u32 *event_type,
+ 		}
+ 		break;
+ 	case PERF_TYPE_SOFTWARE:
+-#ifdef HAVE_ARC4RANDOM
+-		switch (arc4random() % 11) {
+-#else
+ 		switch (rand() % 11) {
+-#endif
+ 		case 0:
+ 			config = PERF_COUNT_SW_CPU_CLOCK;
+ 			break;
+@@ -829,11 +772,7 @@ static long long random_event_config(__u32 *event_type,
+ static void setup_breakpoints(struct perf_event_attr *attr)
+ {
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 6) {
+-#else
+ 	switch (rand() % 6) {
+-#endif
+ 	case 0:
+ 		attr->bp_type = HW_BREAKPOINT_EMPTY;
+ 		break;
+@@ -861,11 +800,7 @@ static void setup_breakpoints(struct perf_event_attr *attr)
+ 	/* or a valid mem location for R/W/RW             */
+ 	attr->bp_addr = (long)get_address();
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 5) {
+-#else
+ 	switch (rand() % 5) {
+-#endif
+ 	case 0:
+ 		attr->bp_len = HW_BREAKPOINT_LEN_1;
+ 		break;
+@@ -956,11 +891,7 @@ static int random_attr_size(void) {
+ 
+ 	int size=0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	switch(arc4random() % 8) {
+-#else
+ 	switch(rand() % 8) {
+-#endif
+ 	case 0:	size = PERF_ATTR_SIZE_VER0;
+ 		break;
+ 	case 1: size = PERF_ATTR_SIZE_VER1;
+@@ -989,11 +920,7 @@ static long long random_branch_sample_type(void)
+ 
+ 	long long branch_sample = 0;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	if (arc4random() % 2)
+-#else
+ 	if (rand() % 2)
+-#endif
+ 		return rand64();
+ 
+ 	if (rand_bool())
+@@ -1057,11 +984,7 @@ static void create_mostly_valid_counting_event(struct perf_event_attr *attr,
+ 	attr->enable_on_exec = rand_bool();
+ 	attr->task = rand_bool();
+ 	attr->watermark = rand_bool();
+-#ifdef HAVE_ARC4RANDOM
+-	attr->precise_ip = arc4random() % 4;	// two bits
+-#else
+ 	attr->precise_ip = rand() % 4;	// two bits
+-#endif
+ 	attr->mmap_data = rand_bool();
+ 	attr->sample_id_all = rand_bool();
+ 	attr->exclude_host = rand_bool();
+@@ -1122,11 +1045,7 @@ static void create_mostly_valid_sampling_event(struct perf_event_attr *attr,
+ 	attr->enable_on_exec = rand_bool();
+ 	attr->task = rand_bool();
+ 	attr->watermark = rand_bool();
+-#ifdef HAVE_ARC4RANDOM
+-	attr->precise_ip = arc4random() % 4;	// two bits
+-#else
+ 	attr->precise_ip = rand() % 4;	// two bits
+-#endif
+ 	attr->mmap_data = rand_bool();
+ 	attr->sample_id_all = rand_bool();
+ 	attr->exclude_host = rand_bool();
+@@ -1149,18 +1068,6 @@ static void create_mostly_valid_sampling_event(struct perf_event_attr *attr,
+ 	/* sample_regs_user is a bitmask of CPU registers to record.     */
+ 	/* The values come from arch/ARCH/include/uapi/asm/perf_regs.h   */
+ 	/* Most architectures have fewer than 64 registers...            */
+-#ifdef HAVE_ARC4RANDOM
+-	switch(arc4random()%3) {
+-		case 0:		attr->sample_regs_user = arc4random()%16;
+-				break;
+-		case 1:		attr->sample_regs_user = arc4random()%64;
+-				break;
+-		case 2:		attr->sample_regs_user = rand64();
+-				break;
+-		default:
+-				break;
+-	}
+-#else
+ 	switch(rand()%3) {
+ 		case 0:		attr->sample_regs_user = rand()%16;
+ 				break;
+@@ -1171,7 +1078,6 @@ static void create_mostly_valid_sampling_event(struct perf_event_attr *attr,
+ 		default:
+ 				break;
+ 	}
+-#endif
+ 
+ 	/* sample_stack_user is the size of user stack backtrace we want  */
+ 	/* if we pick too large of a value the kernel in theory truncates */
+@@ -1211,11 +1117,7 @@ static void create_random_event(struct perf_event_attr *attr)
+ 	attr->enable_on_exec = rand_bool();
+ 	attr->task = rand_bool();
+ 	attr->watermark = rand_bool();
+-#ifdef HAVE_ARC4RANDOM
+-	attr->precise_ip = arc4random() % 4;
+-#else
+ 	attr->precise_ip = rand() % 4;
+-#endif
+ 	attr->mmap_data = rand_bool();
+ 	attr->sample_id_all = rand_bool();
+ 	attr->exclude_host = rand_bool();
+@@ -1273,11 +1175,7 @@ void sanitise_perf_event_open(int childno)
+ 	/* should usually be -1 or another perf_event fd         */
+ 	/* Anything but -1 unlikely to work unless the other pid */
+ 	/* was properly set up to be a group master              */
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 3) {
+-#else
+ 	switch (rand() % 3) {
+-#endif
+ 	case 0:
+ 		shm->a4[childno] = -1;
+ 		group_leader = 1;
+@@ -1285,11 +1183,7 @@ void sanitise_perf_event_open(int childno)
+ 	case 1:
+ 		/* Try to get a previous random perf_event_open() fd  */
+ 		/* It's unclear whether get_random_fd() would do this */
+-#ifdef HAVE_ARC4RANDOM
+-		shm->a4[childno] = arc4random() % 1024;
+-#else
+ 		shm->a4[childno] = rand() % 1024;
+-#endif
+ 		break;
+ 	case 2:
+ 		/* Rely on ARG_FD */
+@@ -1342,11 +1236,7 @@ void sanitise_perf_event_open(int childno)
+ 	shm->a2[childno] = pid;
+ 
+ 	/* set up attr structure */
+-#ifdef HAVE_ARC4RANDOM
+-	switch (arc4random() % 3) {
+-#else
+ 	switch (rand() % 3) {
+-#endif
+ 	case 0:
+ 		create_mostly_valid_counting_event(attr,group_leader);
+ 		break;
+diff --git a/syscalls/prctl.c b/syscalls/prctl.c
+index f7aa8ec..3a09297 100644
+--- a/syscalls/prctl.c
++++ b/syscalls/prctl.c
+@@ -31,32 +31,19 @@ static int prctl_opts[NR_PRCTL_OPTS] = {
+ /* We already got a generic_sanitise at this point */
+ void sanitise_prctl(int childno)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	int option = prctl_opts[arc4random() % NR_PRCTL_OPTS];
+-#else
+ 	int option = prctl_opts[rand() % NR_PRCTL_OPTS];
+-#endif
+ 
+ // For now, just do SECCOMP, the other options need some attention.
+ option = PR_SET_SECCOMP;
+ 
+ 	/* Also allow crap by small chance */
+-#ifdef HAVE_ARC4RANDOM
+-	if (arc4random() % 100 != 0)
+-		shm->a1[childno] = option;
+-#else
+ 	if (rand() % 100 != 0)
+ 		shm->a1[childno] = option;
+-#endif
+ 
+ 	switch (option) {
+ 	case PR_SET_SECCOMP:
+ #ifdef USE_SECCOMP
+-#ifdef HAVE_ARC4RANDOM
+-//		if (arc4random() % 3 == SECCOMP_MODE_FILTER) {
+-#else
+ //		if (rand() % 3 == SECCOMP_MODE_FILTER) {
+-#endif /* HAVE_ARC4RANDOM */
+ 			gen_seccomp_bpf((unsigned long *) page_rand, NULL);
+ 
+ 			shm->a2[childno] = SECCOMP_MODE_FILTER;
+diff --git a/syscalls/ptrace.c b/syscalls/ptrace.c
+index 0b9c039..7ef4828 100644
+--- a/syscalls/ptrace.c
++++ b/syscalls/ptrace.c
+@@ -7,7 +7,6 @@
+ #include "shm.h"
+ #include "compat.h"
+ #include "arch.h"
+-#include "config.h"
+ 
+ 
+ static void sanitise_ptrace(int childno)
+@@ -24,11 +23,7 @@ static void sanitise_ptrace(int childno)
+ 	 * Or at least, that's the theory. In reality, this is currently causing 'no such process' errors.
+ 	 *  but broken is at least better than hanging.
+ 	 */
+-#ifdef HAVE_ARC4RANDOM
+-	i  = arc4random() % shm->running_childs;
+-#else
+ 	i  = rand() % shm->running_childs;
+-#endif
+ 	shm->a2[childno] = shm->pids[i];
+ }
+ 
+diff --git a/syscalls/read.c b/syscalls/read.c
+index 2d8815c..dc7c5b9 100644
+--- a/syscalls/read.c
++++ b/syscalls/read.c
+@@ -7,16 +7,11 @@
+ #include "sanitise.h"
+ #include "shm.h"
+ #include "arch.h"
+-#include "config.h"
+ 
+ static void sanitise_read(int childno)
+ {
+ 	shm->a2[childno] = (unsigned long) page_rand;
+-#ifdef HAVE_ARC4RANDOM
+-	shm->a3[childno] = arc4random() % page_size;
+-#else
+ 	shm->a3[childno] = rand() % page_size;
+-#endif
+ }
+ 
+ struct syscall syscall_read = {
+diff --git a/syscalls/setsockopt.c b/syscalls/setsockopt.c
+index d3f12f3..3e985a4 100644
+--- a/syscalls/setsockopt.c
++++ b/syscalls/setsockopt.c
+@@ -63,28 +63,14 @@ void do_setsockopt(struct sockopt *so)
+ 	if (rand_bool())
+ 		so->optlen = sizeof(int);
+ 	else
+-#ifdef HAVE_ARC4RANDOM
+-		so->optlen = arc4random() % 256;
+-#else
+ 		so->optlen = rand() % 256;
+-#endif
+ 
+-
+-#ifdef HAVE_ARC4RANDOM
+-	if (arc4random() % 100 > 0) {
+-		ssoptrs[arc4random() % ARRAY_SIZE(ssoptrs)].func(&so);
+-	} else {
+-		so.level = arc4random();
+-		so.optname = (arc4random() % 0x100);	/* random operation. */
+-	}
+-#else
+ 	if (rand() % 100 > 0) {
+ 		ssoptrs[rand() % ARRAY_SIZE(ssoptrs)].func(so);
+ 	} else {
+ 		so->level = rand();
+ 		so->optname = (rand() % 0x100);	/* random operation. */
+ 	}
+-#endif
+ 
+ 	/*
+ 	 * 10% of the time, mangle the options.
+diff --git a/syscalls/socket.c b/syscalls/socket.c
+index a8ff2a0..3badd86 100644
+--- a/syscalls/socket.c
++++ b/syscalls/socket.c
+@@ -53,16 +53,6 @@ void rand_proto_type(struct socket_triplet *st)
+ 	 * PF_PACKET is disabled, choose some other type.
+ 	 */
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	st->protocol = arc4random() % PROTO_MAX;
+-
+-	if (st->family == PF_INET && no_protos[PF_PACKET])
+-		n = 5;
+-	else
+-		n = 6;
+-
+-	switch (arc4random() % n) {
+-#else
+ 	st->protocol = rand() % PROTO_MAX;
+ 
+ 	if (st->family == PF_INET && no_protos[PF_PACKET])
+@@ -71,8 +61,6 @@ void rand_proto_type(struct socket_triplet *st)
+ 		n = 6;
+ 
+ 	switch (rand() % n) {
+-#endif
+-
+ 	case 0:	st->type = SOCK_DGRAM;	break;
+ 	case 1:	st->type = SOCK_STREAM;	break;
+ 	case 2:	st->type = SOCK_SEQPACKET;	break;
+@@ -108,11 +96,7 @@ void gen_socket_args(struct socket_triplet *st)
+ 		st->family = specific_proto;
+ 
+ 	else {
+-#ifdef HAVE_ARC4RANDOM
+-		st->family = arc4random() % TRINITY_PF_MAX;
+-#else
+ 		st->family = rand() % TRINITY_PF_MAX;
+-#endif
+ 
+ 		/*
+ 		 * If we get a disabled family, try to find
+@@ -129,11 +113,7 @@ void gen_socket_args(struct socket_triplet *st)
+ 	}
+ 
+ 	/* sometimes, still gen rand crap */
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 100) == 0) {
+-#else
+ 	if ((rand() % 100) == 0) {
+-#endif
+ 		rand_proto_type(st);
+ 		goto done;
+ 	}
+@@ -144,17 +124,10 @@ void gen_socket_args(struct socket_triplet *st)
+ 
+ 
+ done:
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 100) < 25)
+-		st->type |= SOCK_CLOEXEC;
+-	if ((arc4random() % 100) < 25)
+-		st->type |= SOCK_NONBLOCK;
+-#else
+ 	if ((rand() % 100) < 25)
+ 		st->type |= SOCK_CLOEXEC;
+ 	if ((rand() % 100) < 25)
+ 		st->type |= SOCK_NONBLOCK;
+-#endif
+ }
+ 
+ 
+diff --git a/syscalls/socketcall.c b/syscalls/socketcall.c
+index 18a630e..d925acd 100644
+--- a/syscalls/socketcall.c
++++ b/syscalls/socketcall.c
+@@ -58,11 +58,7 @@ static void sanitise_socketcall(int childno)
+ 
+ 	args = malloc(6 * sizeof(unsigned long));
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	shm->a1[childno] = arc4random() % 20;
+-#else
+ 	shm->a1[childno] = rand() % 20;
+-#endif
+ 	shm->a1[childno] = SYS_SOCKET;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(socketcallptrs); i++) {
+diff --git a/syscalls/splice.c b/syscalls/splice.c
+index 438aa29..d136c15 100644
+--- a/syscalls/splice.c
++++ b/syscalls/splice.c
+@@ -17,28 +17,16 @@
+ 
+ static void sanitise_splice(int childno)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 10) < 3)
+-#else
+ 	if ((rand() % 10) < 3)
+-#endif
+ 		return;
+ 
+ 	if (rand_bool()) {
+-#ifdef HAVE_ARC4RANDOM
+-		shm->a1[childno] = shm->pipe_fds[arc4random() % MAX_PIPE_FDS];
+-#else
+ 		shm->a1[childno] = shm->pipe_fds[rand() % MAX_PIPE_FDS];
+-#endif
+ 		shm->a2[childno] = 0;
+ 	}
+ 
+ 	if (rand_bool()) {
+-#ifdef HAVE_ARC4RANDOM
+-		shm->a3[childno] = shm->pipe_fds[arc4random() % MAX_PIPE_FDS];
+-#else
+ 		shm->a3[childno] = shm->pipe_fds[rand() % MAX_PIPE_FDS];
+-#endif
+ 		shm->a4[childno] = 0;
+ 	}
+ }
+diff --git a/syscalls/tee.c b/syscalls/tee.c
+index 7f275ec..9e591d1 100644
+--- a/syscalls/tee.c
++++ b/syscalls/tee.c
+@@ -14,17 +14,10 @@
+ 
+ static void sanitise_tee(int childno)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 10) > 0) {
+-		shm->a1[childno] = shm->pipe_fds[arc4random() % MAX_PIPE_FDS];
+-		shm->a2[childno] = shm->pipe_fds[arc4random() % MAX_PIPE_FDS];
+-	}
+-#else
+ 	if ((rand() % 10) > 0) {
+ 		shm->a1[childno] = shm->pipe_fds[rand() % MAX_PIPE_FDS];
+ 		shm->a2[childno] = shm->pipe_fds[rand() % MAX_PIPE_FDS];
+ 	}
+-#endif
+ }
+ 
+ struct syscall syscall_tee = {
+diff --git a/syscalls/vmsplice.c b/syscalls/vmsplice.c
+index e34a565..4b3ab5e 100644
+--- a/syscalls/vmsplice.c
++++ b/syscalls/vmsplice.c
+@@ -11,15 +11,9 @@
+ 
+ static void sanitise_vmsplice(int childno)
+ {
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 10) > 0)
+-		shm->a1[childno] = shm->pipe_fds[arc4random() % MAX_PIPE_FDS];
+-	shm->a3[childno] = arc4random() % UIO_MAXIOV;
+-#else
+ 	if ((rand() % 10) > 0)
+ 		shm->a1[childno] = shm->pipe_fds[rand() % MAX_PIPE_FDS];
+ 	shm->a3[childno] = rand() % UIO_MAXIOV;
+-#endif
+ }
+ 
+ struct syscall syscall_vmsplice = {
+diff --git a/syscalls/write.c b/syscalls/write.c
+index 0e50228..d57bce8 100644
+--- a/syscalls/write.c
++++ b/syscalls/write.c
+@@ -6,23 +6,14 @@
+ #include "sanitise.h"
+ #include "shm.h"
+ #include "arch.h"	// page_size
+-#include "config.h"	// arc4random
+ 
+ static void sanitise_write(int childno)
+ {
+ 	shm->a2[childno] = (unsigned long) page_rand;
+-#ifdef HAVE_ARC4RANDOM
+-	if ((arc4random() % 100) > 50)
+-#else
+ 	if ((rand() % 100) > 50)
+-#endif
+ 		shm->a3[childno] = 1;
+ 	else
+-#ifdef HAVE_ARC4RANDOM
+-		shm->a3[childno] = arc4random() % page_size;
+-#else
+ 		shm->a3[childno] = rand() % page_size;
+-#endif
+ }
+ 
+ struct syscall syscall_write = {
+diff --git a/tables-biarch.c b/tables-biarch.c
+index 8bbb788..4b46200 100644
+--- a/tables-biarch.c
++++ b/tables-biarch.c
+@@ -149,11 +149,7 @@ retry:
+ 
+ 	//Search for 64 bit version
+ 	if (do_64_arch) {
+-#ifdef HAVE_ARC4RANDOM
+-		call64 = arc4random() % max_nr_64bit_syscalls;
+-#else
+ 		call64 = rand() % max_nr_64bit_syscalls;
+-#endif
+ 		if (validate_specific_syscall_silent(syscalls_64bit, call64) == FALSE)
+ 			goto retry;
+ 
+@@ -183,11 +179,7 @@ try32bit:
+ 			if (syscalls_64bit[call64].entry->flags & TO_BE_DEACTIVATED)
+ 				call64 = NOTFOUND; //mark as not found in order not to increment i.
+ 		} else {
+-#ifdef HAVE_ARC4RANDOM
+-			call32 = arc4random() % max_nr_32bit_syscalls;
+-#else
+ 			call32 = rand() % max_nr_32bit_syscalls;
+-#endif
+ 		}
+ 
+ 		if (validate_specific_syscall_silent(syscalls_32bit, call32) == FALSE) {
+diff --git a/tables-uniarch.c b/tables-uniarch.c
+index bcf98b1..ac0602b 100644
+--- a/tables-uniarch.c
++++ b/tables-uniarch.c
+@@ -57,11 +57,7 @@ void enable_random_syscalls_uniarch(void)
+ 	unsigned int call;
+ 
+ retry:
+-#ifdef HAVE_ARC4RANDOM
+-	call = arc4random() % max_nr_syscalls;
+-#else
+ 	call = rand() % max_nr_syscalls;
+-#endif
+ 
+ 	if (validate_specific_syscall_silent(syscalls, call) == FALSE)
+ 		goto retry;
+diff --git a/unicode.c b/unicode.c
+index d4e34e0..9bc5b83 100644
+--- a/unicode.c
++++ b/unicode.c
+@@ -40,11 +40,7 @@ void gen_unicode_page(char *page)
+ 
+ 	while (i < (page_size - zalgolen)) {
+ 
+-#ifdef HAVE_ARC4RANDOM
+-		j = arc4random() % 9;
+-#else
+ 		j = rand() % 9;
+-#endif
+ 
+ 		switch (j) {
+ 
+@@ -54,11 +50,7 @@ void gen_unicode_page(char *page)
+ 			i += 4;
+ 			break;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-		case 1: unilen = arc4random() % 10;
+-#else
+ 		case 1: unilen = rand() % 10;
+-#endif
+ 			for (l = 0; l < unilen; l++) {
+ 				strncpy(ptr, unicode2, 6);
+ 				ptr += 6;
+@@ -82,11 +74,7 @@ void gen_unicode_page(char *page)
+ 			ptr += 4;
+ 			break;
+ 
+-#ifdef HAVE_ARC4RANDOM
+-		case 5: unilen = arc4random() % 10;
+-#else
+ 		case 5: unilen = rand() % 10;
+-#endif
+ 			for (l = 0; l < unilen; l++) {
+ 				strncpy(ptr, unicode6, 4);
+ 				ptr += 4;
+@@ -117,12 +105,7 @@ void gen_unicode_page(char *page)
+ 		}
+ 	}
+ 
+-#ifdef HAVE_ARC4RANDOM
+-	page[arc4random() % page_size] = 0;
+-#else
+ 	page[rand() % page_size] = 0;
+-#endif
+-
+ }
+ 
+ #ifdef STANDALONE
+@@ -142,11 +125,7 @@ void main(int argc, char* argv[])
+ 	struct timeval t;
+ 
+ 	gettimeofday(&t, 0);
+-#ifdef HAVE_ARC4RANDOM
+-	arc4random_uniform((t.tv_sec * getpid()) ^ t.tv_usec);
+-#else
+ 	srand((t.tv_sec * getpid()) ^ t.tv_usec);
+-#endif
+ 
+ 	page = malloc(4096);
+ 	memset(page, 0, 4096);

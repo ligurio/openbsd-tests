@@ -1,0 +1,678 @@
+diff --git a/.travis.yml b/.travis.yml
+deleted file mode 100644
+index 749d3b5..0000000
+--- a/.travis.yml
++++ /dev/null
+@@ -1,23 +0,0 @@
+-language: c
+-
+-compiler:
+-  - gcc
+-
+-install:
+-  - sudo apt-get install bash make
+-
+-before_script: "bash ./configure.sh"
+-
+-script: make
+-
+-# whitelist
+-branches:
+-  only:
+-    - travis-ci
+-
+-notifications:
+-  email:
+-    recipients:
+-      - estetus@gmail.com
+-    on_success: change
+-    on_failure: always
+diff --git a/Makefile b/Makefile
+index b0bdb36..a0d7dde 100644
+--- a/Makefile
++++ b/Makefile
+@@ -27,7 +27,7 @@ CFLAGS += -Wwrite-strings
+ CFLAGS += -Wstrict-prototypes -Wmissing-prototypes
+ 
+ # Only enabled during development.
+-#CFLAGS += -Werror
++CFLAGS += -Werror
+ 
+ V	= @
+ Q	= $(V:1=)
+@@ -111,7 +111,7 @@ install: trinity
+ 	install -d -m 755 $(INSTALL_PREFIX)/bin
+ 	install trinity $(INSTALL_PREFIX)/bin
+ 
+-tags:
++tags:	$(SRCS)
+ 	@ctags -R --exclude=tmp
+ 
+ mirror:
+diff --git a/fds.c b/fds.c
+index cc1ca6d..c7510b9 100644
+--- a/fds.c
++++ b/fds.c
+@@ -153,7 +153,7 @@ retry:
+ 				fd = rand_pipe_fd();
+ 			return fd;
+ 		}
+-		fd = shm->socket_fds[rand() % nr_sockets];
++		fd = shm->sockets[rand() % nr_sockets].fd;
+ 		break;
+ 
+ 	case 2:
+@@ -206,7 +206,9 @@ regen:
+ 
+ void setup_fds(void)
+ {
+-	open_sockets();
++	/* If we have victim files, don't worry about sockets. */
++	if (victim_path == NULL)
++		open_sockets();
+ 
+ 	open_pipes();
+ 
+diff --git a/include/compat.h b/include/compat.h
+index 2f16ed2..dfd8714 100644
+--- a/include/compat.h
++++ b/include/compat.h
+@@ -332,6 +332,10 @@ enum kcmp_type {
+ #define SO_BUSY_POLL		46
+ #endif
+ 
++#ifndef SO_MAX_PACING_RATE
++#define SO_MAX_PACING_RATE	47
++#endif
++
+ /* linux/tcp.h */
+ #ifndef TCP_COOKIE_TRANSACTIONS
+ #define TCP_COOKIE_TRANSACTIONS	15
+@@ -794,6 +798,15 @@ struct kvm_get_htab_fd {
+ #endif
+ 
+ /* if_ether.h */
++#ifndef ETH_P_CANFD
++#define ETH_P_CANFD	0x000D
++#endif
++#ifndef ETH_P_CAIF
++#define ETH_P_CAIF	0x00F7
++#endif
++#ifndef ETH_P_802_3_MIN
++#define ETH_P_802_3_MIN	0x0600
++#endif
+ #ifndef ETH_P_BATMAN
+ #define ETH_P_BATMAN	0x4305
+ #endif
+@@ -812,6 +825,9 @@ struct kvm_get_htab_fd {
+ #ifndef ETH_P_MVRP
+ #define ETH_P_MVRP	0x88F5
+ #endif
++#ifndef ETH_P_PRP
++#define ETH_P_PRP	0x88FB
++#endif
+ #ifndef ETH_P_QINQ1
+ #define ETH_P_QINQ1	0x9100
+ #endif
+@@ -821,14 +837,5 @@ struct kvm_get_htab_fd {
+ #ifndef ETH_P_QINQ3
+ #define ETH_P_QINQ3	0x9300
+ #endif
+-#ifndef ETH_P_802_3_MIN
+-#define ETH_P_802_3_MIN	0x0600
+-#endif
+-#ifndef ETH_P_CANFD
+-#define ETH_P_CANFD	0x000D
+-#endif
+-#ifndef ETH_P_CAIF
+-#define ETH_P_CAIF	0x00F7
+-#endif
+ 
+ #endif	/* _TRINITY_COMPAT_H */
+diff --git a/include/net.h b/include/net.h
+index ae99c61..0b1b156 100644
+--- a/include/net.h
++++ b/include/net.h
+@@ -4,8 +4,6 @@
+ #include <netinet/in.h>
+ 
+ extern unsigned int nr_sockets;
+-void open_sockets(void);
+-void generate_sockaddr(unsigned long *addr, unsigned long *addrlen, int pf);
+ 
+ /* protocol decoding */
+ extern unsigned int specific_proto;
+@@ -33,6 +31,17 @@ struct sockopt {
+ 	unsigned long optlen;
+ };
+ 
++/* We create one of these per socket fd we open, and store them in shm->sockets */
++struct socketinfo {
++	struct socket_triplet triplet;
++	int fd;
++};
++
++void open_sockets(void);
++void close_sockets(void);
++
++void generate_sockaddr(unsigned long *addr, unsigned long *addrlen, int pf);
++
+ void do_setsockopt(struct sockopt *so);
+ 
+ void rand_proto_type(struct socket_triplet *st);
+diff --git a/include/shm.h b/include/shm.h
+index e0a9791..353f78a 100644
+--- a/include/shm.h
++++ b/include/shm.h
+@@ -6,9 +6,10 @@
+ 
+ #include <stdio.h>
+ 
+-#include "types.h"
+-#include "exit.h"
+ #include "constants.h"
++#include "exit.h"
++#include "net.h"
++#include "types.h"
+ 
+ struct shm_s {
+ 	unsigned long total_syscalls_done;
+@@ -46,11 +47,12 @@ struct shm_s {
+ 
+ 	int pipe_fds[MAX_PIPE_FDS*2];
+ 	int file_fds[NR_FILE_FDS];		/* All children inherit these */
+-	int socket_fds[NR_SOCKET_FDS];
+ 	int perf_fds[MAX_PERF_FDS];
+ 	int epoll_fds[MAX_EPOLL_FDS];
+ 	int eventfd_fds[MAX_EPOLL_FDS];
+ 
++	struct socketinfo sockets[NR_SOCKET_FDS];
++
+ 	/* state for the syscall currently in progress. */
+ 	unsigned int previous_syscallno[MAX_NR_CHILDREN];
+ 	unsigned long previous_a1[MAX_NR_CHILDREN];
+diff --git a/ioctls/socket.c b/ioctls/socket.c
+index 4f82ef3..3496148 100644
+--- a/ioctls/socket.c
++++ b/ioctls/socket.c
+@@ -8,7 +8,7 @@ static int socket_fd_test(int fd, const struct stat *st __attribute__((unused)))
+ 	unsigned i;
+ 
+ 	for (i=0; i < nr_sockets; ++i)
+-		if (shm->socket_fds[i] == fd)
++		if (shm->sockets[i].fd == fd)
+ 			return 0;
+ 
+ 	return -1;
+diff --git a/net/caif_setsockopt.c b/net/caif_setsockopt.c
+index fcc42c0..c829521 100644
+--- a/net/caif_setsockopt.c
++++ b/net/caif_setsockopt.c
+@@ -17,7 +17,9 @@ static const unsigned int caif_opts[] = { CAIFSO_LINK_SELECT, CAIFSO_REQ_PARAM }
+ 
+ void caif_setsockopt(struct sockopt *so)
+ {
++#ifdef USE_CAIF
+ 	unsigned char val;
++#endif
+ 
+ 	so->level = SOL_CAIF;
+ 
+diff --git a/net/ether.c b/net/ether.c
+index 58e2598..1ccb67f 100644
+--- a/net/ether.c
++++ b/net/ether.c
+@@ -19,7 +19,7 @@ static const int ether_types[] = {
+ 	ETH_P_ATMMPOA, ETH_P_LINK_CTL, ETH_P_ATMFATE,
+ 
+ 	ETH_P_PAE, ETH_P_AOE, ETH_P_8021AD, ETH_P_802_EX1,
+-	ETH_P_TIPC, ETH_P_8021AH, ETH_P_MVRP, ETH_P_1588,
++	ETH_P_TIPC, ETH_P_8021AH, ETH_P_MVRP, ETH_P_1588, ETH_P_PRP,
+ 	ETH_P_FCOE, ETH_P_TDLS, ETH_P_FIP, ETH_P_QINQ1,
+ 	ETH_P_QINQ2, ETH_P_QINQ3, ETH_P_EDSA, ETH_P_AF_IUCV,
+ 
+diff --git a/net/rds_setsockopt.c b/net/rds_setsockopt.c
+index 25b6c8b..6ad6e2a 100644
+--- a/net/rds_setsockopt.c
++++ b/net/rds_setsockopt.c
+@@ -20,7 +20,9 @@ static const unsigned int rds_opts[] = {
+ 
+ void rds_setsockopt(struct sockopt *so)
+ {
++#ifdef USE_RDS
+ 	unsigned char val;
++#endif
+ 
+ 	so->level = SOL_RDS;
+ #ifdef USE_RDS
+diff --git a/net/socket_setsockopt.c b/net/socket_setsockopt.c
+index 641fd59..e903a9a 100644
+--- a/net/socket_setsockopt.c
++++ b/net/socket_setsockopt.c
+@@ -17,7 +17,7 @@ static const unsigned int socket_opts[] = { SO_DEBUG, SO_REUSEADDR, SO_TYPE, SO_
+ 	SO_PASSSEC, SO_TIMESTAMPNS, SO_MARK, SO_TIMESTAMPING,
+ 	SO_PROTOCOL, SO_DOMAIN, SO_RXQ_OVFL, SO_WIFI_STATUS,
+ 	SO_PEEK_OFF, SO_NOFCS, SO_LOCK_FILTER, SO_SELECT_ERR_QUEUE,
+-	SO_BUSY_POLL };
++	SO_BUSY_POLL, SO_MAX_PACING_RATE };
+ 
+ void socket_setsockopt(struct sockopt *so)
+ {
+diff --git a/params.c b/params.c
+index 752709d..86d15cc 100644
+--- a/params.c
++++ b/params.c
+@@ -61,6 +61,7 @@ static void usage(void)
+ 	outputerr("%s\n", progname);
+ 	outputerr(" --arch, -a: selects syscalls for the specified architecture (32 or 64). Both by default.\n");
+ 	outputerr(" --children,-C: specify number of child processes\n");
++	outputerr(" --debug,-D: enable debug\n");
+ 	outputerr(" --exclude,-x: don't call a specific syscall\n");
+ 	outputerr(" --group,-g: only run syscalls from a certain group (So far just 'vm').\n");
+ 	outputerr(" --ioctls,-I: list all ioctls.\n");
+diff --git a/random-address.c b/random-address.c
+index 5c3c1ad..52c5366 100644
+--- a/random-address.c
++++ b/random-address.c
+@@ -2,7 +2,7 @@
+ #include <stdlib.h>
+ #include <unistd.h>
+ #include <string.h>
+-#include <linux/uio.h>
++#include <sys/uio.h>
+ 
+ #include "trinity.h"	// page_size
+ #include "arch.h"	// KERNEL_ADDR etc
+diff --git a/random-length.c b/random-length.c
+index 47232ed..40b2d5f 100644
+--- a/random-length.c
++++ b/random-length.c
+@@ -37,8 +37,8 @@ unsigned long get_len(void)
+ 
+ 	/* we might get lucky if something is counting ints/longs etc. */
+ 	if (rand() % 100 < 25) {
+-		int div = 1 << ((rand() % 4) + 1);      /* 2,4,8 or 16 */
+-		i /= div;
++		int _div = 1 << ((rand() % 4) + 1);      /* 2,4,8 or 16 */
++		i /= _div;
+ 	}
+ 
+ 	return i;
+diff --git a/random-page.c b/random-page.c
+index 4691c78..da5c803 100644
+--- a/random-page.c
++++ b/random-page.c
+@@ -109,11 +109,11 @@ void generate_random_page(char *page)
+ 		switch (rand() % 3) {
+ 		case 0:
+ 			switch (rand() % 3) {
+-			case 0:	p = sprintf(page_rand, "%lu", rand64());
++			case 0:	p = sprintf(page_rand, "%lu", (unsigned long) rand64());
+ 				break;
+-			case 1:	p = sprintf(page_rand, "%ld", rand64());
++			case 1:	p = sprintf(page_rand, "%ld", (unsigned long) rand64());
+ 				break;
+-			case 2:	p = sprintf(page_rand, "%lx", rand64());
++			case 2:	p = sprintf(page_rand, "%lx", (unsigned long) rand64());
+ 				break;
+ 			default: break;
+ 			}
+diff --git a/random.c b/random.c
+index 5d469a7..7def9ff 100644
+--- a/random.c
++++ b/random.c
+@@ -175,8 +175,8 @@ unsigned int rand32(void)
+ 
+ 	/* we might get lucky if something is counting ints/longs etc. */
+ 	if (rand() % 100 < 25) {
+-		int div = 1 << ((rand() % 4) + 1);	/* 2,4,8 or 16 */
+-		r /= div;
++		int _div = 1 << ((rand() % 4) + 1);	/* 2,4,8 or 16 */
++		r /= _div;
+ 	}
+ 
+ 	/* limit the size */
+diff --git a/regenerate.c b/regenerate.c
+index b002671..5041693 100644
+--- a/regenerate.c
++++ b/regenerate.c
+@@ -15,7 +15,7 @@ static void do_sso_sockets(void)
+ 	int fd, ret;
+ 
+ 	for (i = 0; i < nr_sockets; i++) {
+-		fd = shm->socket_fds[i];
++		fd = shm->sockets[i].fd;
+ 		do_setsockopt(&so);
+ 		ret = setsockopt(fd, so.level, so.optname, (void *)so.optval, so.optlen);
+ 		if (ret == 0)
+diff --git a/sockets.c b/sockets.c
+index 60aeb0c..a4a0a48 100644
+--- a/sockets.c
++++ b/sockets.c
+@@ -13,7 +13,7 @@
+ #include "shm.h"
+ #include "net.h"
+ #include "log.h"
+-#include "params.h"	// victim_path, verbose, do_specific_proto
++#include "params.h"	// verbose, do_specific_proto
+ #include "random.h"
+ #include "protocols.h"
+ 
+@@ -35,7 +35,10 @@ static int open_socket(unsigned int domain, unsigned int type, unsigned int prot
+ 	if (fd == -1)
+ 		return fd;
+ 
+-	shm->socket_fds[nr_sockets] = fd;
++	shm->sockets[nr_sockets].fd = fd;
++	shm->sockets[nr_sockets].triplet.family = domain;
++	shm->sockets[nr_sockets].triplet.type = type;
++	shm->sockets[nr_sockets].triplet.protocol = protocol;
+ 
+ 	output(2, "fd[%i] = domain:%i (%s) type:0x%x protocol:%i\n",
+ 		fd, domain, get_proto_name(domain), type, protocol);
+@@ -208,17 +211,40 @@ done:
+ }
+ 
+ 
+-static void close_sockets(void)
++void close_sockets(void)
+ {
+ 	unsigned int i;
+ 	int fd;
++	int r = 0;
++	struct linger ling = { .l_onoff = FALSE, };
+ 
+ 	for (i = 0; i < nr_sockets; i++) {
+-		fd = shm->socket_fds[i];
+-		shm->socket_fds[i] = 0;
+-		if (close(fd) != 0) {
+-			output(1, "failed to close socket.(%s)\n", strerror(errno));
+-		}
++
++		//FIXME: This is a workaround for a weird bug where we hang forevre
++		// waiting for bluetooth sockets when we setsockopt.
++		// Hopefully at some point we can remove this when someone figures out what's going on.
++		if (shm->sockets[i].triplet.family == PF_BLUETOOTH)
++			continue;
++
++		/* Grab an fd, and nuke it before someone else uses it. */
++		fd = shm->sockets[i].fd;
++		shm->sockets[i].fd = 0;
++
++		/* disable linger */
++		r = setsockopt(fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(struct linger));
++		if (r)
++			perror("setsockopt");
++
++		r = shutdown(fd, SHUT_RDWR);
++		if (r)
++			perror("shutdown");
++
++		if (close(fd) != 0)
++			output(1, "failed to close socket [%d:%d:%d].(%s)\n",
++				shm->sockets[i].triplet.family,
++				shm->sockets[i].triplet.type,
++				shm->sockets[i].triplet.protocol,
++				strerror(errno));
+ 	}
+ 
+ 	nr_sockets = 0;
+@@ -232,10 +258,6 @@ void open_sockets(void)
+ 	int bytesread=-1;
+ 	int fd;
+ 
+-	/* If we have victim files, don't worry about sockets. */
+-	if (victim_path != NULL)
+-		return;
+-
+ 	cachefile = open(cachefilename, O_RDONLY);
+ 	if (cachefile < 0) {
+ 		output(1, "Couldn't find socket cachefile. Regenerating.\n");
+@@ -291,3 +313,4 @@ regenerate:
+ 	unlock_cachefile(cachefile);
+ 	close(cachefile);
+ }
++
+diff --git a/syscall.c b/syscall.c
+index baa96a6..4b5a8e8 100644
+--- a/syscall.c
++++ b/syscall.c
+@@ -34,9 +34,9 @@
+ 	return (type) (res); \
+ } while (0)
+ 
++#ifdef ARCH_IS_BIARCH
+ /*
+- * This routine is for biarch architectures.
+- * It does 32 bit syscalls on 64 bit kernel.
++ * This routine does 32 bit syscalls on 64 bit kernel.
+  * 32-on-32 will just use syscall() directly from do_syscall() because shm->do32bit is biarch only.
+  */
+ long syscall32(unsigned int call,
+@@ -63,13 +63,14 @@ long syscall32(unsigned int call,
+ 
+ #else
+ 	/* non-x86 implementations go here. */
+-	#ifdef ARCH_IS_BIARCH
+ 	#error Implement 32-on-64 syscall in syscall.c:syscall32() for this architecture.
+-	#endif
+ 
+ #endif
+ 	return __res;
+ }
++#else
++#define syscall32(a,b,c,d,e,f,g) 0
++#endif /* ARCH_IS_BIARCH */
+ 
+ static void check_uid(uid_t olduid)
+ {
+diff --git a/syscalls/getrlimit.c b/syscalls/getrlimit.c
+index 9ab6137..3c91d4e 100644
+--- a/syscalls/getrlimit.c
++++ b/syscalls/getrlimit.c
+@@ -4,9 +4,9 @@
+ #include <stdlib.h>
+ #include <sys/time.h>
+ #include <sys/resource.h>
+-#include "compat.h"
+ #include "sanitise.h"
+ #include "shm.h"
++#include "compat.h"
+ 
+ struct syscall syscall_getrlimit = {
+ 	.name = "getrlimit",
+diff --git a/syscalls/linkat.c b/syscalls/linkat.c
+index 9eb9a19..3487bdc 100644
+--- a/syscalls/linkat.c
++++ b/syscalls/linkat.c
+@@ -4,9 +4,9 @@
+  */
+ #include <fcntl.h>
+ #include <stdlib.h>
+-#include "compat.h"
+ #include "shm.h"
+ #include "sanitise.h"
++#include "compat.h"
+ 
+ static void sanitise_linkat(int childno)
+ {
+diff --git a/syscalls/madvise.c b/syscalls/madvise.c
+index 081bdd9..bf9d8b9 100644
+--- a/syscalls/madvise.c
++++ b/syscalls/madvise.c
+@@ -5,8 +5,8 @@
+ #include <sys/mman.h>
+ #include "arch.h"	// page_size
+ #include "sanitise.h"
+-#include "compat.h"
+ #include "shm.h"
++#include "compat.h"
+ 
+ static void sanitise_madvise(int childno)
+ {
+diff --git a/syscalls/perf_event_open.c b/syscalls/perf_event_open.c
+index 468357a..516172a 100644
+--- a/syscalls/perf_event_open.c
++++ b/syscalls/perf_event_open.c
+@@ -6,16 +6,17 @@
+ 
+ #include <stdlib.h>
+ #include <string.h>
++#include <unistd.h>
+ #include <sys/types.h>
+ #include <dirent.h>
+ #include <errno.h>
+ #include "perf_event.h"
+ #include "random.h"
+ #include "sanitise.h"
+-#include "compat.h"
+ #include "maps.h"
+ #include "shm.h"
+ #include "log.h"
++#include "compat.h"
+ 
+ #define SYSFS "/sys/bus/event_source/devices/"
+ 
+@@ -722,9 +723,20 @@ static long long random_event_config(__u32 *event_type,
+ 		break;
+ 	case PERF_TYPE_TRACEPOINT:
+ 		/* Actual values to use can be found under */
+-		/* debugfs tracing/events// *//*/id        */
+-		/* usually a small < 1024 number           */
+-		config = rand64();
++		/* debugfs tracing/events/?*?/?*?/id       */
++		/* usually a small < 4096 number           */
++		switch(rand()%2) {
++		case 0:
++			/* Try a value < 4096 */
++			config = rand()&0xfff;
++			break;
++		case 1:
++			config = rand64();
++			break;
++		default:
++			config = rand64();
++			break;
++		}
+ 		break;
+ 	case PERF_TYPE_HW_CACHE:
+ 		config = random_cache_config();
+@@ -1144,10 +1156,20 @@ void sanitise_perf_event_open(int childno)
+ 	memset(page_rand, 0, sizeof(struct perf_event_attr));
+ 
+ 	/* cpu */
+-	/* requires ROOT to select CPU if paranoid level not 0 */
++	/* requires ROOT to select specific CPU if pid==-1 (all processes) */
+ 	/* -1 means all CPUs */
+-	//shm->a3[childno] = cpu;
+-	// the default get_cpu() is good enough here
++
++	switch(rand() % 2) {
++	case 0:
++		/* Any CPU */
++		shm->a3[childno] = -1;
++		break;
++	case 1:
++		/* Default to the get_cpu() value */
++		/* set by ARG_CPU                 */
++	default:
++		break;
++	}
+ 
+ 	/* group_fd */
+ 	/* should usually be -1 or another perf_event fd         */
+@@ -1187,18 +1209,28 @@ void sanitise_perf_event_open(int childno)
+ 
+ 	/* pid */
+ 	/* requires ROOT to select pid that doesn't belong to us */
+-	/* pid of 0 means current process */
+-	/* pid of -1 means all processes  */
+ 
+ 	if (flags & PERF_FLAG_PID_CGROUP) {
+ 		/* In theory in this case we should pass in */
+ 		/* a file descriptor from /dev/cgroup       */
+ 		pid = get_random_fd();
+ 	} else {
+-		if (rand_bool()) {
++		switch(rand() % 4) {
++		case 0:	/* use current thread */
+ 			pid = 0;
+-		} else {
++			break;
++		case 1: /* get an arbitrary pid */
+ 			pid = get_pid();
++			break;
++		case 2:	/* measure *all* pids.  Might require root */
++			pid = -1;
++			break;
++		case 3: /* measure our actual pid */
++			pid=getpid();
++			break;
++		default:
++			pid = 0;
++			break;
+ 		}
+ 	}
+ 	shm->a2[childno] = pid;
+diff --git a/syscalls/prctl.c b/syscalls/prctl.c
+index bb7bd32..3a09297 100644
+--- a/syscalls/prctl.c
++++ b/syscalls/prctl.c
+@@ -33,6 +33,9 @@ void sanitise_prctl(int childno)
+ {
+ 	int option = prctl_opts[rand() % NR_PRCTL_OPTS];
+ 
++// For now, just do SECCOMP, the other options need some attention.
++option = PR_SET_SECCOMP;
++
+ 	/* Also allow crap by small chance */
+ 	if (rand() % 100 != 0)
+ 		shm->a1[childno] = option;
+@@ -40,12 +43,12 @@ void sanitise_prctl(int childno)
+ 	switch (option) {
+ 	case PR_SET_SECCOMP:
+ #ifdef USE_SECCOMP
+-		if (rand() % 3 == SECCOMP_MODE_FILTER) {
++//		if (rand() % 3 == SECCOMP_MODE_FILTER) {
+ 			gen_seccomp_bpf((unsigned long *) page_rand, NULL);
+ 
+ 			shm->a2[childno] = SECCOMP_MODE_FILTER;
+ 			shm->a3[childno] = (unsigned long) page_rand;
+-		}
++//		}
+ #endif
+ 		break;
+ 	default:
+@@ -55,7 +58,6 @@ void sanitise_prctl(int childno)
+ 
+ struct syscall syscall_prctl = {
+ 	.name = "prctl",
+-	.flags = AVOID_SYSCALL,
+ 	.num_args = 5,
+ 	.arg1name = "option",
+ 	.arg2name = "arg2",
+diff --git a/trinity.c b/trinity.c
+index d5b6041..a66c849 100644
+--- a/trinity.c
++++ b/trinity.c
+@@ -283,19 +283,7 @@ int main(int argc, char* argv[])
+ 
+ cleanup_fds:
+ 
+-	for (i = 0; i < nr_sockets; i++) {
+-		int r = 0;
+-		struct linger ling = { .l_onoff = FALSE, };
+-
+-		ling.l_onoff = FALSE;	/* linger active */
+-		r = setsockopt(shm->socket_fds[i], SOL_SOCKET, SO_LINGER, &ling, sizeof(struct linger));
+-		if (r)
+-			perror("setsockopt");
+-		r = shutdown(shm->socket_fds[i], SHUT_RDWR);
+-		if (r)
+-			perror("shutdown");
+-		close(shm->socket_fds[i]);
+-	}
++	close_sockets();
+ 
+ 	destroy_maps();
+ 
