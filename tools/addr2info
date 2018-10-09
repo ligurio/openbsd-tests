@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+from collections import Counter
+
+def read(f):
+    """
+    Read lines in addr2line format:
+        uvm_unmap_remove
+        /usr/src/sys/uvm/uvm_map.c:2105
+
+    Returns: [ { "path": path, "lines": [1, 23, 4, 4] }, { ... } ]
+    """
+
+    touched = []
+    for line in f:
+        line = line.strip()
+        l = line.split(":")
+        if len(l) != 2:
+            continue
+        source_file = l[0]
+        line_num = int(l[1])
+        touched.append({ "path": source_file, "lines": [line_num] })
+
+    return touched
+
+def print_cov_file(cov):
+    """
+    see geninfo(1)
+
+    TN:
+    SF:/home/sergeyb/sources/fsx-source/fsx-linux.c
+    FN:1113,main
+    FNDA:0,vwarnc
+    FNDA:1,main
+    FNF:32
+    FNH:19
+    DA:131,0
+    DA:168,0
+    DA:169,0
+    LF:804
+    LH:287
+    end_of_record
+
+    """
+    print "TN:"
+    print "SF:", cov["path"]
+    for line_num, occurences in cov["lines"].iteritems():
+    	print "DA:%s,%s" % (line_num, occurences)
+    print "end_of_record"
+
+def print_cov(cov):
+    for c in cov:
+    	if c["path"]:
+    	   print_cov_file(c)
+
+def summarize_by_file(coverage):
+    coverage_group = []
+    cur_file = ""
+    cur_lines_num = []
+    for cov in coverage:
+        if cur_file != cov["path"]:
+	    cur_file = cov["path"]
+	    cur_lines_num = cov["lines"]
+            coverage_group.append( { "path": cur_file, "lines": cur_lines_num } )
+        else:
+            cur_lines_num += cov["lines"]
+
+    for idx, val in enumerate(coverage_group):
+        coverage_group[idx]["lines"] = Counter(coverage_group[idx]["lines"])
+
+    return coverage_group
+
+def main():
+    coverage = sorted(read(sys.stdin), key=lambda k: k['path']) 
+    cov_by_file = summarize_by_file(coverage)
+    print_cov(cov_by_file)
+
+    	
+if __name__ == '__main__':
+    main()
