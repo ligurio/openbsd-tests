@@ -1,0 +1,1597 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pv/vmt.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/pv</a> - vmt.c<span style="font-size: 80%;"> (source / <a href="vmt.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">540</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">44</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: vmt.c,v 1.15 2018/04/28 15:44:59 jasper Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2007 David Crawshaw &lt;david@zentus.com&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2008 David Gwynne &lt;dlg@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       8 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       9 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      12 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      13 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      14 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      15 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      16 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      17 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      18 </span>            :  */
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : #if !defined(__i386__) &amp;&amp; !defined(__amd64__)
+<span class="lineNum">      21 </span>            : #error vmt(4) is only supported on i386 and amd64
+<span class="lineNum">      22 </span>            : #endif
+<span class="lineNum">      23 </span>            : 
+<span class="lineNum">      24 </span>            : /*
+<span class="lineNum">      25 </span>            :  * Protocol reverse engineered by Ken Kato:
+<span class="lineNum">      26 </span>            :  * https://sites.google.com/site/chitchatvmback/backdoor
+<span class="lineNum">      27 </span>            :  */
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;sys/signalvar.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;sys/syslog.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;sys/proc.h&gt;
+<span class="lineNum">      37 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;sys/mount.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;sys/task.h&gt;
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      43 </span>            : #include &lt;net/if_var.h&gt;
+<span class="lineNum">      44 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      45 </span>            : 
+<span class="lineNum">      46 </span>            : #include &lt;dev/pv/pvvar.h&gt;
+<span class="lineNum">      47 </span>            : #include &lt;dev/rndvar.h&gt;
+<span class="lineNum">      48 </span>            : 
+<span class="lineNum">      49 </span>            : /* &quot;The&quot; magic number, always occupies the EAX register. */
+<span class="lineNum">      50 </span>            : #define VM_MAGIC                        0x564D5868
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : /* Port numbers, passed on EDX.LOW . */
+<span class="lineNum">      53 </span>            : #define VM_PORT_CMD                     0x5658
+<span class="lineNum">      54 </span>            : #define VM_PORT_RPC                     0x5659
+<span class="lineNum">      55 </span>            : 
+<span class="lineNum">      56 </span>            : /* Commands, passed on ECX.LOW. */
+<span class="lineNum">      57 </span>            : #define VM_CMD_GET_SPEED                0x01
+<span class="lineNum">      58 </span>            : #define VM_CMD_APM                      0x02
+<span class="lineNum">      59 </span>            : #define VM_CMD_GET_MOUSEPOS             0x04
+<span class="lineNum">      60 </span>            : #define VM_CMD_SET_MOUSEPOS             0x05
+<span class="lineNum">      61 </span>            : #define VM_CMD_GET_CLIPBOARD_LEN        0x06
+<span class="lineNum">      62 </span>            : #define VM_CMD_GET_CLIPBOARD            0x07
+<span class="lineNum">      63 </span>            : #define VM_CMD_SET_CLIPBOARD_LEN        0x08
+<span class="lineNum">      64 </span>            : #define VM_CMD_SET_CLIPBOARD            0x09
+<span class="lineNum">      65 </span>            : #define VM_CMD_GET_VERSION              0x0a
+<span class="lineNum">      66 </span>            : #define  VM_VERSION_UNMANAGED                   0x7fffffff
+<span class="lineNum">      67 </span>            : #define VM_CMD_GET_DEVINFO              0x0b
+<span class="lineNum">      68 </span>            : #define VM_CMD_DEV_ADDREMOVE            0x0c
+<span class="lineNum">      69 </span>            : #define VM_CMD_GET_GUI_OPTIONS          0x0d
+<span class="lineNum">      70 </span>            : #define VM_CMD_SET_GUI_OPTIONS          0x0e
+<span class="lineNum">      71 </span>            : #define VM_CMD_GET_SCREEN_SIZE          0x0f
+<span class="lineNum">      72 </span>            : #define VM_CMD_GET_HWVER                0x11
+<span class="lineNum">      73 </span>            : #define VM_CMD_POPUP_OSNOTFOUND         0x12
+<span class="lineNum">      74 </span>            : #define VM_CMD_GET_BIOS_UUID            0x13
+<span class="lineNum">      75 </span>            : #define VM_CMD_GET_MEM_SIZE             0x14
+<span class="lineNum">      76 </span>            : /*#define VM_CMD_GET_TIME               0x17 */ /* deprecated */
+<span class="lineNum">      77 </span>            : #define VM_CMD_RPC                      0x1e
+<span class="lineNum">      78 </span>            : #define VM_CMD_GET_TIME_FULL            0x2e
+<span class="lineNum">      79 </span>            : 
+<span class="lineNum">      80 </span>            : /* RPC sub-commands, passed on ECX.HIGH. */
+<span class="lineNum">      81 </span>            : #define VM_RPC_OPEN                     0x00
+<span class="lineNum">      82 </span>            : #define VM_RPC_SET_LENGTH               0x01
+<span class="lineNum">      83 </span>            : #define VM_RPC_SET_DATA                 0x02
+<span class="lineNum">      84 </span>            : #define VM_RPC_GET_LENGTH               0x03
+<span class="lineNum">      85 </span>            : #define VM_RPC_GET_DATA                 0x04
+<span class="lineNum">      86 </span>            : #define VM_RPC_GET_END                  0x05
+<span class="lineNum">      87 </span>            : #define VM_RPC_CLOSE                    0x06
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span>            : /* RPC magic numbers, passed on EBX. */
+<span class="lineNum">      90 </span>            : #define VM_RPC_OPEN_RPCI        0x49435052UL /* with VM_RPC_OPEN. */
+<span class="lineNum">      91 </span>            : #define VM_RPC_OPEN_TCLO        0x4F4C4354UL /* with VP_RPC_OPEN. */
+<span class="lineNum">      92 </span>            : #define VM_RPC_ENH_DATA         0x00010000UL /* with enhanced RPC data calls. */
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span>            : #define VM_RPC_FLAG_COOKIE      0x80000000UL
+<span class="lineNum">      95 </span>            : 
+<span class="lineNum">      96 </span>            : /* RPC reply flags */
+<span class="lineNum">      97 </span>            : #define VM_RPC_REPLY_SUCCESS    0x0001
+<span class="lineNum">      98 </span>            : #define VM_RPC_REPLY_DORECV     0x0002          /* incoming message available */
+<span class="lineNum">      99 </span>            : #define VM_RPC_REPLY_CLOSED     0x0004          /* RPC channel is closed */
+<span class="lineNum">     100 </span>            : #define VM_RPC_REPLY_UNSENT     0x0008          /* incoming message was removed? */
+<span class="lineNum">     101 </span>            : #define VM_RPC_REPLY_CHECKPOINT 0x0010          /* checkpoint occurred -&gt; retry */
+<span class="lineNum">     102 </span>            : #define VM_RPC_REPLY_POWEROFF   0x0020          /* underlying device is powering off */
+<span class="lineNum">     103 </span>            : #define VM_RPC_REPLY_TIMEOUT    0x0040
+<span class="lineNum">     104 </span>            : #define VM_RPC_REPLY_HB         0x0080          /* high-bandwidth tx/rx available */
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span>            : /* VM state change IDs */
+<span class="lineNum">     107 </span>            : #define VM_STATE_CHANGE_HALT    1
+<span class="lineNum">     108 </span>            : #define VM_STATE_CHANGE_REBOOT  2
+<span class="lineNum">     109 </span>            : #define VM_STATE_CHANGE_POWERON 3
+<span class="lineNum">     110 </span>            : #define VM_STATE_CHANGE_RESUME  4
+<span class="lineNum">     111 </span>            : #define VM_STATE_CHANGE_SUSPEND 5
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span>            : /* VM guest info keys */
+<span class="lineNum">     114 </span>            : #define VM_GUEST_INFO_DNS_NAME          1
+<span class="lineNum">     115 </span>            : #define VM_GUEST_INFO_IP_ADDRESS        2
+<span class="lineNum">     116 </span>            : #define VM_GUEST_INFO_DISK_FREE_SPACE   3
+<span class="lineNum">     117 </span>            : #define VM_GUEST_INFO_BUILD_NUMBER      4
+<span class="lineNum">     118 </span>            : #define VM_GUEST_INFO_OS_NAME_FULL      5
+<span class="lineNum">     119 </span>            : #define VM_GUEST_INFO_OS_NAME           6
+<span class="lineNum">     120 </span>            : #define VM_GUEST_INFO_UPTIME            7
+<span class="lineNum">     121 </span>            : #define VM_GUEST_INFO_MEMORY            8
+<span class="lineNum">     122 </span>            : #define VM_GUEST_INFO_IP_ADDRESS_V2     9
+<span class="lineNum">     123 </span>            : 
+<span class="lineNum">     124 </span>            : /* RPC responses */
+<span class="lineNum">     125 </span>            : #define VM_RPC_REPLY_OK                 &quot;OK &quot;
+<span class="lineNum">     126 </span>            : #define VM_RPC_RESET_REPLY              &quot;OK ATR toolbox&quot;
+<span class="lineNum">     127 </span>            : #define VM_RPC_REPLY_ERROR              &quot;ERROR Unknown command&quot;
+<span class="lineNum">     128 </span>            : #define VM_RPC_REPLY_ERROR_IP_ADDR      &quot;ERROR Unable to find guest IP address&quot;
+<span class="lineNum">     129 </span>            : 
+<span class="lineNum">     130 </span>            : /* VM backup error codes */
+<span class="lineNum">     131 </span>            : #define VM_BACKUP_SUCCESS               0
+<span class="lineNum">     132 </span>            : #define VM_BACKUP_SYNC_ERROR            3
+<span class="lineNum">     133 </span>            : #define VM_BACKUP_REMOTE_ABORT          4
+<span class="lineNum">     134 </span>            : 
+<span class="lineNum">     135 </span>            : #define VM_BACKUP_TIMEOUT               30 /* seconds */
+<span class="lineNum">     136 </span>            : 
+<span class="lineNum">     137 </span>            : /* A register. */
+<span class="lineNum">     138 </span>            : union vm_reg {
+<span class="lineNum">     139 </span>            :         struct {
+<span class="lineNum">     140 </span>            :                 uint16_t low;
+<span class="lineNum">     141 </span>            :                 uint16_t high;
+<span class="lineNum">     142 </span>            :         } part;
+<span class="lineNum">     143 </span>            :         uint32_t word;
+<span class="lineNum">     144 </span>            : #ifdef __amd64__
+<span class="lineNum">     145 </span>            :         struct {
+<span class="lineNum">     146 </span>            :                 uint32_t low;
+<span class="lineNum">     147 </span>            :                 uint32_t high;
+<span class="lineNum">     148 </span>            :         } words;
+<span class="lineNum">     149 </span>            :         uint64_t quad;
+<span class="lineNum">     150 </span>            : #endif
+<span class="lineNum">     151 </span>            : } __packed;
+<span class="lineNum">     152 </span>            : 
+<span class="lineNum">     153 </span>            : /* A register frame. */
+<span class="lineNum">     154 </span>            : struct vm_backdoor {
+<span class="lineNum">     155 </span>            :         union vm_reg eax;
+<span class="lineNum">     156 </span>            :         union vm_reg ebx;
+<span class="lineNum">     157 </span>            :         union vm_reg ecx;
+<span class="lineNum">     158 </span>            :         union vm_reg edx;
+<span class="lineNum">     159 </span>            :         union vm_reg esi;
+<span class="lineNum">     160 </span>            :         union vm_reg edi;
+<span class="lineNum">     161 </span>            :         union vm_reg ebp;
+<span class="lineNum">     162 </span>            : } __packed;
+<span class="lineNum">     163 </span>            : 
+<span class="lineNum">     164 </span>            : /* RPC context. */
+<span class="lineNum">     165 </span>            : struct vm_rpc {
+<span class="lineNum">     166 </span>            :         uint16_t channel;
+<span class="lineNum">     167 </span>            :         uint32_t cookie1;
+<span class="lineNum">     168 </span>            :         uint32_t cookie2;
+<span class="lineNum">     169 </span>            : };
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span>            : struct vmt_softc {
+<span class="lineNum">     172 </span>            :         struct device           sc_dev;
+<span class="lineNum">     173 </span>            : 
+<span class="lineNum">     174 </span>            :         struct vm_rpc           sc_tclo_rpc;
+<span class="lineNum">     175 </span>            :         char                    *sc_rpc_buf;
+<span class="lineNum">     176 </span>            :         int                     sc_rpc_error;
+<span class="lineNum">     177 </span>            :         int                     sc_tclo_ping;
+<span class="lineNum">     178 </span>            :         int                     sc_set_guest_os;
+<span class="lineNum">     179 </span>            :         int                     sc_quiesce;
+<span class="lineNum">     180 </span>            :         struct task             sc_quiesce_task;
+<span class="lineNum">     181 </span>            : #define VMT_RPC_BUFLEN          4096
+<span class="lineNum">     182 </span>            : 
+<span class="lineNum">     183 </span>            :         struct timeout          sc_tick;
+<span class="lineNum">     184 </span>            :         struct timeout          sc_tclo_tick;
+<span class="lineNum">     185 </span>            :         struct ksensordev       sc_sensordev;
+<span class="lineNum">     186 </span>            :         struct ksensor          sc_sensor;
+<span class="lineNum">     187 </span>            : 
+<span class="lineNum">     188 </span>            :         char                    sc_hostname[MAXHOSTNAMELEN];
+<span class="lineNum">     189 </span>            : };
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span>            : #ifdef VMT_DEBUG
+<span class="lineNum">     192 </span>            : #define DPRINTF(_arg...)        printf(_arg)
+<span class="lineNum">     193 </span>            : #else
+<span class="lineNum">     194 </span>            : #define DPRINTF(_arg...)        do {} while(0)
+<span class="lineNum">     195 </span>            : #endif
+<span class="lineNum">     196 </span>            : #define DEVNAME(_s)             ((_s)-&gt;sc_dev.dv_xname)
+<span class="lineNum">     197 </span>            : 
+<span class="lineNum">     198 </span>            : void     vm_cmd(struct vm_backdoor *);
+<span class="lineNum">     199 </span>            : void     vm_ins(struct vm_backdoor *);
+<span class="lineNum">     200 </span>            : void     vm_outs(struct vm_backdoor *);
+<span class="lineNum">     201 </span>            : 
+<span class="lineNum">     202 </span>            : /* Functions for communicating with the VM Host. */
+<span class="lineNum">     203 </span>            : int      vm_rpc_open(struct vm_rpc *, uint32_t);
+<span class="lineNum">     204 </span>            : int      vm_rpc_close(struct vm_rpc *);
+<span class="lineNum">     205 </span>            : int      vm_rpc_send(const struct vm_rpc *, const uint8_t *, uint32_t);
+<span class="lineNum">     206 </span>            : int      vm_rpc_send_str(const struct vm_rpc *, const uint8_t *);
+<span class="lineNum">     207 </span>            : int      vm_rpc_get_length(const struct vm_rpc *, uint32_t *, uint16_t *);
+<span class="lineNum">     208 </span>            : int      vm_rpc_get_data(const struct vm_rpc *, char *, uint32_t, uint16_t);
+<span class="lineNum">     209 </span>            : int      vm_rpc_send_rpci_tx_buf(struct vmt_softc *, const uint8_t *, uint32_t);
+<span class="lineNum">     210 </span>            : int      vm_rpc_send_rpci_tx(struct vmt_softc *, const char *, ...)
+<span class="lineNum">     211 </span>            :             __attribute__((__format__(__kprintf__,2,3)));
+<span class="lineNum">     212 </span>            : int      vm_rpci_response_successful(struct vmt_softc *);
+<span class="lineNum">     213 </span>            : 
+<span class="lineNum">     214 </span>            : int      vmt_kvop(void *, int, char *, char *, size_t);
+<span class="lineNum">     215 </span>            : 
+<span class="lineNum">     216 </span>            : void     vmt_probe_cmd(struct vm_backdoor *, uint16_t);
+<span class="lineNum">     217 </span>            : void     vmt_tclo_state_change_success(struct vmt_softc *, int, char);
+<span class="lineNum">     218 </span>            : void     vmt_do_reboot(struct vmt_softc *);
+<span class="lineNum">     219 </span>            : void     vmt_do_shutdown(struct vmt_softc *);
+<span class="lineNum">     220 </span>            : void     vmt_shutdown(void *);
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span>            : void     vmt_update_guest_info(struct vmt_softc *);
+<span class="lineNum">     223 </span>            : void     vmt_update_guest_uptime(struct vmt_softc *);
+<span class="lineNum">     224 </span>            : 
+<span class="lineNum">     225 </span>            : void     vmt_tick_hook(struct device *self);
+<span class="lineNum">     226 </span>            : void     vmt_tick(void *);
+<span class="lineNum">     227 </span>            : void     vmt_resume(void);
+<span class="lineNum">     228 </span>            : 
+<span class="lineNum">     229 </span>            : int      vmt_match(struct device *, void *, void *);
+<span class="lineNum">     230 </span>            : void     vmt_attach(struct device *, struct device *, void *);
+<span class="lineNum">     231 </span>            : int      vmt_activate(struct device *, int);
+<span class="lineNum">     232 </span>            : 
+<span class="lineNum">     233 </span>            : void     vmt_tclo_tick(void *);
+<span class="lineNum">     234 </span>            : int      vmt_tclo_process(struct vmt_softc *, const char *);
+<span class="lineNum">     235 </span>            : void     vmt_tclo_reset(struct vmt_softc *);
+<span class="lineNum">     236 </span>            : void     vmt_tclo_ping(struct vmt_softc *);
+<span class="lineNum">     237 </span>            : void     vmt_tclo_halt(struct vmt_softc *);
+<span class="lineNum">     238 </span>            : void     vmt_tclo_reboot(struct vmt_softc *);
+<span class="lineNum">     239 </span>            : void     vmt_tclo_poweron(struct vmt_softc *);
+<span class="lineNum">     240 </span>            : void     vmt_tclo_suspend(struct vmt_softc *);
+<span class="lineNum">     241 </span>            : void     vmt_tclo_resume(struct vmt_softc *);
+<span class="lineNum">     242 </span>            : void     vmt_tclo_capreg(struct vmt_softc *);
+<span class="lineNum">     243 </span>            : void     vmt_tclo_broadcastip(struct vmt_softc *);
+<span class="lineNum">     244 </span>            : 
+<span class="lineNum">     245 </span>            : void     vmt_set_backup_status(struct vmt_softc *, const char *, int,
+<span class="lineNum">     246 </span>            :             const char *);
+<span class="lineNum">     247 </span>            : void     vmt_quiesce_task(void *);
+<span class="lineNum">     248 </span>            : void     vmt_quiesce_done_task(void *);
+<span class="lineNum">     249 </span>            : void     vmt_tclo_abortbackup(struct vmt_softc *);
+<span class="lineNum">     250 </span>            : void     vmt_tclo_startbackup(struct vmt_softc *);
+<span class="lineNum">     251 </span>            : void     vmt_tclo_backupdone(struct vmt_softc *);
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span>            : int      vmt_probe(void);
+<span class="lineNum">     254 </span>            : 
+<span class="lineNum">     255 </span>            : struct vmt_tclo_rpc {
+<span class="lineNum">     256 </span>            :         const char      *name;
+<span class="lineNum">     257 </span>            :         void            (*cb)(struct vmt_softc *);
+<span class="lineNum">     258 </span>            : } vmt_tclo_rpc[] = {
+<span class="lineNum">     259 </span>            :         /* Keep sorted by name (case-sensitive) */
+<span class="lineNum">     260 </span>            :         { &quot;Capabilities_Register&quot;,      vmt_tclo_capreg },
+<span class="lineNum">     261 </span>            :         { &quot;OS_Halt&quot;,                    vmt_tclo_halt },
+<span class="lineNum">     262 </span>            :         { &quot;OS_PowerOn&quot;,                 vmt_tclo_poweron },
+<span class="lineNum">     263 </span>            :         { &quot;OS_Reboot&quot;,                  vmt_tclo_reboot },
+<span class="lineNum">     264 </span>            :         { &quot;OS_Resume&quot;,                  vmt_tclo_resume },
+<span class="lineNum">     265 </span>            :         { &quot;OS_Suspend&quot;,                 vmt_tclo_suspend },
+<span class="lineNum">     266 </span>            :         { &quot;Set_Option broadcastIP 1&quot;,   vmt_tclo_broadcastip },
+<span class="lineNum">     267 </span>            :         { &quot;ping&quot;,                       vmt_tclo_ping },
+<span class="lineNum">     268 </span>            :         { &quot;reset&quot;,                      vmt_tclo_reset },
+<span class="lineNum">     269 </span>            :         { &quot;vmbackup.abort&quot;,           vmt_tclo_abortbackup },
+<span class="lineNum">     270 </span>            :         { &quot;vmbackup.snapshotDone&quot;,    vmt_tclo_backupdone },
+<span class="lineNum">     271 </span>            :         { &quot;vmbackup.start 1&quot;,         vmt_tclo_startbackup },
+<span class="lineNum">     272 </span>            :         { NULL },
+<span class="lineNum">     273 </span>            : #if 0
+<span class="lineNum">     274 </span>            :         /* Various unsupported commands */
+<span class="lineNum">     275 </span>            :         { &quot;Set_Option autohide 0&quot; },
+<span class="lineNum">     276 </span>            :         { &quot;Set_Option copypaste 1&quot; },
+<span class="lineNum">     277 </span>            :         { &quot;Set_Option enableDnD 1&quot; },
+<span class="lineNum">     278 </span>            :         { &quot;Set_Option enableMessageBusTunnel 0&quot; },
+<span class="lineNum">     279 </span>            :         { &quot;Set_Option linkRootHgfsShare 0&quot; },
+<span class="lineNum">     280 </span>            :         { &quot;Set_Option mapRootHgfsShare 0&quot; },
+<span class="lineNum">     281 </span>            :         { &quot;Set_Option synctime 1&quot; },
+<span class="lineNum">     282 </span>            :         { &quot;Set_Option synctime.period 0&quot; },
+<span class="lineNum">     283 </span>            :         { &quot;Set_Option time.synchronize.tools.enable 1&quot; },
+<span class="lineNum">     284 </span>            :         { &quot;Set_Option time.synchronize.tools.percentCorrection 0&quot; },
+<span class="lineNum">     285 </span>            :         { &quot;Set_Option time.synchronize.tools.slewCorrection 1&quot; },
+<span class="lineNum">     286 </span>            :         { &quot;Set_Option time.synchronize.tools.startup 1&quot; },
+<span class="lineNum">     287 </span>            :         { &quot;Set_Option toolScripts.afterPowerOn 1&quot; },
+<span class="lineNum">     288 </span>            :         { &quot;Set_Option toolScripts.afterResume 1&quot; },
+<span class="lineNum">     289 </span>            :         { &quot;Set_Option toolScripts.beforePowerOff 1&quot; },
+<span class="lineNum">     290 </span>            :         { &quot;Set_Option toolScripts.beforeSuspend 1&quot; },
+<span class="lineNum">     291 </span>            :         { &quot;Time_Synchronize 0&quot; },
+<span class="lineNum">     292 </span>            :         { &quot;Vix_1_Relayed_Command \&quot;38cdcae40e075d66\&quot;&quot; },
+<span class="lineNum">     293 </span>            : #endif
+<span class="lineNum">     294 </span>            : };
+<span class="lineNum">     295 </span>            : 
+<span class="lineNum">     296 </span>            : struct cfattach vmt_ca = {
+<span class="lineNum">     297 </span>            :         sizeof(struct vmt_softc),
+<span class="lineNum">     298 </span>            :         vmt_match,
+<span class="lineNum">     299 </span>            :         vmt_attach,
+<span class="lineNum">     300 </span>            :         NULL,
+<span class="lineNum">     301 </span>            :         vmt_activate
+<span class="lineNum">     302 </span>            : };
+<span class="lineNum">     303 </span>            : 
+<span class="lineNum">     304 </span>            : struct cfdriver vmt_cd = {
+<span class="lineNum">     305 </span>            :         NULL,
+<span class="lineNum">     306 </span>            :         &quot;vmt&quot;,
+<span class="lineNum">     307 </span>            :         DV_DULL
+<span class="lineNum">     308 </span>            : };
+<span class="lineNum">     309 </span>            : 
+<span class="lineNum">     310 </span>            : extern char hostname[MAXHOSTNAMELEN];
+<a name="311"><span class="lineNum">     311 </span>            : </a>
+<span class="lineNum">     312 </span>            : void
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 : vmt_probe_cmd(struct vm_backdoor *frame, uint16_t cmd)</span>
+<span class="lineNum">     314 </span>            : {
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :         bzero(frame, sizeof(*frame));</span>
+<span class="lineNum">     316 </span>            : 
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :         (frame-&gt;eax).word = VM_MAGIC;</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :         (frame-&gt;ebx).word = ~VM_MAGIC;</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :         (frame-&gt;ecx).part.low = cmd;</span>
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         (frame-&gt;ecx).part.high = 0xffff;</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :         (frame-&gt;edx).part.low  = VM_PORT_CMD;</span>
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         (frame-&gt;edx).part.high = 0;</span>
+<span class="lineNum">     323 </span>            : 
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :         vm_cmd(frame);</span>
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 : }</span>
+<a name="326"><span class="lineNum">     326 </span>            : </a>
+<span class="lineNum">     327 </span>            : int
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 : vmt_probe(void)</span>
+<span class="lineNum">     329 </span>            : {
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         struct vm_backdoor frame;</span>
+<span class="lineNum">     331 </span>            : 
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         vmt_probe_cmd(&amp;frame, VM_CMD_GET_VERSION);</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         if (frame.eax.word == 0xffffffff ||</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :             frame.ebx.word != VM_MAGIC)</span>
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     336 </span>            : 
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :         vmt_probe_cmd(&amp;frame, VM_CMD_GET_SPEED);</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         if (frame.eax.word == VM_MAGIC)</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     340 </span>            : 
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 : }</span>
+<a name="343"><span class="lineNum">     343 </span>            : </a>
+<span class="lineNum">     344 </span>            : int
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 : vmt_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     346 </span>            : {
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :         struct pv_attach_args   *pva = aux;</span>
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         struct pvbus_hv         *hv = &amp;pva-&gt;pva_hv[PVBUS_VMWARE];</span>
+<span class="lineNum">     349 </span>            : 
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         if (hv-&gt;hv_base == 0)</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :         if (!vmt_probe())</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     354 </span>            : 
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 : }</span>
+<a name="357"><span class="lineNum">     357 </span>            : </a>
+<span class="lineNum">     358 </span>            : void
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 : vmt_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     360 </span>            : {
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         struct vmt_softc *sc = (struct vmt_softc *)self;</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :         struct pv_attach_args   *pva = aux;</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :         struct pvbus_hv         *hv = &amp;pva-&gt;pva_hv[PVBUS_VMWARE];</span>
+<span class="lineNum">     364 </span>            : 
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         sc-&gt;sc_rpc_buf = malloc(VMT_RPC_BUFLEN, M_DEVBUF, M_NOWAIT);</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_rpc_buf == NULL) {</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to allocate buffer for RPC\n&quot;,</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                     DEVNAME(sc));</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     371 </span>            :         }
+<span class="lineNum">     372 </span>            : 
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :         if (vm_rpc_open(&amp;sc-&gt;sc_tclo_rpc, VM_RPC_OPEN_TCLO) != 0) {</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to open backdoor RPC channel &quot;</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                     &quot;(TCLO protocol)\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                 goto free;</span>
+<span class="lineNum">     377 </span>            :         }
+<span class="lineNum">     378 </span>            : 
+<span class="lineNum">     379 </span>            :         /* don't know if this is important at all yet */
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_rpci_tx(sc,</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :             &quot;tools.capability.hgfs_server toolbox 1&quot;) != 0) {</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                 printf(&quot;: failed to set HGFS server capability\n&quot;);</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :                 goto free;</span>
+<span class="lineNum">     384 </span>            :         }
+<span class="lineNum">     385 </span>            : 
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :         strlcpy(sc-&gt;sc_sensordev.xname, sc-&gt;sc_dev.dv_xname,</span>
+<span class="lineNum">     387 </span>            :             sizeof(sc-&gt;sc_sensordev.xname));
+<span class="lineNum">     388 </span>            : 
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         sc-&gt;sc_sensor.type = SENSOR_TIMEDELTA;</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         sc-&gt;sc_sensor.status = SENSOR_S_UNKNOWN;</span>
+<span class="lineNum">     391 </span>            : 
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         sensor_attach(&amp;sc-&gt;sc_sensordev, &amp;sc-&gt;sc_sensor);</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         sensordev_install(&amp;sc-&gt;sc_sensordev);</span>
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         config_mountroot(self, vmt_tick_hook);</span>
+<span class="lineNum">     396 </span>            : 
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :         timeout_set(&amp;sc-&gt;sc_tclo_tick, vmt_tclo_tick, sc);</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :         timeout_add_sec(&amp;sc-&gt;sc_tclo_tick, 1);</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tclo_ping = 1;</span>
+<span class="lineNum">     400 </span>            : 
+<span class="lineNum">     401 </span>            :         /* pvbus(4) key/value interface */
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :         hv-&gt;hv_kvop = vmt_kvop;</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :         hv-&gt;hv_arg = sc;</span>
+<span class="lineNum">     404 </span>            : 
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     406 </span>            : 
+<span class="lineNum">     407 </span>            : free:
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :         free(sc-&gt;sc_rpc_buf, M_DEVBUF, VMT_RPC_BUFLEN);</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 : }</span>
+<a name="410"><span class="lineNum">     410 </span>            : </a>
+<span class="lineNum">     411 </span>            : int
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 : vmt_kvop(void *arg, int op, char *key, char *value, size_t valuelen)</span>
+<span class="lineNum">     413 </span>            : {
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         struct vmt_softc *sc = arg;</span>
+<span class="lineNum">     415 </span>            :         char *buf = NULL, *ptr;
+<span class="lineNum">     416 </span>            :         size_t bufsz;
+<span class="lineNum">     417 </span>            :         int error = 0;
+<span class="lineNum">     418 </span>            : 
+<span class="lineNum">     419 </span>            :         bufsz = VMT_RPC_BUFLEN;
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         buf = malloc(bufsz, M_TEMP|M_ZERO, M_WAITOK);</span>
+<span class="lineNum">     421 </span>            : 
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :         switch (op) {</span>
+<span class="lineNum">     423 </span>            :         case PVBUS_KVWRITE:
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :                 if ((size_t)snprintf(buf, bufsz, &quot;info-set %s %s&quot;,</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :                     key, value) &gt;= bufsz) {</span>
+<span class="lineNum">     426 </span>            :                         DPRINTF(&quot;%s: write command too long&quot;, DEVNAME(sc));
+<span class="lineNum">     427 </span>            :                         error = EINVAL;
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                         goto done;</span>
+<span class="lineNum">     429 </span>            :                 }
+<span class="lineNum">     430 </span>            :                 break;
+<span class="lineNum">     431 </span>            :         case PVBUS_KVREAD:
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                 if ((size_t)snprintf(buf, bufsz, &quot;info-get %s&quot;,</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :                     key) &gt;= bufsz) {</span>
+<span class="lineNum">     434 </span>            :                         DPRINTF(&quot;%s: read command too long&quot;, DEVNAME(sc));
+<span class="lineNum">     435 </span>            :                         error = EINVAL;
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :                         goto done;</span>
+<span class="lineNum">     437 </span>            :                 }
+<span class="lineNum">     438 </span>            :                 break;
+<span class="lineNum">     439 </span>            :         default:
+<span class="lineNum">     440 </span>            :                 error = EOPNOTSUPP;
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     442 </span>            :         }
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_rpci_tx(sc, &quot;%s&quot;, buf) != 0) {</span>
+<span class="lineNum">     445 </span>            :                 DPRINTF(&quot;%s: error sending command: %s\n&quot;, DEVNAME(sc), buf);
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     447 </span>            :                 error = EIO;
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     449 </span>            :         }
+<span class="lineNum">     450 </span>            : 
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :         if (vm_rpci_response_successful(sc) == 0) {</span>
+<span class="lineNum">     452 </span>            :                 DPRINTF(&quot;%s: host rejected command: %s\n&quot;, DEVNAME(sc), buf);
+<span class="lineNum">     453 </span>            :                 error = EINVAL;
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     455 </span>            :         }
+<span class="lineNum">     456 </span>            : 
+<span class="lineNum">     457 </span>            :         /* skip response that was tested in vm_rpci_response_successful() */
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :         ptr = sc-&gt;sc_rpc_buf + 2;</span>
+<span class="lineNum">     459 </span>            : 
+<span class="lineNum">     460 </span>            :         /* might truncat, copy anyway but return error */
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :         if (strlcpy(value, ptr, valuelen) &gt;= valuelen)</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                 error = ENOMEM;</span>
+<span class="lineNum">     463 </span>            : 
+<span class="lineNum">     464 </span>            :  done:
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :         free(buf, M_TEMP, bufsz);</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     467 </span>            : }
+<a name="468"><span class="lineNum">     468 </span>            : </a>
+<span class="lineNum">     469 </span>            : void
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 : vmt_resume(void)</span>
+<span class="lineNum">     471 </span>            : {
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :         struct vm_backdoor frame;</span>
+<span class="lineNum">     473 </span>            :         extern void rdrand(void *);
+<span class="lineNum">     474 </span>            : 
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :         bzero(&amp;frame, sizeof(frame));</span>
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :         frame.eax.word = VM_MAGIC;</span>
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :         frame.ecx.part.low = VM_CMD_GET_TIME_FULL;</span>
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         frame.edx.part.low  = VM_PORT_CMD;</span>
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :         vm_cmd(&amp;frame);</span>
+<span class="lineNum">     480 </span>            : 
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :         rdrand(NULL);</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :         enqueue_randomness(frame.eax.word);</span>
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :         enqueue_randomness(frame.esi.word);</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         enqueue_randomness(frame.edx.word);</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :         enqueue_randomness(frame.ebx.word);</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :         resume_randomness(NULL, 0);</span>
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 : }</span>
+<a name="488"><span class="lineNum">     488 </span>            : </a>
+<span class="lineNum">     489 </span>            : int
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 : vmt_activate(struct device *self, int act)</span>
+<span class="lineNum">     491 </span>            : {
+<span class="lineNum">     492 </span>            :         int rv = 0;
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :         switch (act) {</span>
+<span class="lineNum">     495 </span>            :         case DVACT_POWERDOWN:
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                 vmt_shutdown(self);</span>
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     498 </span>            :         case DVACT_RESUME:
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :                 vmt_resume();</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     501 </span>            :         }
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     503 </span>            : }
+<span class="lineNum">     504 </span>            : 
+<a name="505"><span class="lineNum">     505 </span>            : </a>
+<span class="lineNum">     506 </span>            : void
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 : vmt_update_guest_uptime(struct vmt_softc *sc)</span>
+<span class="lineNum">     508 </span>            : {
+<span class="lineNum">     509 </span>            :         /* host wants uptime in hundredths of a second */
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_rpci_tx(sc, &quot;SetGuestInfo  %d %lld00&quot;,</span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :             VM_GUEST_INFO_UPTIME, (long long)time_uptime) != 0) {</span>
+<span class="lineNum">     512 </span>            :                 DPRINTF(&quot;%s: unable to set guest uptime&quot;, DEVNAME(sc));
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 : }</span>
+<a name="516"><span class="lineNum">     516 </span>            : </a>
+<span class="lineNum">     517 </span>            : void
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 : vmt_update_guest_info(struct vmt_softc *sc)</span>
+<span class="lineNum">     519 </span>            : {
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         if (strncmp(sc-&gt;sc_hostname, hostname, sizeof(sc-&gt;sc_hostname)) != 0) {</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                 strlcpy(sc-&gt;sc_hostname, hostname, sizeof(sc-&gt;sc_hostname));</span>
+<span class="lineNum">     522 </span>            : 
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :                 if (vm_rpc_send_rpci_tx(sc, &quot;SetGuestInfo  %d %s&quot;,</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :                     VM_GUEST_INFO_DNS_NAME, sc-&gt;sc_hostname) != 0) {</span>
+<span class="lineNum">     525 </span>            :                         DPRINTF(&quot;%s: unable to set hostname&quot;, DEVNAME(sc));
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     528 </span>            :         }
+<span class="lineNum">     529 </span>            : 
+<span class="lineNum">     530 </span>            :         /*
+<span class="lineNum">     531 </span>            :          * We're supposed to pass the full network address information back
+<span class="lineNum">     532 </span>            :          * here, but that involves xdr (sunrpc) data encoding, which seems a
+<span class="lineNum">     533 </span>            :          * bit unreasonable.
+<span class="lineNum">     534 </span>            :          */
+<span class="lineNum">     535 </span>            : 
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_set_guest_os == 0) {</span>
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                 if (vm_rpc_send_rpci_tx(sc, &quot;SetGuestInfo  %d %s %s %s&quot;,</span>
+<span class="lineNum">     538 </span>            :                     VM_GUEST_INFO_OS_NAME_FULL,
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :                     ostype, osrelease, osversion) != 0) {</span>
+<span class="lineNum">     540 </span>            :                         DPRINTF(&quot;%s: unable to set full guest OS&quot;, DEVNAME(sc));
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     543 </span>            : 
+<span class="lineNum">     544 </span>            :                 /*
+<span class="lineNum">     545 </span>            :                  * Host doesn't like it if we send an OS name it doesn't
+<span class="lineNum">     546 </span>            :                  * recognise, so use the closest match, which happens
+<span class="lineNum">     547 </span>            :                  * to be FreeBSD.
+<span class="lineNum">     548 </span>            :                  */
+<span class="lineNum">     549 </span>            : 
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :                 if (vm_rpc_send_rpci_tx(sc, &quot;SetGuestInfo  %d %s&quot;,</span>
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :                     VM_GUEST_INFO_OS_NAME, &quot;FreeBSD&quot;) != 0) {</span>
+<span class="lineNum">     552 </span>            :                         DPRINTF(&quot;%s: unable to set guest OS&quot;, DEVNAME(sc));
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     555 </span>            : 
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_set_guest_os = 1;</span>
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 : }</span>
+<a name="559"><span class="lineNum">     559 </span>            : </a>
+<span class="lineNum">     560 </span>            : void
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 : vmt_tick_hook(struct device *self)</span>
+<span class="lineNum">     562 </span>            : {
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :         struct vmt_softc *sc = (struct vmt_softc *)self;</span>
+<span class="lineNum">     564 </span>            : 
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :         timeout_set(&amp;sc-&gt;sc_tick, vmt_tick, sc);</span>
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :         vmt_tick(sc);</span>
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 : }</span>
+<a name="568"><span class="lineNum">     568 </span>            : </a>
+<span class="lineNum">     569 </span>            : void
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 : vmt_tick(void *xarg)</span>
+<span class="lineNum">     571 </span>            : {
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :         struct vmt_softc *sc = xarg;</span>
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :         struct vm_backdoor frame;</span>
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :         struct timeval *guest = &amp;sc-&gt;sc_sensor.tv;</span>
+<span class="lineNum">     575 </span>            :         struct timeval host, diff;
+<span class="lineNum">     576 </span>            : 
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :         microtime(guest);</span>
+<span class="lineNum">     578 </span>            : 
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :         bzero(&amp;frame, sizeof(frame));</span>
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         frame.eax.word = VM_MAGIC;</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :         frame.ecx.part.low = VM_CMD_GET_TIME_FULL;</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :         frame.edx.part.low  = VM_PORT_CMD;</span>
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :         vm_cmd(&amp;frame);</span>
+<span class="lineNum">     584 </span>            : 
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :         if (frame.eax.word != 0xffffffff) {</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 host.tv_sec = ((uint64_t)frame.esi.word &lt;&lt; 32) | frame.edx.word;</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :                 host.tv_usec = frame.ebx.word;</span>
+<span class="lineNum">     588 </span>            : 
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :                 timersub(guest, &amp;host, &amp;diff);</span>
+<span class="lineNum">     590 </span>            : 
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_sensor.value = (u_int64_t)diff.tv_sec * 1000000000LL +</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :                     (u_int64_t)diff.tv_usec * 1000LL;</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_sensor.status = SENSOR_S_OK;</span>
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_sensor.status = SENSOR_S_UNKNOWN;</span>
+<span class="lineNum">     596 </span>            :         }
+<span class="lineNum">     597 </span>            : 
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :         vmt_update_guest_info(sc);</span>
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :         vmt_update_guest_uptime(sc);</span>
+<span class="lineNum">     600 </span>            : 
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :         timeout_add_sec(&amp;sc-&gt;sc_tick, 15);</span>
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 : }</span>
+<a name="603"><span class="lineNum">     603 </span>            : </a>
+<span class="lineNum">     604 </span>            : void
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 : vmt_tclo_state_change_success(struct vmt_softc *sc, int success, char state)</span>
+<span class="lineNum">     606 </span>            : {
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_rpci_tx(sc, &quot;tools.os.statechange.status %d %d&quot;,</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :             success, state) != 0) {</span>
+<span class="lineNum">     609 </span>            :                 DPRINTF(&quot;%s: unable to send state change result\n&quot;,
+<span class="lineNum">     610 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 : }</span>
+<a name="614"><span class="lineNum">     614 </span>            : </a>
+<span class="lineNum">     615 </span>            : void
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 : vmt_do_shutdown(struct vmt_softc *sc)</span>
+<span class="lineNum">     617 </span>            : {
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :         vmt_tclo_state_change_success(sc, 1, VM_STATE_CHANGE_HALT);</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :         vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, VM_RPC_REPLY_OK);</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :         pvbus_shutdown(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 : }</span>
+<a name="622"><span class="lineNum">     622 </span>            : </a>
+<span class="lineNum">     623 </span>            : void
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 : vmt_do_reboot(struct vmt_softc *sc)</span>
+<span class="lineNum">     625 </span>            : {
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :         vmt_tclo_state_change_success(sc, 1, VM_STATE_CHANGE_REBOOT);</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :         vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, VM_RPC_REPLY_OK);</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :         pvbus_reboot(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 : }</span>
+<a name="630"><span class="lineNum">     630 </span>            : </a>
+<span class="lineNum">     631 </span>            : void
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 : vmt_shutdown(void *arg)</span>
+<span class="lineNum">     633 </span>            : {
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 :         struct vmt_softc *sc = arg;</span>
+<span class="lineNum">     635 </span>            : 
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_rpci_tx(sc,</span>
+<span class="lineNum">     637 </span>            :             &quot;tools.capability.hgfs_server toolbox 0&quot;) != 0) {
+<span class="lineNum">     638 </span>            :                 DPRINTF(&quot;%s: failed to disable hgfs server capability\n&quot;,
+<span class="lineNum">     639 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     640 </span>            :         }
+<span class="lineNum">     641 </span>            : 
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         if (vm_rpc_send(&amp;sc-&gt;sc_tclo_rpc, NULL, 0) != 0) {</span>
+<span class="lineNum">     643 </span>            :                 DPRINTF(&quot;%s: failed to send shutdown ping\n&quot;, DEVNAME(sc));
+<span class="lineNum">     644 </span>            :         }
+<span class="lineNum">     645 </span>            : 
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :         vm_rpc_close(&amp;sc-&gt;sc_tclo_rpc);</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 : }</span>
+<a name="648"><span class="lineNum">     648 </span>            : </a>
+<span class="lineNum">     649 </span>            : void
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 : vmt_tclo_reset(struct vmt_softc *sc)</span>
+<span class="lineNum">     651 </span>            : {
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_rpc_error != 0) {</span>
+<span class="lineNum">     653 </span>            :                 DPRINTF(&quot;%s: resetting rpc\n&quot;, DEVNAME(sc));
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :                 vm_rpc_close(&amp;sc-&gt;sc_tclo_rpc);</span>
+<span class="lineNum">     655 </span>            : 
+<span class="lineNum">     656 </span>            :                 /* reopen and send the reset reply next time around */
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     659 </span>            :         }
+<span class="lineNum">     660 </span>            : 
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, VM_RPC_RESET_REPLY) != 0) {</span>
+<span class="lineNum">     662 </span>            :                 DPRINTF(&quot;%s: failed to send reset reply\n&quot;, DEVNAME(sc));
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 : }</span>
+<a name="666"><span class="lineNum">     666 </span>            : </a>
+<span class="lineNum">     667 </span>            : void
+<span class="lineNum">     668 </span><span class="lineNoCov">          0 : vmt_tclo_ping(struct vmt_softc *sc)</span>
+<span class="lineNum">     669 </span>            : {
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :         vmt_update_guest_info(sc);</span>
+<span class="lineNum">     671 </span>            : 
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, VM_RPC_REPLY_OK) != 0) {</span>
+<span class="lineNum">     673 </span>            :                 DPRINTF(&quot;%s: error sending ping response\n&quot;, DEVNAME(sc));
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 : }</span>
+<a name="677"><span class="lineNum">     677 </span>            : </a>
+<span class="lineNum">     678 </span>            : void
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 : vmt_tclo_halt(struct vmt_softc *sc)</span>
+<span class="lineNum">     680 </span>            : {
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         vmt_do_shutdown(sc);</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 : }</span>
+<a name="683"><span class="lineNum">     683 </span>            : </a>
+<span class="lineNum">     684 </span>            : void
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 : vmt_tclo_reboot(struct vmt_softc *sc)</span>
+<span class="lineNum">     686 </span>            : {
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :         vmt_do_reboot(sc);</span>
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 : }</span>
+<a name="689"><span class="lineNum">     689 </span>            : </a>
+<span class="lineNum">     690 </span>            : void
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 : vmt_tclo_poweron(struct vmt_softc *sc)</span>
+<span class="lineNum">     692 </span>            : {
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :         vmt_tclo_state_change_success(sc, 1, VM_STATE_CHANGE_POWERON);</span>
+<span class="lineNum">     694 </span>            : 
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, VM_RPC_REPLY_OK) != 0) {</span>
+<span class="lineNum">     696 </span>            :                 DPRINTF(&quot;%s: error sending poweron response\n&quot;, DEVNAME(sc));
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 : }</span>
+<a name="700"><span class="lineNum">     700 </span>            : </a>
+<span class="lineNum">     701 </span>            : void
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 : vmt_tclo_suspend(struct vmt_softc *sc)</span>
+<span class="lineNum">     703 </span>            : {
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :         log(LOG_KERN | LOG_NOTICE,</span>
+<span class="lineNum">     705 </span>            :             &quot;VMware guest entering suspended state\n&quot;);
+<span class="lineNum">     706 </span>            : 
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :         suspend_randomness();</span>
+<span class="lineNum">     708 </span>            : 
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :         vmt_tclo_state_change_success(sc, 1, VM_STATE_CHANGE_SUSPEND);</span>
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, VM_RPC_REPLY_OK) != 0) {</span>
+<span class="lineNum">     711 </span>            :                 DPRINTF(&quot;%s: error sending suspend response\n&quot;, DEVNAME(sc));
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 : }</span>
+<a name="715"><span class="lineNum">     715 </span>            : </a>
+<span class="lineNum">     716 </span>            : void
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 : vmt_tclo_resume(struct vmt_softc *sc)</span>
+<span class="lineNum">     718 </span>            : {
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :         log(LOG_KERN | LOG_NOTICE,</span>
+<span class="lineNum">     720 </span>            :             &quot;VMware guest resuming from suspended state\n&quot;);
+<span class="lineNum">     721 </span>            : 
+<span class="lineNum">     722 </span>            :         /* force guest info update */
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :         sc-&gt;sc_hostname[0] = '\0';</span>
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :         sc-&gt;sc_set_guest_os = 0;</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :         vmt_update_guest_info(sc);</span>
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 :         vmt_resume();</span>
+<span class="lineNum">     727 </span>            : 
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :         vmt_tclo_state_change_success(sc, 1, VM_STATE_CHANGE_RESUME);</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, VM_RPC_REPLY_OK) != 0) {</span>
+<span class="lineNum">     730 </span>            :                 DPRINTF(&quot;%s: error sending resume response\n&quot;, DEVNAME(sc));
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 : }</span>
+<a name="734"><span class="lineNum">     734 </span>            : </a>
+<span class="lineNum">     735 </span>            : void
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 : vmt_tclo_capreg(struct vmt_softc *sc)</span>
+<span class="lineNum">     737 </span>            : {
+<span class="lineNum">     738 </span>            :         /* don't know if this is important at all */
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_rpci_tx(sc,</span>
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :             &quot;vmx.capability.unified_loop toolbox&quot;) != 0) {</span>
+<span class="lineNum">     741 </span>            :                 DPRINTF(&quot;%s: unable to set unified loop\n&quot;, DEVNAME(sc));
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     744 </span>            : 
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :         if (vm_rpci_response_successful(sc) == 0) {</span>
+<span class="lineNum">     746 </span>            :                 DPRINTF(&quot;%s: host rejected unified loop setting\n&quot;,
+<span class="lineNum">     747 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     748 </span>            :         }
+<span class="lineNum">     749 </span>            : 
+<span class="lineNum">     750 </span>            :         /* the trailing space is apparently important here */
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_rpci_tx(sc,</span>
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :             &quot;tools.capability.statechange &quot;) != 0) {</span>
+<span class="lineNum">     753 </span>            :                 DPRINTF(&quot;%s: unable to send statechange capability\n&quot;,
+<span class="lineNum">     754 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     757 </span>            : 
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :         if (vm_rpci_response_successful(sc) == 0) {</span>
+<span class="lineNum">     759 </span>            :                 DPRINTF(&quot;%s: host rejected statechange capability\n&quot;,
+<span class="lineNum">     760 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     761 </span>            :         }
+<span class="lineNum">     762 </span>            : 
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_rpci_tx(sc, &quot;tools.set.version %u&quot;,</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :             VM_VERSION_UNMANAGED) != 0) {</span>
+<span class="lineNum">     765 </span>            :                 DPRINTF(&quot;%s: unable to set tools version\n&quot;,
+<span class="lineNum">     766 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     769 </span>            : 
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :         vmt_update_guest_uptime(sc);</span>
+<span class="lineNum">     771 </span>            : 
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, VM_RPC_REPLY_OK) != 0) {</span>
+<span class="lineNum">     773 </span>            :                 DPRINTF(&quot;%s: error sending capabilities_register&quot;
+<span class="lineNum">     774 </span>            :                     &quot; response\n&quot;, DEVNAME(sc));
+<span class="lineNum">     775 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 : }</span>
+<a name="778"><span class="lineNum">     778 </span>            : </a>
+<span class="lineNum">     779 </span>            : void
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 : vmt_tclo_broadcastip(struct vmt_softc *sc)</span>
+<span class="lineNum">     781 </span>            : {
+<span class="lineNum">     782 </span>            :         struct ifnet *iface;
+<span class="lineNum">     783 </span>            :         struct sockaddr_in *guest_ip;
+<span class="lineNum">     784 </span>            : 
+<span class="lineNum">     785 </span>            :         /* find first available ipv4 address */
+<span class="lineNum">     786 </span>            :         guest_ip = NULL;
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(iface, &amp;ifnet, if_list) {</span>
+<span class="lineNum">     788 </span>            :                 struct ifaddr *iface_addr;
+<span class="lineNum">     789 </span>            : 
+<span class="lineNum">     790 </span>            :                 /* skip loopback */
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :                 if (strncmp(iface-&gt;if_xname, &quot;lo&quot;, 2) == 0 &amp;&amp;</span>
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :                     iface-&gt;if_xname[2] &gt;= '0' &amp;&amp;</span>
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :                     iface-&gt;if_xname[2] &lt;= '9') {</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     795 </span>            :                 }
+<span class="lineNum">     796 </span>            : 
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :                 TAILQ_FOREACH(iface_addr, &amp;iface-&gt;if_addrlist,</span>
+<span class="lineNum">     798 </span>            :                     ifa_list) {
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :                         if (iface_addr-&gt;ifa_addr-&gt;sa_family != AF_INET)</span>
+<span class="lineNum">     800 </span>            :                                 continue;
+<span class="lineNum">     801 </span>            : 
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :                         guest_ip = satosin(iface_addr-&gt;ifa_addr);</span>
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     804 </span>            :                 }
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     806 </span>            : 
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :         if (guest_ip != NULL) {</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                 char ip[INET_ADDRSTRLEN];</span>
+<span class="lineNum">     809 </span>            : 
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :                 inet_ntop(AF_INET, &amp;guest_ip-&gt;sin_addr, ip, sizeof(ip));</span>
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :                 if (vm_rpc_send_rpci_tx(sc, &quot;info-set guestinfo.ip %s&quot;,</span>
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :                     ip) != 0) {</span>
+<span class="lineNum">     813 </span>            :                         DPRINTF(&quot;%s: unable to send guest IP address\n&quot;,
+<span class="lineNum">     814 </span>            :                             DEVNAME(sc));
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     817 </span>            : 
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :                 if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc,</span>
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 :                     VM_RPC_REPLY_OK) != 0) {</span>
+<span class="lineNum">     820 </span>            :                         DPRINTF(&quot;%s: error sending broadcastIP&quot;
+<span class="lineNum">     821 </span>            :                             &quot; response\n&quot;, DEVNAME(sc));
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :                 if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc,</span>
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :                     VM_RPC_REPLY_ERROR_IP_ADDR) != 0) {</span>
+<span class="lineNum">     827 </span>            :                         DPRINTF(&quot;%s: error sending broadcastIP&quot;
+<span class="lineNum">     828 </span>            :                             &quot; error response\n&quot;, DEVNAME(sc));
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     831 </span>            :         }
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 : }</span>
+<a name="833"><span class="lineNum">     833 </span>            : </a>
+<span class="lineNum">     834 </span>            : void
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 : vmt_set_backup_status(struct vmt_softc *sc, const char *state, int code,</span>
+<span class="lineNum">     836 </span>            :     const char *desc)
+<span class="lineNum">     837 </span>            : {
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_rpci_tx(sc, &quot;vmbackup.eventSet %s %d %s&quot;,</span>
+<span class="lineNum">     839 </span>            :             state, code, desc) != 0) {
+<span class="lineNum">     840 </span>            :                 DPRINTF(&quot;%s: setting backup status failed\n&quot;, DEVNAME(sc));
+<span class="lineNum">     841 </span>            :         }
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 : }</span>
+<a name="843"><span class="lineNum">     843 </span>            : </a>
+<span class="lineNum">     844 </span>            : void
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 : vmt_quiesce_task(void *data)</span>
+<span class="lineNum">     846 </span>            : {
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :         struct vmt_softc *sc = data;</span>
+<span class="lineNum">     848 </span>            :         int err;
+<span class="lineNum">     849 </span>            : 
+<span class="lineNum">     850 </span>            :         DPRINTF(&quot;%s: quiescing filesystems for backup\n&quot;, DEVNAME(sc));
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :         err = vfs_stall(curproc, 1);</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :         if (err != 0) {</span>
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to quiesce filesystems\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :                 vfs_stall(curproc, 0);</span>
+<span class="lineNum">     855 </span>            : 
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                 vmt_set_backup_status(sc, &quot;req.aborted&quot;, VM_BACKUP_SYNC_ERROR,</span>
+<span class="lineNum">     857 </span>            :                     &quot;vfs_stall failed&quot;);
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :                 vmt_set_backup_status(sc, &quot;req.done&quot;, VM_BACKUP_SUCCESS, &quot;&quot;);</span>
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_quiesce = 0;</span>
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     861 </span>            :         }
+<span class="lineNum">     862 </span>            : 
+<span class="lineNum">     863 </span>            :         DPRINTF(&quot;%s: filesystems quiesced\n&quot;, DEVNAME(sc));
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :         vmt_set_backup_status(sc, &quot;prov.snapshotCommit&quot;, VM_BACKUP_SUCCESS, &quot;&quot;);</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 : }</span>
+<a name="866"><span class="lineNum">     866 </span>            : </a>
+<span class="lineNum">     867 </span>            : void
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 : vmt_quiesce_done_task(void *data)</span>
+<span class="lineNum">     869 </span>            : {
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         struct vmt_softc *sc = data;</span>
+<span class="lineNum">     871 </span>            : 
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :         vfs_stall(curproc, 0);</span>
+<span class="lineNum">     873 </span>            : 
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_quiesce == -1)</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :                 vmt_set_backup_status(sc, &quot;req.aborted&quot;, VM_BACKUP_REMOTE_ABORT,</span>
+<span class="lineNum">     876 </span>            :                     &quot;&quot;);
+<span class="lineNum">     877 </span>            : 
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :         vmt_set_backup_status(sc, &quot;req.done&quot;, VM_BACKUP_SUCCESS, &quot;&quot;);</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :         sc-&gt;sc_quiesce = 0;</span>
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 : }</span>
+<a name="881"><span class="lineNum">     881 </span>            : </a>
+<span class="lineNum">     882 </span>            : void
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 : vmt_tclo_abortbackup(struct vmt_softc *sc)</span>
+<span class="lineNum">     884 </span>            : {
+<span class="lineNum">     885 </span>            :         const char *reply = VM_RPC_REPLY_OK;
+<span class="lineNum">     886 </span>            : 
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_quiesce &gt; 0) {</span>
+<span class="lineNum">     888 </span>            :                 DPRINTF(&quot;%s: aborting backup\n&quot;, DEVNAME(sc));
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_quiesce = -1;</span>
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 :                 task_set(&amp;sc-&gt;sc_quiesce_task, vmt_quiesce_done_task, sc);</span>
+<span class="lineNum">     891 </span><span class="lineNoCov">          0 :                 task_add(systq, &amp;sc-&gt;sc_quiesce_task);</span>
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     893 </span>            :                 DPRINTF(&quot;%s: can't abort, no backup in progress\n&quot;,
+<span class="lineNum">     894 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     895 </span>            :                 reply = VM_RPC_REPLY_ERROR;
+<span class="lineNum">     896 </span>            :         }
+<span class="lineNum">     897 </span>            : 
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, reply) != 0) {</span>
+<span class="lineNum">     899 </span>            :                 DPRINTF(&quot;%s: error sending vmbackup.abort reply\n&quot;,
+<span class="lineNum">     900 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 : }</span>
+<a name="904"><span class="lineNum">     904 </span>            : </a>
+<span class="lineNum">     905 </span>            : void
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 : vmt_tclo_startbackup(struct vmt_softc *sc)</span>
+<span class="lineNum">     907 </span>            : {
+<span class="lineNum">     908 </span>            :         const char *reply = VM_RPC_REPLY_OK;
+<span class="lineNum">     909 </span>            : 
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_quiesce == 0) {</span>
+<span class="lineNum">     911 </span>            :                 DPRINTF(&quot;%s: starting quiesce\n&quot;, DEVNAME(sc));
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :                 vmt_set_backup_status(sc, &quot;reset&quot;, VM_BACKUP_SUCCESS, &quot;&quot;);</span>
+<span class="lineNum">     913 </span>            : 
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :                 task_set(&amp;sc-&gt;sc_quiesce_task, vmt_quiesce_task, sc);</span>
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :                 task_add(systq, &amp;sc-&gt;sc_quiesce_task);</span>
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_quiesce = 1;</span>
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     918 </span>            :                 DPRINTF(&quot;%s: can't start backup, already in progress\n&quot;,
+<span class="lineNum">     919 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     920 </span>            :                 reply = VM_RPC_REPLY_ERROR;
+<span class="lineNum">     921 </span>            :         }
+<span class="lineNum">     922 </span>            : 
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, reply) != 0) {</span>
+<span class="lineNum">     924 </span>            :                 DPRINTF(&quot;%s: error sending vmbackup.start reply\n&quot;,
+<span class="lineNum">     925 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 : }</span>
+<a name="929"><span class="lineNum">     929 </span>            : </a>
+<span class="lineNum">     930 </span>            : void
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 : vmt_tclo_backupdone(struct vmt_softc *sc)</span>
+<span class="lineNum">     932 </span>            : {
+<span class="lineNum">     933 </span>            :         const char *reply = VM_RPC_REPLY_OK;
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_quiesce &gt; 0) {</span>
+<span class="lineNum">     935 </span>            :                 DPRINTF(&quot;%s: backup complete\n&quot;, DEVNAME(sc));
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :                 task_set(&amp;sc-&gt;sc_quiesce_task, vmt_quiesce_done_task, sc);</span>
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :                 task_add(systq, &amp;sc-&gt;sc_quiesce_task);</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     939 </span>            :                 DPRINTF(&quot;%s: got backup complete, but not doing a backup\n&quot;,
+<span class="lineNum">     940 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     941 </span>            :                 reply = VM_RPC_REPLY_ERROR;
+<span class="lineNum">     942 </span>            :         }
+<span class="lineNum">     943 </span>            : 
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc, reply) != 0) {</span>
+<span class="lineNum">     945 </span>            :                 DPRINTF(&quot;%s: error sending vmbackup.snapshotDone reply\n&quot;,
+<span class="lineNum">     946 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     947 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 : }</span>
+<a name="950"><span class="lineNum">     950 </span>            : </a>
+<span class="lineNum">     951 </span>            : int
+<span class="lineNum">     952 </span><span class="lineNoCov">          0 : vmt_tclo_process(struct vmt_softc *sc, const char *name)</span>
+<span class="lineNum">     953 </span>            : {
+<span class="lineNum">     954 </span>            :         int i;
+<span class="lineNum">     955 </span>            : 
+<span class="lineNum">     956 </span>            :         /* Search for rpc command and call handler */
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :         for (i = 0; vmt_tclo_rpc[i].name != NULL; i++) {</span>
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :                 if (strcmp(vmt_tclo_rpc[i].name, sc-&gt;sc_rpc_buf) == 0) {</span>
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :                         vmt_tclo_rpc[i].cb(sc);</span>
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     961 </span>            :                 }
+<span class="lineNum">     962 </span>            :         }
+<span class="lineNum">     963 </span>            : 
+<span class="lineNum">     964 </span>            :         DPRINTF(&quot;%s: unknown command: \&quot;%s\&quot;\n&quot;, DEVNAME(sc), name);
+<span class="lineNum">     965 </span>            : 
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :         return (-1);</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 : }</span>
+<a name="968"><span class="lineNum">     968 </span>            : </a>
+<span class="lineNum">     969 </span>            : void
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 : vmt_tclo_tick(void *xarg)</span>
+<span class="lineNum">     971 </span>            : {
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :         struct vmt_softc *sc = xarg;</span>
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :         u_int32_t rlen;</span>
+<span class="lineNum">     974 </span><span class="lineNoCov">          0 :         u_int16_t ack;</span>
+<span class="lineNum">     975 </span>            :         int delay;
+<span class="lineNum">     976 </span>            : 
+<span class="lineNum">     977 </span>            :         /* By default, poll every second for new messages */
+<span class="lineNum">     978 </span>            :         delay = 1;
+<span class="lineNum">     979 </span>            : 
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_quiesce &gt; 0) {</span>
+<span class="lineNum">     981 </span>            :                 /* abort quiesce if it's taking too long */
+<span class="lineNum">     982 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_quiesce++ == VM_BACKUP_TIMEOUT) {</span>
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: aborting quiesce\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_quiesce = -1;</span>
+<span class="lineNum">     985 </span><span class="lineNoCov">          0 :                         task_set(&amp;sc-&gt;sc_quiesce_task, vmt_quiesce_done_task,</span>
+<span class="lineNum">     986 </span>            :                             sc);
+<span class="lineNum">     987 </span><span class="lineNoCov">          0 :                         task_add(systq, &amp;sc-&gt;sc_quiesce_task);</span>
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 :                         vmt_set_backup_status(sc, &quot;req.keepAlive&quot;,</span>
+<span class="lineNum">     990 </span>            :                             VM_BACKUP_SUCCESS, &quot;&quot;);
+<span class="lineNum">     991 </span>            :         }
+<span class="lineNum">     992 </span>            : 
+<span class="lineNum">     993 </span>            :         /* reopen tclo channel if it's currently closed */
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tclo_rpc.channel == 0 &amp;&amp;</span>
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :             sc-&gt;sc_tclo_rpc.cookie1 == 0 &amp;&amp;</span>
+<span class="lineNum">     996 </span><span class="lineNoCov">          0 :             sc-&gt;sc_tclo_rpc.cookie2 == 0) {</span>
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :                 if (vm_rpc_open(&amp;sc-&gt;sc_tclo_rpc, VM_RPC_OPEN_TCLO) != 0) {</span>
+<span class="lineNum">     998 </span>            :                         DPRINTF(&quot;%s: unable to reopen TCLO channel\n&quot;,
+<span class="lineNum">     999 </span>            :                             DEVNAME(sc));
+<span class="lineNum">    1000 </span>            :                         delay = 15;
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :                         goto out;</span>
+<span class="lineNum">    1002 </span>            :                 }
+<span class="lineNum">    1003 </span>            : 
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :                 if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc,</span>
+<span class="lineNum">    1005 </span><span class="lineNoCov">          0 :                     VM_RPC_RESET_REPLY) != 0) {</span>
+<span class="lineNum">    1006 </span>            :                         DPRINTF(&quot;%s: failed to send reset reply\n&quot;,
+<span class="lineNum">    1007 </span>            :                             DEVNAME(sc));
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 :                         goto out;</span>
+<span class="lineNum">    1010 </span>            :                 } else {
+<span class="lineNum">    1011 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rpc_error = 0;</span>
+<span class="lineNum">    1012 </span>            :                 }
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1014 </span>            : 
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tclo_ping) {</span>
+<span class="lineNum">    1016 </span><span class="lineNoCov">          0 :                 if (vm_rpc_send(&amp;sc-&gt;sc_tclo_rpc, NULL, 0) != 0) {</span>
+<span class="lineNum">    1017 </span>            :                         DPRINTF(&quot;%s: failed to send TCLO outgoing ping\n&quot;,
+<span class="lineNum">    1018 </span>            :                             DEVNAME(sc));
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">    1020 </span><span class="lineNoCov">          0 :                         goto out;</span>
+<span class="lineNum">    1021 </span>            :                 }
+<span class="lineNum">    1022 </span>            :         }
+<span class="lineNum">    1023 </span>            : 
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :         if (vm_rpc_get_length(&amp;sc-&gt;sc_tclo_rpc, &amp;rlen, &amp;ack) != 0) {</span>
+<span class="lineNum">    1025 </span>            :                 DPRINTF(&quot;%s: failed to get length of incoming TCLO data\n&quot;,
+<span class="lineNum">    1026 </span>            :                     DEVNAME(sc));
+<span class="lineNum">    1027 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">    1029 </span>            :         }
+<span class="lineNum">    1030 </span>            : 
+<span class="lineNum">    1031 </span><span class="lineNoCov">          0 :         if (rlen == 0) {</span>
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_tclo_ping = 1;</span>
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">    1034 </span>            :         }
+<span class="lineNum">    1035 </span>            : 
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 :         if (rlen &gt;= VMT_RPC_BUFLEN) {</span>
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :                 rlen = VMT_RPC_BUFLEN - 1;</span>
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1039 </span><span class="lineNoCov">          0 :         if (vm_rpc_get_data(&amp;sc-&gt;sc_tclo_rpc, sc-&gt;sc_rpc_buf, rlen, ack) != 0) {</span>
+<span class="lineNum">    1040 </span>            :                 DPRINTF(&quot;%s: failed to get incoming TCLO data\n&quot;, DEVNAME(sc));
+<span class="lineNum">    1041 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">    1043 </span>            :         }
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tclo_ping = 0;</span>
+<span class="lineNum">    1045 </span>            : 
+<span class="lineNum">    1046 </span>            :         /* The VM host can queue multiple messages; continue without delay */
+<span class="lineNum">    1047 </span>            :         delay = 0;
+<span class="lineNum">    1048 </span>            : 
+<span class="lineNum">    1049 </span><span class="lineNoCov">          0 :         if (vmt_tclo_process(sc, sc-&gt;sc_rpc_buf) != 0) {</span>
+<span class="lineNum">    1050 </span><span class="lineNoCov">          0 :                 if (vm_rpc_send_str(&amp;sc-&gt;sc_tclo_rpc,</span>
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :                     VM_RPC_REPLY_ERROR) != 0) {</span>
+<span class="lineNum">    1052 </span>            :                         DPRINTF(&quot;%s: error sending unknown command reply\n&quot;,
+<span class="lineNum">    1053 </span>            :                             DEVNAME(sc));
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rpc_error = 1;</span>
+<span class="lineNum">    1055 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1056 </span>            :         }
+<span class="lineNum">    1057 </span>            : 
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_rpc_error == 1) {</span>
+<span class="lineNum">    1059 </span>            :                 /* On error, give time to recover and wait a second */
+<span class="lineNum">    1060 </span>            :                 delay = 1;
+<span class="lineNum">    1061 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1062 </span>            : 
+<span class="lineNum">    1063 </span>            : out:
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :         timeout_add_sec(&amp;sc-&gt;sc_tclo_tick, delay);</span>
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1066 </span>            : 
+<span class="lineNum">    1067 </span>            : #define BACKDOOR_OP_I386(op, frame)             \
+<span class="lineNum">    1068 </span>            :         __asm__ volatile (                      \
+<span class="lineNum">    1069 </span>            :                 &quot;pushal;&quot;                     \
+<span class="lineNum">    1070 </span>            :                 &quot;pushl %%eax;&quot;                        \
+<span class="lineNum">    1071 </span>            :                 &quot;movl 0x18(%%eax), %%ebp;&quot;    \
+<span class="lineNum">    1072 </span>            :                 &quot;movl 0x14(%%eax), %%edi;&quot;    \
+<span class="lineNum">    1073 </span>            :                 &quot;movl 0x10(%%eax), %%esi;&quot;    \
+<span class="lineNum">    1074 </span>            :                 &quot;movl 0x0c(%%eax), %%edx;&quot;    \
+<span class="lineNum">    1075 </span>            :                 &quot;movl 0x08(%%eax), %%ecx;&quot;    \
+<span class="lineNum">    1076 </span>            :                 &quot;movl 0x04(%%eax), %%ebx;&quot;    \
+<span class="lineNum">    1077 </span>            :                 &quot;movl 0x00(%%eax), %%eax;&quot;    \
+<span class="lineNum">    1078 </span>            :                 op                              \
+<span class="lineNum">    1079 </span>            :                 &quot;xchgl %%eax, 0x00(%%esp);&quot;   \
+<span class="lineNum">    1080 </span>            :                 &quot;movl %%ebp, 0x18(%%eax);&quot;    \
+<span class="lineNum">    1081 </span>            :                 &quot;movl %%edi, 0x14(%%eax);&quot;    \
+<span class="lineNum">    1082 </span>            :                 &quot;movl %%esi, 0x10(%%eax);&quot;    \
+<span class="lineNum">    1083 </span>            :                 &quot;movl %%edx, 0x0c(%%eax);&quot;    \
+<span class="lineNum">    1084 </span>            :                 &quot;movl %%ecx, 0x08(%%eax);&quot;    \
+<span class="lineNum">    1085 </span>            :                 &quot;movl %%ebx, 0x04(%%eax);&quot;    \
+<span class="lineNum">    1086 </span>            :                 &quot;popl 0x00(%%eax);&quot;           \
+<span class="lineNum">    1087 </span>            :                 &quot;popal;&quot;                      \
+<span class="lineNum">    1088 </span>            :                 ::&quot;a&quot;(frame)                  \
+<span class="lineNum">    1089 </span>            :         )
+<span class="lineNum">    1090 </span>            : 
+<span class="lineNum">    1091 </span>            : #define BACKDOOR_OP_AMD64(op, frame)            \
+<span class="lineNum">    1092 </span>            :         __asm__ volatile (                      \
+<span class="lineNum">    1093 </span>            :                 &quot;pushq %%rbp;                      \n\t&quot; \
+<span class="lineNum">    1094 </span>            :                 &quot;pushq %%rax;                      \n\t&quot; \
+<span class="lineNum">    1095 </span>            :                 &quot;movq 0x30(%%rax), %%rbp;  \n\t&quot; \
+<span class="lineNum">    1096 </span>            :                 &quot;movq 0x28(%%rax), %%rdi;  \n\t&quot; \
+<span class="lineNum">    1097 </span>            :                 &quot;movq 0x20(%%rax), %%rsi;  \n\t&quot; \
+<span class="lineNum">    1098 </span>            :                 &quot;movq 0x18(%%rax), %%rdx;  \n\t&quot; \
+<span class="lineNum">    1099 </span>            :                 &quot;movq 0x10(%%rax), %%rcx;  \n\t&quot; \
+<span class="lineNum">    1100 </span>            :                 &quot;movq 0x08(%%rax), %%rbx;  \n\t&quot; \
+<span class="lineNum">    1101 </span>            :                 &quot;movq 0x00(%%rax), %%rax;  \n\t&quot; \
+<span class="lineNum">    1102 </span>            :                 op                              &quot;\n\t&quot; \
+<span class="lineNum">    1103 </span>            :                 &quot;xchgq %%rax, 0x00(%%rsp); \n\t&quot; \
+<span class="lineNum">    1104 </span>            :                 &quot;movq %%rbp, 0x30(%%rax);  \n\t&quot; \
+<span class="lineNum">    1105 </span>            :                 &quot;movq %%rdi, 0x28(%%rax);  \n\t&quot; \
+<span class="lineNum">    1106 </span>            :                 &quot;movq %%rsi, 0x20(%%rax);  \n\t&quot; \
+<span class="lineNum">    1107 </span>            :                 &quot;movq %%rdx, 0x18(%%rax);  \n\t&quot; \
+<span class="lineNum">    1108 </span>            :                 &quot;movq %%rcx, 0x10(%%rax);  \n\t&quot; \
+<span class="lineNum">    1109 </span>            :                 &quot;movq %%rbx, 0x08(%%rax);  \n\t&quot; \
+<span class="lineNum">    1110 </span>            :                 &quot;popq 0x00(%%rax);         \n\t&quot; \
+<span class="lineNum">    1111 </span>            :                 &quot;popq %%rbp;                       \n\t&quot; \
+<span class="lineNum">    1112 </span>            :                 : /* No outputs. */ : &quot;a&quot; (frame) \
+<span class="lineNum">    1113 </span>            :                   /* No pushal on amd64 so warn gcc about the clobbered registers. */ \
+<span class="lineNum">    1114 </span>            :                 : &quot;rbx&quot;, &quot;rcx&quot;, &quot;rdx&quot;, &quot;rdi&quot;, &quot;rsi&quot;, &quot;cc&quot;, &quot;memory&quot; \
+<span class="lineNum">    1115 </span>            :         )
+<span class="lineNum">    1116 </span>            : 
+<span class="lineNum">    1117 </span>            : 
+<span class="lineNum">    1118 </span>            : #ifdef __i386__
+<span class="lineNum">    1119 </span>            : #define BACKDOOR_OP(op, frame) BACKDOOR_OP_I386(op, frame)
+<span class="lineNum">    1120 </span>            : #else
+<span class="lineNum">    1121 </span>            : #define BACKDOOR_OP(op, frame) BACKDOOR_OP_AMD64(op, frame)
+<span class="lineNum">    1122 </span>            : #endif
+<a name="1123"><span class="lineNum">    1123 </span>            : </a>
+<span class="lineNum">    1124 </span>            : void
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 : vm_cmd(struct vm_backdoor *frame)</span>
+<span class="lineNum">    1126 </span>            : {
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :         BACKDOOR_OP(&quot;inl %%dx, %%eax;&quot;, frame);</span>
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 : }</span>
+<a name="1129"><span class="lineNum">    1129 </span>            : </a>
+<span class="lineNum">    1130 </span>            : void
+<span class="lineNum">    1131 </span><span class="lineNoCov">          0 : vm_ins(struct vm_backdoor *frame)</span>
+<span class="lineNum">    1132 </span>            : {
+<span class="lineNum">    1133 </span><span class="lineNoCov">          0 :         BACKDOOR_OP(&quot;cld;\n\trep insb;&quot;, frame);</span>
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 : }</span>
+<a name="1135"><span class="lineNum">    1135 </span>            : </a>
+<span class="lineNum">    1136 </span>            : void
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 : vm_outs(struct vm_backdoor *frame)</span>
+<span class="lineNum">    1138 </span>            : {
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :         BACKDOOR_OP(&quot;cld;\n\trep outsb;&quot;, frame);</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 : }</span>
+<a name="1141"><span class="lineNum">    1141 </span>            : </a>
+<span class="lineNum">    1142 </span>            : int
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 : vm_rpc_open(struct vm_rpc *rpc, uint32_t proto)</span>
+<span class="lineNum">    1144 </span>            : {
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :         struct vm_backdoor frame;</span>
+<span class="lineNum">    1146 </span>            : 
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 :         bzero(&amp;frame, sizeof(frame));</span>
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :         frame.eax.word      = VM_MAGIC;</span>
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 :         frame.ebx.word      = proto | VM_RPC_FLAG_COOKIE;</span>
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :         frame.ecx.part.low  = VM_CMD_RPC;</span>
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 :         frame.ecx.part.high = VM_RPC_OPEN;</span>
+<span class="lineNum">    1152 </span><span class="lineNoCov">          0 :         frame.edx.part.low  = VM_PORT_CMD;</span>
+<span class="lineNum">    1153 </span><span class="lineNoCov">          0 :         frame.edx.part.high = 0;</span>
+<span class="lineNum">    1154 </span>            : 
+<span class="lineNum">    1155 </span><span class="lineNoCov">          0 :         vm_cmd(&amp;frame);</span>
+<span class="lineNum">    1156 </span>            : 
+<span class="lineNum">    1157 </span><span class="lineNoCov">          0 :         if (frame.ecx.part.high != 1 || frame.edx.part.low != 0) {</span>
+<span class="lineNum">    1158 </span>            :                 /* open-vm-tools retries without VM_RPC_FLAG_COOKIE here.. */
+<span class="lineNum">    1159 </span>            :                 DPRINTF(&quot;vmware: open failed, eax=%08x, ecx=%08x, edx=%08x\n&quot;,
+<span class="lineNum">    1160 </span>            :                     frame.eax.word, frame.ecx.word, frame.edx.word);
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :                 return EIO;</span>
+<span class="lineNum">    1162 </span>            :         }
+<span class="lineNum">    1163 </span>            : 
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :         rpc-&gt;channel = frame.edx.part.high;</span>
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 :         rpc-&gt;cookie1 = frame.esi.word;</span>
+<span class="lineNum">    1166 </span><span class="lineNoCov">          0 :         rpc-&gt;cookie2 = frame.edi.word;</span>
+<span class="lineNum">    1167 </span>            : 
+<span class="lineNum">    1168 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1169 </span><span class="lineNoCov">          0 : }</span>
+<a name="1170"><span class="lineNum">    1170 </span>            : </a>
+<span class="lineNum">    1171 </span>            : int
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 : vm_rpc_close(struct vm_rpc *rpc)</span>
+<span class="lineNum">    1173 </span>            : {
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :         struct vm_backdoor frame;</span>
+<span class="lineNum">    1175 </span>            : 
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 :         bzero(&amp;frame, sizeof(frame));</span>
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :         frame.eax.word      = VM_MAGIC;</span>
+<span class="lineNum">    1178 </span><span class="lineNoCov">          0 :         frame.ebx.word      = 0;</span>
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 :         frame.ecx.part.low  = VM_CMD_RPC;</span>
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :         frame.ecx.part.high = VM_RPC_CLOSE;</span>
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 :         frame.edx.part.low  = VM_PORT_CMD;</span>
+<span class="lineNum">    1182 </span><span class="lineNoCov">          0 :         frame.edx.part.high = rpc-&gt;channel;</span>
+<span class="lineNum">    1183 </span><span class="lineNoCov">          0 :         frame.edi.word      = rpc-&gt;cookie2;</span>
+<span class="lineNum">    1184 </span><span class="lineNoCov">          0 :         frame.esi.word      = rpc-&gt;cookie1;</span>
+<span class="lineNum">    1185 </span>            : 
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :         vm_cmd(&amp;frame);</span>
+<span class="lineNum">    1187 </span>            : 
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :         if (frame.ecx.part.high == 0 || frame.ecx.part.low != 0) {</span>
+<span class="lineNum">    1189 </span>            :                 DPRINTF(&quot;vmware: close failed, eax=%08x, ecx=%08x\n&quot;,
+<span class="lineNum">    1190 </span>            :                     frame.eax.word, frame.ecx.word);
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :                 return EIO;</span>
+<span class="lineNum">    1192 </span>            :         }
+<span class="lineNum">    1193 </span>            : 
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 :         rpc-&gt;channel = 0;</span>
+<span class="lineNum">    1195 </span><span class="lineNoCov">          0 :         rpc-&gt;cookie1 = 0;</span>
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :         rpc-&gt;cookie2 = 0;</span>
+<span class="lineNum">    1197 </span>            : 
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1199 </span><span class="lineNoCov">          0 : }</span>
+<a name="1200"><span class="lineNum">    1200 </span>            : </a>
+<span class="lineNum">    1201 </span>            : int
+<span class="lineNum">    1202 </span><span class="lineNoCov">          0 : vm_rpc_send(const struct vm_rpc *rpc, const uint8_t *buf, uint32_t length)</span>
+<span class="lineNum">    1203 </span>            : {
+<span class="lineNum">    1204 </span><span class="lineNoCov">          0 :         struct vm_backdoor frame;</span>
+<span class="lineNum">    1205 </span>            : 
+<span class="lineNum">    1206 </span>            :         /* Send the length of the command. */
+<span class="lineNum">    1207 </span><span class="lineNoCov">          0 :         bzero(&amp;frame, sizeof(frame));</span>
+<span class="lineNum">    1208 </span><span class="lineNoCov">          0 :         frame.eax.word = VM_MAGIC;</span>
+<span class="lineNum">    1209 </span><span class="lineNoCov">          0 :         frame.ebx.word = length;</span>
+<span class="lineNum">    1210 </span><span class="lineNoCov">          0 :         frame.ecx.part.low  = VM_CMD_RPC;</span>
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :         frame.ecx.part.high = VM_RPC_SET_LENGTH;</span>
+<span class="lineNum">    1212 </span><span class="lineNoCov">          0 :         frame.edx.part.low  = VM_PORT_CMD;</span>
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :         frame.edx.part.high = rpc-&gt;channel;</span>
+<span class="lineNum">    1214 </span><span class="lineNoCov">          0 :         frame.esi.word = rpc-&gt;cookie1;</span>
+<span class="lineNum">    1215 </span><span class="lineNoCov">          0 :         frame.edi.word = rpc-&gt;cookie2;</span>
+<span class="lineNum">    1216 </span>            : 
+<span class="lineNum">    1217 </span><span class="lineNoCov">          0 :         vm_cmd(&amp;frame);</span>
+<span class="lineNum">    1218 </span>            : 
+<span class="lineNum">    1219 </span><span class="lineNoCov">          0 :         if ((frame.ecx.part.high &amp; VM_RPC_REPLY_SUCCESS) == 0) {</span>
+<span class="lineNum">    1220 </span>            :                 DPRINTF(&quot;vmware: sending length failed, eax=%08x, ecx=%08x\n&quot;,
+<span class="lineNum">    1221 </span>            :                     frame.eax.word, frame.ecx.word);
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 :                 return EIO;</span>
+<span class="lineNum">    1223 </span>            :         }
+<span class="lineNum">    1224 </span>            : 
+<span class="lineNum">    1225 </span><span class="lineNoCov">          0 :         if (length == 0)</span>
+<span class="lineNum">    1226 </span><span class="lineNoCov">          0 :                 return 0; /* Only need to poke once if command is null. */</span>
+<span class="lineNum">    1227 </span>            : 
+<span class="lineNum">    1228 </span>            :         /* Send the command using enhanced RPC. */
+<span class="lineNum">    1229 </span><span class="lineNoCov">          0 :         bzero(&amp;frame, sizeof(frame));</span>
+<span class="lineNum">    1230 </span><span class="lineNoCov">          0 :         frame.eax.word = VM_MAGIC;</span>
+<span class="lineNum">    1231 </span><span class="lineNoCov">          0 :         frame.ebx.word = VM_RPC_ENH_DATA;</span>
+<span class="lineNum">    1232 </span><span class="lineNoCov">          0 :         frame.ecx.word = length;</span>
+<span class="lineNum">    1233 </span><span class="lineNoCov">          0 :         frame.edx.part.low  = VM_PORT_RPC;</span>
+<span class="lineNum">    1234 </span><span class="lineNoCov">          0 :         frame.edx.part.high = rpc-&gt;channel;</span>
+<span class="lineNum">    1235 </span><span class="lineNoCov">          0 :         frame.ebp.word = rpc-&gt;cookie1;</span>
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :         frame.edi.word = rpc-&gt;cookie2;</span>
+<span class="lineNum">    1237 </span>            : #ifdef __amd64__
+<span class="lineNum">    1238 </span><span class="lineNoCov">          0 :         frame.esi.quad = (uint64_t)buf;</span>
+<span class="lineNum">    1239 </span>            : #else
+<span class="lineNum">    1240 </span>            :         frame.esi.word = (uint32_t)buf;
+<span class="lineNum">    1241 </span>            : #endif
+<span class="lineNum">    1242 </span>            : 
+<span class="lineNum">    1243 </span><span class="lineNoCov">          0 :         vm_outs(&amp;frame);</span>
+<span class="lineNum">    1244 </span>            : 
+<span class="lineNum">    1245 </span><span class="lineNoCov">          0 :         if (frame.ebx.word != VM_RPC_ENH_DATA) {</span>
+<span class="lineNum">    1246 </span>            :                 /* open-vm-tools retries on VM_RPC_REPLY_CHECKPOINT */
+<span class="lineNum">    1247 </span>            :                 DPRINTF(&quot;vmware: send failed, ebx=%08x\n&quot;, frame.ebx.word);
+<span class="lineNum">    1248 </span><span class="lineNoCov">          0 :                 return EIO;</span>
+<span class="lineNum">    1249 </span>            :         }
+<span class="lineNum">    1250 </span>            : 
+<span class="lineNum">    1251 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1252 </span><span class="lineNoCov">          0 : }</span>
+<a name="1253"><span class="lineNum">    1253 </span>            : </a>
+<span class="lineNum">    1254 </span>            : int
+<span class="lineNum">    1255 </span><span class="lineNoCov">          0 : vm_rpc_send_str(const struct vm_rpc *rpc, const uint8_t *str)</span>
+<span class="lineNum">    1256 </span>            : {
+<span class="lineNum">    1257 </span><span class="lineNoCov">          0 :         return vm_rpc_send(rpc, str, strlen(str));</span>
+<span class="lineNum">    1258 </span>            : }
+<a name="1259"><span class="lineNum">    1259 </span>            : </a>
+<span class="lineNum">    1260 </span>            : int
+<span class="lineNum">    1261 </span><span class="lineNoCov">          0 : vm_rpc_get_data(const struct vm_rpc *rpc, char *data, uint32_t length,</span>
+<span class="lineNum">    1262 </span>            :     uint16_t dataid)
+<span class="lineNum">    1263 </span>            : {
+<span class="lineNum">    1264 </span><span class="lineNoCov">          0 :         struct vm_backdoor frame;</span>
+<span class="lineNum">    1265 </span>            : 
+<span class="lineNum">    1266 </span>            :         /* Get data using enhanced RPC. */
+<span class="lineNum">    1267 </span><span class="lineNoCov">          0 :         bzero(&amp;frame, sizeof(frame));</span>
+<span class="lineNum">    1268 </span><span class="lineNoCov">          0 :         frame.eax.word      = VM_MAGIC;</span>
+<span class="lineNum">    1269 </span><span class="lineNoCov">          0 :         frame.ebx.word      = VM_RPC_ENH_DATA;</span>
+<span class="lineNum">    1270 </span><span class="lineNoCov">          0 :         frame.ecx.word      = length;</span>
+<span class="lineNum">    1271 </span><span class="lineNoCov">          0 :         frame.edx.part.low  = VM_PORT_RPC;</span>
+<span class="lineNum">    1272 </span><span class="lineNoCov">          0 :         frame.edx.part.high = rpc-&gt;channel;</span>
+<span class="lineNum">    1273 </span><span class="lineNoCov">          0 :         frame.esi.word      = rpc-&gt;cookie1;</span>
+<span class="lineNum">    1274 </span>            : #ifdef __amd64__
+<span class="lineNum">    1275 </span><span class="lineNoCov">          0 :         frame.edi.quad      = (uint64_t)data;</span>
+<span class="lineNum">    1276 </span>            : #else
+<span class="lineNum">    1277 </span>            :         frame.edi.word      = (uint32_t)data;
+<span class="lineNum">    1278 </span>            : #endif
+<span class="lineNum">    1279 </span><span class="lineNoCov">          0 :         frame.ebp.word      = rpc-&gt;cookie2;</span>
+<span class="lineNum">    1280 </span>            : 
+<span class="lineNum">    1281 </span><span class="lineNoCov">          0 :         vm_ins(&amp;frame);</span>
+<span class="lineNum">    1282 </span>            : 
+<span class="lineNum">    1283 </span>            :         /* NUL-terminate the data */
+<span class="lineNum">    1284 </span><span class="lineNoCov">          0 :         data[length] = '\0';</span>
+<span class="lineNum">    1285 </span>            : 
+<span class="lineNum">    1286 </span><span class="lineNoCov">          0 :         if (frame.ebx.word != VM_RPC_ENH_DATA) {</span>
+<span class="lineNum">    1287 </span>            :                 DPRINTF(&quot;vmware: get data failed, ebx=%08x\n&quot;,
+<span class="lineNum">    1288 </span>            :                     frame.ebx.word);
+<span class="lineNum">    1289 </span><span class="lineNoCov">          0 :                 return EIO;</span>
+<span class="lineNum">    1290 </span>            :         }
+<span class="lineNum">    1291 </span>            : 
+<span class="lineNum">    1292 </span>            :         /* Acknowledge data received. */
+<span class="lineNum">    1293 </span><span class="lineNoCov">          0 :         bzero(&amp;frame, sizeof(frame));</span>
+<span class="lineNum">    1294 </span><span class="lineNoCov">          0 :         frame.eax.word      = VM_MAGIC;</span>
+<span class="lineNum">    1295 </span><span class="lineNoCov">          0 :         frame.ebx.word      = dataid;</span>
+<span class="lineNum">    1296 </span><span class="lineNoCov">          0 :         frame.ecx.part.low  = VM_CMD_RPC;</span>
+<span class="lineNum">    1297 </span><span class="lineNoCov">          0 :         frame.ecx.part.high = VM_RPC_GET_END;</span>
+<span class="lineNum">    1298 </span><span class="lineNoCov">          0 :         frame.edx.part.low  = VM_PORT_CMD;</span>
+<span class="lineNum">    1299 </span><span class="lineNoCov">          0 :         frame.edx.part.high = rpc-&gt;channel;</span>
+<span class="lineNum">    1300 </span><span class="lineNoCov">          0 :         frame.esi.word      = rpc-&gt;cookie1;</span>
+<span class="lineNum">    1301 </span><span class="lineNoCov">          0 :         frame.edi.word      = rpc-&gt;cookie2;</span>
+<span class="lineNum">    1302 </span>            : 
+<span class="lineNum">    1303 </span><span class="lineNoCov">          0 :         vm_cmd(&amp;frame);</span>
+<span class="lineNum">    1304 </span>            : 
+<span class="lineNum">    1305 </span><span class="lineNoCov">          0 :         if (frame.ecx.part.high == 0) {</span>
+<span class="lineNum">    1306 </span>            :                 DPRINTF(&quot;vmware: ack data failed, eax=%08x, ecx=%08x\n&quot;,
+<span class="lineNum">    1307 </span>            :                     frame.eax.word, frame.ecx.word);
+<span class="lineNum">    1308 </span><span class="lineNoCov">          0 :                 return EIO;</span>
+<span class="lineNum">    1309 </span>            :         }
+<span class="lineNum">    1310 </span>            : 
+<span class="lineNum">    1311 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1312 </span><span class="lineNoCov">          0 : }</span>
+<a name="1313"><span class="lineNum">    1313 </span>            : </a>
+<span class="lineNum">    1314 </span>            : int
+<span class="lineNum">    1315 </span><span class="lineNoCov">          0 : vm_rpc_get_length(const struct vm_rpc *rpc, uint32_t *length, uint16_t *dataid)</span>
+<span class="lineNum">    1316 </span>            : {
+<span class="lineNum">    1317 </span><span class="lineNoCov">          0 :         struct vm_backdoor frame;</span>
+<span class="lineNum">    1318 </span>            : 
+<span class="lineNum">    1319 </span><span class="lineNoCov">          0 :         bzero(&amp;frame, sizeof(frame));</span>
+<span class="lineNum">    1320 </span><span class="lineNoCov">          0 :         frame.eax.word      = VM_MAGIC;</span>
+<span class="lineNum">    1321 </span><span class="lineNoCov">          0 :         frame.ebx.word      = 0;</span>
+<span class="lineNum">    1322 </span><span class="lineNoCov">          0 :         frame.ecx.part.low  = VM_CMD_RPC;</span>
+<span class="lineNum">    1323 </span><span class="lineNoCov">          0 :         frame.ecx.part.high = VM_RPC_GET_LENGTH;</span>
+<span class="lineNum">    1324 </span><span class="lineNoCov">          0 :         frame.edx.part.low  = VM_PORT_CMD;</span>
+<span class="lineNum">    1325 </span><span class="lineNoCov">          0 :         frame.edx.part.high = rpc-&gt;channel;</span>
+<span class="lineNum">    1326 </span><span class="lineNoCov">          0 :         frame.esi.word      = rpc-&gt;cookie1;</span>
+<span class="lineNum">    1327 </span><span class="lineNoCov">          0 :         frame.edi.word      = rpc-&gt;cookie2;</span>
+<span class="lineNum">    1328 </span>            : 
+<span class="lineNum">    1329 </span><span class="lineNoCov">          0 :         vm_cmd(&amp;frame);</span>
+<span class="lineNum">    1330 </span>            : 
+<span class="lineNum">    1331 </span><span class="lineNoCov">          0 :         if ((frame.ecx.part.high &amp; VM_RPC_REPLY_SUCCESS) == 0) {</span>
+<span class="lineNum">    1332 </span>            :                 DPRINTF(&quot;vmware: get length failed, eax=%08x, ecx=%08x\n&quot;,
+<span class="lineNum">    1333 </span>            :                     frame.eax.word, frame.ecx.word);
+<span class="lineNum">    1334 </span><span class="lineNoCov">          0 :                 return EIO;</span>
+<span class="lineNum">    1335 </span>            :         }
+<span class="lineNum">    1336 </span><span class="lineNoCov">          0 :         if ((frame.ecx.part.high &amp; VM_RPC_REPLY_DORECV) == 0) {</span>
+<span class="lineNum">    1337 </span><span class="lineNoCov">          0 :                 *length = 0;</span>
+<span class="lineNum">    1338 </span><span class="lineNoCov">          0 :                 *dataid = 0;</span>
+<span class="lineNum">    1339 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1340 </span><span class="lineNoCov">          0 :                 *length = frame.ebx.word;</span>
+<span class="lineNum">    1341 </span><span class="lineNoCov">          0 :                 *dataid = frame.edx.part.high;</span>
+<span class="lineNum">    1342 </span>            :         }
+<span class="lineNum">    1343 </span>            : 
+<span class="lineNum">    1344 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1345 </span><span class="lineNoCov">          0 : }</span>
+<a name="1346"><span class="lineNum">    1346 </span>            : </a>
+<span class="lineNum">    1347 </span>            : int
+<span class="lineNum">    1348 </span><span class="lineNoCov">          0 : vm_rpci_response_successful(struct vmt_softc *sc)</span>
+<span class="lineNum">    1349 </span>            : {
+<span class="lineNum">    1350 </span><span class="lineNoCov">          0 :         return (sc-&gt;sc_rpc_buf[0] == '1' &amp;&amp; sc-&gt;sc_rpc_buf[1] == ' ');</span>
+<span class="lineNum">    1351 </span>            : }
+<a name="1352"><span class="lineNum">    1352 </span>            : </a>
+<span class="lineNum">    1353 </span>            : int
+<span class="lineNum">    1354 </span><span class="lineNoCov">          0 : vm_rpc_send_rpci_tx_buf(struct vmt_softc *sc, const uint8_t *buf,</span>
+<span class="lineNum">    1355 </span>            :     uint32_t length)
+<span class="lineNum">    1356 </span>            : {
+<span class="lineNum">    1357 </span><span class="lineNoCov">          0 :         struct vm_rpc rpci;</span>
+<span class="lineNum">    1358 </span><span class="lineNoCov">          0 :         u_int32_t rlen;</span>
+<span class="lineNum">    1359 </span><span class="lineNoCov">          0 :         u_int16_t ack;</span>
+<span class="lineNum">    1360 </span>            :         int result = 0;
+<span class="lineNum">    1361 </span>            : 
+<span class="lineNum">    1362 </span><span class="lineNoCov">          0 :         if (vm_rpc_open(&amp;rpci, VM_RPC_OPEN_RPCI) != 0) {</span>
+<span class="lineNum">    1363 </span>            :                 DPRINTF(&quot;%s: rpci channel open failed\n&quot;, DEVNAME(sc));
+<span class="lineNum">    1364 </span><span class="lineNoCov">          0 :                 return EIO;</span>
+<span class="lineNum">    1365 </span>            :         }
+<span class="lineNum">    1366 </span>            : 
+<span class="lineNum">    1367 </span><span class="lineNoCov">          0 :         if (vm_rpc_send(&amp;rpci, sc-&gt;sc_rpc_buf, length) != 0) {</span>
+<span class="lineNum">    1368 </span>            :                 DPRINTF(&quot;%s: unable to send rpci command\n&quot;, DEVNAME(sc));
+<span class="lineNum">    1369 </span>            :                 result = EIO;
+<span class="lineNum">    1370 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">    1371 </span>            :         }
+<span class="lineNum">    1372 </span>            : 
+<span class="lineNum">    1373 </span><span class="lineNoCov">          0 :         if (vm_rpc_get_length(&amp;rpci, &amp;rlen, &amp;ack) != 0) {</span>
+<span class="lineNum">    1374 </span>            :                 DPRINTF(&quot;%s: failed to get length of rpci response data\n&quot;,
+<span class="lineNum">    1375 </span>            :                     DEVNAME(sc));
+<span class="lineNum">    1376 </span>            :                 result = EIO;
+<span class="lineNum">    1377 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">    1378 </span>            :         }
+<span class="lineNum">    1379 </span>            : 
+<span class="lineNum">    1380 </span><span class="lineNoCov">          0 :         if (rlen &gt; 0) {</span>
+<span class="lineNum">    1381 </span><span class="lineNoCov">          0 :                 if (rlen &gt;= VMT_RPC_BUFLEN) {</span>
+<span class="lineNum">    1382 </span><span class="lineNoCov">          0 :                         rlen = VMT_RPC_BUFLEN - 1;</span>
+<span class="lineNum">    1383 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1384 </span>            : 
+<span class="lineNum">    1385 </span><span class="lineNoCov">          0 :                 if (vm_rpc_get_data(&amp;rpci, sc-&gt;sc_rpc_buf, rlen, ack) != 0) {</span>
+<span class="lineNum">    1386 </span>            :                         DPRINTF(&quot;%s: failed to get rpci response data\n&quot;,
+<span class="lineNum">    1387 </span>            :                             DEVNAME(sc));
+<span class="lineNum">    1388 </span>            :                         result = EIO;
+<span class="lineNum">    1389 </span><span class="lineNoCov">          0 :                         goto out;</span>
+<span class="lineNum">    1390 </span>            :                 }
+<span class="lineNum">    1391 </span>            :         }
+<span class="lineNum">    1392 </span>            : 
+<span class="lineNum">    1393 </span>            : out:
+<span class="lineNum">    1394 </span><span class="lineNoCov">          0 :         if (vm_rpc_close(&amp;rpci) != 0) {</span>
+<span class="lineNum">    1395 </span>            :                 DPRINTF(&quot;%s: unable to close rpci channel\n&quot;, DEVNAME(sc));
+<span class="lineNum">    1396 </span>            :         }
+<span class="lineNum">    1397 </span>            : 
+<span class="lineNum">    1398 </span><span class="lineNoCov">          0 :         return result;</span>
+<span class="lineNum">    1399 </span><span class="lineNoCov">          0 : }</span>
+<a name="1400"><span class="lineNum">    1400 </span>            : </a>
+<span class="lineNum">    1401 </span>            : int
+<span class="lineNum">    1402 </span><span class="lineNoCov">          0 : vm_rpc_send_rpci_tx(struct vmt_softc *sc, const char *fmt, ...)</span>
+<span class="lineNum">    1403 </span>            : {
+<span class="lineNum">    1404 </span><span class="lineNoCov">          0 :         va_list args;</span>
+<span class="lineNum">    1405 </span>            :         int len;
+<span class="lineNum">    1406 </span>            : 
+<span class="lineNum">    1407 </span><span class="lineNoCov">          0 :         va_start(args, fmt);</span>
+<span class="lineNum">    1408 </span><span class="lineNoCov">          0 :         len = vsnprintf(sc-&gt;sc_rpc_buf, VMT_RPC_BUFLEN, fmt, args);</span>
+<span class="lineNum">    1409 </span><span class="lineNoCov">          0 :         va_end(args);</span>
+<span class="lineNum">    1410 </span>            : 
+<span class="lineNum">    1411 </span><span class="lineNoCov">          0 :         if (len &gt;= VMT_RPC_BUFLEN) {</span>
+<span class="lineNum">    1412 </span>            :                 DPRINTF(&quot;%s: rpci command didn't fit in buffer\n&quot;, DEVNAME(sc));
+<span class="lineNum">    1413 </span><span class="lineNoCov">          0 :                 return EIO;</span>
+<span class="lineNum">    1414 </span>            :         }
+<span class="lineNum">    1415 </span>            : 
+<span class="lineNum">    1416 </span><span class="lineNoCov">          0 :         return vm_rpc_send_rpci_tx_buf(sc, sc-&gt;sc_rpc_buf, len);</span>
+<span class="lineNum">    1417 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1418 </span>            : 
+<span class="lineNum">    1419 </span>            : #if 0
+<span class="lineNum">    1420 </span>            :         struct vm_backdoor frame;
+<span class="lineNum">    1421 </span>            : 
+<span class="lineNum">    1422 </span>            :         bzero(&amp;frame, sizeof(frame));
+<span class="lineNum">    1423 </span>            : 
+<span class="lineNum">    1424 </span>            :         frame.eax.word = VM_MAGIC;
+<span class="lineNum">    1425 </span>            :         frame.ecx.part.low = VM_CMD_GET_VERSION;
+<span class="lineNum">    1426 </span>            :         frame.edx.part.low  = VM_PORT_CMD;
+<span class="lineNum">    1427 </span>            : 
+<span class="lineNum">    1428 </span>            :         printf(&quot;\n&quot;);
+<span class="lineNum">    1429 </span>            :         printf(&quot;eax 0x%08x\n&quot;, frame.eax.word);
+<span class="lineNum">    1430 </span>            :         printf(&quot;ebx 0x%08x\n&quot;, frame.ebx.word);
+<span class="lineNum">    1431 </span>            :         printf(&quot;ecx 0x%08x\n&quot;, frame.ecx.word);
+<span class="lineNum">    1432 </span>            :         printf(&quot;edx 0x%08x\n&quot;, frame.edx.word);
+<span class="lineNum">    1433 </span>            :         printf(&quot;ebp 0x%08x\n&quot;, frame.ebp.word);
+<span class="lineNum">    1434 </span>            :         printf(&quot;edi 0x%08x\n&quot;, frame.edi.word);
+<span class="lineNum">    1435 </span>            :         printf(&quot;esi 0x%08x\n&quot;, frame.esi.word);
+<span class="lineNum">    1436 </span>            : 
+<span class="lineNum">    1437 </span>            :         vm_cmd(&amp;frame);
+<span class="lineNum">    1438 </span>            : 
+<span class="lineNum">    1439 </span>            :         printf(&quot;-\n&quot;);
+<span class="lineNum">    1440 </span>            :         printf(&quot;eax 0x%08x\n&quot;, frame.eax.word);
+<span class="lineNum">    1441 </span>            :         printf(&quot;ebx 0x%08x\n&quot;, frame.ebx.word);
+<span class="lineNum">    1442 </span>            :         printf(&quot;ecx 0x%08x\n&quot;, frame.ecx.word);
+<span class="lineNum">    1443 </span>            :         printf(&quot;edx 0x%08x\n&quot;, frame.edx.word);
+<span class="lineNum">    1444 </span>            :         printf(&quot;ebp 0x%08x\n&quot;, frame.ebp.word);
+<span class="lineNum">    1445 </span>            :         printf(&quot;edi 0x%08x\n&quot;, frame.edi.word);
+<span class="lineNum">    1446 </span>            :         printf(&quot;esi 0x%08x\n&quot;, frame.esi.word);
+<span class="lineNum">    1447 </span>            : #endif
+<span class="lineNum">    1448 </span>            : 
+<span class="lineNum">    1449 </span>            : /*
+<span class="lineNum">    1450 </span>            :  * Notes on tracing backdoor activity in vmware-guestd:
+<span class="lineNum">    1451 </span>            :  *
+<span class="lineNum">    1452 </span>            :  * - Find the addresses of the inl / rep insb / rep outsb
+<span class="lineNum">    1453 </span>            :  *   instructions used to perform backdoor operations.
+<span class="lineNum">    1454 </span>            :  *   One way to do this is to disassemble vmware-guestd:
+<span class="lineNum">    1455 </span>            :  *
+<span class="lineNum">    1456 </span>            :  *   $ objdump -S /emul/freebsd/sbin/vmware-guestd &gt; vmware-guestd.S
+<span class="lineNum">    1457 </span>            :  *
+<span class="lineNum">    1458 </span>            :  *   and search for '&lt;tab&gt;in ' in the resulting file.  The rep insb and
+<span class="lineNum">    1459 </span>            :  *   rep outsb code is directly below that.
+<span class="lineNum">    1460 </span>            :  *
+<span class="lineNum">    1461 </span>            :  * - Run vmware-guestd under gdb, setting up breakpoints as follows:
+<span class="lineNum">    1462 </span>            :  *   (the addresses shown here are the ones from VMware-server-1.0.10-203137,
+<span class="lineNum">    1463 </span>            :  *   the last version that actually works in FreeBSD emulation on OpenBSD)
+<span class="lineNum">    1464 </span>            :  *
+<span class="lineNum">    1465 </span>            :  * break *0x805497b   (address of 'in' instruction)
+<span class="lineNum">    1466 </span>            :  * commands 1
+<span class="lineNum">    1467 </span>            :  * silent
+<span class="lineNum">    1468 </span>            :  * echo INOUT\n
+<span class="lineNum">    1469 </span>            :  * print/x $ecx
+<span class="lineNum">    1470 </span>            :  * print/x $ebx
+<span class="lineNum">    1471 </span>            :  * print/x $edx
+<span class="lineNum">    1472 </span>            :  * continue
+<span class="lineNum">    1473 </span>            :  * end
+<span class="lineNum">    1474 </span>            :  * break *0x805497c   (address of instruction after 'in')
+<span class="lineNum">    1475 </span>            :  * commands 2
+<span class="lineNum">    1476 </span>            :  * silent
+<span class="lineNum">    1477 </span>            :  * echo ===\n
+<span class="lineNum">    1478 </span>            :  * print/x $ecx
+<span class="lineNum">    1479 </span>            :  * print/x $ebx
+<span class="lineNum">    1480 </span>            :  * print/x $edx
+<span class="lineNum">    1481 </span>            :  * echo \n
+<span class="lineNum">    1482 </span>            :  * continue
+<span class="lineNum">    1483 </span>            :  * end
+<span class="lineNum">    1484 </span>            :  * break *0x80549b7   (address of instruction before 'rep insb')
+<span class="lineNum">    1485 </span>            :  * commands 3
+<span class="lineNum">    1486 </span>            :  * silent
+<span class="lineNum">    1487 </span>            :  * set variable $inaddr = $edi
+<span class="lineNum">    1488 </span>            :  * set variable $incount = $ecx
+<span class="lineNum">    1489 </span>            :  * continue
+<span class="lineNum">    1490 </span>            :  * end
+<span class="lineNum">    1491 </span>            :  * break *0x80549ba   (address of instruction after 'rep insb')
+<span class="lineNum">    1492 </span>            :  * commands 4
+<span class="lineNum">    1493 </span>            :  * silent
+<span class="lineNum">    1494 </span>            :  * echo IN\n
+<span class="lineNum">    1495 </span>            :  * print $incount
+<span class="lineNum">    1496 </span>            :  * x/s $inaddr
+<span class="lineNum">    1497 </span>            :  * echo \n
+<span class="lineNum">    1498 </span>            :  * continue
+<span class="lineNum">    1499 </span>            :  * end
+<span class="lineNum">    1500 </span>            :  * break *0x80549fb    (address of instruction before 'rep outsb')
+<span class="lineNum">    1501 </span>            :  * commands 5
+<span class="lineNum">    1502 </span>            :  * silent
+<span class="lineNum">    1503 </span>            :  * echo OUT\n
+<span class="lineNum">    1504 </span>            :  * print $ecx
+<span class="lineNum">    1505 </span>            :  * x/s $esi
+<span class="lineNum">    1506 </span>            :  * echo \n
+<span class="lineNum">    1507 </span>            :  * continue
+<span class="lineNum">    1508 </span>            :  * end
+<span class="lineNum">    1509 </span>            :  *
+<span class="lineNum">    1510 </span>            :  * This will produce a log of the backdoor operations, including the
+<span class="lineNum">    1511 </span>            :  * data sent and received and the relevant register values.  You can then
+<span class="lineNum">    1512 </span>            :  * match the register values to the various constants in this file.
+<span class="lineNum">    1513 </span>            :  */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,1041 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/softraid_raid5.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">dev</a> - softraid_raid5.c<span style="font-size: 80%;"> (source / <a href="softraid_raid5.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">333</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">17</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /* $OpenBSD: softraid_raid5.c,v 1.27 2016/10/07 19:17:50 krw Exp $ */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2014 Joel Sing &lt;jsing@openbsd.org&gt;
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2009 Marco Peereboom &lt;marco@peereboom.us&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2009 Jordan Hargrave &lt;jordan@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       8 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       9 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      12 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      13 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      14 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      15 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      16 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      17 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      18 </span>            :  */
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : #include &quot;bio.h&quot;
+<span class="lineNum">      21 </span>            : 
+<span class="lineNum">      22 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/buf.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/disk.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/rwlock.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/fcntl.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;sys/mount.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;sys/sensors.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;sys/task.h&gt;
+<span class="lineNum">      37 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;sys/conf.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;sys/uio.h&gt;
+<span class="lineNum">      40 </span>            : 
+<span class="lineNum">      41 </span>            : #include &lt;scsi/scsi_all.h&gt;
+<span class="lineNum">      42 </span>            : #include &lt;scsi/scsiconf.h&gt;
+<span class="lineNum">      43 </span>            : #include &lt;scsi/scsi_disk.h&gt;
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : #include &lt;dev/softraidvar.h&gt;
+<span class="lineNum">      46 </span>            : 
+<span class="lineNum">      47 </span>            : /* RAID 5 functions. */
+<span class="lineNum">      48 </span>            : int     sr_raid5_create(struct sr_discipline *, struct bioc_createraid *,
+<span class="lineNum">      49 </span>            :             int, int64_t);
+<span class="lineNum">      50 </span>            : int     sr_raid5_assemble(struct sr_discipline *, struct bioc_createraid *,
+<span class="lineNum">      51 </span>            :             int, void *);
+<span class="lineNum">      52 </span>            : int     sr_raid5_init(struct sr_discipline *);
+<span class="lineNum">      53 </span>            : int     sr_raid5_rw(struct sr_workunit *);
+<span class="lineNum">      54 </span>            : int     sr_raid5_openings(struct sr_discipline *);
+<span class="lineNum">      55 </span>            : void    sr_raid5_intr(struct buf *);
+<span class="lineNum">      56 </span>            : int     sr_raid5_wu_done(struct sr_workunit *);
+<span class="lineNum">      57 </span>            : void    sr_raid5_set_chunk_state(struct sr_discipline *, int, int);
+<span class="lineNum">      58 </span>            : void    sr_raid5_set_vol_state(struct sr_discipline *);
+<span class="lineNum">      59 </span>            : 
+<span class="lineNum">      60 </span>            : int     sr_raid5_addio(struct sr_workunit *wu, int, daddr_t, long,
+<span class="lineNum">      61 </span>            :             void *, int, int, void *);
+<span class="lineNum">      62 </span>            : int     sr_raid5_regenerate(struct sr_workunit *, int, daddr_t, long,
+<span class="lineNum">      63 </span>            :             void *);
+<span class="lineNum">      64 </span>            : int     sr_raid5_write(struct sr_workunit *, struct sr_workunit *, int, int,
+<span class="lineNum">      65 </span>            :             daddr_t, long, void *, int, int);
+<span class="lineNum">      66 </span>            : void    sr_raid5_xor(void *, void *, int);
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            : void    sr_raid5_rebuild(struct sr_discipline *);
+<span class="lineNum">      69 </span>            : void    sr_raid5_scrub(struct sr_discipline *);
+<span class="lineNum">      70 </span>            : 
+<a name="71"><span class="lineNum">      71 </span>            : /* discipline initialisation. */</a>
+<span class="lineNum">      72 </span>            : void
+<span class="lineNum">      73 </span><span class="lineNoCov">          0 : sr_raid5_discipline_init(struct sr_discipline *sd)</span>
+<span class="lineNum">      74 </span>            : {
+<span class="lineNum">      75 </span>            :         /* Fill out discipline members. */
+<span class="lineNum">      76 </span><span class="lineNoCov">          0 :         sd-&gt;sd_type = SR_MD_RAID5;</span>
+<span class="lineNum">      77 </span><span class="lineNoCov">          0 :         strlcpy(sd-&gt;sd_name, &quot;RAID 5&quot;, sizeof(sd-&gt;sd_name));</span>
+<span class="lineNum">      78 </span><span class="lineNoCov">          0 :         sd-&gt;sd_capabilities = SR_CAP_SYSTEM_DISK | SR_CAP_AUTO_ASSEMBLE |</span>
+<span class="lineNum">      79 </span>            :             SR_CAP_REBUILD | SR_CAP_REDUNDANT;
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 :         sd-&gt;sd_max_wu = SR_RAID5_NOWU + 2;   /* Two for scrub/rebuild. */</span>
+<span class="lineNum">      81 </span>            : 
+<span class="lineNum">      82 </span>            :         /* Setup discipline specific function pointers. */
+<span class="lineNum">      83 </span><span class="lineNoCov">          0 :         sd-&gt;sd_assemble = sr_raid5_assemble;</span>
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 :         sd-&gt;sd_create = sr_raid5_create;</span>
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :         sd-&gt;sd_openings = sr_raid5_openings;</span>
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :         sd-&gt;sd_rebuild = sr_raid5_rebuild;</span>
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :         sd-&gt;sd_scsi_rw = sr_raid5_rw;</span>
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :         sd-&gt;sd_scsi_intr = sr_raid5_intr;</span>
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :         sd-&gt;sd_scsi_wu_done = sr_raid5_wu_done;</span>
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :         sd-&gt;sd_set_chunk_state = sr_raid5_set_chunk_state;</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :         sd-&gt;sd_set_vol_state = sr_raid5_set_vol_state;</span>
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 : }</span>
+<a name="93"><span class="lineNum">      93 </span>            : </a>
+<span class="lineNum">      94 </span>            : int
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 : sr_raid5_create(struct sr_discipline *sd, struct bioc_createraid *bc,</span>
+<span class="lineNum">      96 </span>            :     int no_chunk, int64_t coerced_size)
+<span class="lineNum">      97 </span>            : {
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :         if (no_chunk &lt; 3) {</span>
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :                 sr_error(sd-&gt;sd_sc, &quot;%s requires three or more chunks&quot;,</span>
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 :                     sd-&gt;sd_name);</span>
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">     102 </span>            :         }
+<span class="lineNum">     103 </span>            : 
+<span class="lineNum">     104 </span>            :         /*
+<span class="lineNum">     105 </span>            :          * XXX add variable strip size later even though MAXPHYS is really
+<span class="lineNum">     106 </span>            :          * the clever value, users like to tinker with that type of stuff.
+<span class="lineNum">     107 </span>            :          */
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :         sd-&gt;sd_meta-&gt;ssdi.ssd_strip_size = MAXPHYS;</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         sd-&gt;sd_meta-&gt;ssdi.ssd_size = (coerced_size &amp;</span>
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :             ~(((u_int64_t)sd-&gt;sd_meta-&gt;ssdi.ssd_strip_size &gt;&gt;</span>
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :             DEV_BSHIFT) - 1)) * (no_chunk - 1);</span>
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         return sr_raid5_init(sd);</span>
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 : }</span>
+<a name="115"><span class="lineNum">     115 </span>            : </a>
+<span class="lineNum">     116 </span>            : int
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 : sr_raid5_assemble(struct sr_discipline *sd, struct bioc_createraid *bc,</span>
+<span class="lineNum">     118 </span>            :     int no_chunk, void *data)
+<span class="lineNum">     119 </span>            : {
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         return sr_raid5_init(sd);</span>
+<span class="lineNum">     121 </span>            : }
+<a name="122"><span class="lineNum">     122 </span>            : </a>
+<span class="lineNum">     123 </span>            : int
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 : sr_raid5_init(struct sr_discipline *sd)</span>
+<span class="lineNum">     125 </span>            : {
+<span class="lineNum">     126 </span>            :         /* Initialise runtime values. */
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :         sd-&gt;mds.mdd_raid5.sr5_strip_bits =</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :             sr_validate_stripsize(sd-&gt;sd_meta-&gt;ssdi.ssd_strip_size);</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :         if (sd-&gt;mds.mdd_raid5.sr5_strip_bits == -1) {</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :                 sr_error(sd-&gt;sd_sc, &quot;invalid strip size&quot;);</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">     132 </span>            :         }
+<span class="lineNum">     133 </span>            : 
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         sd-&gt;sd_max_ccb_per_wu = sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no;</span>
+<span class="lineNum">     135 </span>            : 
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 : }</span>
+<a name="138"><span class="lineNum">     138 </span>            : </a>
+<span class="lineNum">     139 </span>            : int
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 : sr_raid5_openings(struct sr_discipline *sd)</span>
+<span class="lineNum">     141 </span>            : {
+<span class="lineNum">     142 </span>            :         /* Two work units per I/O, two for rebuild/scrub. */
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         return ((sd-&gt;sd_max_wu - 2) &gt;&gt; 1);</span>
+<span class="lineNum">     144 </span>            : }
+<a name="145"><span class="lineNum">     145 </span>            : </a>
+<span class="lineNum">     146 </span>            : void
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 : sr_raid5_set_chunk_state(struct sr_discipline *sd, int c, int new_state)</span>
+<span class="lineNum">     148 </span>            : {
+<span class="lineNum">     149 </span>            :         int                     old_state, s;
+<span class="lineNum">     150 </span>            : 
+<span class="lineNum">     151 </span>            :         DNPRINTF(SR_D_STATE, &quot;%s: %s: %s: sr_raid_set_chunk_state %d -&gt; %d\n&quot;,
+<span class="lineNum">     152 </span>            :             DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname,
+<span class="lineNum">     153 </span>            :             sd-&gt;sd_vol.sv_chunks[c]-&gt;src_meta.scmi.scm_devname, c, new_state);
+<span class="lineNum">     154 </span>            : 
+<span class="lineNum">     155 </span>            :         /* ok to go to splbio since this only happens in error path */
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         s = splbio();</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         old_state = sd-&gt;sd_vol.sv_chunks[c]-&gt;src_meta.scm_status;</span>
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span>            :         /* multiple IOs to the same chunk that fail will come through here */
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         if (old_state == new_state)</span>
+<span class="lineNum">     161 </span>            :                 goto done;
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         switch (old_state) {</span>
+<span class="lineNum">     164 </span>            :         case BIOC_SDONLINE:
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :                 switch (new_state) {</span>
+<span class="lineNum">     166 </span>            :                 case BIOC_SDOFFLINE:
+<span class="lineNum">     167 </span>            :                 case BIOC_SDSCRUB:
+<span class="lineNum">     168 </span>            :                         break;
+<span class="lineNum">     169 </span>            :                 default:
+<span class="lineNum">     170 </span>            :                         goto die;
+<span class="lineNum">     171 </span>            :                 }
+<span class="lineNum">     172 </span>            :                 break;
+<span class="lineNum">     173 </span>            : 
+<span class="lineNum">     174 </span>            :         case BIOC_SDOFFLINE:
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                 if (new_state == BIOC_SDREBUILD) {</span>
+<span class="lineNum">     176 </span>            :                         ;
+<span class="lineNum">     177 </span>            :                 } else
+<span class="lineNum">     178 </span>            :                         goto die;
+<span class="lineNum">     179 </span>            :                 break;
+<span class="lineNum">     180 </span>            : 
+<span class="lineNum">     181 </span>            :         case BIOC_SDSCRUB:
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :                 switch (new_state) {</span>
+<span class="lineNum">     183 </span>            :                 case BIOC_SDONLINE:
+<span class="lineNum">     184 </span>            :                 case BIOC_SDOFFLINE:
+<span class="lineNum">     185 </span>            :                         break;
+<span class="lineNum">     186 </span>            :                 default:
+<span class="lineNum">     187 </span>            :                         goto die;
+<span class="lineNum">     188 </span>            :                 }
+<span class="lineNum">     189 </span>            :                 break;
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span>            :         case BIOC_SDREBUILD:
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                 switch (new_state) {</span>
+<span class="lineNum">     193 </span>            :                 case BIOC_SDONLINE:
+<span class="lineNum">     194 </span>            :                 case BIOC_SDOFFLINE:
+<span class="lineNum">     195 </span>            :                         break;
+<span class="lineNum">     196 </span>            :                 default:
+<span class="lineNum">     197 </span>            :                         goto die;
+<span class="lineNum">     198 </span>            :                 }
+<span class="lineNum">     199 </span>            :                 break;
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span>            :         default:
+<span class="lineNum">     202 </span>            : die:
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :                 splx(s); /* XXX */</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                 panic(&quot;%s: %s: %s: invalid chunk state transition &quot;</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                     &quot;%d -&gt; %d&quot;, DEVNAME(sd-&gt;sd_sc),</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                     sd-&gt;sd_meta-&gt;ssd_devname,</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :                     sd-&gt;sd_vol.sv_chunks[c]-&gt;src_meta.scmi.scm_devname,</span>
+<span class="lineNum">     208 </span>            :                     old_state, new_state);
+<span class="lineNum">     209 </span>            :                 /* NOTREACHED */
+<span class="lineNum">     210 </span>            :         }
+<span class="lineNum">     211 </span>            : 
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :         sd-&gt;sd_vol.sv_chunks[c]-&gt;src_meta.scm_status = new_state;</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         sd-&gt;sd_set_vol_state(sd);</span>
+<span class="lineNum">     214 </span>            : 
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         sd-&gt;sd_must_flush = 1;</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :         task_add(systq, &amp;sd-&gt;sd_meta_save_task);</span>
+<span class="lineNum">     217 </span>            : done:
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 : }</span>
+<a name="220"><span class="lineNum">     220 </span>            : </a>
+<span class="lineNum">     221 </span>            : void
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 : sr_raid5_set_vol_state(struct sr_discipline *sd)</span>
+<span class="lineNum">     223 </span>            : {
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :         int                     states[SR_MAX_STATES];</span>
+<span class="lineNum">     225 </span>            :         int                     new_state, i, s, nd;
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :         int                     old_state = sd-&gt;sd_vol_status;</span>
+<span class="lineNum">     227 </span>            : 
+<span class="lineNum">     228 </span>            :         DNPRINTF(SR_D_STATE, &quot;%s: %s: sr_raid_set_vol_state\n&quot;,
+<span class="lineNum">     229 </span>            :             DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname);
+<span class="lineNum">     230 </span>            : 
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :         nd = sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no;</span>
+<span class="lineNum">     232 </span>            : 
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; SR_MAX_STATES; i++)</span>
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :                 states[i] = 0;</span>
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; nd; i++) {</span>
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :                 s = sd-&gt;sd_vol.sv_chunks[i]-&gt;src_meta.scm_status;</span>
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :                 if (s &gt;= SR_MAX_STATES)</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :                         panic(&quot;%s: %s: %s: invalid chunk state&quot;,</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                             DEVNAME(sd-&gt;sd_sc),</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                             sd-&gt;sd_meta-&gt;ssd_devname,</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :                             sd-&gt;sd_vol.sv_chunks[i]-&gt;src_meta.scmi.scm_devname);</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :                 states[s]++;</span>
+<span class="lineNum">     244 </span>            :         }
+<span class="lineNum">     245 </span>            : 
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         if (states[BIOC_SDONLINE] == nd)</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :                 new_state = BIOC_SVONLINE;</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :         else if (states[BIOC_SDONLINE] &lt; nd - 1)</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                 new_state = BIOC_SVOFFLINE;</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         else if (states[BIOC_SDSCRUB] != 0)</span>
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :                 new_state = BIOC_SVSCRUB;</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         else if (states[BIOC_SDREBUILD] != 0)</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :                 new_state = BIOC_SVREBUILD;</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         else if (states[BIOC_SDONLINE] == nd - 1)</span>
+<span class="lineNum">     255 </span>            :                 new_state = BIOC_SVDEGRADED;
+<span class="lineNum">     256 </span>            :         else {
+<span class="lineNum">     257 </span>            : #ifdef SR_DEBUG
+<span class="lineNum">     258 </span>            :                 DNPRINTF(SR_D_STATE, &quot;%s: invalid volume state, old state &quot;
+<span class="lineNum">     259 </span>            :                     &quot;was %d\n&quot;, DEVNAME(sd-&gt;sd_sc), old_state);
+<span class="lineNum">     260 </span>            :                 for (i = 0; i &lt; nd; i++)
+<span class="lineNum">     261 </span>            :                         DNPRINTF(SR_D_STATE, &quot;%s: chunk %d status = %d\n&quot;,
+<span class="lineNum">     262 </span>            :                             DEVNAME(sd-&gt;sd_sc), i,
+<span class="lineNum">     263 </span>            :                             sd-&gt;sd_vol.sv_chunks[i]-&gt;src_meta.scm_status);
+<span class="lineNum">     264 </span>            : #endif
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :                 panic(&quot;invalid volume state&quot;);</span>
+<span class="lineNum">     266 </span>            :         }
+<span class="lineNum">     267 </span>            : 
+<span class="lineNum">     268 </span>            :         DNPRINTF(SR_D_STATE, &quot;%s: %s: sr_raid5_set_vol_state %d -&gt; %d\n&quot;,
+<span class="lineNum">     269 </span>            :             DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname,
+<span class="lineNum">     270 </span>            :             old_state, new_state);
+<span class="lineNum">     271 </span>            : 
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :         switch (old_state) {</span>
+<span class="lineNum">     273 </span>            :         case BIOC_SVONLINE:
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :                 switch (new_state) {</span>
+<span class="lineNum">     275 </span>            :                 case BIOC_SVONLINE: /* can go to same state */
+<span class="lineNum">     276 </span>            :                 case BIOC_SVOFFLINE:
+<span class="lineNum">     277 </span>            :                 case BIOC_SVDEGRADED:
+<span class="lineNum">     278 </span>            :                 case BIOC_SVREBUILD: /* happens on boot */
+<span class="lineNum">     279 </span>            :                         break;
+<span class="lineNum">     280 </span>            :                 default:
+<span class="lineNum">     281 </span>            :                         goto die;
+<span class="lineNum">     282 </span>            :                 }
+<span class="lineNum">     283 </span>            :                 break;
+<span class="lineNum">     284 </span>            : 
+<span class="lineNum">     285 </span>            :         case BIOC_SVOFFLINE:
+<span class="lineNum">     286 </span>            :                 /* XXX this might be a little too much */
+<span class="lineNum">     287 </span>            :                 goto die;
+<span class="lineNum">     288 </span>            : 
+<span class="lineNum">     289 </span>            :         case BIOC_SVDEGRADED:
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                 switch (new_state) {</span>
+<span class="lineNum">     291 </span>            :                 case BIOC_SVOFFLINE:
+<span class="lineNum">     292 </span>            :                 case BIOC_SVREBUILD:
+<span class="lineNum">     293 </span>            :                 case BIOC_SVDEGRADED: /* can go to the same state */
+<span class="lineNum">     294 </span>            :                         break;
+<span class="lineNum">     295 </span>            :                 default:
+<span class="lineNum">     296 </span>            :                         goto die;
+<span class="lineNum">     297 </span>            :                 }
+<span class="lineNum">     298 </span>            :                 break;
+<span class="lineNum">     299 </span>            : 
+<span class="lineNum">     300 </span>            :         case BIOC_SVBUILDING:
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :                 switch (new_state) {</span>
+<span class="lineNum">     302 </span>            :                 case BIOC_SVONLINE:
+<span class="lineNum">     303 </span>            :                 case BIOC_SVOFFLINE:
+<span class="lineNum">     304 </span>            :                 case BIOC_SVBUILDING: /* can go to the same state */
+<span class="lineNum">     305 </span>            :                         break;
+<span class="lineNum">     306 </span>            :                 default:
+<span class="lineNum">     307 </span>            :                         goto die;
+<span class="lineNum">     308 </span>            :                 }
+<span class="lineNum">     309 </span>            :                 break;
+<span class="lineNum">     310 </span>            : 
+<span class="lineNum">     311 </span>            :         case BIOC_SVSCRUB:
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                 switch (new_state) {</span>
+<span class="lineNum">     313 </span>            :                 case BIOC_SVONLINE:
+<span class="lineNum">     314 </span>            :                 case BIOC_SVOFFLINE:
+<span class="lineNum">     315 </span>            :                 case BIOC_SVDEGRADED:
+<span class="lineNum">     316 </span>            :                 case BIOC_SVSCRUB: /* can go to same state */
+<span class="lineNum">     317 </span>            :                         break;
+<span class="lineNum">     318 </span>            :                 default:
+<span class="lineNum">     319 </span>            :                         goto die;
+<span class="lineNum">     320 </span>            :                 }
+<span class="lineNum">     321 </span>            :                 break;
+<span class="lineNum">     322 </span>            : 
+<span class="lineNum">     323 </span>            :         case BIOC_SVREBUILD:
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :                 switch (new_state) {</span>
+<span class="lineNum">     325 </span>            :                 case BIOC_SVONLINE:
+<span class="lineNum">     326 </span>            :                 case BIOC_SVOFFLINE:
+<span class="lineNum">     327 </span>            :                 case BIOC_SVDEGRADED:
+<span class="lineNum">     328 </span>            :                 case BIOC_SVREBUILD: /* can go to the same state */
+<span class="lineNum">     329 </span>            :                         break;
+<span class="lineNum">     330 </span>            :                 default:
+<span class="lineNum">     331 </span>            :                         goto die;
+<span class="lineNum">     332 </span>            :                 }
+<span class="lineNum">     333 </span>            :                 break;
+<span class="lineNum">     334 </span>            : 
+<span class="lineNum">     335 </span>            :         default:
+<span class="lineNum">     336 </span>            : die:
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :                 panic(&quot;%s: %s: invalid volume state transition %d -&gt; %d&quot;,</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                     DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname,</span>
+<span class="lineNum">     339 </span>            :                     old_state, new_state);
+<span class="lineNum">     340 </span>            :                 /* NOTREACHED */
+<span class="lineNum">     341 </span>            :         }
+<span class="lineNum">     342 </span>            : 
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :         sd-&gt;sd_vol_status = new_state;</span>
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 : }</span>
+<a name="345"><span class="lineNum">     345 </span>            : </a>
+<span class="lineNum">     346 </span>            : static inline int
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 : sr_raid5_chunk_online(struct sr_discipline *sd, int chunk)</span>
+<span class="lineNum">     348 </span>            : {
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :         switch (sd-&gt;sd_vol.sv_chunks[chunk]-&gt;src_meta.scm_status) {</span>
+<span class="lineNum">     350 </span>            :         case BIOC_SDONLINE:
+<span class="lineNum">     351 </span>            :         case BIOC_SDSCRUB:
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">     353 </span>            :         default:
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     355 </span>            :         }
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 : }</span>
+<a name="357"><span class="lineNum">     357 </span>            : </a>
+<span class="lineNum">     358 </span>            : static inline int
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 : sr_raid5_chunk_rebuild(struct sr_discipline *sd, int chunk)</span>
+<span class="lineNum">     360 </span>            : {
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         switch (sd-&gt;sd_vol.sv_chunks[chunk]-&gt;src_meta.scm_status) {</span>
+<span class="lineNum">     362 </span>            :         case BIOC_SDREBUILD:
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">     364 </span>            :         default:
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     366 </span>            :         }
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 : }</span>
+<a name="368"><span class="lineNum">     368 </span>            : </a>
+<span class="lineNum">     369 </span>            : int
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 : sr_raid5_rw(struct sr_workunit *wu)</span>
+<span class="lineNum">     371 </span>            : {
+<span class="lineNum">     372 </span>            :         struct sr_workunit      *wu_r = NULL;
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :         struct sr_discipline    *sd = wu-&gt;swu_dis;</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :         struct scsi_xfer        *xs = wu-&gt;swu_xs;</span>
+<span class="lineNum">     375 </span>            :         struct sr_chunk         *scp;
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :         daddr_t                 blkno, lba;</span>
+<span class="lineNum">     377 </span>            :         int64_t                 chunk_offs, lbaoffs, offset, strip_offs;
+<span class="lineNum">     378 </span>            :         int64_t                 strip_bits, strip_no, strip_size;
+<span class="lineNum">     379 </span>            :         int64_t                 chunk, no_chunk;
+<span class="lineNum">     380 </span>            :         int64_t                 parity, row_size;
+<span class="lineNum">     381 </span>            :         long                    length, datalen;
+<span class="lineNum">     382 </span>            :         void                    *data;
+<span class="lineNum">     383 </span>            :         int                     s;
+<span class="lineNum">     384 </span>            : 
+<span class="lineNum">     385 </span>            :         /* blkno and scsi error will be handled by sr_validate_io */
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :         if (sr_validate_io(wu, &amp;blkno, &quot;sr_raid5_rw&quot;))</span>
+<span class="lineNum">     387 </span>            :                 goto bad;
+<span class="lineNum">     388 </span>            : 
+<span class="lineNum">     389 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: %s sr_raid5_rw %s: blkno %lld size %d\n&quot;,
+<span class="lineNum">     390 </span>            :             DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname,
+<span class="lineNum">     391 </span>            :             (xs-&gt;flags &amp; SCSI_DATA_IN) ? &quot;read&quot; : &quot;write&quot;,
+<span class="lineNum">     392 </span>            :             (long long)blkno, xs-&gt;datalen);
+<span class="lineNum">     393 </span>            : 
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :         strip_size = sd-&gt;sd_meta-&gt;ssdi.ssd_strip_size;</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         strip_bits = sd-&gt;mds.mdd_raid5.sr5_strip_bits;</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         no_chunk = sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no - 1;</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :         row_size = (no_chunk &lt;&lt; strip_bits) &gt;&gt; DEV_BSHIFT;</span>
+<span class="lineNum">     398 </span>            : 
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :         data = xs-&gt;data;</span>
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :         datalen = xs-&gt;datalen;</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :         lbaoffs = blkno &lt;&lt; DEV_BSHIFT;</span>
+<span class="lineNum">     402 </span>            : 
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :         if (xs-&gt;flags &amp; SCSI_DATA_OUT) {</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                 if ((wu_r = sr_scsi_wu_get(sd, SCSI_NOSLEEP)) == NULL){</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: %s failed to get read work unit&quot;,</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :                             DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname);</span>
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :                         goto bad;</span>
+<span class="lineNum">     408 </span>            :                 }
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                 wu_r-&gt;swu_state = SR_WU_INPROGRESS;</span>
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :                 wu_r-&gt;swu_flags |= SR_WUF_DISCIPLINE;</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         wu-&gt;swu_blk_start = 0;</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         while (datalen != 0) {</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :                 strip_no = lbaoffs &gt;&gt; strip_bits;</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :                 strip_offs = lbaoffs &amp; (strip_size - 1);</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 chunk_offs = (strip_no / no_chunk) &lt;&lt; strip_bits;</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                 offset = chunk_offs + strip_offs;</span>
+<span class="lineNum">     419 </span>            : 
+<span class="lineNum">     420 </span>            :                 /* get size remaining in this stripe */
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                 length = MIN(strip_size - strip_offs, datalen);</span>
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span>            :                 /*
+<span class="lineNum">     424 </span>            :                  * Map disk offset to data and parity chunks, using a left
+<span class="lineNum">     425 </span>            :                  * asymmetric algorithm for the parity assignment.
+<span class="lineNum">     426 </span>            :                  */
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :                 chunk = strip_no % no_chunk;</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                 parity = no_chunk - ((strip_no / no_chunk) % (no_chunk + 1));</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :                 if (chunk &gt;= parity)</span>
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :                         chunk++;</span>
+<span class="lineNum">     431 </span>            : 
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                 lba = offset &gt;&gt; DEV_BSHIFT;</span>
+<span class="lineNum">     433 </span>            : 
+<span class="lineNum">     434 </span>            :                 /* XXX big hammer.. exclude I/O from entire stripe */
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :                 if (wu-&gt;swu_blk_start == 0)</span>
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :                         wu-&gt;swu_blk_start = (strip_no / no_chunk) * row_size;</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :                 wu-&gt;swu_blk_end = (strip_no / no_chunk) * row_size +</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                     (row_size - 1);</span>
+<span class="lineNum">     439 </span>            : 
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :                 scp = sd-&gt;sd_vol.sv_chunks[chunk];</span>
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                 if (xs-&gt;flags &amp; SCSI_DATA_IN) {</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :                         switch (scp-&gt;src_meta.scm_status) {</span>
+<span class="lineNum">     443 </span>            :                         case BIOC_SDONLINE:
+<span class="lineNum">     444 </span>            :                         case BIOC_SDSCRUB:
+<span class="lineNum">     445 </span>            :                                 /*
+<span class="lineNum">     446 </span>            :                                  * Chunk is online, issue a single read
+<span class="lineNum">     447 </span>            :                                  * request.
+<span class="lineNum">     448 </span>            :                                  */
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                                 if (sr_raid5_addio(wu, chunk, lba, length,</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                                     data, xs-&gt;flags, 0, NULL))</span>
+<span class="lineNum">     451 </span>            :                                         goto bad;
+<span class="lineNum">     452 </span>            :                                 break;
+<span class="lineNum">     453 </span>            :                         case BIOC_SDOFFLINE:
+<span class="lineNum">     454 </span>            :                         case BIOC_SDREBUILD:
+<span class="lineNum">     455 </span>            :                         case BIOC_SDHOTSPARE:
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :                                 if (sr_raid5_regenerate(wu, chunk, lba,</span>
+<span class="lineNum">     457 </span>            :                                     length, data))
+<span class="lineNum">     458 </span>            :                                         goto bad;
+<span class="lineNum">     459 </span>            :                                 break;
+<span class="lineNum">     460 </span>            :                         default:
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: is offline, can't read\n&quot;,</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                                     DEVNAME(sd-&gt;sd_sc));</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                                 goto bad;</span>
+<span class="lineNum">     464 </span>            :                         }
+<span class="lineNum">     465 </span>            :                 } else {
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                         if (sr_raid5_write(wu, wu_r, chunk, parity, lba,</span>
+<span class="lineNum">     467 </span>            :                             length, data, xs-&gt;flags, 0))
+<span class="lineNum">     468 </span>            :                                 goto bad;
+<span class="lineNum">     469 </span>            :                 }
+<span class="lineNum">     470 </span>            : 
+<span class="lineNum">     471 </span>            :                 /* advance to next block */
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :                 lbaoffs += length;</span>
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :                 datalen -= length;</span>
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :                 data += length;</span>
+<span class="lineNum">     475 </span>            :         }
+<span class="lineNum">     476 </span>            : 
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :         s = splbio();</span>
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         if (wu_r) {</span>
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :                 if (wu_r-&gt;swu_io_count &gt; 0) {</span>
+<span class="lineNum">     480 </span>            :                         /* collide write request with reads */
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :                         wu_r-&gt;swu_blk_start = wu-&gt;swu_blk_start;</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :                         wu_r-&gt;swu_blk_end = wu-&gt;swu_blk_end;</span>
+<span class="lineNum">     483 </span>            : 
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :                         wu-&gt;swu_state = SR_WU_DEFERRED;</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :                         wu_r-&gt;swu_collider = wu;</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                         TAILQ_INSERT_TAIL(&amp;sd-&gt;sd_wu_defq, wu, swu_link);</span>
+<span class="lineNum">     487 </span>            : 
+<span class="lineNum">     488 </span>            :                         wu = wu_r;
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :                         sr_scsi_wu_put(sd, wu_r);</span>
+<span class="lineNum">     491 </span>            :                 }
+<span class="lineNum">     492 </span>            :         }
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">     494 </span>            : 
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :         sr_schedule_wu(wu);</span>
+<span class="lineNum">     496 </span>            : 
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     498 </span>            : 
+<span class="lineNum">     499 </span>            : bad:
+<span class="lineNum">     500 </span>            :         /* wu is unwound by sr_wu_put */
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         if (wu_r)</span>
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                 sr_scsi_wu_put(sd, wu_r);</span>
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 : }</span>
+<a name="505"><span class="lineNum">     505 </span>            : </a>
+<span class="lineNum">     506 </span>            : int
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 : sr_raid5_regenerate(struct sr_workunit *wu, int chunk, daddr_t blkno,</span>
+<span class="lineNum">     508 </span>            :     long len, void *data)
+<span class="lineNum">     509 </span>            : {
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :         struct sr_discipline    *sd = wu-&gt;swu_dis;</span>
+<span class="lineNum">     511 </span>            :         int                     i;
+<span class="lineNum">     512 </span>            : 
+<span class="lineNum">     513 </span>            :         /*
+<span class="lineNum">     514 </span>            :          * Regenerate a block on a RAID 5 volume by xoring the data and parity
+<span class="lineNum">     515 </span>            :          * from all of the remaining online chunks. This requires the parity
+<span class="lineNum">     516 </span>            :          * to already be correct.
+<span class="lineNum">     517 </span>            :          */
+<span class="lineNum">     518 </span>            : 
+<span class="lineNum">     519 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: %s sr_raid5_regenerate chunk %d offline, &quot;
+<span class="lineNum">     520 </span>            :             &quot;regenerating block %llu\n&quot;,
+<span class="lineNum">     521 </span>            :             DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname, chunk, blkno);
+<span class="lineNum">     522 </span>            : 
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :         memset(data, 0, len);</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no; i++) {</span>
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                 if (i == chunk)</span>
+<span class="lineNum">     526 </span>            :                         continue;
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                 if (!sr_raid5_chunk_online(sd, i))</span>
+<span class="lineNum">     528 </span>            :                         goto bad;
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                 if (sr_raid5_addio(wu, i, blkno, len, NULL, SCSI_DATA_IN,</span>
+<span class="lineNum">     530 </span>            :                     0, data))
+<span class="lineNum">     531 </span>            :                         goto bad;
+<span class="lineNum">     532 </span>            :         }
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     534 </span>            : 
+<span class="lineNum">     535 </span>            : bad:
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 : }</span>
+<a name="538"><span class="lineNum">     538 </span>            : </a>
+<span class="lineNum">     539 </span>            : int
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 : sr_raid5_write(struct sr_workunit *wu, struct sr_workunit *wu_r, int chunk,</span>
+<span class="lineNum">     541 </span>            :     int parity, daddr_t blkno, long len, void *data, int xsflags,
+<span class="lineNum">     542 </span>            :     int ccbflags)
+<span class="lineNum">     543 </span>            : {
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :         struct sr_discipline    *sd = wu-&gt;swu_dis;</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         struct scsi_xfer        *xs = wu-&gt;swu_xs;</span>
+<span class="lineNum">     546 </span>            :         void                    *xorbuf;
+<span class="lineNum">     547 </span>            :         int                     chunk_online, chunk_rebuild;
+<span class="lineNum">     548 </span>            :         int                     parity_online, parity_rebuild;
+<span class="lineNum">     549 </span>            :         int                     other_offline = 0, other_rebuild = 0;
+<span class="lineNum">     550 </span>            :         int                     i;
+<span class="lineNum">     551 </span>            : 
+<span class="lineNum">     552 </span>            :         /*
+<span class="lineNum">     553 </span>            :          * Perform a write to a RAID 5 volume. This write routine does not
+<span class="lineNum">     554 </span>            :          * require the parity to already be correct and will operate on a
+<span class="lineNum">     555 </span>            :          * uninitialised volume.
+<span class="lineNum">     556 </span>            :          *
+<span class="lineNum">     557 </span>            :          * There are four possible cases:
+<span class="lineNum">     558 </span>            :          *
+<span class="lineNum">     559 </span>            :          * 1) All data chunks and parity are online. In this case we read the
+<span class="lineNum">     560 </span>            :          *    data from all data chunks, except the one we are writing to, in
+<span class="lineNum">     561 </span>            :          *    order to calculate and write the new parity.
+<span class="lineNum">     562 </span>            :          *
+<span class="lineNum">     563 </span>            :          * 2) The parity chunk is offline. In this case we only need to write
+<span class="lineNum">     564 </span>            :          *    to the data chunk. No parity calculation is required.
+<span class="lineNum">     565 </span>            :          *
+<span class="lineNum">     566 </span>            :          * 3) The data chunk is offline. In this case we read the data from all
+<span class="lineNum">     567 </span>            :          *    online chunks in order to calculate and write the new parity.
+<span class="lineNum">     568 </span>            :          *    This is the same as (1) except we do not write the data chunk.
+<span class="lineNum">     569 </span>            :          *
+<span class="lineNum">     570 </span>            :          * 4) A different data chunk is offline. The new parity is calculated
+<span class="lineNum">     571 </span>            :          *    by taking the existing parity, xoring the original data and
+<span class="lineNum">     572 </span>            :          *    xoring in the new data. This requires that the parity already be
+<span class="lineNum">     573 </span>            :          *    correct, which it will be if any of the data chunks has
+<span class="lineNum">     574 </span>            :          *    previously been written.
+<span class="lineNum">     575 </span>            :          *
+<span class="lineNum">     576 </span>            :          * There is an additional complication introduced by a chunk that is
+<span class="lineNum">     577 </span>            :          * being rebuilt. If this is the data or parity chunk, then we want
+<span class="lineNum">     578 </span>            :          * to write to it as per normal. If it is another data chunk then we
+<span class="lineNum">     579 </span>            :          * need to presume that it has not yet been regenerated and use the
+<span class="lineNum">     580 </span>            :          * same method as detailed in (4) above.
+<span class="lineNum">     581 </span>            :          */
+<span class="lineNum">     582 </span>            : 
+<span class="lineNum">     583 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: %s sr_raid5_write chunk %i parity %i &quot;
+<span class="lineNum">     584 </span>            :             &quot;blkno %llu\n&quot;, DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname,
+<span class="lineNum">     585 </span>            :             chunk, parity, (unsigned long long)blkno);
+<span class="lineNum">     586 </span>            : 
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :         chunk_online = sr_raid5_chunk_online(sd, chunk);</span>
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :         chunk_rebuild = sr_raid5_chunk_rebuild(sd, chunk);</span>
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :         parity_online = sr_raid5_chunk_online(sd, parity);</span>
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :         parity_rebuild = sr_raid5_chunk_rebuild(sd, parity);</span>
+<span class="lineNum">     591 </span>            : 
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no; i++) {</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :                 if (i == chunk || i == parity)</span>
+<span class="lineNum">     594 </span>            :                         continue;
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                 if (sr_raid5_chunk_rebuild(sd, i))</span>
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :                         other_rebuild = 1;</span>
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :                 else if (!sr_raid5_chunk_online(sd, i))</span>
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :                         other_offline = 1;</span>
+<span class="lineNum">     599 </span>            :         }
+<span class="lineNum">     600 </span>            : 
+<span class="lineNum">     601 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: %s chunk online %d, parity online %d, &quot;
+<span class="lineNum">     602 </span>            :             &quot;other offline %d\n&quot;, DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname,
+<span class="lineNum">     603 </span>            :             chunk_online, parity_online, other_offline);
+<span class="lineNum">     604 </span>            : 
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :         if (!parity_online &amp;&amp; !parity_rebuild)</span>
+<span class="lineNum">     606 </span>            :                 goto data_write;
+<span class="lineNum">     607 </span>            : 
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :         xorbuf = sr_block_get(sd, len);</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         if (xorbuf == NULL)</span>
+<span class="lineNum">     610 </span>            :                 goto bad;
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :         memcpy(xorbuf, data, len);</span>
+<span class="lineNum">     612 </span>            : 
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         if (other_offline || other_rebuild) {</span>
+<span class="lineNum">     614 </span>            : 
+<span class="lineNum">     615 </span>            :                 /*
+<span class="lineNum">     616 </span>            :                  * XXX - If we can guarantee that this LBA has been scrubbed
+<span class="lineNum">     617 </span>            :                  * then we can also take this faster path.
+<span class="lineNum">     618 </span>            :                  */
+<span class="lineNum">     619 </span>            : 
+<span class="lineNum">     620 </span>            :                 /* Read in existing data and existing parity. */
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :                 if (sr_raid5_addio(wu_r, chunk, blkno, len, NULL,</span>
+<span class="lineNum">     622 </span>            :                     SCSI_DATA_IN, 0, xorbuf))
+<span class="lineNum">     623 </span>            :                         goto bad;
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :                 if (sr_raid5_addio(wu_r, parity, blkno, len, NULL,</span>
+<span class="lineNum">     625 </span>            :                     SCSI_DATA_IN, 0, xorbuf))
+<span class="lineNum">     626 </span>            :                         goto bad;
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span>            :         } else {
+<span class="lineNum">     629 </span>            : 
+<span class="lineNum">     630 </span>            :                 /* Read in existing data from all other chunks. */
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no; i++) {</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :                         if (i == chunk || i == parity)</span>
+<span class="lineNum">     633 </span>            :                                 continue;
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 :                         if (sr_raid5_addio(wu_r, i, blkno, len, NULL,</span>
+<span class="lineNum">     635 </span>            :                             SCSI_DATA_IN, 0, xorbuf))
+<span class="lineNum">     636 </span>            :                                 goto bad;
+<span class="lineNum">     637 </span>            :                 }
+<span class="lineNum">     638 </span>            : 
+<span class="lineNum">     639 </span>            :         }
+<span class="lineNum">     640 </span>            : 
+<span class="lineNum">     641 </span>            :         /* Write new parity. */
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         if (sr_raid5_addio(wu, parity, blkno, len, xorbuf, xs-&gt;flags,</span>
+<span class="lineNum">     643 </span>            :             SR_CCBF_FREEBUF, NULL))
+<span class="lineNum">     644 </span>            :                 goto bad;
+<span class="lineNum">     645 </span>            : 
+<span class="lineNum">     646 </span>            : data_write:
+<span class="lineNum">     647 </span>            :         /* Write new data. */
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :         if (chunk_online || chunk_rebuild)</span>
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :                 if (sr_raid5_addio(wu, chunk, blkno, len, data, xs-&gt;flags,</span>
+<span class="lineNum">     650 </span>            :                     0, NULL))
+<span class="lineNum">     651 </span>            :                         goto bad;
+<span class="lineNum">     652 </span>            : 
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     654 </span>            : 
+<span class="lineNum">     655 </span>            : bad:
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 : }</span>
+<a name="658"><span class="lineNum">     658 </span>            : </a>
+<span class="lineNum">     659 </span>            : void
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 : sr_raid5_intr(struct buf *bp)</span>
+<span class="lineNum">     661 </span>            : {
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :         struct sr_ccb           *ccb = (struct sr_ccb *)bp;</span>
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :         struct sr_workunit      *wu = ccb-&gt;ccb_wu;</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :         struct sr_discipline    *sd = wu-&gt;swu_dis;</span>
+<span class="lineNum">     665 </span>            :         int                     s;
+<span class="lineNum">     666 </span>            : 
+<span class="lineNum">     667 </span>            :         DNPRINTF(SR_D_INTR, &quot;%s: sr_raid5_intr bp %p xs %p\n&quot;,
+<span class="lineNum">     668 </span>            :             DEVNAME(sd-&gt;sd_sc), bp, wu-&gt;swu_xs);
+<span class="lineNum">     669 </span>            : 
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :         s = splbio();</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :         sr_ccb_done(ccb);</span>
+<span class="lineNum">     672 </span>            : 
+<span class="lineNum">     673 </span>            :         /* XXX - Should this be done via the taskq? */
+<span class="lineNum">     674 </span>            : 
+<span class="lineNum">     675 </span>            :         /* XOR data to result. */
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :         if (ccb-&gt;ccb_state == SR_CCB_OK &amp;&amp; ccb-&gt;ccb_opaque)</span>
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :                 sr_raid5_xor(ccb-&gt;ccb_opaque, ccb-&gt;ccb_buf.b_data,</span>
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :                     ccb-&gt;ccb_buf.b_bcount);</span>
+<span class="lineNum">     679 </span>            : 
+<span class="lineNum">     680 </span>            :         /* Free allocated data buffer. */
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         if (ccb-&gt;ccb_flags &amp; SR_CCBF_FREEBUF) {</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :                 sr_block_put(sd, ccb-&gt;ccb_buf.b_data, ccb-&gt;ccb_buf.b_bcount);</span>
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_buf.b_data = NULL;</span>
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     685 </span>            : 
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :         sr_wu_done(wu);</span>
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 : }</span>
+<a name="689"><span class="lineNum">     689 </span>            : </a>
+<span class="lineNum">     690 </span>            : int
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 : sr_raid5_wu_done(struct sr_workunit *wu)</span>
+<span class="lineNum">     692 </span>            : {
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :         struct sr_discipline    *sd = wu-&gt;swu_dis;</span>
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :         struct scsi_xfer        *xs = wu-&gt;swu_xs;</span>
+<span class="lineNum">     695 </span>            : 
+<span class="lineNum">     696 </span>            :         /* XXX - we have no way of propagating errors... */
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :         if (wu-&gt;swu_flags &amp; (SR_WUF_DISCIPLINE | SR_WUF_REBUILD))</span>
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :                 return SR_WU_OK;</span>
+<span class="lineNum">     699 </span>            : 
+<span class="lineNum">     700 </span>            :         /* XXX - This is insufficient for RAID 5. */
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :         if (wu-&gt;swu_ios_succeeded &gt; 0) {</span>
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :                 xs-&gt;error = XS_NOERROR;</span>
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :                 return SR_WU_OK;</span>
+<span class="lineNum">     704 </span>            :         }
+<span class="lineNum">     705 </span>            : 
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :         if (xs-&gt;flags &amp; SCSI_DATA_IN) {</span>
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: retrying read on block %lld\n&quot;,</span>
+<span class="lineNum">     708 </span>            :                     sd-&gt;sd_meta-&gt;ssd_devname, (long long)wu-&gt;swu_blk_start);
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :                 sr_wu_release_ccbs(wu);</span>
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :                 wu-&gt;swu_state = SR_WU_RESTART;</span>
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                 if (sd-&gt;sd_scsi_rw(wu) == 0)</span>
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :                         return SR_WU_RESTART;</span>
+<span class="lineNum">     713 </span>            :         } else {
+<span class="lineNum">     714 </span>            :                 /* XXX - retry write if we just went from online to degraded. */
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: permanently fail write on block %lld\n&quot;,</span>
+<span class="lineNum">     716 </span>            :                     sd-&gt;sd_meta-&gt;ssd_devname, (long long)wu-&gt;swu_blk_start);
+<span class="lineNum">     717 </span>            :         }
+<span class="lineNum">     718 </span>            : 
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :         wu-&gt;swu_state = SR_WU_FAILED;</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :         xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">     721 </span>            : 
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :         return SR_WU_FAILED;</span>
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 : }</span>
+<a name="724"><span class="lineNum">     724 </span>            : </a>
+<span class="lineNum">     725 </span>            : int
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 : sr_raid5_addio(struct sr_workunit *wu, int chunk, daddr_t blkno,</span>
+<span class="lineNum">     727 </span>            :     long len, void *data, int xsflags, int ccbflags, void *xorbuf)
+<span class="lineNum">     728 </span>            : {
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :         struct sr_discipline    *sd = wu-&gt;swu_dis;</span>
+<span class="lineNum">     730 </span>            :         struct sr_ccb           *ccb;
+<span class="lineNum">     731 </span>            : 
+<span class="lineNum">     732 </span>            :         DNPRINTF(SR_D_DIS, &quot;sr_raid5_addio: %s chunk %d block %lld &quot;
+<span class="lineNum">     733 </span>            :             &quot;length %ld %s\n&quot;, (xsflags &amp; SCSI_DATA_IN) ? &quot;read&quot; : &quot;write&quot;,
+<span class="lineNum">     734 </span>            :             chunk, (long long)blkno, len, xorbuf ? &quot;X0R&quot; : &quot;-&quot;);
+<span class="lineNum">     735 </span>            : 
+<span class="lineNum">     736 </span>            :         /* Allocate temporary buffer. */
+<span class="lineNum">     737 </span><span class="lineNoCov">          0 :         if (data == NULL) {</span>
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :                 data = sr_block_get(sd, len);</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :                 if (data == NULL)</span>
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :                         return (-1);</span>
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 :                 ccbflags |= SR_CCBF_FREEBUF;</span>
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     743 </span>            : 
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :         ccb = sr_ccb_rw(sd, chunk, blkno, len, data, xsflags, ccbflags);</span>
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :         if (ccb == NULL) {</span>
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :                 if (ccbflags &amp; SR_CCBF_FREEBUF)</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :                         sr_block_put(sd, data, len);</span>
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     749 </span>            :         }
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_opaque = xorbuf;</span>
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :         sr_wu_enqueue_ccb(wu, ccb);</span>
+<span class="lineNum">     752 </span>            : 
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 : }</span>
+<a name="755"><span class="lineNum">     755 </span>            : </a>
+<span class="lineNum">     756 </span>            : void
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 : sr_raid5_xor(void *a, void *b, int len)</span>
+<span class="lineNum">     758 </span>            : {
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :         uint32_t                *xa = a, *xb = b;</span>
+<span class="lineNum">     760 </span>            : 
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :         len &gt;&gt;= 2;</span>
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :         while (len--)</span>
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :                 *xa++ ^= *xb++;</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 : }</span>
+<a name="765"><span class="lineNum">     765 </span>            : </a>
+<span class="lineNum">     766 </span>            : void
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 : sr_raid5_rebuild(struct sr_discipline *sd)</span>
+<span class="lineNum">     768 </span>            : {
+<span class="lineNum">     769 </span>            :         int64_t strip_no, strip_size, strip_bits, i, restart;
+<span class="lineNum">     770 </span>            :         int64_t chunk_count, chunk_strips, chunk_lba, chunk_size, row_size;
+<span class="lineNum">     771 </span>            :         struct sr_workunit *wu_r, *wu_w;
+<span class="lineNum">     772 </span>            :         int s, slept, percent = 0, old_percent = -1;
+<span class="lineNum">     773 </span>            :         int rebuild_chunk = -1;
+<span class="lineNum">     774 </span>            :         void *xorbuf;
+<span class="lineNum">     775 </span>            : 
+<span class="lineNum">     776 </span>            :         /* Find the rebuild chunk. */
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no; i++) {</span>
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :                 if (sr_raid5_chunk_rebuild(sd, i)) {</span>
+<span class="lineNum">     779 </span>            :                         rebuild_chunk = i;
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     781 </span>            :                 }
+<span class="lineNum">     782 </span>            :         }
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :         if (rebuild_chunk == -1)</span>
+<span class="lineNum">     784 </span>            :                 goto bad;
+<span class="lineNum">     785 </span>            : 
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :         strip_size = sd-&gt;sd_meta-&gt;ssdi.ssd_strip_size;</span>
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :         strip_bits = sd-&gt;mds.mdd_raid5.sr5_strip_bits;</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :         chunk_count = sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no - 1;</span>
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 :         chunk_size = sd-&gt;sd_meta-&gt;ssdi.ssd_size / chunk_count;</span>
+<span class="lineNum">     790 </span><span class="lineNoCov">          0 :         chunk_strips = (chunk_size &lt;&lt; DEV_BSHIFT) &gt;&gt; strip_bits;</span>
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :         row_size = (chunk_count &lt;&lt; strip_bits) &gt;&gt; DEV_BSHIFT;</span>
+<span class="lineNum">     792 </span>            : 
+<span class="lineNum">     793 </span>            :         DNPRINTF(SR_D_REBUILD, &quot;%s: %s sr_raid5_rebuild volume size = %lld, &quot;
+<span class="lineNum">     794 </span>            :             &quot;chunk count = %lld, chunk size = %lld, chunk strips = %lld, &quot;
+<span class="lineNum">     795 </span>            :             &quot;row size = %lld\n&quot;, DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname,
+<span class="lineNum">     796 </span>            :             sd-&gt;sd_meta-&gt;ssdi.ssd_size, chunk_count, chunk_size, chunk_strips,
+<span class="lineNum">     797 </span>            :             row_size);
+<span class="lineNum">     798 </span>            : 
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :         restart = sd-&gt;sd_meta-&gt;ssd_rebuild / row_size;</span>
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :         if (restart &gt; chunk_strips) {</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: bogus rebuild restart offset, starting from 0\n&quot;,</span>
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :                     DEVNAME(sd-&gt;sd_sc));</span>
+<span class="lineNum">     803 </span>            :                 restart = 0;
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :         if (restart != 0) {</span>
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :                 percent = sr_rebuild_percent(sd);</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: resuming rebuild on %s at %d%%\n&quot;,</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                     DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname, percent);</span>
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     810 </span>            : 
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :         for (strip_no = restart; strip_no &lt; chunk_strips; strip_no++) {</span>
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :                 chunk_lba = (strip_size &gt;&gt; DEV_BSHIFT) * strip_no;</span>
+<span class="lineNum">     813 </span>            : 
+<span class="lineNum">     814 </span>            :                 DNPRINTF(SR_D_REBUILD, &quot;%s: %s rebuild strip %lld, &quot;
+<span class="lineNum">     815 </span>            :                     &quot;chunk lba = %lld\n&quot;, DEVNAME(sd-&gt;sd_sc),
+<span class="lineNum">     816 </span>            :                     sd-&gt;sd_meta-&gt;ssd_devname, strip_no, chunk_lba);
+<span class="lineNum">     817 </span>            : 
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :                 wu_w = sr_scsi_wu_get(sd, 0);</span>
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 :                 wu_r = sr_scsi_wu_get(sd, 0);</span>
+<span class="lineNum">     820 </span>            : 
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :                 xorbuf = sr_block_get(sd, strip_size);</span>
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :                 if (sr_raid5_regenerate(wu_r, rebuild_chunk, chunk_lba,</span>
+<span class="lineNum">     823 </span>            :                     strip_size, xorbuf))
+<span class="lineNum">     824 </span>            :                         goto bad;
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :                 if (sr_raid5_addio(wu_w, rebuild_chunk, chunk_lba, strip_size,</span>
+<span class="lineNum">     826 </span>            :                     xorbuf, SCSI_DATA_OUT, SR_CCBF_FREEBUF, NULL))
+<span class="lineNum">     827 </span>            :                         goto bad;
+<span class="lineNum">     828 </span>            : 
+<span class="lineNum">     829 </span>            :                 /* Collide write work unit with read work unit. */
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :                 wu_r-&gt;swu_state = SR_WU_INPROGRESS;</span>
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :                 wu_r-&gt;swu_flags |= SR_WUF_REBUILD;</span>
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                 wu_w-&gt;swu_state = SR_WU_DEFERRED;</span>
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 :                 wu_w-&gt;swu_flags |= SR_WUF_REBUILD | SR_WUF_WAKEUP;</span>
+<span class="lineNum">     834 </span><span class="lineNoCov">          0 :                 wu_r-&gt;swu_collider = wu_w;</span>
+<span class="lineNum">     835 </span>            : 
+<span class="lineNum">     836 </span>            :                 /* Block I/O to this strip while we rebuild it. */
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :                 wu_r-&gt;swu_blk_start = (strip_no / chunk_count) * row_size;</span>
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :                 wu_r-&gt;swu_blk_end = wu_r-&gt;swu_blk_start + row_size - 1;</span>
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :                 wu_w-&gt;swu_blk_start = wu_r-&gt;swu_blk_start;</span>
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 :                 wu_w-&gt;swu_blk_end = wu_r-&gt;swu_blk_end;</span>
+<span class="lineNum">     841 </span>            : 
+<span class="lineNum">     842 </span>            :                 DNPRINTF(SR_D_REBUILD, &quot;%s: %s rebuild swu_blk_start = %lld, &quot;
+<span class="lineNum">     843 </span>            :                     &quot;swu_blk_end = %lld\n&quot;, DEVNAME(sd-&gt;sd_sc),
+<span class="lineNum">     844 </span>            :                     sd-&gt;sd_meta-&gt;ssd_devname,
+<span class="lineNum">     845 </span>            :                     wu_r-&gt;swu_blk_start, wu_r-&gt;swu_blk_end);
+<span class="lineNum">     846 </span>            : 
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :                 s = splbio();</span>
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :                 TAILQ_INSERT_TAIL(&amp;sd-&gt;sd_wu_defq, wu_w, swu_link);</span>
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">     850 </span>            : 
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                 sr_schedule_wu(wu_r);</span>
+<span class="lineNum">     852 </span>            : 
+<span class="lineNum">     853 </span>            :                 slept = 0;
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :                 while ((wu_w-&gt;swu_flags &amp; SR_WUF_REBUILDIOCOMP) == 0) {</span>
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :                         tsleep(wu_w, PRIBIO, &quot;sr_rebuild&quot;, 0);</span>
+<span class="lineNum">     856 </span>            :                         slept = 1;
+<span class="lineNum">     857 </span>            :                 }
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :                 if (!slept)</span>
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                         tsleep(sd-&gt;sd_sc, PWAIT, &quot;sr_yield&quot;, 1);</span>
+<span class="lineNum">     860 </span>            : 
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :                 sr_scsi_wu_put(sd, wu_r);</span>
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :                 sr_scsi_wu_put(sd, wu_w);</span>
+<span class="lineNum">     863 </span>            : 
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :                 sd-&gt;sd_meta-&gt;ssd_rebuild = chunk_lba * chunk_count;</span>
+<span class="lineNum">     865 </span>            : 
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :                 percent = sr_rebuild_percent(sd);</span>
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :                 if (percent != old_percent &amp;&amp; strip_no != chunk_strips - 1) {</span>
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 :                         if (sr_meta_save(sd, SR_META_DIRTY))</span>
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: could not save metadata to %s\n&quot;,</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :                                     DEVNAME(sd-&gt;sd_sc),</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :                                     sd-&gt;sd_meta-&gt;ssd_devname);</span>
+<span class="lineNum">     872 </span>            :                         old_percent = percent;
+<span class="lineNum">     873 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     874 </span>            : 
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :                 if (sd-&gt;sd_reb_abort)</span>
+<span class="lineNum">     876 </span>            :                         goto abort;
+<span class="lineNum">     877 </span>            :         }
+<span class="lineNum">     878 </span>            : 
+<span class="lineNum">     879 </span>            :         DNPRINTF(SR_D_REBUILD, &quot;%s: %s rebuild complete\n&quot;, DEVNAME(sd-&gt;sd_sc),
+<span class="lineNum">     880 </span>            :             sd-&gt;sd_meta-&gt;ssd_devname);
+<span class="lineNum">     881 </span>            : 
+<span class="lineNum">     882 </span>            :         /* all done */
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :         sd-&gt;sd_meta-&gt;ssd_rebuild = 0;</span>
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no; i++) {</span>
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :                 if (sd-&gt;sd_vol.sv_chunks[i]-&gt;src_meta.scm_status ==</span>
+<span class="lineNum">     886 </span>            :                     BIOC_SDREBUILD) {
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :                         sd-&gt;sd_set_chunk_state(sd, i, BIOC_SDONLINE);</span>
+<span class="lineNum">     888 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     889 </span>            :                 }
+<span class="lineNum">     890 </span>            :         }
+<span class="lineNum">     891 </span>            : 
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     893 </span>            : 
+<span class="lineNum">     894 </span>            : abort:
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :         if (sr_meta_save(sd, SR_META_DIRTY))</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: could not save metadata to %s\n&quot;,</span>
+<span class="lineNum">     897 </span><span class="lineNoCov">          0 :                     DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname);</span>
+<span class="lineNum">     898 </span>            : bad:
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     901 </span>            : 
+<span class="lineNum">     902 </span>            : #if 0
+<span class="lineNum">     903 </span>            : void
+<span class="lineNum">     904 </span>            : sr_raid5_scrub(struct sr_discipline *sd)
+<span class="lineNum">     905 </span>            : {
+<span class="lineNum">     906 </span>            :         int64_t strip_no, strip_size, no_chunk, parity, max_strip, strip_bits;
+<span class="lineNum">     907 </span>            :         int64_t i;
+<span class="lineNum">     908 </span>            :         struct sr_workunit *wu_r, *wu_w;
+<span class="lineNum">     909 </span>            :         int s, slept;
+<span class="lineNum">     910 </span>            :         void *xorbuf;
+<span class="lineNum">     911 </span>            : 
+<span class="lineNum">     912 </span>            :         wu_w = sr_scsi_wu_get(sd, 0);
+<span class="lineNum">     913 </span>            :         wu_r = sr_scsi_wu_get(sd, 0);
+<span class="lineNum">     914 </span>            : 
+<span class="lineNum">     915 </span>            :         no_chunk = sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no - 1;
+<span class="lineNum">     916 </span>            :         strip_size = sd-&gt;sd_meta-&gt;ssdi.ssd_strip_size;
+<span class="lineNum">     917 </span>            :         strip_bits = sd-&gt;mds.mdd_raid5.sr5_strip_bits;
+<span class="lineNum">     918 </span>            :         max_strip = sd-&gt;sd_meta-&gt;ssdi.ssd_size &gt;&gt; strip_bits;
+<span class="lineNum">     919 </span>            : 
+<span class="lineNum">     920 </span>            :         for (strip_no = 0; strip_no &lt; max_strip; strip_no++) {
+<span class="lineNum">     921 </span>            :                 parity = no_chunk - ((strip_no / no_chunk) % (no_chunk + 1));
+<span class="lineNum">     922 </span>            : 
+<span class="lineNum">     923 </span>            :                 xorbuf = sr_block_get(sd, strip_size);
+<span class="lineNum">     924 </span>            :                 for (i = 0; i &lt;= no_chunk; i++) {
+<span class="lineNum">     925 </span>            :                         if (i != parity)
+<span class="lineNum">     926 </span>            :                                 sr_raid5_addio(wu_r, i, 0xBADCAFE, strip_size,
+<span class="lineNum">     927 </span>            :                                     NULL, SCSI_DATA_IN, 0, xorbuf);
+<span class="lineNum">     928 </span>            :                 }
+<span class="lineNum">     929 </span>            :                 sr_raid5_addio(wu_w, parity, 0xBADCAFE, strip_size, xorbuf,
+<span class="lineNum">     930 </span>            :                     SCSI_DATA_OUT, SR_CCBF_FREEBUF, NULL);
+<span class="lineNum">     931 </span>            : 
+<span class="lineNum">     932 </span>            :                 wu_r-&gt;swu_flags |= SR_WUF_REBUILD;
+<span class="lineNum">     933 </span>            : 
+<span class="lineNum">     934 </span>            :                 /* Collide wu_w with wu_r */
+<span class="lineNum">     935 </span>            :                 wu_w-&gt;swu_state = SR_WU_DEFERRED;
+<span class="lineNum">     936 </span>            :                 wu_w-&gt;swu_flags |= SR_WUF_REBUILD | SR_WUF_WAKEUP;
+<span class="lineNum">     937 </span>            :                 wu_r-&gt;swu_collider = wu_w;
+<span class="lineNum">     938 </span>            : 
+<span class="lineNum">     939 </span>            :                 s = splbio();
+<span class="lineNum">     940 </span>            :                 TAILQ_INSERT_TAIL(&amp;sd-&gt;sd_wu_defq, wu_w, swu_link);
+<span class="lineNum">     941 </span>            :                 splx(s);
+<span class="lineNum">     942 </span>            : 
+<span class="lineNum">     943 </span>            :                 wu_r-&gt;swu_state = SR_WU_INPROGRESS;
+<span class="lineNum">     944 </span>            :                 sr_schedule_wu(wu_r);
+<span class="lineNum">     945 </span>            : 
+<span class="lineNum">     946 </span>            :                 slept = 0;
+<span class="lineNum">     947 </span>            :                 while ((wu_w-&gt;swu_flags &amp; SR_WUF_REBUILDIOCOMP) == 0) {
+<span class="lineNum">     948 </span>            :                         tsleep(wu_w, PRIBIO, &quot;sr_scrub&quot;, 0);
+<span class="lineNum">     949 </span>            :                         slept = 1;
+<span class="lineNum">     950 </span>            :                 }
+<span class="lineNum">     951 </span>            :                 if (!slept)
+<span class="lineNum">     952 </span>            :                         tsleep(sd-&gt;sd_sc, PWAIT, &quot;sr_yield&quot;, 1);
+<span class="lineNum">     953 </span>            :         }
+<span class="lineNum">     954 </span>            : done:
+<span class="lineNum">     955 </span>            :         return;
+<span class="lineNum">     956 </span>            : }
+<span class="lineNum">     957 </span>            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

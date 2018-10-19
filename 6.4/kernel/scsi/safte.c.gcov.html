@@ -1,0 +1,735 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - scsi/safte.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">scsi</a> - safte.c<span style="font-size: 80%;"> (source / <a href="safte.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">314</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: safte.c,v 1.53 2015/08/23 01:55:39 tedu Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2005 David Gwynne &lt;dlg@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : #include &quot;bio.h&quot;
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/scsiio.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/rwlock.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/sensors.h&gt;
+<span class="lineNum">      30 </span>            : 
+<span class="lineNum">      31 </span>            : #if NBIO &gt; 0
+<span class="lineNum">      32 </span>            : #include &lt;dev/biovar.h&gt;
+<span class="lineNum">      33 </span>            : #endif
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : #include &lt;scsi/scsi_all.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;scsi/scsiconf.h&gt;
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : #include &lt;scsi/safte.h&gt;
+<span class="lineNum">      39 </span>            : 
+<span class="lineNum">      40 </span>            : #ifdef SAFTE_DEBUG
+<span class="lineNum">      41 </span>            : #define DPRINTF(x)      do { if (safte_debug) printf x ; } while (0)
+<span class="lineNum">      42 </span>            : int     safte_debug = 1;
+<span class="lineNum">      43 </span>            : #else
+<span class="lineNum">      44 </span>            : #define DPRINTF(x)      /* x */
+<span class="lineNum">      45 </span>            : #endif
+<span class="lineNum">      46 </span>            : 
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : int     safte_match(struct device *, void *, void *);
+<span class="lineNum">      49 </span>            : void    safte_attach(struct device *, struct device *, void *);
+<span class="lineNum">      50 </span>            : int     safte_detach(struct device *, int);
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : struct safte_sensor {
+<span class="lineNum">      53 </span>            :         struct ksensor          se_sensor;
+<span class="lineNum">      54 </span>            :         enum {
+<span class="lineNum">      55 </span>            :                 SAFTE_T_FAN,
+<span class="lineNum">      56 </span>            :                 SAFTE_T_PWRSUP,
+<span class="lineNum">      57 </span>            :                 SAFTE_T_DOORLOCK,
+<span class="lineNum">      58 </span>            :                 SAFTE_T_ALARM,
+<span class="lineNum">      59 </span>            :                 SAFTE_T_TEMP
+<span class="lineNum">      60 </span>            :         }                       se_type;
+<span class="lineNum">      61 </span>            :         u_int8_t                *se_field;
+<span class="lineNum">      62 </span>            : };
+<span class="lineNum">      63 </span>            : 
+<span class="lineNum">      64 </span>            : struct safte_softc {
+<span class="lineNum">      65 </span>            :         struct device           sc_dev;
+<span class="lineNum">      66 </span>            :         struct scsi_link         *sc_link;
+<span class="lineNum">      67 </span>            :         struct rwlock           sc_lock;
+<span class="lineNum">      68 </span>            : 
+<span class="lineNum">      69 </span>            :         u_int                   sc_encbuflen;
+<span class="lineNum">      70 </span>            :         u_char                  *sc_encbuf;
+<span class="lineNum">      71 </span>            : 
+<span class="lineNum">      72 </span>            :         int                     sc_nsensors;
+<span class="lineNum">      73 </span>            :         struct safte_sensor     *sc_sensors;
+<span class="lineNum">      74 </span>            :         struct ksensordev       sc_sensordev;
+<span class="lineNum">      75 </span>            :         struct sensor_task      *sc_sensortask;
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            :         int                     sc_celsius;
+<span class="lineNum">      78 </span>            :         int                     sc_ntemps;
+<span class="lineNum">      79 </span>            :         struct safte_sensor     *sc_temps;
+<span class="lineNum">      80 </span>            :         u_int8_t                *sc_temperrs;
+<span class="lineNum">      81 </span>            : 
+<span class="lineNum">      82 </span>            : #if NBIO &gt; 0
+<span class="lineNum">      83 </span>            :         int                     sc_nslots;
+<span class="lineNum">      84 </span>            :         u_int8_t                *sc_slots;
+<span class="lineNum">      85 </span>            : #endif
+<span class="lineNum">      86 </span>            : };
+<span class="lineNum">      87 </span>            : 
+<span class="lineNum">      88 </span>            : struct cfattach safte_ca = {
+<span class="lineNum">      89 </span>            :         sizeof(struct safte_softc), safte_match, safte_attach, safte_detach
+<span class="lineNum">      90 </span>            : };
+<span class="lineNum">      91 </span>            : 
+<span class="lineNum">      92 </span>            : struct cfdriver safte_cd = {
+<span class="lineNum">      93 </span>            :         NULL, &quot;safte&quot;, DV_DULL
+<span class="lineNum">      94 </span>            : };
+<span class="lineNum">      95 </span>            : 
+<span class="lineNum">      96 </span>            : #define DEVNAME(s)      ((s)-&gt;sc_dev.dv_xname)
+<span class="lineNum">      97 </span>            : 
+<span class="lineNum">      98 </span>            : int     safte_read_config(struct safte_softc *);
+<span class="lineNum">      99 </span>            : void    safte_read_encstat(void *);
+<span class="lineNum">     100 </span>            : 
+<span class="lineNum">     101 </span>            : #if NBIO &gt; 0
+<span class="lineNum">     102 </span>            : int     safte_ioctl(struct device *, u_long, caddr_t);
+<span class="lineNum">     103 </span>            : int     safte_bio_blink(struct safte_softc *, struct bioc_blink *);
+<span class="lineNum">     104 </span>            : #endif
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span>            : int64_t safte_temp2uK(u_int8_t, int);
+<a name="107"><span class="lineNum">     107 </span>            : </a>
+<span class="lineNum">     108 </span>            : int
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 : safte_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     110 </span>            : {
+<span class="lineNum">     111 </span>            :         struct scsi_inquiry_data *inqbuf;
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :         struct scsi_attach_args *sa = aux;</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         struct scsi_inquiry_data *inq = sa-&gt;sa_inqbuf;</span>
+<span class="lineNum">     114 </span>            :         struct scsi_xfer *xs;
+<span class="lineNum">     115 </span>            :         struct safte_inq *si;
+<span class="lineNum">     116 </span>            :         int error, flags = 0, length;
+<span class="lineNum">     117 </span>            : 
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :         if (inq == NULL)</span>
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     120 </span>            : 
+<span class="lineNum">     121 </span>            :         /* match on dell enclosures */
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :         if ((inq-&gt;device &amp; SID_TYPE) == T_PROCESSOR &amp;&amp;</span>
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :             SCSISPC(inq-&gt;version) == 3)</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :                 return (2);</span>
+<span class="lineNum">     125 </span>            : 
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         if ((inq-&gt;device &amp; SID_TYPE) != T_PROCESSOR ||</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :             SCSISPC(inq-&gt;version) != 2 ||</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :             (inq-&gt;response_format &amp; SID_ANSII) != 2)</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     130 </span>            : 
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :         length = inq-&gt;additional_length + SAFTE_EXTRA_OFFSET;</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :         if (length &lt; SAFTE_INQ_LEN)</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         if (length &gt; sizeof(*inqbuf))</span>
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :                 length = sizeof(*inqbuf);</span>
+<span class="lineNum">     136 </span>            : 
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :         inqbuf = dma_alloc(sizeof(*inqbuf), PR_NOWAIT | PR_ZERO);</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :         if (inqbuf == NULL)</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     140 </span>            : 
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         memset(inqbuf-&gt;extra, ' ', sizeof(inqbuf-&gt;extra));</span>
+<span class="lineNum">     142 </span>            : 
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         if (cold)</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :                 flags |= SCSI_AUTOCONF;</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         xs = scsi_xs_get(sa-&gt;sa_sc_link, flags | SCSI_DATA_IN);</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         if (xs == NULL)</span>
+<span class="lineNum">     147 </span>            :                 goto fail;
+<span class="lineNum">     148 </span>            : 
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         xs-&gt;retries = 2;</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         xs-&gt;timeout = 10000;</span>
+<span class="lineNum">     151 </span>            : 
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         scsi_init_inquiry(xs, 0, 0, inqbuf, length);</span>
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         error = scsi_xs_sync(xs);</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         scsi_xs_put(xs);</span>
+<span class="lineNum">     156 </span>            : 
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">     158 </span>            :                 goto fail;
+<span class="lineNum">     159 </span>            : 
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         si = (struct safte_inq *)&amp;inqbuf-&gt;extra;</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         if (memcmp(si-&gt;ident, SAFTE_IDENT, sizeof(si-&gt;ident)) == 0) {</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                 dma_free(inqbuf, sizeof(*inqbuf));</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                 return (2);</span>
+<span class="lineNum">     164 </span>            :         }
+<span class="lineNum">     165 </span>            : 
+<span class="lineNum">     166 </span>            : fail:
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :         dma_free(inqbuf, sizeof(*inqbuf));</span>
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 : }</span>
+<a name="170"><span class="lineNum">     170 </span>            : </a>
+<span class="lineNum">     171 </span>            : void
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 : safte_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     173 </span>            : {
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         struct safte_softc              *sc = (struct safte_softc *)self;</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :         struct scsi_attach_args         *sa = aux;</span>
+<span class="lineNum">     176 </span>            :         int                             i = 0;
+<span class="lineNum">     177 </span>            : 
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link = sa-&gt;sa_sc_link;</span>
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :         sa-&gt;sa_sc_link-&gt;device_softc = sc;</span>
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         rw_init(&amp;sc-&gt;sc_lock, DEVNAME(sc));</span>
+<span class="lineNum">     181 </span>            : 
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :         sc-&gt;sc_encbuf = NULL;</span>
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         sc-&gt;sc_nsensors = 0;</span>
+<span class="lineNum">     186 </span>            : #if NBIO &gt; 0
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         sc-&gt;sc_nslots = 0;</span>
+<span class="lineNum">     188 </span>            : #endif
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         if (safte_read_config(sc) != 0) {</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to read enclosure configuration\n&quot;,</span>
+<span class="lineNum">     192 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     194 </span>            :         }
+<span class="lineNum">     195 </span>            : 
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_nsensors &gt; 0) {</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_sensortask = sensor_task_register(sc,</span>
+<span class="lineNum">     198 </span>            :                     safte_read_encstat, 10);
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_sensortask == NULL) {</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: unable to register update task\n&quot;,</span>
+<span class="lineNum">     201 </span>            :                             DEVNAME(sc));
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                         free(sc-&gt;sc_sensors, M_DEVBUF,</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_nsensors * sizeof(struct safte_sensor));</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_nsensors = sc-&gt;sc_ntemps = 0;</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                         for (i = 0; i &lt; sc-&gt;sc_nsensors; i++)</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :                                 sensor_attach(&amp;sc-&gt;sc_sensordev,</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :                                     &amp;sc-&gt;sc_sensors[i].se_sensor);</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :                         sensordev_install(&amp;sc-&gt;sc_sensordev);</span>
+<span class="lineNum">     210 </span>            :                 }
+<span class="lineNum">     211 </span>            :         }
+<span class="lineNum">     212 </span>            : 
+<span class="lineNum">     213 </span>            : #if NBIO &gt; 0
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_nslots &gt; 0 &amp;&amp;</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :             bio_register(self, safte_ioctl) != 0) {</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to register ioctl with bio\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_nslots = 0;</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                 i++;</span>
+<span class="lineNum">     220 </span>            : #endif
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         if (i) /* if we're doing something, then preinit encbuf and sensors */</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                 safte_read_encstat(sc);</span>
+<span class="lineNum">     224 </span>            :         else {
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                 dma_free(sc-&gt;sc_encbuf, sc-&gt;sc_encbuflen);</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_encbuf = NULL;</span>
+<span class="lineNum">     227 </span>            :         }
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 : }</span>
+<a name="229"><span class="lineNum">     229 </span>            : </a>
+<span class="lineNum">     230 </span>            : int
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 : safte_detach(struct device *self, int flags)</span>
+<span class="lineNum">     232 </span>            : {
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :         struct safte_softc              *sc = (struct safte_softc *)self;</span>
+<span class="lineNum">     234 </span>            :         int                             i;
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         rw_enter_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     237 </span>            : 
+<span class="lineNum">     238 </span>            : #if NBIO &gt; 0
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_nslots &gt; 0)</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                 bio_unregister(self);</span>
+<span class="lineNum">     241 </span>            : #endif
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_nsensors &gt; 0) {</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :                 sensordev_deinstall(&amp;sc-&gt;sc_sensordev);</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                 sensor_task_unregister(sc-&gt;sc_sensortask);</span>
+<span class="lineNum">     246 </span>            : 
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; sc-&gt;sc_nsensors; i++)</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :                         sensor_detach(&amp;sc-&gt;sc_sensordev,</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                             &amp;sc-&gt;sc_sensors[i].se_sensor);</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :                 free(sc-&gt;sc_sensors, M_DEVBUF,</span>
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_nsensors * sizeof(struct safte_sensor));</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     253 </span>            : 
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_encbuf != NULL)</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :                 dma_free(sc-&gt;sc_encbuf, sc-&gt;sc_encbuflen);</span>
+<span class="lineNum">     256 </span>            : 
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         rw_exit_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     258 </span>            : 
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     260 </span>            : }
+<a name="261"><span class="lineNum">     261 </span>            : </a>
+<span class="lineNum">     262 </span>            : int
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 : safte_read_config(struct safte_softc *sc)</span>
+<span class="lineNum">     264 </span>            : {
+<span class="lineNum">     265 </span>            :         struct safte_config *config = NULL;
+<span class="lineNum">     266 </span>            :         struct safte_readbuf_cmd *cmd;
+<span class="lineNum">     267 </span>            :         struct safte_sensor *s;
+<span class="lineNum">     268 </span>            :         struct scsi_xfer *xs;
+<span class="lineNum">     269 </span>            :         int error = 0, flags = 0, i, j;
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         config = dma_alloc(sizeof(*config), PR_NOWAIT);</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :         if (config == NULL)</span>
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     274 </span>            : 
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         if (cold)</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :                 flags |= SCSI_AUTOCONF;</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         xs = scsi_xs_get(sc-&gt;sc_link, flags | SCSI_DATA_IN | SCSI_SILENT);</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :         if (xs == NULL) {</span>
+<span class="lineNum">     279 </span>            :                 error = 1;
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     281 </span>            :         }
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :         xs-&gt;cmdlen = sizeof(*cmd);</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         xs-&gt;data = (void *)config;</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         xs-&gt;datalen = sizeof(*config);</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         xs-&gt;retries = 2;</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :         xs-&gt;timeout = 30000;</span>
+<span class="lineNum">     287 </span>            : 
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         cmd = (struct safte_readbuf_cmd *)xs-&gt;cmd;</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :         cmd-&gt;opcode = READ_BUFFER;</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :         cmd-&gt;flags |= SAFTE_RD_MODE;</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         cmd-&gt;bufferid = SAFTE_RD_CONFIG;</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :         cmd-&gt;length = htobe16(sizeof(*config));</span>
+<span class="lineNum">     293 </span>            : 
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         error = scsi_xs_sync(xs);</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :         scsi_xs_put(xs);</span>
+<span class="lineNum">     296 </span>            : 
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         if (error != 0) {</span>
+<span class="lineNum">     298 </span>            :                 error = 1;
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     300 </span>            :         }
+<span class="lineNum">     301 </span>            : 
+<span class="lineNum">     302 </span>            :         DPRINTF((&quot;%s: nfans: %d npwrsup: %d nslots: %d doorlock: %d ntemps: %d&quot;
+<span class="lineNum">     303 </span>            :             &quot; alarm: %d celsius: %d ntherm: %d\n&quot;, DEVNAME(sc), config-&gt;nfans,
+<span class="lineNum">     304 </span>            :             config-&gt;npwrsup, config-&gt;nslots, config-&gt;doorlock, config-&gt;ntemps,
+<span class="lineNum">     305 </span>            :             config-&gt;alarm, SAFTE_CFG_CELSIUS(config-&gt;therm),
+<span class="lineNum">     306 </span>            :             SAFTE_CFG_NTHERM(config-&gt;therm)));
+<span class="lineNum">     307 </span>            : 
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         sc-&gt;sc_encbuflen = config-&gt;nfans * sizeof(u_int8_t) + /* fan status */</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :             config-&gt;npwrsup * sizeof(u_int8_t) + /* power supply status */</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :             config-&gt;nslots * sizeof(u_int8_t) + /* device scsi id (lun) */</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :             sizeof(u_int8_t) + /* door lock status */</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :             sizeof(u_int8_t) + /* speaker status */</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :             config-&gt;ntemps * sizeof(u_int8_t) + /* temp sensors */</span>
+<span class="lineNum">     314 </span>            :             sizeof(u_int16_t); /* temp out of range sensors */
+<span class="lineNum">     315 </span>            : 
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         sc-&gt;sc_encbuf = dma_alloc(sc-&gt;sc_encbuflen, PR_NOWAIT);</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_encbuf == NULL) {</span>
+<span class="lineNum">     318 </span>            :                 error = 1;
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     320 </span>            :         }
+<span class="lineNum">     321 </span>            : 
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         sc-&gt;sc_nsensors = config-&gt;nfans + config-&gt;npwrsup + config-&gt;ntemps +</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :                 (config-&gt;doorlock ? 1 : 0) + (config-&gt;alarm ? 1 : 0);</span>
+<span class="lineNum">     324 </span>            : 
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         sc-&gt;sc_sensors = mallocarray(sc-&gt;sc_nsensors, sizeof(struct safte_sensor),</span>
+<span class="lineNum">     326 </span>            :             M_DEVBUF, M_NOWAIT | M_ZERO);
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_sensors == NULL) {</span>
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :                 dma_free(sc-&gt;sc_encbuf, sc-&gt;sc_encbuflen);</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_encbuf = NULL;</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_nsensors = 0;</span>
+<span class="lineNum">     331 </span>            :                 error = 1;
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     333 </span>            :         }
+<span class="lineNum">     334 </span>            : 
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         strlcpy(sc-&gt;sc_sensordev.xname, DEVNAME(sc),</span>
+<span class="lineNum">     336 </span>            :             sizeof(sc-&gt;sc_sensordev.xname));
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         s = sc-&gt;sc_sensors;</span>
+<span class="lineNum">     339 </span>            : 
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; config-&gt;nfans; i++) {</span>
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :                 s-&gt;se_type = SAFTE_T_FAN;</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :                 s-&gt;se_field = (u_int8_t *)(sc-&gt;sc_encbuf + i);</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :                 s-&gt;se_sensor.type = SENSOR_INDICATOR;</span>
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :                 snprintf(s-&gt;se_sensor.desc, sizeof(s-&gt;se_sensor.desc),</span>
+<span class="lineNum">     345 </span>            :                     &quot;Fan%d&quot;, i);
+<span class="lineNum">     346 </span>            : 
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :                 s++;</span>
+<span class="lineNum">     348 </span>            :         }
+<span class="lineNum">     349 </span>            :         j = config-&gt;nfans;
+<span class="lineNum">     350 </span>            : 
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; config-&gt;npwrsup; i++) {</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                 s-&gt;se_type = SAFTE_T_PWRSUP;</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :                 s-&gt;se_field = (u_int8_t *)(sc-&gt;sc_encbuf + j + i);</span>
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :                 s-&gt;se_sensor.type = SENSOR_INDICATOR;</span>
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :                 snprintf(s-&gt;se_sensor.desc, sizeof(s-&gt;se_sensor.desc),</span>
+<span class="lineNum">     356 </span>            :                     &quot;PSU%d&quot;, i);
+<span class="lineNum">     357 </span>            : 
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :                 s++;</span>
+<span class="lineNum">     359 </span>            :         }
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         j += config-&gt;npwrsup;</span>
+<span class="lineNum">     361 </span>            : 
+<span class="lineNum">     362 </span>            : #if NBIO &gt; 0
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :         sc-&gt;sc_nslots = config-&gt;nslots;</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :         sc-&gt;sc_slots = (u_int8_t *)(sc-&gt;sc_encbuf + j);</span>
+<span class="lineNum">     365 </span>            : #endif
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         j += config-&gt;nslots;</span>
+<span class="lineNum">     367 </span>            : 
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         if (config-&gt;doorlock) {</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                 s-&gt;se_type = SAFTE_T_DOORLOCK;</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                 s-&gt;se_field = (u_int8_t *)(sc-&gt;sc_encbuf + j);</span>
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                 s-&gt;se_sensor.type = SENSOR_INDICATOR;</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                 strlcpy(s-&gt;se_sensor.desc, &quot;doorlock&quot;,</span>
+<span class="lineNum">     373 </span>            :                     sizeof(s-&gt;se_sensor.desc));
+<span class="lineNum">     374 </span>            : 
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                 s++;</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :         j++;</span>
+<span class="lineNum">     378 </span>            : 
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :         if (config-&gt;alarm) {</span>
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :                 s-&gt;se_type = SAFTE_T_ALARM;</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                 s-&gt;se_field = (u_int8_t *)(sc-&gt;sc_encbuf + j);</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                 s-&gt;se_sensor.type = SENSOR_INDICATOR;</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :                 strlcpy(s-&gt;se_sensor.desc, &quot;alarm&quot;, sizeof(s-&gt;se_sensor.desc));</span>
+<span class="lineNum">     384 </span>            : 
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                 s++;</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :         j++;</span>
+<span class="lineNum">     388 </span>            : 
+<span class="lineNum">     389 </span>            :         /*
+<span class="lineNum">     390 </span>            :          * stash the temp info so we can get out of range status. limit the
+<span class="lineNum">     391 </span>            :          * number so the out of temp checks cant go into memory it doesnt own
+<span class="lineNum">     392 </span>            :          */
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         sc-&gt;sc_ntemps = (config-&gt;ntemps &gt; 15) ? 15 : config-&gt;ntemps;</span>
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :         sc-&gt;sc_temps = s;</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         sc-&gt;sc_celsius = SAFTE_CFG_CELSIUS(config-&gt;therm);</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; config-&gt;ntemps; i++) {</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 s-&gt;se_type = SAFTE_T_TEMP;</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                 s-&gt;se_field = (u_int8_t *)(sc-&gt;sc_encbuf + j + i);</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                 s-&gt;se_sensor.type = SENSOR_TEMP;</span>
+<span class="lineNum">     400 </span>            : 
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :                 s++;</span>
+<span class="lineNum">     402 </span>            :         }
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :         j += config-&gt;ntemps;</span>
+<span class="lineNum">     404 </span>            : 
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         sc-&gt;sc_temperrs = (u_int8_t *)(sc-&gt;sc_encbuf + j);</span>
+<span class="lineNum">     406 </span>            : done:
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         dma_free(config, sizeof(*config));</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 : }</span>
+<a name="410"><span class="lineNum">     410 </span>            : </a>
+<span class="lineNum">     411 </span>            : void
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 : safte_read_encstat(void *arg)</span>
+<span class="lineNum">     413 </span>            : {
+<span class="lineNum">     414 </span>            :         struct safte_readbuf_cmd *cmd;
+<span class="lineNum">     415 </span>            :         struct safte_sensor *s;
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         struct safte_softc *sc = (struct safte_softc *)arg;</span>
+<span class="lineNum">     417 </span>            :         struct scsi_xfer *xs;
+<span class="lineNum">     418 </span>            :         int error, i, flags = 0;
+<span class="lineNum">     419 </span>            :         u_int16_t oot;
+<span class="lineNum">     420 </span>            : 
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         rw_enter_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         if (cold)</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :                 flags |= SCSI_AUTOCONF;</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         xs = scsi_xs_get(sc-&gt;sc_link, flags | SCSI_DATA_IN | SCSI_SILENT);</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :         if (xs == NULL) {</span>
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :                 rw_exit_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     429 </span>            :         }
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :         xs-&gt;cmdlen = sizeof(*cmd);</span>
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :         xs-&gt;data = sc-&gt;sc_encbuf;</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :         xs-&gt;datalen = sc-&gt;sc_encbuflen;</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         xs-&gt;retries = 2;</span>
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         xs-&gt;timeout = 30000;</span>
+<span class="lineNum">     435 </span>            : 
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :         cmd = (struct safte_readbuf_cmd *)xs-&gt;cmd;</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         cmd-&gt;opcode = READ_BUFFER;</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :         cmd-&gt;flags |= SAFTE_RD_MODE;</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         cmd-&gt;bufferid = SAFTE_RD_ENCSTAT;</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :         cmd-&gt;length = htobe16(sc-&gt;sc_encbuflen);</span>
+<span class="lineNum">     441 </span>            : 
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         error = scsi_xs_sync(xs);</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :         scsi_xs_put(xs);</span>
+<span class="lineNum">     444 </span>            : 
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :         if (error != 0) {</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                 rw_exit_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     448 </span>            :         }
+<span class="lineNum">     449 </span>            : 
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sc-&gt;sc_nsensors; i++) {</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                 s = &amp;sc-&gt;sc_sensors[i];</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                 s-&gt;se_sensor.flags &amp;= ~SENSOR_FUNKNOWN;</span>
+<span class="lineNum">     453 </span>            : 
+<span class="lineNum">     454 </span>            :                 DPRINTF((&quot;%s: %d type: %d field: 0x%02x\n&quot;, DEVNAME(sc), i,
+<span class="lineNum">     455 </span>            :                     s-&gt;se_type, *s-&gt;se_field));
+<span class="lineNum">     456 </span>            : 
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                 switch (s-&gt;se_type) {</span>
+<span class="lineNum">     458 </span>            :                 case SAFTE_T_FAN:
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :                         switch (*s-&gt;se_field) {</span>
+<span class="lineNum">     460 </span>            :                         case SAFTE_FAN_OP:
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 1;</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_OK;</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     464 </span>            :                         case SAFTE_FAN_MF:
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 0;</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_CRIT;</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     468 </span>            :                         case SAFTE_FAN_NOTINST:
+<span class="lineNum">     469 </span>            :                         case SAFTE_FAN_UNKNOWN:
+<span class="lineNum">     470 </span>            :                         default:
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 0;</span>
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_UNKNOWN;</span>
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.flags |= SENSOR_FUNKNOWN;</span>
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     475 </span>            :                         }
+<span class="lineNum">     476 </span>            :                         break;
+<span class="lineNum">     477 </span>            : 
+<span class="lineNum">     478 </span>            :                 case SAFTE_T_PWRSUP:
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :                         switch (*s-&gt;se_field) {</span>
+<span class="lineNum">     480 </span>            :                         case SAFTE_PWR_OP_ON:
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 1;</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_OK;</span>
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     484 </span>            :                         case SAFTE_PWR_OP_OFF:
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 0;</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_OK;</span>
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     488 </span>            :                         case SAFTE_PWR_MF_ON:
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 1;</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_CRIT;</span>
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     492 </span>            :                         case SAFTE_PWR_MF_OFF:
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 0;</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_CRIT;</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     496 </span>            :                         case SAFTE_PWR_NOTINST:
+<span class="lineNum">     497 </span>            :                         case SAFTE_PWR_PRESENT:
+<span class="lineNum">     498 </span>            :                         case SAFTE_PWR_UNKNOWN:
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 0;</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_UNKNOWN;</span>
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.flags |= SENSOR_FUNKNOWN;</span>
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     503 </span>            :                         }
+<span class="lineNum">     504 </span>            :                         break;
+<span class="lineNum">     505 </span>            : 
+<span class="lineNum">     506 </span>            :                 case SAFTE_T_DOORLOCK:
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :                         switch (*s-&gt;se_field) {</span>
+<span class="lineNum">     508 </span>            :                         case SAFTE_DOOR_LOCKED:
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 1;</span>
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_OK;</span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     512 </span>            :                         case SAFTE_DOOR_UNLOCKED:
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 0;</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_CRIT;</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     516 </span>            :                         case SAFTE_DOOR_UNKNOWN:
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 0;</span>
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_CRIT;</span>
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.flags |= SENSOR_FUNKNOWN;</span>
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     521 </span>            :                         }
+<span class="lineNum">     522 </span>            :                         break;
+<span class="lineNum">     523 </span>            : 
+<span class="lineNum">     524 </span>            :                 case SAFTE_T_ALARM:
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                         switch (*s-&gt;se_field) {</span>
+<span class="lineNum">     526 </span>            :                         case SAFTE_SPKR_OFF:
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 0;</span>
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_OK;</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     530 </span>            :                         case SAFTE_SPKR_ON:
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.value = 1;</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :                                 s-&gt;se_sensor.status = SENSOR_S_CRIT;</span>
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     534 </span>            :                         }
+<span class="lineNum">     535 </span>            :                         break;
+<span class="lineNum">     536 </span>            : 
+<span class="lineNum">     537 </span>            :                 case SAFTE_T_TEMP:
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :                         s-&gt;se_sensor.value = safte_temp2uK(*s-&gt;se_field,</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_celsius);</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     541 </span>            :                 }
+<span class="lineNum">     542 </span>            :         }
+<span class="lineNum">     543 </span>            : 
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :         oot = _2btol(sc-&gt;sc_temperrs);</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sc-&gt;sc_ntemps; i++)</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_temps[i].se_sensor.status =</span>
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 :                     (oot &amp; (1 &lt;&lt; i)) ? SENSOR_S_CRIT : SENSOR_S_OK;</span>
+<span class="lineNum">     548 </span>            : 
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :         rw_exit_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     551 </span>            : 
+<a name="552"><span class="lineNum">     552 </span>            : #if NBIO &gt; 0</a>
+<span class="lineNum">     553 </span>            : int
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 : safte_ioctl(struct device *dev, u_long cmd, caddr_t addr)</span>
+<span class="lineNum">     555 </span>            : {
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :         struct safte_softc              *sc = (struct safte_softc *)dev;</span>
+<span class="lineNum">     557 </span>            :         int                             error = 0;
+<span class="lineNum">     558 </span>            : 
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     560 </span>            :         case BIOCBLINK:
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                 error = safte_bio_blink(sc, (struct bioc_blink *)addr);</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     563 </span>            : 
+<span class="lineNum">     564 </span>            :         default:
+<span class="lineNum">     565 </span>            :                 error = EINVAL;
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     567 </span>            :         }
+<span class="lineNum">     568 </span>            : 
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     570 </span>            : }
+<a name="571"><span class="lineNum">     571 </span>            : </a>
+<span class="lineNum">     572 </span>            : int
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 : safte_bio_blink(struct safte_softc *sc, struct bioc_blink *blink)</span>
+<span class="lineNum">     574 </span>            : {
+<span class="lineNum">     575 </span>            :         struct safte_writebuf_cmd *cmd;
+<span class="lineNum">     576 </span>            :         struct safte_slotop *op;
+<span class="lineNum">     577 </span>            :         struct scsi_xfer *xs;
+<span class="lineNum">     578 </span>            :         int error, slot, flags = 0, wantblink;
+<span class="lineNum">     579 </span>            : 
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         switch (blink-&gt;bb_status) {</span>
+<span class="lineNum">     581 </span>            :         case BIOC_SBBLINK:
+<span class="lineNum">     582 </span>            :                 wantblink = 1;
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     584 </span>            :         case BIOC_SBUNBLINK:
+<span class="lineNum">     585 </span>            :                 wantblink = 0;
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     587 </span>            :         default:
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     589 </span>            :         }
+<span class="lineNum">     590 </span>            : 
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :         rw_enter_read(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :         for (slot = 0; slot &lt; sc-&gt;sc_nslots; slot++) {</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_slots[slot] == blink-&gt;bb_target)</span>
+<span class="lineNum">     594 </span>            :                         break;
+<span class="lineNum">     595 </span>            :         }
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :         rw_exit_read(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     597 </span>            : 
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :         if (slot &gt;= sc-&gt;sc_nslots)</span>
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :                 return (ENODEV);</span>
+<span class="lineNum">     600 </span>            : 
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :         op = dma_alloc(sizeof(*op), PR_WAITOK | PR_ZERO);</span>
+<span class="lineNum">     602 </span>            : 
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :         op-&gt;opcode = SAFTE_WRITE_SLOTOP;</span>
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :         op-&gt;slot = slot;</span>
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :         op-&gt;flags |= wantblink ? SAFTE_SLOTOP_IDENTIFY : 0;</span>
+<span class="lineNum">     606 </span>            : 
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :         if (cold)</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                 flags |= SCSI_AUTOCONF;</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         xs = scsi_xs_get(sc-&gt;sc_link, flags | SCSI_DATA_OUT | SCSI_SILENT);</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :         if (xs == NULL) {</span>
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :                 dma_free(op, sizeof(*op));</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     613 </span>            :         }
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :         xs-&gt;cmdlen = sizeof(*cmd);</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :         xs-&gt;data = (void *)op;</span>
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :         xs-&gt;datalen = sizeof(*op);</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :         xs-&gt;retries = 2;</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :         xs-&gt;timeout = 30000;</span>
+<span class="lineNum">     619 </span>            : 
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :         cmd = (struct safte_writebuf_cmd *)xs-&gt;cmd;</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :         cmd-&gt;opcode = WRITE_BUFFER;</span>
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :         cmd-&gt;flags |= SAFTE_WR_MODE;</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :         cmd-&gt;length = htobe16(sizeof(struct safte_slotop));</span>
+<span class="lineNum">     624 </span>            : 
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :         error = scsi_xs_sync(xs);</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :         scsi_xs_put(xs);</span>
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :         if (error != 0) {</span>
+<span class="lineNum">     629 </span>            :                 error = EIO;
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :         dma_free(op, sizeof(*op));</span>
+<span class="lineNum">     632 </span>            : 
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     635 </span>            : #endif /* NBIO &gt; 0 */
+<a name="636"><span class="lineNum">     636 </span>            : </a>
+<span class="lineNum">     637 </span>            : int64_t
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 : safte_temp2uK(u_int8_t measured, int celsius)</span>
+<span class="lineNum">     639 </span>            : {
+<span class="lineNum">     640 </span>            :         int64_t                         temp;
+<span class="lineNum">     641 </span>            : 
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         temp = (int64_t)measured;</span>
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :         temp += SAFTE_TEMP_OFFSET;</span>
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :         temp *= 1000000; /* convert to micro (mu) degrees */</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :         if (!celsius)</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :                 temp = ((temp - 32000000) * 5) / 9; /* convert to Celsius */</span>
+<span class="lineNum">     647 </span>            : 
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :         temp += 273150000; /* convert to kelvin */</span>
+<span class="lineNum">     649 </span>            : 
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :         return (temp);</span>
+<span class="lineNum">     651 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

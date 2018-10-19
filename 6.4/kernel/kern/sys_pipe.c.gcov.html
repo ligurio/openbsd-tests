@@ -1,0 +1,988 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - kern/sys_pipe.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">kern</a> - sys_pipe.c<span style="font-size: 80%;"> (source / <a href="sys_pipe.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">411</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">21</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: sys_pipe.c,v 1.85 2018/08/20 16:00:22 mpi Exp $       */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 1996 John S. Dyson
+<span class="lineNum">       5 </span>            :  * All rights reserved.
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Redistribution and use in source and binary forms, with or without
+<span class="lineNum">       8 </span>            :  * modification, are permitted provided that the following conditions
+<span class="lineNum">       9 </span>            :  * are met:
+<span class="lineNum">      10 </span>            :  * 1. Redistributions of source code must retain the above copyright
+<span class="lineNum">      11 </span>            :  *    notice immediately at the beginning of the file, without modification,
+<span class="lineNum">      12 </span>            :  *    this list of conditions, and the following disclaimer.
+<span class="lineNum">      13 </span>            :  * 2. Redistributions in binary form must reproduce the above copyright
+<span class="lineNum">      14 </span>            :  *    notice, this list of conditions and the following disclaimer in the
+<span class="lineNum">      15 </span>            :  *    documentation and/or other materials provided with the distribution.
+<span class="lineNum">      16 </span>            :  * 3. Absolutely no warranty of function or purpose is made by the author
+<span class="lineNum">      17 </span>            :  *    John S. Dyson.
+<span class="lineNum">      18 </span>            :  * 4. Modifications may be freely made to this file if the above conditions
+<span class="lineNum">      19 </span>            :  *    are met.
+<span class="lineNum">      20 </span>            :  */
+<span class="lineNum">      21 </span>            : 
+<span class="lineNum">      22 </span>            : /*
+<span class="lineNum">      23 </span>            :  * This file contains a high-performance replacement for the socket-based
+<span class="lineNum">      24 </span>            :  * pipes scheme originally used in FreeBSD/4.4Lite.  It does not support
+<span class="lineNum">      25 </span>            :  * all features of sockets, but does do everything that pipes normally
+<span class="lineNum">      26 </span>            :  * do.
+<span class="lineNum">      27 </span>            :  */
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/proc.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/fcntl.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;sys/file.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;sys/filedesc.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      37 </span>            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;sys/signalvar.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;sys/mount.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;sys/syscallargs.h&gt;
+<span class="lineNum">      41 </span>            : #include &lt;sys/event.h&gt;
+<span class="lineNum">      42 </span>            : #include &lt;sys/lock.h&gt;
+<span class="lineNum">      43 </span>            : #include &lt;sys/poll.h&gt;
+<span class="lineNum">      44 </span>            : #ifdef KTRACE
+<span class="lineNum">      45 </span>            : #include &lt;sys/ktrace.h&gt;
+<span class="lineNum">      46 </span>            : #endif
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : #include &lt;uvm/uvm_extern.h&gt;
+<span class="lineNum">      49 </span>            : 
+<span class="lineNum">      50 </span>            : #include &lt;sys/pipe.h&gt;
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : /*
+<span class="lineNum">      53 </span>            :  * interfaces to the outside world
+<span class="lineNum">      54 </span>            :  */
+<span class="lineNum">      55 </span>            : int     pipe_read(struct file *, struct uio *, int);
+<span class="lineNum">      56 </span>            : int     pipe_write(struct file *, struct uio *, int);
+<span class="lineNum">      57 </span>            : int     pipe_close(struct file *, struct proc *);
+<span class="lineNum">      58 </span>            : int     pipe_poll(struct file *, int events, struct proc *);
+<span class="lineNum">      59 </span>            : int     pipe_kqfilter(struct file *fp, struct knote *kn);
+<span class="lineNum">      60 </span>            : int     pipe_ioctl(struct file *, u_long, caddr_t, struct proc *);
+<span class="lineNum">      61 </span>            : int     pipe_stat(struct file *fp, struct stat *ub, struct proc *p);
+<span class="lineNum">      62 </span>            : 
+<span class="lineNum">      63 </span>            : static struct fileops pipeops = {
+<span class="lineNum">      64 </span>            :         .fo_read        = pipe_read,
+<span class="lineNum">      65 </span>            :         .fo_write       = pipe_write,
+<span class="lineNum">      66 </span>            :         .fo_ioctl       = pipe_ioctl,
+<span class="lineNum">      67 </span>            :         .fo_poll        = pipe_poll,
+<span class="lineNum">      68 </span>            :         .fo_kqfilter    = pipe_kqfilter,
+<span class="lineNum">      69 </span>            :         .fo_stat        = pipe_stat,
+<span class="lineNum">      70 </span>            :         .fo_close       = pipe_close
+<span class="lineNum">      71 </span>            : };
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span>            : void    filt_pipedetach(struct knote *kn);
+<span class="lineNum">      74 </span>            : int     filt_piperead(struct knote *kn, long hint);
+<span class="lineNum">      75 </span>            : int     filt_pipewrite(struct knote *kn, long hint);
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            : struct filterops pipe_rfiltops =
+<span class="lineNum">      78 </span>            :         { 1, NULL, filt_pipedetach, filt_piperead };
+<span class="lineNum">      79 </span>            : struct filterops pipe_wfiltops =
+<span class="lineNum">      80 </span>            :         { 1, NULL, filt_pipedetach, filt_pipewrite };
+<span class="lineNum">      81 </span>            : 
+<span class="lineNum">      82 </span>            : /*
+<span class="lineNum">      83 </span>            :  * Default pipe buffer size(s), this can be kind-of large now because pipe
+<span class="lineNum">      84 </span>            :  * space is pageable.  The pipe code will try to maintain locality of
+<span class="lineNum">      85 </span>            :  * reference for performance reasons, so small amounts of outstanding I/O
+<span class="lineNum">      86 </span>            :  * will not wipe the cache.
+<span class="lineNum">      87 </span>            :  */
+<span class="lineNum">      88 </span>            : #define MINPIPESIZE (PIPE_SIZE/3)
+<span class="lineNum">      89 </span>            : 
+<span class="lineNum">      90 </span>            : /*
+<span class="lineNum">      91 </span>            :  * Limit the number of &quot;big&quot; pipes
+<span class="lineNum">      92 </span>            :  */
+<span class="lineNum">      93 </span>            : #define LIMITBIGPIPES   32
+<span class="lineNum">      94 </span>            : unsigned int nbigpipe;
+<span class="lineNum">      95 </span>            : static unsigned int amountpipekva;
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span>            : struct pool pipe_pool;
+<span class="lineNum">      98 </span>            : 
+<span class="lineNum">      99 </span>            : int     dopipe(struct proc *, int *, int);
+<span class="lineNum">     100 </span>            : void    pipeclose(struct pipe *);
+<span class="lineNum">     101 </span>            : void    pipe_free_kmem(struct pipe *);
+<span class="lineNum">     102 </span>            : int     pipe_create(struct pipe *);
+<span class="lineNum">     103 </span>            : int     pipelock(struct pipe *);
+<span class="lineNum">     104 </span>            : void    pipeunlock(struct pipe *);
+<span class="lineNum">     105 </span>            : void    pipeselwakeup(struct pipe *);
+<span class="lineNum">     106 </span>            : int     pipespace(struct pipe *, u_int);
+<span class="lineNum">     107 </span>            : 
+<span class="lineNum">     108 </span>            : /*
+<span class="lineNum">     109 </span>            :  * The pipe system call for the DTYPE_PIPE type of pipes
+<span class="lineNum">     110 </span>            :  */
+<a name="111"><span class="lineNum">     111 </span>            : </a>
+<span class="lineNum">     112 </span>            : int
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 : sys_pipe(struct proc *p, void *v, register_t *retval)</span>
+<span class="lineNum">     114 </span>            : {
+<span class="lineNum">     115 </span>            :         struct sys_pipe_args /* {
+<span class="lineNum">     116 </span>            :                 syscallarg(int *) fdp;
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         } */ *uap = v;</span>
+<span class="lineNum">     118 </span>            : 
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :         return (dopipe(p, SCARG(uap, fdp), 0));</span>
+<span class="lineNum">     120 </span>            : }
+<a name="121"><span class="lineNum">     121 </span>            : </a>
+<span class="lineNum">     122 </span>            : int
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 : sys_pipe2(struct proc *p, void *v, register_t *retval)</span>
+<span class="lineNum">     124 </span>            : {
+<span class="lineNum">     125 </span>            :         struct sys_pipe2_args /* {
+<span class="lineNum">     126 </span>            :                 syscallarg(int *) fdp;
+<span class="lineNum">     127 </span>            :                 syscallarg(int) flags;
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         } */ *uap = v;</span>
+<span class="lineNum">     129 </span>            : 
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         if (SCARG(uap, flags) &amp; ~(O_CLOEXEC | FNONBLOCK))</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     132 </span>            : 
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :         return (dopipe(p, SCARG(uap, fdp), SCARG(uap, flags)));</span>
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 : }</span>
+<a name="135"><span class="lineNum">     135 </span>            : </a>
+<span class="lineNum">     136 </span>            : int
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 : dopipe(struct proc *p, int *ufds, int flags)</span>
+<span class="lineNum">     138 </span>            : {
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         struct filedesc *fdp = p-&gt;p_fd;</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :         struct file *rf, *wf;</span>
+<span class="lineNum">     141 </span>            :         struct pipe *rpipe, *wpipe = NULL;
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         int fds[2], cloexec, error;</span>
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         cloexec = (flags &amp; O_CLOEXEC) ? UF_EXCLOSE : 0;</span>
+<span class="lineNum">     145 </span>            : 
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         rpipe = pool_get(&amp;pipe_pool, PR_WAITOK);</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         error = pipe_create(rpipe);</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         if (error != 0)</span>
+<span class="lineNum">     149 </span>            :                 goto free1;
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         wpipe = pool_get(&amp;pipe_pool, PR_WAITOK);</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         error = pipe_create(wpipe);</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         if (error != 0)</span>
+<span class="lineNum">     153 </span>            :                 goto free1;
+<span class="lineNum">     154 </span>            : 
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         fdplock(fdp);</span>
+<span class="lineNum">     156 </span>            : 
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         error = falloc(p, &amp;rf, &amp;fds[0]);</span>
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :         if (error != 0)</span>
+<span class="lineNum">     159 </span>            :                 goto free2;
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         rf-&gt;f_flag = FREAD | FWRITE | (flags &amp; FNONBLOCK);</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         rf-&gt;f_type = DTYPE_PIPE;</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :         rf-&gt;f_data = rpipe;</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         rf-&gt;f_ops = &amp;pipeops;</span>
+<span class="lineNum">     164 </span>            : 
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         error = falloc(p, &amp;wf, &amp;fds[1]);</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :         if (error != 0)</span>
+<span class="lineNum">     167 </span>            :                 goto free3;
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :         wf-&gt;f_flag = FREAD | FWRITE | (flags &amp; FNONBLOCK);</span>
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :         wf-&gt;f_type = DTYPE_PIPE;</span>
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :         wf-&gt;f_data = wpipe;</span>
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         wf-&gt;f_ops = &amp;pipeops;</span>
+<span class="lineNum">     172 </span>            : 
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :         rpipe-&gt;pipe_peer = wpipe;</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         wpipe-&gt;pipe_peer = rpipe;</span>
+<span class="lineNum">     175 </span>            : 
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :         fdinsert(fdp, fds[0], cloexec, rf);</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :         fdinsert(fdp, fds[1], cloexec, wf);</span>
+<span class="lineNum">     178 </span>            : 
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :         error = copyout(fds, ufds, sizeof(fds));</span>
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         if (error != 0) {</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                 fdrelease(p, fds[0]);</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :                 fdrelease(p, fds[1]);</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     184 </span>            : #ifdef KTRACE
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         else if (KTRPOINT(p, KTR_STRUCT))</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                 ktrfds(p, fds, 2);</span>
+<span class="lineNum">     187 </span>            : #endif
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         fdpunlock(fdp);</span>
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         FRELE(rf, p);</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         FRELE(wf, p);</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     193 </span>            : 
+<span class="lineNum">     194 </span>            : free3:
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         fdremove(fdp, fds[0]);</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         closef(rf, p);</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         rpipe = NULL;</span>
+<span class="lineNum">     198 </span>            : free2:
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         fdpunlock(fdp);</span>
+<span class="lineNum">     200 </span>            : free1:
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :         pipeclose(wpipe);</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :         pipeclose(rpipe);</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     205 </span>            : 
+<span class="lineNum">     206 </span>            : /*
+<span class="lineNum">     207 </span>            :  * Allocate kva for pipe circular buffer, the space is pageable.
+<span class="lineNum">     208 </span>            :  * This routine will 'realloc' the size of a pipe safely, if it fails
+<span class="lineNum">     209 </span>            :  * it will retain the old buffer.
+<span class="lineNum">     210 </span>            :  * If it fails it will return ENOMEM.
+<a name="211"><span class="lineNum">     211 </span>            :  */</a>
+<span class="lineNum">     212 </span>            : int
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 : pipespace(struct pipe *cpipe, u_int size)</span>
+<span class="lineNum">     214 </span>            : {
+<span class="lineNum">     215 </span>            :         caddr_t buffer;
+<span class="lineNum">     216 </span>            : 
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         KERNEL_LOCK();</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :         buffer = km_alloc(size, &amp;kv_any, &amp;kp_pageable, &amp;kd_waitok);</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         KERNEL_UNLOCK();</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         if (buffer == NULL) {</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     222 </span>            :         }
+<span class="lineNum">     223 </span>            : 
+<span class="lineNum">     224 </span>            :         /* free old resources if we are resizing */
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :         pipe_free_kmem(cpipe);</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_buffer.buffer = buffer;</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_buffer.size = size;</span>
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_buffer.in = 0;</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_buffer.out = 0;</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_buffer.cnt = 0;</span>
+<span class="lineNum">     231 </span>            : 
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :         atomic_add_int(&amp;amountpipekva, cpipe-&gt;pipe_buffer.size);</span>
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     236 </span>            : 
+<span class="lineNum">     237 </span>            : /*
+<span class="lineNum">     238 </span>            :  * initialize and allocate VM and memory for pipe
+<a name="239"><span class="lineNum">     239 </span>            :  */</a>
+<span class="lineNum">     240 </span>            : int
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 : pipe_create(struct pipe *cpipe)</span>
+<span class="lineNum">     242 </span>            : {
+<span class="lineNum">     243 </span>            :         int error;
+<span class="lineNum">     244 </span>            : 
+<span class="lineNum">     245 </span>            :         /* so pipe_free_kmem() doesn't follow junk pointer */
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_buffer.buffer = NULL;</span>
+<span class="lineNum">     247 </span>            :         /*
+<span class="lineNum">     248 </span>            :          * protect so pipeclose() doesn't follow a junk pointer
+<span class="lineNum">     249 </span>            :          * if pipespace() fails.
+<span class="lineNum">     250 </span>            :          */
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :         memset(&amp;cpipe-&gt;pipe_sel, 0, sizeof(cpipe-&gt;pipe_sel));</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_state = 0;</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_peer = NULL;</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_busy = 0;</span>
+<span class="lineNum">     255 </span>            : 
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         error = pipespace(cpipe, PIPE_SIZE);</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         if (error != 0)</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">     259 </span>            : 
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         getnanotime(&amp;cpipe-&gt;pipe_ctime);</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_atime = cpipe-&gt;pipe_ctime;</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_mtime = cpipe-&gt;pipe_ctime;</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_pgid = NO_PID;</span>
+<span class="lineNum">     264 </span>            : 
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     267 </span>            : 
+<span class="lineNum">     268 </span>            : 
+<span class="lineNum">     269 </span>            : /*
+<span class="lineNum">     270 </span>            :  * lock a pipe for I/O, blocking other access
+<a name="271"><span class="lineNum">     271 </span>            :  */</a>
+<span class="lineNum">     272 </span>            : int
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 : pipelock(struct pipe *cpipe)</span>
+<span class="lineNum">     274 </span>            : {
+<span class="lineNum">     275 </span>            :         int error;
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :         while (cpipe-&gt;pipe_state &amp; PIPE_LOCK) {</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :                 cpipe-&gt;pipe_state |= PIPE_LWANT;</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :                 if ((error = tsleep(cpipe, PRIBIO|PCATCH, &quot;pipelk&quot;, 0)))</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                         return error;</span>
+<span class="lineNum">     280 </span>            :         }
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_state |= PIPE_LOCK;</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     284 </span>            : 
+<span class="lineNum">     285 </span>            : /*
+<span class="lineNum">     286 </span>            :  * unlock a pipe I/O lock
+<a name="287"><span class="lineNum">     287 </span>            :  */</a>
+<span class="lineNum">     288 </span>            : void
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 : pipeunlock(struct pipe *cpipe)</span>
+<span class="lineNum">     290 </span>            : {
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         cpipe-&gt;pipe_state &amp;= ~PIPE_LOCK;</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :         if (cpipe-&gt;pipe_state &amp; PIPE_LWANT) {</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                 cpipe-&gt;pipe_state &amp;= ~PIPE_LWANT;</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :                 wakeup(cpipe);</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 : }</span>
+<a name="297"><span class="lineNum">     297 </span>            : </a>
+<span class="lineNum">     298 </span>            : void
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 : pipeselwakeup(struct pipe *cpipe)</span>
+<span class="lineNum">     300 </span>            : {
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         if (cpipe-&gt;pipe_state &amp; PIPE_SEL) {</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                 cpipe-&gt;pipe_state &amp;= ~PIPE_SEL;</span>
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :                 selwakeup(&amp;cpipe-&gt;pipe_sel);</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                 KNOTE(&amp;cpipe-&gt;pipe_sel.si_note, 0);</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :         if ((cpipe-&gt;pipe_state &amp; PIPE_ASYNC) &amp;&amp; cpipe-&gt;pipe_pgid != NO_PID)</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :                 gsignal(cpipe-&gt;pipe_pgid, SIGIO);</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 : }</span>
+<a name="309"><span class="lineNum">     309 </span>            : </a>
+<span class="lineNum">     310 </span>            : int
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 : pipe_read(struct file *fp, struct uio *uio, int fflags)</span>
+<span class="lineNum">     312 </span>            : {
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         struct pipe *rpipe = fp-&gt;f_data;</span>
+<span class="lineNum">     314 </span>            :         int error;
+<span class="lineNum">     315 </span>            :         size_t size, nread = 0;
+<span class="lineNum">     316 </span>            : 
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :         error = pipelock(rpipe);</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">     320 </span>            : 
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :         ++rpipe-&gt;pipe_busy;</span>
+<span class="lineNum">     322 </span>            : 
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         while (uio-&gt;uio_resid) {</span>
+<span class="lineNum">     324 </span>            :                 /*
+<span class="lineNum">     325 </span>            :                  * normal pipe buffer receive
+<span class="lineNum">     326 </span>            :                  */
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :                 if (rpipe-&gt;pipe_buffer.cnt &gt; 0) {</span>
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :                         size = rpipe-&gt;pipe_buffer.size - rpipe-&gt;pipe_buffer.out;</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                         if (size &gt; rpipe-&gt;pipe_buffer.cnt)</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                                 size = rpipe-&gt;pipe_buffer.cnt;</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :                         if (size &gt; uio-&gt;uio_resid)</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                                 size = uio-&gt;uio_resid;</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :                         error = uiomove(&amp;rpipe-&gt;pipe_buffer.buffer[rpipe-&gt;pipe_buffer.out],</span>
+<span class="lineNum">     334 </span>            :                                         size, uio);
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                         if (error) {</span>
+<span class="lineNum">     336 </span>            :                                 break;
+<span class="lineNum">     337 </span>            :                         }
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                         rpipe-&gt;pipe_buffer.out += size;</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :                         if (rpipe-&gt;pipe_buffer.out &gt;= rpipe-&gt;pipe_buffer.size)</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :                                 rpipe-&gt;pipe_buffer.out = 0;</span>
+<span class="lineNum">     341 </span>            : 
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :                         rpipe-&gt;pipe_buffer.cnt -= size;</span>
+<span class="lineNum">     343 </span>            :                         /*
+<span class="lineNum">     344 </span>            :                          * If there is no more to read in the pipe, reset
+<span class="lineNum">     345 </span>            :                          * its pointers to the beginning.  This improves
+<span class="lineNum">     346 </span>            :                          * cache hit stats.
+<span class="lineNum">     347 </span>            :                          */
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :                         if (rpipe-&gt;pipe_buffer.cnt == 0) {</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                                 rpipe-&gt;pipe_buffer.in = 0;</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                                 rpipe-&gt;pipe_buffer.out = 0;</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                         nread += size;</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     354 </span>            :                         /*
+<span class="lineNum">     355 </span>            :                          * detect EOF condition
+<span class="lineNum">     356 </span>            :                          * read returns 0 on EOF, no need to set error
+<span class="lineNum">     357 </span>            :                          */
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :                         if (rpipe-&gt;pipe_state &amp; PIPE_EOF)</span>
+<span class="lineNum">     359 </span>            :                                 break;
+<span class="lineNum">     360 </span>            : 
+<span class="lineNum">     361 </span>            :                         /*
+<span class="lineNum">     362 </span>            :                          * If the &quot;write-side&quot; has been blocked, wake it up now.
+<span class="lineNum">     363 </span>            :                          */
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :                         if (rpipe-&gt;pipe_state &amp; PIPE_WANTW) {</span>
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                                 rpipe-&gt;pipe_state &amp;= ~PIPE_WANTW;</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :                                 wakeup(rpipe);</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     368 </span>            : 
+<span class="lineNum">     369 </span>            :                         /*
+<span class="lineNum">     370 </span>            :                          * Break if some data was read.
+<span class="lineNum">     371 </span>            :                          */
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                         if (nread &gt; 0)</span>
+<span class="lineNum">     373 </span>            :                                 break;
+<span class="lineNum">     374 </span>            : 
+<span class="lineNum">     375 </span>            :                         /*
+<span class="lineNum">     376 </span>            :                          * Unlock the pipe buffer for our remaining processing.
+<span class="lineNum">     377 </span>            :                          * We will either break out with an error or we will
+<span class="lineNum">     378 </span>            :                          * sleep and relock to loop.
+<span class="lineNum">     379 </span>            :                          */
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :                         pipeunlock(rpipe);</span>
+<span class="lineNum">     381 </span>            : 
+<span class="lineNum">     382 </span>            :                         /*
+<span class="lineNum">     383 </span>            :                          * Handle non-blocking mode operation or
+<span class="lineNum">     384 </span>            :                          * wait for more data.
+<span class="lineNum">     385 </span>            :                          */
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_flag &amp; FNONBLOCK) {</span>
+<span class="lineNum">     387 </span>            :                                 error = EAGAIN;
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                         } else {</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :                                 rpipe-&gt;pipe_state |= PIPE_WANTR;</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :                                 if ((error = tsleep(rpipe, PRIBIO|PCATCH, &quot;piperd&quot;, 0)) == 0)</span>
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :                                         error = pipelock(rpipe);</span>
+<span class="lineNum">     392 </span>            :                         }
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :                         if (error)</span>
+<span class="lineNum">     394 </span>            :                                 goto unlocked_error;
+<span class="lineNum">     395 </span>            :                 }
+<span class="lineNum">     396 </span>            :         }
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :         pipeunlock(rpipe);</span>
+<span class="lineNum">     398 </span>            : 
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :         if (error == 0)</span>
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :                 getnanotime(&amp;rpipe-&gt;pipe_atime);</span>
+<span class="lineNum">     401 </span>            : unlocked_error:
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :         --rpipe-&gt;pipe_busy;</span>
+<span class="lineNum">     403 </span>            : 
+<span class="lineNum">     404 </span>            :         /*
+<span class="lineNum">     405 </span>            :          * PIPE_WANT processing only makes sense if pipe_busy is 0.
+<span class="lineNum">     406 </span>            :          */
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         if ((rpipe-&gt;pipe_busy == 0) &amp;&amp; (rpipe-&gt;pipe_state &amp; PIPE_WANT)) {</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 rpipe-&gt;pipe_state &amp;= ~(PIPE_WANT|PIPE_WANTW);</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                 wakeup(rpipe);</span>
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         } else if (rpipe-&gt;pipe_buffer.cnt &lt; MINPIPESIZE) {</span>
+<span class="lineNum">     411 </span>            :                 /*
+<span class="lineNum">     412 </span>            :                  * Handle write blocking hysteresis.
+<span class="lineNum">     413 </span>            :                  */
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :                 if (rpipe-&gt;pipe_state &amp; PIPE_WANTW) {</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :                         rpipe-&gt;pipe_state &amp;= ~PIPE_WANTW;</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :                         wakeup(rpipe);</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     418 </span>            :         }
+<span class="lineNum">     419 </span>            : 
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         if ((rpipe-&gt;pipe_buffer.size - rpipe-&gt;pipe_buffer.cnt) &gt;= PIPE_BUF)</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                 pipeselwakeup(rpipe);</span>
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 : }</span>
+<a name="425"><span class="lineNum">     425 </span>            : </a>
+<span class="lineNum">     426 </span>            : int
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 : pipe_write(struct file *fp, struct uio *uio, int fflags)</span>
+<span class="lineNum">     428 </span>            : {
+<span class="lineNum">     429 </span>            :         int error = 0;
+<span class="lineNum">     430 </span>            :         size_t orig_resid;
+<span class="lineNum">     431 </span>            :         struct pipe *wpipe, *rpipe;
+<span class="lineNum">     432 </span>            : 
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         rpipe = fp-&gt;f_data;</span>
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         wpipe = rpipe-&gt;pipe_peer;</span>
+<span class="lineNum">     435 </span>            : 
+<span class="lineNum">     436 </span>            :         /*
+<span class="lineNum">     437 </span>            :          * detect loss of pipe read side, issue SIGPIPE if lost.
+<span class="lineNum">     438 </span>            :          */
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         if ((wpipe == NULL) || (wpipe-&gt;pipe_state &amp; PIPE_EOF)) {</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :                 return (EPIPE);</span>
+<span class="lineNum">     441 </span>            :         }
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         ++wpipe-&gt;pipe_busy;</span>
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span>            :         /*
+<span class="lineNum">     445 </span>            :          * If it is advantageous to resize the pipe buffer, do
+<span class="lineNum">     446 </span>            :          * so.
+<span class="lineNum">     447 </span>            :          */
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :         if ((uio-&gt;uio_resid &gt; PIPE_SIZE) &amp;&amp;</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :             (wpipe-&gt;pipe_buffer.size &lt;= PIPE_SIZE) &amp;&amp;</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :             (wpipe-&gt;pipe_buffer.cnt == 0)) {</span>
+<span class="lineNum">     451 </span>            :                 unsigned int npipe;
+<span class="lineNum">     452 </span>            : 
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                 npipe = atomic_inc_int_nv(&amp;nbigpipe);</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :                 if ((npipe &lt;= LIMITBIGPIPES) &amp;&amp;</span>
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :                     (error = pipelock(wpipe)) == 0) {</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :                         if (pipespace(wpipe, BIG_PIPE_SIZE) != 0)</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                                 atomic_dec_int(&amp;nbigpipe);</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :                         pipeunlock(wpipe);</span>
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :                         atomic_dec_int(&amp;nbigpipe);</span>
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     462 </span>            : 
+<span class="lineNum">     463 </span>            :         /*
+<span class="lineNum">     464 </span>            :          * If an early error occurred unbusy and return, waking up any pending
+<span class="lineNum">     465 </span>            :          * readers.
+<span class="lineNum">     466 </span>            :          */
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :                 --wpipe-&gt;pipe_busy;</span>
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :                 if ((wpipe-&gt;pipe_busy == 0) &amp;&amp;</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :                     (wpipe-&gt;pipe_state &amp; PIPE_WANT)) {</span>
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                         wpipe-&gt;pipe_state &amp;= ~(PIPE_WANT | PIPE_WANTR);</span>
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :                         wakeup(wpipe);</span>
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">     475 </span>            :         }
+<span class="lineNum">     476 </span>            : 
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :         orig_resid = uio-&gt;uio_resid;</span>
+<span class="lineNum">     478 </span>            : 
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :         while (uio-&gt;uio_resid) {</span>
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :                 size_t space;</span>
+<span class="lineNum">     481 </span>            : 
+<span class="lineNum">     482 </span>            : retrywrite:
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :                 if (wpipe-&gt;pipe_state &amp; PIPE_EOF) {</span>
+<span class="lineNum">     484 </span>            :                         error = EPIPE;
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     486 </span>            :                 }
+<span class="lineNum">     487 </span>            : 
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :                 space = wpipe-&gt;pipe_buffer.size - wpipe-&gt;pipe_buffer.cnt;</span>
+<span class="lineNum">     489 </span>            : 
+<span class="lineNum">     490 </span>            :                 /* Writes of size &lt;= PIPE_BUF must be atomic. */
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :                 if ((space &lt; uio-&gt;uio_resid) &amp;&amp; (orig_resid &lt;= PIPE_BUF))</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :                         space = 0;</span>
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                 if (space &gt; 0) {</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :                         if ((error = pipelock(wpipe)) == 0) {</span>
+<span class="lineNum">     496 </span>            :                                 size_t size;    /* Transfer size */
+<span class="lineNum">     497 </span>            :                                 size_t segsize; /* first segment to transfer */
+<span class="lineNum">     498 </span>            : 
+<span class="lineNum">     499 </span>            :                                 /*
+<span class="lineNum">     500 </span>            :                                  * If a process blocked in uiomove, our
+<span class="lineNum">     501 </span>            :                                  * value for space might be bad.
+<span class="lineNum">     502 </span>            :                                  *
+<span class="lineNum">     503 </span>            :                                  * XXX will we be ok if the reader has gone
+<span class="lineNum">     504 </span>            :                                  * away here?
+<span class="lineNum">     505 </span>            :                                  */
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :                                 if (space &gt; wpipe-&gt;pipe_buffer.size -</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :                                     wpipe-&gt;pipe_buffer.cnt) {</span>
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :                                         pipeunlock(wpipe);</span>
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :                                         goto retrywrite;</span>
+<span class="lineNum">     510 </span>            :                                 }
+<span class="lineNum">     511 </span>            : 
+<span class="lineNum">     512 </span>            :                                 /*
+<span class="lineNum">     513 </span>            :                                  * Transfer size is minimum of uio transfer
+<span class="lineNum">     514 </span>            :                                  * and free space in pipe buffer.
+<span class="lineNum">     515 </span>            :                                  */
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :                                 if (space &gt; uio-&gt;uio_resid)</span>
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :                                         size = uio-&gt;uio_resid;</span>
+<span class="lineNum">     518 </span>            :                                 else
+<span class="lineNum">     519 </span>            :                                         size = space;
+<span class="lineNum">     520 </span>            :                                 /*
+<span class="lineNum">     521 </span>            :                                  * First segment to transfer is minimum of
+<span class="lineNum">     522 </span>            :                                  * transfer size and contiguous space in
+<span class="lineNum">     523 </span>            :                                  * pipe buffer.  If first segment to transfer
+<span class="lineNum">     524 </span>            :                                  * is less than the transfer size, we've got
+<span class="lineNum">     525 </span>            :                                  * a wraparound in the buffer.
+<span class="lineNum">     526 </span>            :                                  */
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                                 segsize = wpipe-&gt;pipe_buffer.size -</span>
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :                                         wpipe-&gt;pipe_buffer.in;</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                                 if (segsize &gt; size)</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :                                         segsize = size;</span>
+<span class="lineNum">     531 </span>            : 
+<span class="lineNum">     532 </span>            :                                 /* Transfer first segment */
+<span class="lineNum">     533 </span>            : 
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :                                 error = uiomove(&amp;wpipe-&gt;pipe_buffer.buffer[wpipe-&gt;pipe_buffer.in],</span>
+<span class="lineNum">     535 </span>            :                                                 segsize, uio);
+<span class="lineNum">     536 </span>            : 
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                                 if (error == 0 &amp;&amp; segsize &lt; size) {</span>
+<span class="lineNum">     538 </span>            :                                         /*
+<span class="lineNum">     539 </span>            :                                          * Transfer remaining part now, to
+<span class="lineNum">     540 </span>            :                                          * support atomic writes.  Wraparound
+<span class="lineNum">     541 </span>            :                                          * happened.
+<span class="lineNum">     542 </span>            :                                          */
+<span class="lineNum">     543 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :                                         if (wpipe-&gt;pipe_buffer.in + segsize !=</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :                                             wpipe-&gt;pipe_buffer.size)</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :                                                 panic(&quot;Expected pipe buffer wraparound disappeared&quot;);</span>
+<span class="lineNum">     547 </span>            : #endif
+<span class="lineNum">     548 </span>            : 
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :                                         error = uiomove(&amp;wpipe-&gt;pipe_buffer.buffer[0],</span>
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :                                                         size - segsize, uio);</span>
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :                                 }</span>
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :                                 if (error == 0) {</span>
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 :                                         wpipe-&gt;pipe_buffer.in += size;</span>
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :                                         if (wpipe-&gt;pipe_buffer.in &gt;=</span>
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 :                                             wpipe-&gt;pipe_buffer.size) {</span>
+<span class="lineNum">     556 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :                                                 if (wpipe-&gt;pipe_buffer.in != size - segsize + wpipe-&gt;pipe_buffer.size)</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :                                                         panic(&quot;Expected wraparound bad&quot;);</span>
+<span class="lineNum">     559 </span>            : #endif
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :                                                 wpipe-&gt;pipe_buffer.in = size - segsize;</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                                         }</span>
+<span class="lineNum">     562 </span>            : 
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                                         wpipe-&gt;pipe_buffer.cnt += size;</span>
+<span class="lineNum">     564 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :                                         if (wpipe-&gt;pipe_buffer.cnt &gt; wpipe-&gt;pipe_buffer.size)</span>
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :                                                 panic(&quot;Pipe buffer overflow&quot;);</span>
+<span class="lineNum">     567 </span>            : #endif
+<span class="lineNum">     568 </span>            :                                 }
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :                                 pipeunlock(wpipe);</span>
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :                         if (error)</span>
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     573 </span>            :                 } else {
+<span class="lineNum">     574 </span>            :                         /*
+<span class="lineNum">     575 </span>            :                          * If the &quot;read-side&quot; has been blocked, wake it up now.
+<span class="lineNum">     576 </span>            :                          */
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :                         if (wpipe-&gt;pipe_state &amp; PIPE_WANTR) {</span>
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :                                 wpipe-&gt;pipe_state &amp;= ~PIPE_WANTR;</span>
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :                                 wakeup(wpipe);</span>
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     581 </span>            : 
+<span class="lineNum">     582 </span>            :                         /*
+<span class="lineNum">     583 </span>            :                          * don't block on non-blocking I/O
+<span class="lineNum">     584 </span>            :                          */
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_flag &amp; FNONBLOCK) {</span>
+<span class="lineNum">     586 </span>            :                                 error = EAGAIN;
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     588 </span>            :                         }
+<span class="lineNum">     589 </span>            : 
+<span class="lineNum">     590 </span>            :                         /*
+<span class="lineNum">     591 </span>            :                          * We have no more space and have something to offer,
+<span class="lineNum">     592 </span>            :                          * wake up select/poll.
+<span class="lineNum">     593 </span>            :                          */
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :                         pipeselwakeup(wpipe);</span>
+<span class="lineNum">     595 </span>            : 
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :                         wpipe-&gt;pipe_state |= PIPE_WANTW;</span>
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :                         error = tsleep(wpipe, (PRIBIO + 1)|PCATCH,</span>
+<span class="lineNum">     598 </span>            :                             &quot;pipewr&quot;, 0);
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :                         if (error)</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     601 </span>            :                         /*
+<span class="lineNum">     602 </span>            :                          * If read side wants to go away, we just issue a
+<span class="lineNum">     603 </span>            :                          * signal to ourselves.
+<span class="lineNum">     604 </span>            :                          */
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :                         if (wpipe-&gt;pipe_state &amp; PIPE_EOF) {</span>
+<span class="lineNum">     606 </span>            :                                 error = EPIPE;
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     608 </span>            :                         }       
+<span class="lineNum">     609 </span>            :                 }
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     611 </span>            : 
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :         --wpipe-&gt;pipe_busy;</span>
+<span class="lineNum">     613 </span>            : 
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :         if ((wpipe-&gt;pipe_busy == 0) &amp;&amp; (wpipe-&gt;pipe_state &amp; PIPE_WANT)) {</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :                 wpipe-&gt;pipe_state &amp;= ~(PIPE_WANT | PIPE_WANTR);</span>
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :                 wakeup(wpipe);</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :         } else if (wpipe-&gt;pipe_buffer.cnt &gt; 0) {</span>
+<span class="lineNum">     618 </span>            :                 /*
+<span class="lineNum">     619 </span>            :                  * If we have put any characters in the buffer, we wake up
+<span class="lineNum">     620 </span>            :                  * the reader.
+<span class="lineNum">     621 </span>            :                  */
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :                 if (wpipe-&gt;pipe_state &amp; PIPE_WANTR) {</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :                         wpipe-&gt;pipe_state &amp;= ~PIPE_WANTR;</span>
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :                         wakeup(wpipe);</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     626 </span>            :         }
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span>            :         /*
+<span class="lineNum">     629 </span>            :          * Don't return EPIPE if I/O was successful
+<span class="lineNum">     630 </span>            :          */
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :         if ((wpipe-&gt;pipe_buffer.cnt == 0) &amp;&amp;</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :             (uio-&gt;uio_resid == 0) &amp;&amp;</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :             (error == EPIPE)) {</span>
+<span class="lineNum">     634 </span>            :                 error = 0;
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     636 </span>            : 
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :         if (error == 0)</span>
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :                 getnanotime(&amp;wpipe-&gt;pipe_mtime);</span>
+<span class="lineNum">     639 </span>            :         /*
+<span class="lineNum">     640 </span>            :          * We have something to offer, wake up select/poll.
+<span class="lineNum">     641 </span>            :          */
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         if (wpipe-&gt;pipe_buffer.cnt)</span>
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :                 pipeselwakeup(wpipe);</span>
+<span class="lineNum">     644 </span>            : 
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     647 </span>            : 
+<span class="lineNum">     648 </span>            : /*
+<span class="lineNum">     649 </span>            :  * we implement a very minimal set of ioctls for compatibility with sockets.
+<a name="650"><span class="lineNum">     650 </span>            :  */</a>
+<span class="lineNum">     651 </span>            : int
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 : pipe_ioctl(struct file *fp, u_long cmd, caddr_t data, struct proc *p)</span>
+<span class="lineNum">     653 </span>            : {
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :         struct pipe *mpipe = fp-&gt;f_data;</span>
+<span class="lineNum">     655 </span>            : 
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     657 </span>            : 
+<span class="lineNum">     658 </span>            :         case FIONBIO:
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     660 </span>            : 
+<span class="lineNum">     661 </span>            :         case FIOASYNC:
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :                 if (*(int *)data) {</span>
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                         mpipe-&gt;pipe_state |= PIPE_ASYNC;</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :                         mpipe-&gt;pipe_state &amp;= ~PIPE_ASYNC;</span>
+<span class="lineNum">     666 </span>            :                 }
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     668 </span>            : 
+<span class="lineNum">     669 </span>            :         case FIONREAD:
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :                 *(int *)data = mpipe-&gt;pipe_buffer.cnt;</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     672 </span>            : 
+<span class="lineNum">     673 </span>            :         case TIOCSPGRP:
+<span class="lineNum">     674 </span>            :                 /* FALLTHROUGH */
+<span class="lineNum">     675 </span>            :         case SIOCSPGRP:
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :                 mpipe-&gt;pipe_pgid = *(int *)data;</span>
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     678 </span>            : 
+<span class="lineNum">     679 </span>            :         case SIOCGPGRP:
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :                 *(int *)data = mpipe-&gt;pipe_pgid;</span>
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     682 </span>            : 
+<span class="lineNum">     683 </span>            :         case TIOCGPGRP:
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :                 *(int *)data = -mpipe-&gt;pipe_pgid;</span>
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     686 </span>            : 
+<span class="lineNum">     687 </span>            :         }
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :         return (ENOTTY);</span>
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 : }</span>
+<a name="690"><span class="lineNum">     690 </span>            : </a>
+<span class="lineNum">     691 </span>            : int
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 : pipe_poll(struct file *fp, int events, struct proc *p)</span>
+<span class="lineNum">     693 </span>            : {
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :         struct pipe *rpipe = fp-&gt;f_data;</span>
+<span class="lineNum">     695 </span>            :         struct pipe *wpipe;
+<span class="lineNum">     696 </span>            :         int revents = 0;
+<span class="lineNum">     697 </span>            : 
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :         wpipe = rpipe-&gt;pipe_peer;</span>
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :         if (events &amp; (POLLIN | POLLRDNORM)) {</span>
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 :                 if ((rpipe-&gt;pipe_buffer.cnt &gt; 0) ||</span>
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :                     (rpipe-&gt;pipe_state &amp; PIPE_EOF))</span>
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :                         revents |= events &amp; (POLLIN | POLLRDNORM);</span>
+<span class="lineNum">     703 </span>            :         }
+<span class="lineNum">     704 </span>            : 
+<span class="lineNum">     705 </span>            :         /* NOTE: POLLHUP and POLLOUT/POLLWRNORM are mutually exclusive */
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :         if ((rpipe-&gt;pipe_state &amp; PIPE_EOF) ||</span>
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :             (wpipe == NULL) ||</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :             (wpipe-&gt;pipe_state &amp; PIPE_EOF))</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :                 revents |= POLLHUP;</span>
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :         else if (events &amp; (POLLOUT | POLLWRNORM)) {</span>
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                 if ((wpipe-&gt;pipe_buffer.size - wpipe-&gt;pipe_buffer.cnt) &gt;= PIPE_BUF)</span>
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :                         revents |= events &amp; (POLLOUT | POLLWRNORM);</span>
+<span class="lineNum">     713 </span>            :         }
+<span class="lineNum">     714 </span>            : 
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :         if (revents == 0) {</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :                 if (events &amp; (POLLIN | POLLRDNORM)) {</span>
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :                         selrecord(p, &amp;rpipe-&gt;pipe_sel);</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :                         rpipe-&gt;pipe_state |= PIPE_SEL;</span>
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :                 if (events &amp; (POLLOUT | POLLWRNORM)) {</span>
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :                         selrecord(p, &amp;wpipe-&gt;pipe_sel);</span>
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :                         wpipe-&gt;pipe_state |= PIPE_SEL;</span>
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     724 </span>            :         }
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :         return (revents);</span>
+<span class="lineNum">     726 </span>            : }
+<a name="727"><span class="lineNum">     727 </span>            : </a>
+<span class="lineNum">     728 </span>            : int
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 : pipe_stat(struct file *fp, struct stat *ub, struct proc *p)</span>
+<span class="lineNum">     730 </span>            : {
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :         struct pipe *pipe = fp-&gt;f_data;</span>
+<span class="lineNum">     732 </span>            : 
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :         memset(ub, 0, sizeof(*ub));</span>
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :         ub-&gt;st_mode = S_IFIFO;</span>
+<span class="lineNum">     735 </span><span class="lineNoCov">          0 :         ub-&gt;st_blksize = pipe-&gt;pipe_buffer.size;</span>
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :         ub-&gt;st_size = pipe-&gt;pipe_buffer.cnt;</span>
+<span class="lineNum">     737 </span><span class="lineNoCov">          0 :         ub-&gt;st_blocks = (ub-&gt;st_size + ub-&gt;st_blksize - 1) / ub-&gt;st_blksize;</span>
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :         ub-&gt;st_atim.tv_sec  = pipe-&gt;pipe_atime.tv_sec;</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :         ub-&gt;st_atim.tv_nsec = pipe-&gt;pipe_atime.tv_nsec;</span>
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :         ub-&gt;st_mtim.tv_sec  = pipe-&gt;pipe_mtime.tv_sec;</span>
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 :         ub-&gt;st_mtim.tv_nsec = pipe-&gt;pipe_mtime.tv_nsec;</span>
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :         ub-&gt;st_ctim.tv_sec  = pipe-&gt;pipe_ctime.tv_sec;</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :         ub-&gt;st_ctim.tv_nsec = pipe-&gt;pipe_ctime.tv_nsec;</span>
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :         ub-&gt;st_uid = fp-&gt;f_cred-&gt;cr_uid;</span>
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :         ub-&gt;st_gid = fp-&gt;f_cred-&gt;cr_gid;</span>
+<span class="lineNum">     746 </span>            :         /*
+<span class="lineNum">     747 </span>            :          * Left as 0: st_dev, st_ino, st_nlink, st_rdev, st_flags, st_gen.
+<span class="lineNum">     748 </span>            :          * XXX (st_dev, st_ino) should be unique.
+<span class="lineNum">     749 </span>            :          */
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     751 </span>            : }
+<a name="752"><span class="lineNum">     752 </span>            : </a>
+<span class="lineNum">     753 </span>            : int
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 : pipe_close(struct file *fp, struct proc *p)</span>
+<span class="lineNum">     755 </span>            : {
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         struct pipe *cpipe = fp-&gt;f_data;</span>
+<span class="lineNum">     757 </span>            : 
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :         fp-&gt;f_ops = NULL;</span>
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :         fp-&gt;f_data = NULL;</span>
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         KERNEL_LOCK();</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :         pipeclose(cpipe);</span>
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :         KERNEL_UNLOCK();</span>
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     764 </span>            : }
+<a name="765"><span class="lineNum">     765 </span>            : </a>
+<span class="lineNum">     766 </span>            : void
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 : pipe_free_kmem(struct pipe *cpipe)</span>
+<span class="lineNum">     768 </span>            : {
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :         u_int size = cpipe-&gt;pipe_buffer.size;</span>
+<span class="lineNum">     770 </span>            : 
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :         if (cpipe-&gt;pipe_buffer.buffer != NULL) {</span>
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :                 KERNEL_LOCK();</span>
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 :                 km_free(cpipe-&gt;pipe_buffer.buffer, size, &amp;kv_any, &amp;kp_pageable);</span>
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :                 KERNEL_UNLOCK();</span>
+<span class="lineNum">     775 </span><span class="lineNoCov">          0 :                 atomic_sub_int(&amp;amountpipekva, size);</span>
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :                 cpipe-&gt;pipe_buffer.buffer = NULL;</span>
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :                 if (size &gt; PIPE_SIZE)</span>
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :                         atomic_dec_int(&amp;nbigpipe);</span>
+<span class="lineNum">     779 </span>            :         }
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     781 </span>            : 
+<span class="lineNum">     782 </span>            : /*
+<span class="lineNum">     783 </span>            :  * shutdown the pipe
+<a name="784"><span class="lineNum">     784 </span>            :  */</a>
+<span class="lineNum">     785 </span>            : void
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 : pipeclose(struct pipe *cpipe)</span>
+<span class="lineNum">     787 </span>            : {
+<span class="lineNum">     788 </span>            :         struct pipe *ppipe;
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 :         if (cpipe) {</span>
+<span class="lineNum">     790 </span><span class="lineNoCov">          0 :                 pipeselwakeup(cpipe);</span>
+<span class="lineNum">     791 </span>            : 
+<span class="lineNum">     792 </span>            :                 /*
+<span class="lineNum">     793 </span>            :                  * If the other side is blocked, wake it up saying that
+<span class="lineNum">     794 </span>            :                  * we want to close it down.
+<span class="lineNum">     795 </span>            :                  */
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 :                 cpipe-&gt;pipe_state |= PIPE_EOF;</span>
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :                 while (cpipe-&gt;pipe_busy) {</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :                         wakeup(cpipe);</span>
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :                         cpipe-&gt;pipe_state |= PIPE_WANT;</span>
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :                         tsleep(cpipe, PRIBIO, &quot;pipecl&quot;, 0);</span>
+<span class="lineNum">     801 </span>            :                 }
+<span class="lineNum">     802 </span>            : 
+<span class="lineNum">     803 </span>            :                 /*
+<span class="lineNum">     804 </span>            :                  * Disconnect from peer
+<span class="lineNum">     805 </span>            :                  */
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :                 if ((ppipe = cpipe-&gt;pipe_peer) != NULL) {</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :                         pipeselwakeup(ppipe);</span>
+<span class="lineNum">     808 </span>            : 
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 :                         ppipe-&gt;pipe_state |= PIPE_EOF;</span>
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :                         wakeup(ppipe);</span>
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :                         ppipe-&gt;pipe_peer = NULL;</span>
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     813 </span>            : 
+<span class="lineNum">     814 </span>            :                 /*
+<span class="lineNum">     815 </span>            :                  * free resources
+<span class="lineNum">     816 </span>            :                  */
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 :                 pipe_free_kmem(cpipe);</span>
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :                 pool_put(&amp;pipe_pool, cpipe);</span>
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 : }</span>
+<a name="821"><span class="lineNum">     821 </span>            : </a>
+<span class="lineNum">     822 </span>            : int
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 : pipe_kqfilter(struct file *fp, struct knote *kn)</span>
+<span class="lineNum">     824 </span>            : {
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :         struct pipe *rpipe = kn-&gt;kn_fp-&gt;f_data;</span>
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         struct pipe *wpipe = rpipe-&gt;pipe_peer;</span>
+<span class="lineNum">     827 </span>            : 
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :         switch (kn-&gt;kn_filter) {</span>
+<span class="lineNum">     829 </span>            :         case EVFILT_READ:
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :                 kn-&gt;kn_fop = &amp;pipe_rfiltops;</span>
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :                 SLIST_INSERT_HEAD(&amp;rpipe-&gt;pipe_sel.si_note, kn, kn_selnext);</span>
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     833 </span>            :         case EVFILT_WRITE:
+<span class="lineNum">     834 </span><span class="lineNoCov">          0 :                 if (wpipe == NULL) {</span>
+<span class="lineNum">     835 </span>            :                         /* other end of pipe has been closed */
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :                         return (EPIPE);</span>
+<span class="lineNum">     837 </span>            :                 }
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :                 kn-&gt;kn_fop = &amp;pipe_wfiltops;</span>
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :                 SLIST_INSERT_HEAD(&amp;wpipe-&gt;pipe_sel.si_note, kn, kn_selnext);</span>
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     841 </span>            :         default:
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     843 </span>            :         }
+<span class="lineNum">     844 </span>            : 
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 : }</span>
+<a name="847"><span class="lineNum">     847 </span>            : </a>
+<span class="lineNum">     848 </span>            : void
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 : filt_pipedetach(struct knote *kn)</span>
+<span class="lineNum">     850 </span>            : {
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :         struct pipe *rpipe = kn-&gt;kn_fp-&gt;f_data;</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :         struct pipe *wpipe = rpipe-&gt;pipe_peer;</span>
+<span class="lineNum">     853 </span>            : 
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :         switch (kn-&gt;kn_filter) {</span>
+<span class="lineNum">     855 </span>            :         case EVFILT_READ:
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                 SLIST_REMOVE(&amp;rpipe-&gt;pipe_sel.si_note, kn, knote, kn_selnext);</span>
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     858 </span>            :         case EVFILT_WRITE:
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                 if (wpipe == NULL)</span>
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :                 SLIST_REMOVE(&amp;wpipe-&gt;pipe_sel.si_note, kn, knote, kn_selnext);</span>
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     863 </span>            :         }
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 : }</span>
+<a name="865"><span class="lineNum">     865 </span>            : </a>
+<span class="lineNum">     866 </span>            : int
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 : filt_piperead(struct knote *kn, long hint)</span>
+<span class="lineNum">     868 </span>            : {
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :         struct pipe *rpipe = kn-&gt;kn_fp-&gt;f_data;</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         struct pipe *wpipe = rpipe-&gt;pipe_peer;</span>
+<span class="lineNum">     871 </span>            : 
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :         kn-&gt;kn_data = rpipe-&gt;pipe_buffer.cnt;</span>
+<span class="lineNum">     873 </span>            : 
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :         if ((rpipe-&gt;pipe_state &amp; PIPE_EOF) ||</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :             (wpipe == NULL) || (wpipe-&gt;pipe_state &amp; PIPE_EOF)) {</span>
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :                 kn-&gt;kn_flags |= EV_EOF; </span>
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     878 </span>            :         }
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :         return (kn-&gt;kn_data &gt; 0);</span>
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 : }</span>
+<a name="881"><span class="lineNum">     881 </span>            : </a>
+<span class="lineNum">     882 </span>            : int
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 : filt_pipewrite(struct knote *kn, long hint)</span>
+<span class="lineNum">     884 </span>            : {
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :         struct pipe *rpipe = kn-&gt;kn_fp-&gt;f_data;</span>
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :         struct pipe *wpipe = rpipe-&gt;pipe_peer;</span>
+<span class="lineNum">     887 </span>            : 
+<span class="lineNum">     888 </span><span class="lineNoCov">          0 :         if ((wpipe == NULL) || (wpipe-&gt;pipe_state &amp; PIPE_EOF)) {</span>
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :                 kn-&gt;kn_data = 0;</span>
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 :                 kn-&gt;kn_flags |= EV_EOF; </span>
+<span class="lineNum">     891 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     892 </span>            :         }
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 :         kn-&gt;kn_data = wpipe-&gt;pipe_buffer.size - wpipe-&gt;pipe_buffer.cnt;</span>
+<span class="lineNum">     894 </span>            : 
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :         return (kn-&gt;kn_data &gt;= PIPE_BUF);</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 : }</span>
+<a name="897"><span class="lineNum">     897 </span>            : </a>
+<span class="lineNum">     898 </span>            : void
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 : pipe_init(void)</span>
+<span class="lineNum">     900 </span>            : {
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :         pool_init(&amp;pipe_pool, sizeof(struct pipe), 0, IPL_MPFLOOR, PR_WAITOK,</span>
+<span class="lineNum">     902 </span>            :             &quot;pipepl&quot;, NULL);
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     904 </span>            : 
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

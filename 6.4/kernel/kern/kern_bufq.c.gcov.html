@@ -1,0 +1,593 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - kern/kern_bufq.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">kern</a> - kern_bufq.c<span style="font-size: 80%;"> (source / <a href="kern_bufq.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">215</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">26</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: kern_bufq.c,v 1.32 2017/08/16 17:52:17 mikeb Exp $    */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2010 Thordur I. Bjornsson &lt;thib@openbsd.org&gt;
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2010 David Gwynne &lt;dlg@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      20 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/mount.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/mutex.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/buf.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/errno.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span>            : SLIST_HEAD(, bufq)      bufqs = SLIST_HEAD_INITIALIZER(bufqs);
+<span class="lineNum">      30 </span>            : struct mutex            bufqs_mtx = MUTEX_INITIALIZER(IPL_NONE);
+<span class="lineNum">      31 </span>            : int                     bufqs_stop;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : struct bufq_impl {
+<span class="lineNum">      34 </span>            :         void            *(*impl_create)(void);
+<span class="lineNum">      35 </span>            :         void             (*impl_destroy)(void *);
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span>            :         void             (*impl_queue)(void *, struct buf *);
+<span class="lineNum">      38 </span>            :         struct buf      *(*impl_dequeue)(void *);
+<span class="lineNum">      39 </span>            :         void             (*impl_requeue)(void *, struct buf *);
+<span class="lineNum">      40 </span>            :         int              (*impl_peek)(void *);
+<span class="lineNum">      41 </span>            : };
+<span class="lineNum">      42 </span>            : 
+<span class="lineNum">      43 </span>            : void            *bufq_fifo_create(void);
+<span class="lineNum">      44 </span>            : void             bufq_fifo_destroy(void *);
+<span class="lineNum">      45 </span>            : void             bufq_fifo_queue(void *, struct buf *);
+<span class="lineNum">      46 </span>            : struct buf      *bufq_fifo_dequeue(void *);
+<span class="lineNum">      47 </span>            : void             bufq_fifo_requeue(void *, struct buf *);
+<span class="lineNum">      48 </span>            : int              bufq_fifo_peek(void *);
+<span class="lineNum">      49 </span>            : 
+<span class="lineNum">      50 </span>            : void            *bufq_nscan_create(void);
+<span class="lineNum">      51 </span>            : void             bufq_nscan_destroy(void *);
+<span class="lineNum">      52 </span>            : void             bufq_nscan_queue(void *, struct buf *);
+<span class="lineNum">      53 </span>            : struct buf      *bufq_nscan_dequeue(void *);
+<span class="lineNum">      54 </span>            : void             bufq_nscan_requeue(void *, struct buf *);
+<span class="lineNum">      55 </span>            : int              bufq_nscan_peek(void *);
+<span class="lineNum">      56 </span>            : 
+<span class="lineNum">      57 </span>            : const struct bufq_impl bufq_impls[BUFQ_HOWMANY] = {
+<span class="lineNum">      58 </span>            :         {
+<span class="lineNum">      59 </span>            :                 bufq_fifo_create,
+<span class="lineNum">      60 </span>            :                 bufq_fifo_destroy,
+<span class="lineNum">      61 </span>            :                 bufq_fifo_queue,
+<span class="lineNum">      62 </span>            :                 bufq_fifo_dequeue,
+<span class="lineNum">      63 </span>            :                 bufq_fifo_requeue,
+<span class="lineNum">      64 </span>            :                 bufq_fifo_peek
+<span class="lineNum">      65 </span>            :         },
+<span class="lineNum">      66 </span>            :         {
+<span class="lineNum">      67 </span>            :                 bufq_nscan_create,
+<span class="lineNum">      68 </span>            :                 bufq_nscan_destroy,
+<span class="lineNum">      69 </span>            :                 bufq_nscan_queue,
+<span class="lineNum">      70 </span>            :                 bufq_nscan_dequeue,
+<span class="lineNum">      71 </span>            :                 bufq_nscan_requeue,
+<span class="lineNum">      72 </span>            :                 bufq_nscan_peek
+<span class="lineNum">      73 </span>            :         }
+<span class="lineNum">      74 </span>            : };
+<a name="75"><span class="lineNum">      75 </span>            : </a>
+<span class="lineNum">      76 </span>            : int
+<span class="lineNum">      77 </span><span class="lineNoCov">          0 : bufq_init(struct bufq *bq, int type)</span>
+<span class="lineNum">      78 </span>            : {
+<span class="lineNum">      79 </span>            :         u_int hi = BUFQ_HI, low = BUFQ_LOW;
+<span class="lineNum">      80 </span>            : 
+<span class="lineNum">      81 </span><span class="lineNoCov">          0 :         if (type &gt;= BUFQ_HOWMANY)</span>
+<span class="lineNum">      82 </span><span class="lineNoCov">          0 :                 panic(&quot;bufq_init: type %i unknown&quot;, type);</span>
+<span class="lineNum">      83 </span>            : 
+<span class="lineNum">      84 </span>            :         /*
+<span class="lineNum">      85 </span>            :          * Ensure that writes can't consume the entire amount of kva
+<span class="lineNum">      86 </span>            :          * available the buffer cache if we only have a limited amount
+<span class="lineNum">      87 </span>            :          * of kva available to us.
+<span class="lineNum">      88 </span>            :          */
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :         if (hi &gt;= (bcstats.kvaslots / 16)) {</span>
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :                 hi = bcstats.kvaslots / 16;</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :                 if (hi &lt; 2)</span>
+<span class="lineNum">      92 </span>            :                         hi = 2;
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :                 low = hi / 2;</span>
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">      95 </span>            : 
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :         mtx_init(&amp;bq-&gt;bufq_mtx, IPL_BIO);</span>
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_hi = hi;</span>
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_low = low;</span>
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_type = type;</span>
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_impl = &amp;bufq_impls[type];</span>
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_data = bq-&gt;bufq_impl-&gt;impl_create();</span>
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :         if (bq-&gt;bufq_data == NULL) {</span>
+<span class="lineNum">     103 </span>            :                 /*
+<span class="lineNum">     104 </span>            :                  * we should actually return failure so disks attaching after
+<span class="lineNum">     105 </span>            :                  * boot in low memory situations dont panic the system.
+<span class="lineNum">     106 </span>            :                  */
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :                 panic(&quot;bufq init fail&quot;);</span>
+<span class="lineNum">     108 </span>            :         }
+<span class="lineNum">     109 </span>            : 
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bufqs_mtx);</span>
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :         while (bufqs_stop) {</span>
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :                 msleep(&amp;bufqs_stop, &amp;bufqs_mtx, PRIBIO, &quot;bqinit&quot;, 0);</span>
+<span class="lineNum">     113 </span>            :         }
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         SLIST_INSERT_HEAD(&amp;bufqs, bq, bufq_entries);</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bufqs_mtx);</span>
+<span class="lineNum">     116 </span>            : 
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     118 </span>            : }
+<a name="119"><span class="lineNum">     119 </span>            : </a>
+<span class="lineNum">     120 </span>            : int
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 : bufq_switch(struct bufq *bq, int type)</span>
+<span class="lineNum">     122 </span>            : {
+<span class="lineNum">     123 </span>            :         void            *data;
+<span class="lineNum">     124 </span>            :         void            *odata;
+<span class="lineNum">     125 </span>            :         int             otype;
+<span class="lineNum">     126 </span>            :         struct buf      *bp;
+<span class="lineNum">     127 </span>            :         int             ret;
+<span class="lineNum">     128 </span>            : 
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         ret = (bq-&gt;bufq_type == type);</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     134 </span>            : 
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :         data = bufq_impls[type].impl_create();</span>
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         if (data == NULL)</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :         if (bq-&gt;bufq_type != type) { /* might have changed during create */</span>
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :                 odata = bq-&gt;bufq_data;</span>
+<span class="lineNum">     142 </span>            :                 otype = bq-&gt;bufq_type;
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :                 while ((bp = bufq_impls[otype].impl_dequeue(odata)) != NULL)</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :                         bufq_impls[type].impl_queue(data, bp);</span>
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :                 bq-&gt;bufq_data = data;</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :                 bq-&gt;bufq_type = type;</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :                 bq-&gt;bufq_impl = &amp;bufq_impls[type];</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     151 </span>            :                 otype = type;
+<span class="lineNum">     152 </span>            :                 odata = data;
+<span class="lineNum">     153 </span>            :         }
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     155 </span>            : 
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         bufq_impls[otype].impl_destroy(odata);</span>
+<span class="lineNum">     157 </span>            : 
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 : }</span>
+<a name="160"><span class="lineNum">     160 </span>            : </a>
+<span class="lineNum">     161 </span>            : void
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 : bufq_destroy(struct bufq *bq)</span>
+<span class="lineNum">     163 </span>            : {
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :         bufq_drain(bq);</span>
+<span class="lineNum">     165 </span>            : 
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_impl-&gt;impl_destroy(bq-&gt;bufq_data);</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_data = NULL;</span>
+<span class="lineNum">     168 </span>            : 
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bufqs_mtx);</span>
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :         while (bufqs_stop) {</span>
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :                 msleep(&amp;bufqs_stop, &amp;bufqs_mtx, PRIBIO, &quot;bqdest&quot;, 0);</span>
+<span class="lineNum">     172 </span>            :         }
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :         SLIST_REMOVE(&amp;bufqs, bq, bufq, bufq_entries);</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bufqs_mtx);</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     176 </span>            : 
+<a name="177"><span class="lineNum">     177 </span>            : </a>
+<span class="lineNum">     178 </span>            : void
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 : bufq_queue(struct bufq *bq, struct buf *bp)</span>
+<span class="lineNum">     180 </span>            : {
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         while (bq-&gt;bufq_stop) {</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :                 msleep(&amp;bq-&gt;bufq_stop, &amp;bq-&gt;bufq_mtx, PRIBIO, &quot;bqqueue&quot;, 0);</span>
+<span class="lineNum">     184 </span>            :         }
+<span class="lineNum">     185 </span>            : 
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :         bp-&gt;b_bq = bq;</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_outstanding++;</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_impl-&gt;impl_queue(bq-&gt;bufq_data, bp);</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 : }</span>
+<a name="191"><span class="lineNum">     191 </span>            : </a>
+<span class="lineNum">     192 </span>            : struct buf *
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 : bufq_dequeue(struct bufq *bq)</span>
+<span class="lineNum">     194 </span>            : {
+<span class="lineNum">     195 </span>            :         struct buf      *bp;
+<span class="lineNum">     196 </span>            : 
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         bp = bq-&gt;bufq_impl-&gt;impl_dequeue(bq-&gt;bufq_data);</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :         return (bp);</span>
+<span class="lineNum">     202 </span>            : }
+<a name="203"><span class="lineNum">     203 </span>            : </a>
+<span class="lineNum">     204 </span>            : void
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 : bufq_requeue(struct bufq *bq, struct buf *bp)</span>
+<span class="lineNum">     206 </span>            : {
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_impl-&gt;impl_requeue(bq-&gt;bufq_data, bp);</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 : }</span>
+<a name="211"><span class="lineNum">     211 </span>            : </a>
+<span class="lineNum">     212 </span>            : int
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 : bufq_peek(struct bufq *bq)</span>
+<span class="lineNum">     214 </span>            : {
+<span class="lineNum">     215 </span>            :         int             rv;
+<span class="lineNum">     216 </span>            : 
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :         rv = bq-&gt;bufq_impl-&gt;impl_peek(bq-&gt;bufq_data);</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     220 </span>            : 
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     222 </span>            : }
+<a name="223"><span class="lineNum">     223 </span>            : </a>
+<span class="lineNum">     224 </span>            : void
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 : bufq_drain(struct bufq *bq)</span>
+<span class="lineNum">     226 </span>            : {
+<span class="lineNum">     227 </span>            :         struct buf      *bp;
+<span class="lineNum">     228 </span>            :         int              s;
+<span class="lineNum">     229 </span>            : 
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         while ((bp = bufq_dequeue(bq)) != NULL) {</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                 bp-&gt;b_error = ENXIO;</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                 bp-&gt;b_flags |= B_ERROR;</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :                 s = splbio();</span>
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :                 biodone(bp);</span>
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">     236 </span>            :         }
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 : }</span>
+<a name="238"><span class="lineNum">     238 </span>            : </a>
+<span class="lineNum">     239 </span>            : void
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 : bufq_wait(struct bufq *bq)</span>
+<span class="lineNum">     241 </span>            : {
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         if (bq-&gt;bufq_hi) {</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :                 assertwaitok();</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :                 mtx_enter(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                 while (bq-&gt;bufq_outstanding &gt;= bq-&gt;bufq_hi) {</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :                         bq-&gt;bufq_waiting++;</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :                         msleep(&amp;bq-&gt;bufq_waiting, &amp;bq-&gt;bufq_mtx,</span>
+<span class="lineNum">     248 </span>            :                             PRIBIO, &quot;bqwait&quot;, 0);
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                         bq-&gt;bufq_waiting--;</span>
+<span class="lineNum">     250 </span>            :                 }
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 : }</span>
+<a name="254"><span class="lineNum">     254 </span>            : </a>
+<span class="lineNum">     255 </span>            : void
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 : bufq_done(struct bufq *bq, struct buf *bp)</span>
+<span class="lineNum">     257 </span>            : {
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         KASSERT(bq-&gt;bufq_outstanding &gt; 0);</span>
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         bq-&gt;bufq_outstanding--;</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         if (bq-&gt;bufq_stop &amp;&amp; bq-&gt;bufq_outstanding == 0)</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :                 wakeup(&amp;bq-&gt;bufq_outstanding);</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :         if (bq-&gt;bufq_waiting &amp;&amp; bq-&gt;bufq_outstanding &lt; bq-&gt;bufq_low)</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :                 wakeup(&amp;bq-&gt;bufq_waiting);</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         bp-&gt;b_bq = NULL;</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 : }</span>
+<a name="268"><span class="lineNum">     268 </span>            : </a>
+<span class="lineNum">     269 </span>            : void
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 : bufq_quiesce(void)</span>
+<span class="lineNum">     271 </span>            : {
+<span class="lineNum">     272 </span>            :         struct bufq             *bq;
+<span class="lineNum">     273 </span>            : 
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bufqs_mtx);</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         bufqs_stop = 1;</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bufqs_mtx);</span>
+<span class="lineNum">     277 </span>            :         /*
+<span class="lineNum">     278 </span>            :          * We can safely walk the list since it can't be modified as
+<span class="lineNum">     279 </span>            :          * long as bufqs_stop is non-zero.
+<span class="lineNum">     280 </span>            :          */
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(bq, &amp;bufqs, bufq_entries) {</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :                 mtx_enter(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :                 bq-&gt;bufq_stop = 1;</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :                 while (bq-&gt;bufq_outstanding) {</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                         msleep(&amp;bq-&gt;bufq_outstanding, &amp;bq-&gt;bufq_mtx,</span>
+<span class="lineNum">     286 </span>            :                             PRIBIO, &quot;bqquies&quot;, 0);
+<span class="lineNum">     287 </span>            :                 }
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     289 </span>            :         }
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 : }</span>
+<a name="291"><span class="lineNum">     291 </span>            : </a>
+<span class="lineNum">     292 </span>            : void
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 : bufq_restart(void)</span>
+<span class="lineNum">     294 </span>            : {
+<span class="lineNum">     295 </span>            :         struct bufq             *bq;
+<span class="lineNum">     296 </span>            : 
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;bufqs_mtx);</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(bq, &amp;bufqs, bufq_entries) {</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 mtx_enter(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                 bq-&gt;bufq_stop = 0;</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :                 wakeup(&amp;bq-&gt;bufq_stop);</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;bq-&gt;bufq_mtx);</span>
+<span class="lineNum">     303 </span>            :         }
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         bufqs_stop = 0;</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         wakeup(&amp;bufqs_stop);</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;bufqs_mtx);</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     308 </span>            : 
+<span class="lineNum">     309 </span>            : 
+<span class="lineNum">     310 </span>            : /*
+<span class="lineNum">     311 </span>            :  * fifo implementation
+<span class="lineNum">     312 </span>            :  */
+<a name="313"><span class="lineNum">     313 </span>            : </a>
+<span class="lineNum">     314 </span>            : void *
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 : bufq_fifo_create(void)</span>
+<span class="lineNum">     316 </span>            : {
+<span class="lineNum">     317 </span>            :         struct bufq_fifo_head   *head;
+<span class="lineNum">     318 </span>            : 
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :         head = malloc(sizeof(*head), M_DEVBUF, M_NOWAIT | M_ZERO);</span>
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         if (head == NULL)</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     322 </span>            : 
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         SIMPLEQ_INIT(head);</span>
+<span class="lineNum">     324 </span>            : 
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         return (head);</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 : }</span>
+<a name="327"><span class="lineNum">     327 </span>            : </a>
+<span class="lineNum">     328 </span>            : void
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 : bufq_fifo_destroy(void *data)</span>
+<span class="lineNum">     330 </span>            : {
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         struct bufq_fifo_head   *head = data;</span>
+<span class="lineNum">     332 </span>            :         
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         free(head, M_DEVBUF, sizeof(*head));</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 : }</span>
+<a name="335"><span class="lineNum">     335 </span>            : </a>
+<span class="lineNum">     336 </span>            : void
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 : bufq_fifo_queue(void *data, struct buf *bp)</span>
+<span class="lineNum">     338 </span>            : {
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         struct bufq_fifo_head   *head = data;</span>
+<span class="lineNum">     340 </span>            : 
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         SIMPLEQ_INSERT_TAIL(head, bp, b_bufq.bufq_data_fifo.bqf_entries);</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 : }</span>
+<a name="343"><span class="lineNum">     343 </span>            : </a>
+<span class="lineNum">     344 </span>            : struct buf *
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 : bufq_fifo_dequeue(void *data)</span>
+<span class="lineNum">     346 </span>            : {
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :         struct bufq_fifo_head   *head = data;</span>
+<span class="lineNum">     348 </span>            :         struct buf              *bp;
+<span class="lineNum">     349 </span>            : 
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         bp = SIMPLEQ_FIRST(head);</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         if (bp != NULL)</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                 SIMPLEQ_REMOVE_HEAD(head, b_bufq.bufq_data_fifo.bqf_entries);</span>
+<span class="lineNum">     353 </span>            : 
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         return (bp);</span>
+<span class="lineNum">     355 </span>            : }
+<a name="356"><span class="lineNum">     356 </span>            : </a>
+<span class="lineNum">     357 </span>            : void
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 : bufq_fifo_requeue(void *data, struct buf *bp)</span>
+<span class="lineNum">     359 </span>            : {
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         struct bufq_fifo_head   *head = data;</span>
+<span class="lineNum">     361 </span>            : 
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :         SIMPLEQ_INSERT_HEAD(head, bp, b_bufq.bufq_data_fifo.bqf_entries);</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 : }</span>
+<a name="364"><span class="lineNum">     364 </span>            : </a>
+<span class="lineNum">     365 </span>            : int
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 : bufq_fifo_peek(void *data)</span>
+<span class="lineNum">     367 </span>            : {
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         struct bufq_fifo_head   *head = data;</span>
+<span class="lineNum">     369 </span>            : 
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :         return (SIMPLEQ_FIRST(head) != NULL);</span>
+<span class="lineNum">     371 </span>            : }
+<span class="lineNum">     372 </span>            : 
+<span class="lineNum">     373 </span>            : /*
+<span class="lineNum">     374 </span>            :  * nscan implementation
+<span class="lineNum">     375 </span>            :  */
+<span class="lineNum">     376 </span>            : 
+<span class="lineNum">     377 </span>            : #define BUF_INORDER(ba, bb) ((ba)-&gt;b_blkno &lt; (bb)-&gt;b_blkno)
+<span class="lineNum">     378 </span>            : 
+<span class="lineNum">     379 </span>            : #define dsentries b_bufq.bufq_data_nscan.bqf_entries
+<span class="lineNum">     380 </span>            : 
+<span class="lineNum">     381 </span>            : struct bufq_nscan_data {
+<span class="lineNum">     382 </span>            :         struct bufq_nscan_head sorted;
+<span class="lineNum">     383 </span>            :         struct bufq_nscan_head fifo;
+<span class="lineNum">     384 </span>            :         int leftoverroom; /* Remaining number of buffer inserts allowed  */
+<span class="lineNum">     385 </span>            : };
+<span class="lineNum">     386 </span>            : 
+<span class="lineNum">     387 </span>            : void bufq_nscan_resort(struct bufq_nscan_data *data);
+<span class="lineNum">     388 </span>            : void bufq_simple_nscan(struct bufq_nscan_head *, struct buf *);
+<a name="389"><span class="lineNum">     389 </span>            : </a>
+<span class="lineNum">     390 </span>            : void
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 : bufq_simple_nscan(struct bufq_nscan_head *head, struct buf *bp)</span>
+<span class="lineNum">     392 </span>            : {
+<span class="lineNum">     393 </span>            :         struct buf *cur, *prev;
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span>            :         prev = NULL;
+<span class="lineNum">     396 </span>            :         /*
+<span class="lineNum">     397 </span>            :          * We look for the first slot where we would fit, then insert
+<span class="lineNum">     398 </span>            :          * after the element we just passed.
+<span class="lineNum">     399 </span>            :          */
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :         SIMPLEQ_FOREACH(cur, head, dsentries) {</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :                 if (BUF_INORDER(bp, cur))</span>
+<span class="lineNum">     402 </span>            :                         break;
+<span class="lineNum">     403 </span>            :                 prev = cur;
+<span class="lineNum">     404 </span>            :         }
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         if (prev)</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :                 SIMPLEQ_INSERT_AFTER(head, prev, bp, dsentries);</span>
+<span class="lineNum">     407 </span>            :         else
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 SIMPLEQ_INSERT_HEAD(head, bp, dsentries);</span>
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     411 </span>            : 
+<span class="lineNum">     412 </span>            : /*
+<span class="lineNum">     413 </span>            :  * Take N elements from the fifo queue and sort them
+<a name="414"><span class="lineNum">     414 </span>            :  */</a>
+<span class="lineNum">     415 </span>            : void
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 : bufq_nscan_resort(struct bufq_nscan_data *data)</span>
+<span class="lineNum">     417 </span>            : {
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :         struct bufq_nscan_head *fifo = &amp;data-&gt;fifo;</span>
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :         struct bufq_nscan_head *sorted = &amp;data-&gt;sorted;</span>
+<span class="lineNum">     420 </span>            :         int count, segmentsize = BUFQ_NSCAN_N;
+<span class="lineNum">     421 </span>            :         struct buf *bp;
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         for (count = 0; count &lt; segmentsize; count++) {</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :                 bp = SIMPLEQ_FIRST(fifo);</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :                 if (!bp)</span>
+<span class="lineNum">     426 </span>            :                         break;
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :                 SIMPLEQ_REMOVE_HEAD(fifo, dsentries);</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                 bufq_simple_nscan(sorted, bp);</span>
+<span class="lineNum">     429 </span>            :         }
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :         data-&gt;leftoverroom = segmentsize - count;</span>
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 : }</span>
+<a name="432"><span class="lineNum">     432 </span>            : </a>
+<span class="lineNum">     433 </span>            : void *
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 : bufq_nscan_create(void)</span>
+<span class="lineNum">     435 </span>            : {
+<span class="lineNum">     436 </span>            :         struct bufq_nscan_data *data;
+<span class="lineNum">     437 </span>            : 
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :         data = malloc(sizeof(*data), M_DEVBUF, M_NOWAIT | M_ZERO);</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         if (!data)</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :         SIMPLEQ_INIT(&amp;data-&gt;sorted);</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         SIMPLEQ_INIT(&amp;data-&gt;fifo);</span>
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :         return data;</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 : }</span>
+<a name="446"><span class="lineNum">     446 </span>            : </a>
+<span class="lineNum">     447 </span>            : void
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 : bufq_nscan_destroy(void *vdata)</span>
+<span class="lineNum">     449 </span>            : {
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :         struct bufq_nscan_data *data = vdata;</span>
+<span class="lineNum">     451 </span>            : 
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :         free(data, M_DEVBUF, sizeof(*data));</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 : }</span>
+<a name="454"><span class="lineNum">     454 </span>            : </a>
+<span class="lineNum">     455 </span>            : void
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 : bufq_nscan_queue(void *vdata, struct buf *bp)</span>
+<span class="lineNum">     457 </span>            : {
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :         struct bufq_nscan_data *data = vdata;</span>
+<span class="lineNum">     459 </span>            : 
+<span class="lineNum">     460 </span>            :         /*
+<span class="lineNum">     461 </span>            :          * If the previous sorted segment was small, we will continue
+<span class="lineNum">     462 </span>            :          * packing in bufs as long as they're in order.
+<span class="lineNum">     463 </span>            :          */
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :         if (data-&gt;leftoverroom) {</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                 struct buf *next = SIMPLEQ_FIRST(&amp;data-&gt;sorted);</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                 if (next &amp;&amp; BUF_INORDER(next, bp)) {</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :                         bufq_simple_nscan(&amp;data-&gt;sorted, bp);</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :                         data-&gt;leftoverroom--;</span>
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     470 </span>            :                 }
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     472 </span>            : 
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :         SIMPLEQ_INSERT_TAIL(&amp;data-&gt;fifo, bp, dsentries);</span>
+<span class="lineNum">     474 </span>            : 
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 : }</span>
+<a name="476"><span class="lineNum">     476 </span>            : </a>
+<span class="lineNum">     477 </span>            : struct buf *
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 : bufq_nscan_dequeue(void *vdata)</span>
+<span class="lineNum">     479 </span>            : {
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :         struct bufq_nscan_data *data = vdata;</span>
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :         struct bufq_nscan_head *sorted = &amp;data-&gt;sorted;</span>
+<span class="lineNum">     482 </span>            :         struct buf      *bp;
+<span class="lineNum">     483 </span>            : 
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         if (SIMPLEQ_FIRST(sorted) == NULL)</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :                 bufq_nscan_resort(data);</span>
+<span class="lineNum">     486 </span>            : 
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :         bp = SIMPLEQ_FIRST(sorted);</span>
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :         if (bp != NULL)</span>
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                 SIMPLEQ_REMOVE_HEAD(sorted, dsentries);</span>
+<span class="lineNum">     490 </span>            : 
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :         return (bp);</span>
+<span class="lineNum">     492 </span>            : }
+<a name="493"><span class="lineNum">     493 </span>            : </a>
+<span class="lineNum">     494 </span>            : void
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 : bufq_nscan_requeue(void *vdata, struct buf *bp)</span>
+<span class="lineNum">     496 </span>            : {
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :         struct bufq_nscan_data *data = vdata;</span>
+<span class="lineNum">     498 </span>            : 
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :         SIMPLEQ_INSERT_HEAD(&amp;data-&gt;fifo, bp, dsentries);</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 : }</span>
+<a name="501"><span class="lineNum">     501 </span>            : </a>
+<span class="lineNum">     502 </span>            : int
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 : bufq_nscan_peek(void *vdata)</span>
+<span class="lineNum">     504 </span>            : {
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         struct bufq_nscan_data *data = vdata;</span>
+<span class="lineNum">     506 </span>            : 
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :         return (SIMPLEQ_FIRST(&amp;data-&gt;sorted) != NULL) ||</span>
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :             (SIMPLEQ_FIRST(&amp;data-&gt;fifo) != NULL);</span>
+<span class="lineNum">     509 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

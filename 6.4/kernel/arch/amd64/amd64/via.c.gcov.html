@@ -1,0 +1,603 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - arch/amd64/amd64/via.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../index.html">top level</a> - <a href="index.html">arch/amd64/amd64</a> - via.c<span style="font-size: 80%;"> (source / <a href="via.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">225</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: via.c,v 1.32 2018/06/05 06:39:10 guenther Exp $       */</a>
+<span class="lineNum">       2 </span>            : /*      $NetBSD: machdep.c,v 1.214 1996/11/10 03:16:17 thorpej Exp $    */
+<span class="lineNum">       3 </span>            : 
+<span class="lineNum">       4 </span>            : /*-
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2003 Jason Wright
+<span class="lineNum">       6 </span>            :  * Copyright (c) 2003, 2004 Theo de Raadt
+<span class="lineNum">       7 </span>            :  * All rights reserved.
+<span class="lineNum">       8 </span>            :  *
+<span class="lineNum">       9 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">      10 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">      11 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      12 </span>            :  *
+<span class="lineNum">      13 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      14 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      15 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      16 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      17 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      18 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      19 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      20 </span>            :  */
+<span class="lineNum">      21 </span>            : 
+<span class="lineNum">      22 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      27 </span>            : 
+<span class="lineNum">      28 </span>            : #ifdef CRYPTO
+<span class="lineNum">      29 </span>            : #include &lt;crypto/cryptodev.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;crypto/aes.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;crypto/xform.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;crypto/cryptosoft.h&gt;
+<span class="lineNum">      33 </span>            : #endif
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : #include &lt;machine/cpufunc.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;machine/specialreg.h&gt;
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : #include &lt;dev/rndvar.h&gt;
+<span class="lineNum">      39 </span>            : 
+<span class="lineNum">      40 </span>            : void    viac3_rnd(void *);
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : 
+<span class="lineNum">      43 </span>            : #ifdef CRYPTO
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : struct viac3_session {
+<span class="lineNum">      46 </span>            :         u_int32_t       ses_ekey[4 * (AES_MAXROUNDS + 1) + 4];  /* 128 bit aligned */
+<span class="lineNum">      47 </span>            :         u_int32_t       ses_dkey[4 * (AES_MAXROUNDS + 1) + 4];  /* 128 bit aligned */
+<span class="lineNum">      48 </span>            :         u_int32_t       ses_cw0;
+<span class="lineNum">      49 </span>            :         struct swcr_data *swd;
+<span class="lineNum">      50 </span>            :         int             ses_klen;
+<span class="lineNum">      51 </span>            :         int             ses_used;
+<span class="lineNum">      52 </span>            : };
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span>            : struct viac3_softc {
+<span class="lineNum">      55 </span>            :         u_int32_t               op_cw[4];               /* 128 bit aligned */
+<span class="lineNum">      56 </span>            :         u_int8_t                op_iv[16];              /* 128 bit aligned */
+<span class="lineNum">      57 </span>            :         void                    *op_buf;
+<span class="lineNum">      58 </span>            : 
+<span class="lineNum">      59 </span>            :         /* normal softc stuff */
+<span class="lineNum">      60 </span>            :         int32_t                 sc_cid;
+<span class="lineNum">      61 </span>            :         int                     sc_nsessions;
+<span class="lineNum">      62 </span>            :         struct viac3_session    *sc_sessions;
+<span class="lineNum">      63 </span>            : };
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span>            : #define VIAC3_SESSION(sid)              ((sid) &amp; 0x0fffffff)
+<span class="lineNum">      66 </span>            : #define VIAC3_SID(crd,ses)              (((crd) &lt;&lt; 28) | ((ses) &amp; 0x0fffffff))
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            : static struct viac3_softc *vc3_sc;
+<span class="lineNum">      69 </span>            : 
+<span class="lineNum">      70 </span>            : extern const u_int8_t hmac_ipad_buffer[HMAC_MAX_BLOCK_LEN];
+<span class="lineNum">      71 </span>            : extern const u_int8_t hmac_opad_buffer[HMAC_MAX_BLOCK_LEN];
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span>            : void viac3_crypto_setup(void);
+<span class="lineNum">      74 </span>            : int viac3_crypto_newsession(u_int32_t *, struct cryptoini *);
+<span class="lineNum">      75 </span>            : int viac3_crypto_process(struct cryptop *);
+<span class="lineNum">      76 </span>            : int viac3_crypto_swauth(struct cryptop *, struct cryptodesc *,
+<span class="lineNum">      77 </span>            :     struct swcr_data *, caddr_t);
+<span class="lineNum">      78 </span>            : int viac3_crypto_encdec(struct cryptop *, struct cryptodesc *,
+<span class="lineNum">      79 </span>            :     struct viac3_session *, struct viac3_softc *, caddr_t);
+<span class="lineNum">      80 </span>            : int viac3_crypto_freesession(u_int64_t);
+<span class="lineNum">      81 </span>            : static __inline void viac3_cbc(void *, void *, void *, void *, int, void *);
+<a name="82"><span class="lineNum">      82 </span>            : </a>
+<span class="lineNum">      83 </span>            : void
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 : viac3_crypto_setup(void)</span>
+<span class="lineNum">      85 </span>            : {
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :         int algs[CRYPTO_ALGORITHM_MAX + 1];</span>
+<span class="lineNum">      87 </span>            : 
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :         vc3_sc = malloc(sizeof(*vc3_sc), M_DEVBUF, M_NOWAIT|M_ZERO);</span>
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :         if (vc3_sc == NULL)</span>
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">      91 </span>            : 
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 :         bzero(algs, sizeof(algs));</span>
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :         algs[CRYPTO_AES_CBC] = CRYPTO_ALG_FLAG_SUPPORTED;</span>
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :         algs[CRYPTO_MD5_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;</span>
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         algs[CRYPTO_SHA1_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :         algs[CRYPTO_RIPEMD160_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;</span>
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :         algs[CRYPTO_SHA2_256_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;</span>
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :         algs[CRYPTO_SHA2_384_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;</span>
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :         algs[CRYPTO_SHA2_512_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;</span>
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 :         algs[CRYPTO_ESN] = CRYPTO_ALG_FLAG_SUPPORTED;</span>
+<span class="lineNum">     101 </span>            : 
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :         vc3_sc-&gt;sc_cid = crypto_get_driverid(0);</span>
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :         if (vc3_sc-&gt;sc_cid &lt; 0) {</span>
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 :                 free(vc3_sc, M_DEVBUF, sizeof(*vc3_sc));</span>
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :                 vc3_sc = NULL;</span>
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     107 </span>            :         }
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         crypto_register(vc3_sc-&gt;sc_cid, algs, viac3_crypto_newsession,</span>
+<span class="lineNum">     110 </span>            :             viac3_crypto_freesession, viac3_crypto_process);
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 : }</span>
+<a name="112"><span class="lineNum">     112 </span>            : </a>
+<span class="lineNum">     113 </span>            : int
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 : viac3_crypto_newsession(u_int32_t *sidp, struct cryptoini *cri)</span>
+<span class="lineNum">     115 </span>            : {
+<span class="lineNum">     116 </span>            :         struct cryptoini        *c;
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         struct viac3_softc      *sc = vc3_sc;</span>
+<span class="lineNum">     118 </span>            :         struct viac3_session    *ses = NULL;
+<span class="lineNum">     119 </span>            :         struct auth_hash        *axf;
+<span class="lineNum">     120 </span>            :         struct swcr_data        *swd;
+<span class="lineNum">     121 </span>            :         int                      sesn, i, cw0;
+<span class="lineNum">     122 </span>            : 
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         if (sc == NULL || sidp == NULL || cri == NULL)</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     125 </span>            : 
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_sessions == NULL) {</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :                 ses = sc-&gt;sc_sessions = malloc(sizeof(*ses), M_DEVBUF,</span>
+<span class="lineNum">     128 </span>            :                     M_NOWAIT);
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :                 if (ses == NULL)</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :                         return (ENOMEM);</span>
+<span class="lineNum">     131 </span>            :                 sesn = 0;
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_nsessions = 1;</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :                 for (sesn = 0; sesn &lt; sc-&gt;sc_nsessions; sesn++) {</span>
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :                         if (sc-&gt;sc_sessions[sesn].ses_used == 0) {</span>
+<span class="lineNum">     136 </span>            :                                 ses = &amp;sc-&gt;sc_sessions[sesn];
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     138 </span>            :                         }
+<span class="lineNum">     139 </span>            :                 }
+<span class="lineNum">     140 </span>            : 
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :                 if (ses == NULL) {</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                         sesn = sc-&gt;sc_nsessions;</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :                         ses = mallocarray(sesn + 1, sizeof(*ses), M_DEVBUF,</span>
+<span class="lineNum">     144 </span>            :                             M_NOWAIT);
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :                         if (ses == NULL)</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :                                 return (ENOMEM);</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :                         memcpy(ses, sc-&gt;sc_sessions, sesn * sizeof(*ses));</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :                         explicit_bzero(sc-&gt;sc_sessions, sesn * sizeof(*ses));</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :                         free(sc-&gt;sc_sessions, M_DEVBUF, sesn * sizeof(*ses));</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_sessions = ses;</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :                         ses = &amp;sc-&gt;sc_sessions[sesn];</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_nsessions++;</span>
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     154 </span>            :         }
+<span class="lineNum">     155 </span>            : 
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         bzero(ses, sizeof(*ses));</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         ses-&gt;ses_used = 1;</span>
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         for (c = cri; c != NULL; c = c-&gt;cri_next) {</span>
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :                 switch (c-&gt;cri_alg) {</span>
+<span class="lineNum">     161 </span>            :                 case CRYPTO_AES_CBC:
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                         switch (c-&gt;cri_klen) {</span>
+<span class="lineNum">     163 </span>            :                         case 128:
+<span class="lineNum">     164 </span>            :                                 cw0 = C3_CRYPT_CWLO_KEY128;
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     166 </span>            :                         case 192:
+<span class="lineNum">     167 </span>            :                                 cw0 = C3_CRYPT_CWLO_KEY192;
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     169 </span>            :                         case 256:
+<span class="lineNum">     170 </span>            :                                 cw0 = C3_CRYPT_CWLO_KEY256;
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     172 </span>            :                         default:
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :                                 viac3_crypto_freesession(sesn);</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :                                 return (EINVAL);</span>
+<span class="lineNum">     175 </span>            :                         }
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                         cw0 |= C3_CRYPT_CWLO_ALG_AES | C3_CRYPT_CWLO_KEYGEN_SW |</span>
+<span class="lineNum">     177 </span>            :                             C3_CRYPT_CWLO_NORMAL;
+<span class="lineNum">     178 </span>            : 
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                         ses-&gt;ses_klen = c-&gt;cri_klen;</span>
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :                         ses-&gt;ses_cw0 = cw0;</span>
+<span class="lineNum">     181 </span>            : 
+<span class="lineNum">     182 </span>            :                         /* Build expanded keys for both directions */
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :                         AES_KeySetup_Encrypt(ses-&gt;ses_ekey, c-&gt;cri_key,</span>
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :                             c-&gt;cri_klen / 8);</span>
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :                         AES_KeySetup_Decrypt(ses-&gt;ses_dkey, c-&gt;cri_key,</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                             c-&gt;cri_klen / 8);</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :                         for (i = 0; i &lt; 4 * (AES_MAXROUNDS + 1); i++) {</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :                                 ses-&gt;ses_ekey[i] = ntohl(ses-&gt;ses_ekey[i]);</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                                 ses-&gt;ses_dkey[i] = ntohl(ses-&gt;ses_dkey[i]);</span>
+<span class="lineNum">     190 </span>            :                         }
+<span class="lineNum">     191 </span>            : 
+<span class="lineNum">     192 </span>            :                         break;
+<span class="lineNum">     193 </span>            : 
+<span class="lineNum">     194 </span>            :                 case CRYPTO_MD5_HMAC:
+<span class="lineNum">     195 </span>            :                         axf = &amp;auth_hash_hmac_md5_96;
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :                         goto authcommon;</span>
+<span class="lineNum">     197 </span>            :                 case CRYPTO_SHA1_HMAC:
+<span class="lineNum">     198 </span>            :                         axf = &amp;auth_hash_hmac_sha1_96;
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                         goto authcommon;</span>
+<span class="lineNum">     200 </span>            :                 case CRYPTO_RIPEMD160_HMAC:
+<span class="lineNum">     201 </span>            :                         axf = &amp;auth_hash_hmac_ripemd_160_96;
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                         goto authcommon;</span>
+<span class="lineNum">     203 </span>            :                 case CRYPTO_SHA2_256_HMAC:
+<span class="lineNum">     204 </span>            :                         axf = &amp;auth_hash_hmac_sha2_256_128;
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                         goto authcommon;</span>
+<span class="lineNum">     206 </span>            :                 case CRYPTO_SHA2_384_HMAC:
+<span class="lineNum">     207 </span>            :                         axf = &amp;auth_hash_hmac_sha2_384_192;
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :                         goto authcommon;</span>
+<span class="lineNum">     209 </span>            :                 case CRYPTO_SHA2_512_HMAC:
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                         axf = &amp;auth_hash_hmac_sha2_512_256;</span>
+<span class="lineNum">     211 </span>            :                 authcommon:
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :                         swd = malloc(sizeof(struct swcr_data), M_CRYPTO_DATA,</span>
+<span class="lineNum">     213 </span>            :                             M_NOWAIT|M_ZERO);
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                         if (swd == NULL) {</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                                 viac3_crypto_freesession(sesn);</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                                 return (ENOMEM);</span>
+<span class="lineNum">     217 </span>            :                         }
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                         ses-&gt;swd = swd;</span>
+<span class="lineNum">     219 </span>            : 
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :                         swd-&gt;sw_ictx = malloc(axf-&gt;ctxsize, M_CRYPTO_DATA,</span>
+<span class="lineNum">     221 </span>            :                             M_NOWAIT);
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :                         if (swd-&gt;sw_ictx == NULL) {</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                                 viac3_crypto_freesession(sesn);</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :                                 return (ENOMEM);</span>
+<span class="lineNum">     225 </span>            :                         }
+<span class="lineNum">     226 </span>            : 
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                         swd-&gt;sw_octx = malloc(axf-&gt;ctxsize, M_CRYPTO_DATA,</span>
+<span class="lineNum">     228 </span>            :                             M_NOWAIT);
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                         if (swd-&gt;sw_octx == NULL) {</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                                 viac3_crypto_freesession(sesn);</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                                 return (ENOMEM);</span>
+<span class="lineNum">     232 </span>            :                         }
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :                         for (i = 0; i &lt; c-&gt;cri_klen / 8; i++)</span>
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :                                 c-&gt;cri_key[i] ^= HMAC_IPAD_VAL;</span>
+<span class="lineNum">     236 </span>            : 
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :                         axf-&gt;Init(swd-&gt;sw_ictx);</span>
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :                         axf-&gt;Update(swd-&gt;sw_ictx, c-&gt;cri_key, c-&gt;cri_klen / 8);</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :                         axf-&gt;Update(swd-&gt;sw_ictx, hmac_ipad_buffer,</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                             axf-&gt;blocksize - (c-&gt;cri_klen / 8));</span>
+<span class="lineNum">     241 </span>            : 
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :                         for (i = 0; i &lt; c-&gt;cri_klen / 8; i++)</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :                                 c-&gt;cri_key[i] ^= (HMAC_IPAD_VAL ^</span>
+<span class="lineNum">     244 </span>            :                                     HMAC_OPAD_VAL);
+<span class="lineNum">     245 </span>            : 
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :                         axf-&gt;Init(swd-&gt;sw_octx);</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :                         axf-&gt;Update(swd-&gt;sw_octx, c-&gt;cri_key, c-&gt;cri_klen / 8);</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :                         axf-&gt;Update(swd-&gt;sw_octx, hmac_opad_buffer,</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                             axf-&gt;blocksize - (c-&gt;cri_klen / 8));</span>
+<span class="lineNum">     250 </span>            : 
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :                         for (i = 0; i &lt; c-&gt;cri_klen / 8; i++)</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :                                 c-&gt;cri_key[i] ^= HMAC_OPAD_VAL;</span>
+<span class="lineNum">     253 </span>            : 
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :                         swd-&gt;sw_axf = axf;</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :                         swd-&gt;sw_alg = c-&gt;cri_alg;</span>
+<span class="lineNum">     256 </span>            : 
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     258 </span>            :                 case CRYPTO_ESN:
+<span class="lineNum">     259 </span>            :                         /* nothing to do */
+<span class="lineNum">     260 </span>            :                         break;
+<span class="lineNum">     261 </span>            :                 default:
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :                         viac3_crypto_freesession(sesn);</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :                         return (EINVAL);</span>
+<span class="lineNum">     264 </span>            :                 }
+<span class="lineNum">     265 </span>            :         }
+<span class="lineNum">     266 </span>            : 
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         *sidp = VIAC3_SID(0, sesn);</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 : }</span>
+<a name="270"><span class="lineNum">     270 </span>            : </a>
+<span class="lineNum">     271 </span>            : int
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 : viac3_crypto_freesession(u_int64_t tid)</span>
+<span class="lineNum">     273 </span>            : {
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :         struct viac3_softc *sc = vc3_sc;</span>
+<span class="lineNum">     275 </span>            :         struct swcr_data *swd;
+<span class="lineNum">     276 </span>            :         struct auth_hash *axf;
+<span class="lineNum">     277 </span>            :         int sesn;
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :         u_int32_t sid = ((u_int32_t)tid) &amp; 0xffffffff;</span>
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         if (sc == NULL)</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :         sesn = VIAC3_SESSION(sid);</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         if (sesn &gt;= sc-&gt;sc_nsessions)</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     285 </span>            : 
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_sessions[sesn].swd) {</span>
+<span class="lineNum">     287 </span>            :                 swd = sc-&gt;sc_sessions[sesn].swd;
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                 axf = swd-&gt;sw_axf;</span>
+<span class="lineNum">     289 </span>            : 
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                 if (swd-&gt;sw_ictx) {</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :                         explicit_bzero(swd-&gt;sw_ictx, axf-&gt;ctxsize);</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :                         free(swd-&gt;sw_ictx, M_CRYPTO_DATA, axf-&gt;ctxsize);</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :                 if (swd-&gt;sw_octx) {</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :                         explicit_bzero(swd-&gt;sw_octx, axf-&gt;ctxsize);</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :                         free(swd-&gt;sw_octx, M_CRYPTO_DATA, axf-&gt;ctxsize);</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :                 free(swd, M_CRYPTO_DATA, sizeof(*swd));</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     300 </span>            : 
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;sc-&gt;sc_sessions[sesn], sizeof(sc-&gt;sc_sessions[sesn]));</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 : }</span>
+<a name="304"><span class="lineNum">     304 </span>            : </a>
+<span class="lineNum">     305 </span>            : static __inline void
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 : viac3_cbc(void *cw, void *src, void *dst, void *key, int rep,</span>
+<span class="lineNum">     307 </span>            :     void *iv)
+<span class="lineNum">     308 </span>            : {
+<span class="lineNum">     309 </span>            :         /* Do the deed */
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         __asm volatile(&quot;pushfq; popfq&quot;);</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :         __asm volatile(&quot;rep xcryptcbc&quot; :</span>
+<span class="lineNum">     312 </span>            :             : &quot;b&quot; (key), &quot;a&quot; (iv), &quot;c&quot; (rep), &quot;d&quot; (cw), &quot;S&quot; (src), &quot;D&quot; (dst)
+<span class="lineNum">     313 </span>            :             : &quot;memory&quot;, &quot;cc&quot;);
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 : }</span>
+<a name="315"><span class="lineNum">     315 </span>            : </a>
+<span class="lineNum">     316 </span>            : int
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 : viac3_crypto_swauth(struct cryptop *crp, struct cryptodesc *crd,</span>
+<span class="lineNum">     318 </span>            :     struct swcr_data *sw, caddr_t buf)
+<span class="lineNum">     319 </span>            : {
+<span class="lineNum">     320 </span>            :         int     type;
+<span class="lineNum">     321 </span>            : 
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         if (crp-&gt;crp_flags &amp; CRYPTO_F_IMBUF)</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :                 type = CRYPTO_BUF_MBUF;</span>
+<span class="lineNum">     324 </span>            :         else
+<span class="lineNum">     325 </span>            :                 type= CRYPTO_BUF_IOV;
+<span class="lineNum">     326 </span>            :                 
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :         return (swcr_authcompute(crp, crd, sw, buf, type));</span>
+<span class="lineNum">     328 </span>            : }
+<a name="329"><span class="lineNum">     329 </span>            : </a>
+<span class="lineNum">     330 </span>            : int
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 : viac3_crypto_encdec(struct cryptop *crp, struct cryptodesc *crd,</span>
+<span class="lineNum">     332 </span>            :     struct viac3_session *ses, struct viac3_softc *sc, caddr_t buf)
+<span class="lineNum">     333 </span>            : {
+<span class="lineNum">     334 </span>            :         u_int32_t *key;
+<span class="lineNum">     335 </span>            :         int     err = 0;
+<span class="lineNum">     336 </span>            : 
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :         if ((crd-&gt;crd_len % 16) != 0)</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     339 </span>            : 
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :         sc-&gt;op_buf = malloc(crd-&gt;crd_len, M_DEVBUF, M_NOWAIT);</span>
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         if (sc-&gt;op_buf == NULL)</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     343 </span>            : 
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         if (crd-&gt;crd_flags &amp; CRD_F_ENCRYPT) {</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :                 sc-&gt;op_cw[0] = ses-&gt;ses_cw0 | C3_CRYPT_CWLO_ENCRYPT;</span>
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :                 key = ses-&gt;ses_ekey;</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :                 if (crd-&gt;crd_flags &amp; CRD_F_IV_EXPLICIT)</span>
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :                         memcpy(sc-&gt;op_iv, crd-&gt;crd_iv, 16);</span>
+<span class="lineNum">     349 </span>            :                 else
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                         arc4random_buf(sc-&gt;op_iv, 16);</span>
+<span class="lineNum">     351 </span>            : 
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                 if ((crd-&gt;crd_flags &amp; CRD_F_IV_PRESENT) == 0) {</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :                         if (crp-&gt;crp_flags &amp; CRYPTO_F_IMBUF)</span>
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :                                 err = m_copyback((struct mbuf *)crp-&gt;crp_buf,</span>
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :                                     crd-&gt;crd_inject, 16, sc-&gt;op_iv, M_NOWAIT);</span>
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :                         else if (crp-&gt;crp_flags &amp; CRYPTO_F_IOV)</span>
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :                                 cuio_copyback((struct uio *)crp-&gt;crp_buf,</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :                                     crd-&gt;crd_inject, 16, sc-&gt;op_iv);</span>
+<span class="lineNum">     359 </span>            :                         else
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :                                 memcpy(crp-&gt;crp_buf + crd-&gt;crd_inject,</span>
+<span class="lineNum">     361 </span>            :                                     sc-&gt;op_iv, 16);
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :                         if (err)</span>
+<span class="lineNum">     363 </span>            :                                 goto errout;
+<span class="lineNum">     364 </span>            :                 }
+<span class="lineNum">     365 </span>            :         } else {
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :                 sc-&gt;op_cw[0] = ses-&gt;ses_cw0 | C3_CRYPT_CWLO_DECRYPT;</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :                 key = ses-&gt;ses_dkey;</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :                 if (crd-&gt;crd_flags &amp; CRD_F_IV_EXPLICIT)</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                         memcpy(sc-&gt;op_iv, crd-&gt;crd_iv, 16);</span>
+<span class="lineNum">     370 </span>            :                 else {
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                         if (crp-&gt;crp_flags &amp; CRYPTO_F_IMBUF)</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                                 m_copydata((struct mbuf *)crp-&gt;crp_buf,</span>
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                                     crd-&gt;crd_inject, 16, sc-&gt;op_iv);</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                         else if (crp-&gt;crp_flags &amp; CRYPTO_F_IOV)</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                                 cuio_copydata((struct uio *)crp-&gt;crp_buf,</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                                     crd-&gt;crd_inject, 16, sc-&gt;op_iv);</span>
+<span class="lineNum">     377 </span>            :                         else
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                                 memcpy(sc-&gt;op_iv,</span>
+<span class="lineNum">     379 </span>            :                                     crp-&gt;crp_buf + crd-&gt;crd_inject, 16);
+<span class="lineNum">     380 </span>            :                 }
+<span class="lineNum">     381 </span>            :         }
+<span class="lineNum">     382 </span>            : 
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :         if (crp-&gt;crp_flags &amp; CRYPTO_F_IMBUF)</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :                 m_copydata((struct mbuf *)crp-&gt;crp_buf,</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                     crd-&gt;crd_skip, crd-&gt;crd_len, sc-&gt;op_buf);</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :         else if (crp-&gt;crp_flags &amp; CRYPTO_F_IOV)</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :                 cuio_copydata((struct uio *)crp-&gt;crp_buf,</span>
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                     crd-&gt;crd_skip, crd-&gt;crd_len, sc-&gt;op_buf);</span>
+<span class="lineNum">     389 </span>            :         else
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :                 memcpy(sc-&gt;op_buf, crp-&gt;crp_buf + crd-&gt;crd_skip, crd-&gt;crd_len);</span>
+<span class="lineNum">     391 </span>            : 
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         sc-&gt;op_cw[1] = sc-&gt;op_cw[2] = sc-&gt;op_cw[3] = 0;</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         viac3_cbc(&amp;sc-&gt;op_cw, sc-&gt;op_buf, sc-&gt;op_buf, key,</span>
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :             crd-&gt;crd_len / 16, sc-&gt;op_iv);</span>
+<span class="lineNum">     395 </span>            : 
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         if (crp-&gt;crp_flags &amp; CRYPTO_F_IMBUF)</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 err = m_copyback((struct mbuf *)crp-&gt;crp_buf,</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                     crd-&gt;crd_skip, crd-&gt;crd_len, sc-&gt;op_buf, M_NOWAIT);</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :         else if (crp-&gt;crp_flags &amp; CRYPTO_F_IOV)</span>
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :                 cuio_copyback((struct uio *)crp-&gt;crp_buf,</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :                     crd-&gt;crd_skip, crd-&gt;crd_len, sc-&gt;op_buf);</span>
+<span class="lineNum">     402 </span>            :         else
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                 memcpy(crp-&gt;crp_buf + crd-&gt;crd_skip, sc-&gt;op_buf,</span>
+<span class="lineNum">     404 </span>            :                     crd-&gt;crd_len);
+<span class="lineNum">     405 </span>            : 
+<span class="lineNum">     406 </span>            :  errout:
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         if (sc-&gt;op_buf != NULL) {</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 explicit_bzero(sc-&gt;op_buf, crd-&gt;crd_len);</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                 free(sc-&gt;op_buf, M_DEVBUF, crd-&gt;crd_len);</span>
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :                 sc-&gt;op_buf = NULL;</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         return (err);</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 : }</span>
+<a name="415"><span class="lineNum">     415 </span>            : </a>
+<span class="lineNum">     416 </span>            : int
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 : viac3_crypto_process(struct cryptop *crp)</span>
+<span class="lineNum">     418 </span>            : {
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :         struct viac3_softc *sc = vc3_sc;</span>
+<span class="lineNum">     420 </span>            :         struct viac3_session *ses;
+<span class="lineNum">     421 </span>            :         struct cryptodesc *crd;
+<span class="lineNum">     422 </span>            :         int sesn, err = 0;
+<span class="lineNum">     423 </span>            :         int i;
+<span class="lineNum">     424 </span>            : 
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         if (crp == NULL || crp-&gt;crp_callback == NULL)</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :         if (crp-&gt;crp_ndesc &lt; 1)</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     429 </span>            : 
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :         sesn = VIAC3_SESSION(crp-&gt;crp_sid);</span>
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :         if (sesn &gt;= sc-&gt;sc_nsessions) {</span>
+<span class="lineNum">     432 </span>            :                 err = EINVAL;
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     434 </span>            :         }
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :         ses = &amp;sc-&gt;sc_sessions[sesn];</span>
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :         if (ses-&gt;ses_used == 0) {</span>
+<span class="lineNum">     437 </span>            :                 err = EINVAL;
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     439 </span>            :         }
+<span class="lineNum">     440 </span>            : 
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; crp-&gt;crp_ndesc; i++) {</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :                 crd = &amp;crp-&gt;crp_desc[i];</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :                 switch (crd-&gt;crd_alg) {</span>
+<span class="lineNum">     444 </span>            :                 case CRYPTO_AES_CBC:
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                         if ((err = viac3_crypto_encdec(crp, crd, ses, sc,</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                             crp-&gt;crp_buf)) != 0)</span>
+<span class="lineNum">     447 </span>            :                                 goto out;
+<span class="lineNum">     448 </span>            :                         break;
+<span class="lineNum">     449 </span>            : 
+<span class="lineNum">     450 </span>            :                 case CRYPTO_MD5_HMAC:
+<span class="lineNum">     451 </span>            :                 case CRYPTO_SHA1_HMAC:
+<span class="lineNum">     452 </span>            :                 case CRYPTO_RIPEMD160_HMAC:
+<span class="lineNum">     453 </span>            :                 case CRYPTO_SHA2_256_HMAC:
+<span class="lineNum">     454 </span>            :                 case CRYPTO_SHA2_384_HMAC:
+<span class="lineNum">     455 </span>            :                 case CRYPTO_SHA2_512_HMAC:
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :                         if ((err = viac3_crypto_swauth(crp, crd, ses-&gt;swd,</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                             crp-&gt;crp_buf)) != 0)</span>
+<span class="lineNum">     458 </span>            :                                 goto out;
+<span class="lineNum">     459 </span>            :                         break;
+<span class="lineNum">     460 </span>            : 
+<span class="lineNum">     461 </span>            :                 default:
+<span class="lineNum">     462 </span>            :                         err = EINVAL;
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                         goto out;</span>
+<span class="lineNum">     464 </span>            :                 }
+<span class="lineNum">     465 </span>            :         }
+<span class="lineNum">     466 </span>            : out:
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :         crp-&gt;crp_etype = err;</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :         crypto_done(crp);</span>
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :         return (err);</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     471 </span>            : 
+<span class="lineNum">     472 </span>            : #endif /* CRYPTO */
+<span class="lineNum">     473 </span>            : 
+<span class="lineNum">     474 </span>            : /*
+<span class="lineNum">     475 </span>            :  * Note, the VIA C3 Nehemiah provides 4 internal 8-byte buffers, which
+<span class="lineNum">     476 </span>            :  * store random data, and can be accessed a lot quicker than waiting
+<span class="lineNum">     477 </span>            :  * for new data to be generated.  As we are using every 8th bit only
+<span class="lineNum">     478 </span>            :  * due to whitening. Since the RNG generates in excess of 21KB/s at
+<span class="lineNum">     479 </span>            :  * its worst, collecting 64 bytes worth of entropy should not affect
+<span class="lineNum">     480 </span>            :  * things significantly.
+<span class="lineNum">     481 </span>            :  *
+<span class="lineNum">     482 </span>            :  * Note, due to some weirdness in the RNG, we need at least 7 bytes
+<span class="lineNum">     483 </span>            :  * extra on the end of our buffer.  Also, there is an outside chance
+<span class="lineNum">     484 </span>            :  * that the VIA RNG can &quot;wedge&quot;, as the generated bit-rate is variable.
+<span class="lineNum">     485 </span>            :  * We could do all sorts of startup testing and things, but
+<span class="lineNum">     486 </span>            :  * frankly, I don't really see the point.  If the RNG wedges, then the
+<span class="lineNum">     487 </span>            :  * chances of you having a defective CPU are very high.  Let it wedge.
+<span class="lineNum">     488 </span>            :  *
+<span class="lineNum">     489 </span>            :  * Adding to the whole confusion, in order to access the RNG, we need
+<span class="lineNum">     490 </span>            :  * to have FXSR support enabled, and the correct FPU enable bits must
+<span class="lineNum">     491 </span>            :  * be there to enable the FPU in kernel.  It would be nice if all this
+<span class="lineNum">     492 </span>            :  * mumbo-jumbo was not needed in order to use the RNG.  Oh well, life
+<span class="lineNum">     493 </span>            :  * does go on...
+<span class="lineNum">     494 </span>            :  */
+<span class="lineNum">     495 </span>            : #define VIAC3_RNG_BUFSIZ        16              /* 32bit words */
+<span class="lineNum">     496 </span>            : struct timeout viac3_rnd_tmo;
+<span class="lineNum">     497 </span>            : int viac3_rnd_present;
+<a name="498"><span class="lineNum">     498 </span>            : </a>
+<span class="lineNum">     499 </span>            : void
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 : viac3_rnd(void *v)</span>
+<span class="lineNum">     501 </span>            : {
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :         struct timeout *tmo = v;</span>
+<span class="lineNum">     503 </span>            :         unsigned int *p, i, rv, len = VIAC3_RNG_BUFSIZ;
+<span class="lineNum">     504 </span>            :         static int buffer[VIAC3_RNG_BUFSIZ + 2];        /* XXX why + 2? */
+<span class="lineNum">     505 </span>            : 
+<span class="lineNum">     506 </span>            :         /*
+<span class="lineNum">     507 </span>            :          * Here we collect the random data from the VIA C3 RNG.  We make
+<span class="lineNum">     508 </span>            :          * sure that we turn on maximum whitening (%edx[0,1] == &quot;11&quot;), so
+<span class="lineNum">     509 </span>            :          * that we get the best random data possible.
+<span class="lineNum">     510 </span>            :          */
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :         __asm volatile(&quot;rep xstorerng&quot;</span>
+<span class="lineNum">     512 </span>            :             : &quot;=a&quot; (rv) : &quot;d&quot; (3), &quot;D&quot; (buffer), &quot;c&quot; (len*sizeof(int))
+<span class="lineNum">     513 </span>            :             : &quot;memory&quot;, &quot;cc&quot;);
+<span class="lineNum">     514 </span>            : 
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :         for (i = 0, p = buffer; i &lt; VIAC3_RNG_BUFSIZ; i++, p++)</span>
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :                 enqueue_randomness(*p);</span>
+<span class="lineNum">     517 </span>            : 
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :         timeout_add_msec(tmo, 10);</span>
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

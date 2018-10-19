@@ -1,0 +1,675 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - net/pf_osfp.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">net</a> - pf_osfp.c<span style="font-size: 80%;"> (source / <a href="pf_osfp.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">244</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: pf_osfp.c,v 1.40 2017/04/23 11:37:11 sthen Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2003 Mike Frantzen &lt;frantzen@w4g.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  *
+<span class="lineNum">      18 </span>            :  */
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      22 </span>            : #ifdef _KERNEL
+<span class="lineNum">      23 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      25 </span>            : #endif /* _KERNEL */
+<span class="lineNum">      26 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/syslog.h&gt;
+<span class="lineNum">      29 </span>            : 
+<span class="lineNum">      30 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      31 </span>            : 
+<span class="lineNum">      32 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;netinet/ip.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;netinet/ip_icmp.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;netinet/tcp.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;netinet/udp.h&gt;
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : #ifdef INET6
+<span class="lineNum">      39 </span>            : #include &lt;netinet/ip6.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;netinet/icmp6.h&gt;
+<span class="lineNum">      41 </span>            : #endif /* INET6 */
+<span class="lineNum">      42 </span>            : 
+<span class="lineNum">      43 </span>            : #include &lt;net/pfvar.h&gt;
+<span class="lineNum">      44 </span>            : #include &lt;net/pfvar_priv.h&gt;
+<span class="lineNum">      45 </span>            : 
+<span class="lineNum">      46 </span>            : #ifdef _KERNEL
+<span class="lineNum">      47 </span>            : typedef struct pool pool_t;
+<span class="lineNum">      48 </span>            : 
+<span class="lineNum">      49 </span>            : #else   /* !_KERNEL */
+<span class="lineNum">      50 </span>            : /* Userland equivalents so we can lend code to tcpdump et al. */
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : #include &lt;arpa/inet.h&gt;
+<span class="lineNum">      53 </span>            : #include &lt;errno.h&gt;
+<span class="lineNum">      54 </span>            : #include &lt;stdio.h&gt;
+<span class="lineNum">      55 </span>            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      56 </span>            : #include &lt;string.h&gt;
+<span class="lineNum">      57 </span>            : #include &lt;netdb.h&gt;
+<span class="lineNum">      58 </span>            : #define pool_t                  int
+<span class="lineNum">      59 </span>            : #define pool_get(pool, flags)   malloc(*(pool))
+<span class="lineNum">      60 </span>            : #define pool_put(pool, item)    free(item)
+<span class="lineNum">      61 </span>            : #define pool_init(pool, size, a, ao, f, m, p)   (*(pool)) = (size)
+<span class="lineNum">      62 </span>            : 
+<span class="lineNum">      63 </span>            : #ifdef PFDEBUG
+<span class="lineNum">      64 </span>            : #include &lt;sys/stdarg.h&gt;   /* for DPFPRINTF() */
+<span class="lineNum">      65 </span>            : #endif /* PFDEBUG */
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span>            : #endif /* _KERNEL */
+<span class="lineNum">      68 </span>            : 
+<span class="lineNum">      69 </span>            : SLIST_HEAD(pf_osfp_list, pf_os_fingerprint) pf_osfp_list;
+<span class="lineNum">      70 </span>            : pool_t pf_osfp_entry_pl;
+<span class="lineNum">      71 </span>            : pool_t pf_osfp_pl;
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span>            : struct pf_os_fingerprint        *pf_osfp_find(struct pf_osfp_list *,
+<span class="lineNum">      74 </span>            :                                     struct pf_os_fingerprint *, u_int8_t);
+<span class="lineNum">      75 </span>            : struct pf_os_fingerprint        *pf_osfp_find_exact(struct pf_osfp_list *,
+<span class="lineNum">      76 </span>            :                                     struct pf_os_fingerprint *);
+<span class="lineNum">      77 </span>            : void                             pf_osfp_insert(struct pf_osfp_list *,
+<span class="lineNum">      78 </span>            :                                     struct pf_os_fingerprint *);
+<span class="lineNum">      79 </span>            : 
+<span class="lineNum">      80 </span>            : 
+<span class="lineNum">      81 </span>            : #ifdef _KERNEL
+<span class="lineNum">      82 </span>            : /*
+<span class="lineNum">      83 </span>            :  * Passively fingerprint the OS of the host (IPv4 TCP SYN packets only)
+<span class="lineNum">      84 </span>            :  * Returns the list of possible OSes.
+<a name="85"><span class="lineNum">      85 </span>            :  */</a>
+<span class="lineNum">      86 </span>            : struct pf_osfp_enlist *
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 : pf_osfp_fingerprint(struct pf_pdesc *pd)</span>
+<span class="lineNum">      88 </span>            : {
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :         struct tcphdr   *th = &amp;pd-&gt;hdr.tcp;</span>
+<span class="lineNum">      90 </span>            :         struct ip       *ip = NULL;
+<span class="lineNum">      91 </span>            :         struct ip6_hdr  *ip6 = NULL;
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 :         char             hdr[60];</span>
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :         if (pd-&gt;proto != IPPROTO_TCP)</span>
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :         switch (pd-&gt;af) {</span>
+<span class="lineNum">      98 </span>            :         case AF_INET:
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :                 ip = mtod(pd-&gt;m, struct ip *);</span>
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     101 </span>            :         case AF_INET6:
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :                 ip6 = mtod(pd-&gt;m, struct ip6_hdr *);</span>
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     104 </span>            :         }
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :         if (!pf_pull_hdr(pd-&gt;m, pd-&gt;off, hdr, th-&gt;th_off &lt;&lt; 2, NULL, NULL,</span>
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 :             pd-&gt;af))</span>
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         return (pf_osfp_fingerprint_hdr(ip, ip6, (struct tcphdr *)hdr));</span>
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     111 </span>            : #endif /* _KERNEL */
+<a name="112"><span class="lineNum">     112 </span>            : </a>
+<span class="lineNum">     113 </span>            : struct pf_osfp_enlist *
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 : pf_osfp_fingerprint_hdr(const struct ip *ip, const struct ip6_hdr *ip6,</span>
+<span class="lineNum">     115 </span>            :     const struct tcphdr *tcp)
+<span class="lineNum">     116 </span>            : {
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         struct pf_os_fingerprint fp, *fpresult;</span>
+<span class="lineNum">     118 </span>            :         int cnt, optlen = 0;
+<span class="lineNum">     119 </span>            :         const u_int8_t *optp;
+<span class="lineNum">     120 </span>            : #ifdef _KERNEL
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :         char srcname[128];</span>
+<span class="lineNum">     122 </span>            : #else   /* !_KERNEL */
+<span class="lineNum">     123 </span>            :         char srcname[NI_MAXHOST];
+<span class="lineNum">     124 </span>            : #endif  /* _KERNEL */
+<span class="lineNum">     125 </span>            : 
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         if ((tcp-&gt;th_flags &amp; (TH_SYN|TH_ACK)) != TH_SYN)</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         if (ip) {</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :                 if ((ip-&gt;ip_off &amp; htons(IP_OFFMASK)) != 0)</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :                         return (NULL);</span>
+<span class="lineNum">     131 </span>            :         }
+<span class="lineNum">     132 </span>            : 
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :         memset(&amp;fp, 0, sizeof(fp));</span>
+<span class="lineNum">     134 </span>            : 
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :         if (ip) {</span>
+<span class="lineNum">     136 </span>            : #ifndef _KERNEL
+<span class="lineNum">     137 </span>            :                 struct sockaddr_in sin;
+<span class="lineNum">     138 </span>            : #endif  /* _KERNEL */
+<span class="lineNum">     139 </span>            : 
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :                 fp.fp_psize = ntohs(ip-&gt;ip_len);</span>
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :                 fp.fp_ttl = ip-&gt;ip_ttl;</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                 if (ip-&gt;ip_off &amp; htons(IP_DF))</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :                         fp.fp_flags |= PF_OSFP_DF;</span>
+<span class="lineNum">     144 </span>            : #ifdef _KERNEL
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :                 inet_ntop(AF_INET, &amp;ip-&gt;ip_src, srcname, sizeof(srcname));</span>
+<span class="lineNum">     146 </span>            : #else   /* !_KERNEL */
+<span class="lineNum">     147 </span>            :                 memset(&amp;sin, 0, sizeof(sin));
+<span class="lineNum">     148 </span>            :                 sin.sin_family = AF_INET;
+<span class="lineNum">     149 </span>            :                 sin.sin_len = sizeof(struct sockaddr_in);
+<span class="lineNum">     150 </span>            :                 sin.sin_addr = ip-&gt;ip_src;
+<span class="lineNum">     151 </span>            :                 (void)getnameinfo((struct sockaddr *)&amp;sin,
+<span class="lineNum">     152 </span>            :                     sizeof(struct sockaddr_in), srcname, sizeof(srcname),
+<span class="lineNum">     153 </span>            :                     NULL, 0, NI_NUMERICHOST);
+<span class="lineNum">     154 </span>            : #endif  /* _KERNEL */
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     156 </span>            : #ifdef INET6
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         else if (ip6) {</span>
+<span class="lineNum">     158 </span>            : #ifndef _KERNEL
+<span class="lineNum">     159 </span>            :                 struct sockaddr_in6 sin6;
+<span class="lineNum">     160 </span>            : #endif  /* !_KERNEL */
+<span class="lineNum">     161 </span>            : 
+<span class="lineNum">     162 </span>            :                 /* jumbo payload? */
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                 fp.fp_psize = sizeof(struct ip6_hdr) + ntohs(ip6-&gt;ip6_plen);</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                 fp.fp_ttl = ip6-&gt;ip6_hlim;</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :                 fp.fp_flags |= PF_OSFP_DF;</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 fp.fp_flags |= PF_OSFP_INET6;</span>
+<span class="lineNum">     167 </span>            : #ifdef _KERNEL
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                 inet_ntop(AF_INET6, &amp;ip6-&gt;ip6_src, srcname, sizeof(srcname));</span>
+<span class="lineNum">     169 </span>            : #else   /* !_KERNEL */
+<span class="lineNum">     170 </span>            :                 memset(&amp;sin6, 0, sizeof(sin6));
+<span class="lineNum">     171 </span>            :                 sin6.sin6_family = AF_INET6;
+<span class="lineNum">     172 </span>            :                 sin6.sin6_len = sizeof(struct sockaddr_in6);
+<span class="lineNum">     173 </span>            :                 sin6.sin6_addr = ip6-&gt;ip6_src;
+<span class="lineNum">     174 </span>            :                 (void)getnameinfo((struct sockaddr *)&amp;sin6,
+<span class="lineNum">     175 </span>            :                     sizeof(struct sockaddr_in6), srcname, sizeof(srcname),
+<span class="lineNum">     176 </span>            :                     NULL, 0, NI_NUMERICHOST);
+<span class="lineNum">     177 </span>            : #endif  /* !_KERNEL */
+<span class="lineNum">     178 </span>            :         }
+<span class="lineNum">     179 </span>            : #endif  /* INET6 */
+<span class="lineNum">     180 </span>            :         else
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         fp.fp_wsize = ntohs(tcp-&gt;th_win);</span>
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span>            : 
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         cnt = (tcp-&gt;th_off &lt;&lt; 2) - sizeof(*tcp);</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :         optp = (const u_int8_t *)((const char *)tcp + sizeof(*tcp));</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         for (; cnt &gt; 0; cnt -= optlen, optp += optlen) {</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :                 if (*optp == TCPOPT_EOL)</span>
+<span class="lineNum">     189 </span>            :                         break;
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :                 fp.fp_optcnt++;</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                 if (*optp == TCPOPT_NOP) {</span>
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :                         fp.fp_tcpopts = (fp.fp_tcpopts &lt;&lt; PF_OSFP_TCPOPT_BITS) |</span>
+<span class="lineNum">     194 </span>            :                             PF_OSFP_TCPOPT_NOP;
+<span class="lineNum">     195 </span>            :                         optlen = 1;
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :                         if (cnt &lt; 2)</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                                 return (NULL);</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                         optlen = optp[1];</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                         if (optlen &gt; cnt || optlen &lt; 2)</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                                 return (NULL);</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                         switch (*optp) {</span>
+<span class="lineNum">     203 </span>            :                         case TCPOPT_MAXSEG:
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                                 if (optlen &gt;= TCPOLEN_MAXSEG)</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                                         memcpy(&amp;fp.fp_mss, &amp;optp[2],</span>
+<span class="lineNum">     206 </span>            :                                             sizeof(fp.fp_mss));
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :                                 fp.fp_tcpopts = (fp.fp_tcpopts &lt;&lt;</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :                                     PF_OSFP_TCPOPT_BITS) | PF_OSFP_TCPOPT_MSS;</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :                                 fp.fp_mss = ntohs(fp.fp_mss);</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     211 </span>            :                         case TCPOPT_WINDOW:
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :                                 if (optlen &gt;= TCPOLEN_WINDOW)</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :                                         memcpy(&amp;fp.fp_wscale, &amp;optp[2],</span>
+<span class="lineNum">     214 </span>            :                                             sizeof(fp.fp_wscale));
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                                 fp.fp_tcpopts = (fp.fp_tcpopts &lt;&lt;</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                                     PF_OSFP_TCPOPT_BITS) |</span>
+<span class="lineNum">     217 </span>            :                                     PF_OSFP_TCPOPT_WSCALE;
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     219 </span>            :                         case TCPOPT_SACK_PERMITTED:
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :                                 fp.fp_tcpopts = (fp.fp_tcpopts &lt;&lt;</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                                     PF_OSFP_TCPOPT_BITS) | PF_OSFP_TCPOPT_SACK;</span>
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     223 </span>            :                         case TCPOPT_TIMESTAMP:
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :                                 if (optlen &gt;= TCPOLEN_TIMESTAMP) {</span>
+<span class="lineNum">     225 </span>            :                                         u_int32_t ts;
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                                         memcpy(&amp;ts, &amp;optp[2], sizeof(ts));</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                                         if (ts == 0)</span>
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                                                 fp.fp_flags |= PF_OSFP_TS0;</span>
+<span class="lineNum">     229 </span>            : 
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                                 }</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                                 fp.fp_tcpopts = (fp.fp_tcpopts &lt;&lt;</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                                     PF_OSFP_TCPOPT_BITS) | PF_OSFP_TCPOPT_TS;</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     234 </span>            :                         default:
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :                                 return (NULL);</span>
+<span class="lineNum">     236 </span>            :                         }
+<span class="lineNum">     237 </span>            :                 }
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :                 optlen = MAX(optlen, 1);        /* paranoia */</span>
+<span class="lineNum">     239 </span>            :         }
+<span class="lineNum">     240 </span>            : 
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :         DPFPRINTF(LOG_INFO,</span>
+<span class="lineNum">     242 </span>            :             &quot;fingerprinted %s:%d  %d:%d:%d:%d:%llx (%d) &quot;
+<span class="lineNum">     243 </span>            :             &quot;(TS=%s,M=%s%d,W=%s%d)&quot;,
+<span class="lineNum">     244 </span>            :             srcname, ntohs(tcp-&gt;th_sport),
+<span class="lineNum">     245 </span>            :             fp.fp_wsize, fp.fp_ttl, (fp.fp_flags &amp; PF_OSFP_DF) != 0,
+<span class="lineNum">     246 </span>            :             fp.fp_psize, (long long int)fp.fp_tcpopts, fp.fp_optcnt,
+<span class="lineNum">     247 </span>            :             (fp.fp_flags &amp; PF_OSFP_TS0) ? &quot;0&quot; : &quot;&quot;,
+<span class="lineNum">     248 </span>            :             (fp.fp_flags &amp; PF_OSFP_MSS_MOD) ? &quot;%&quot; :
+<span class="lineNum">     249 </span>            :             (fp.fp_flags &amp; PF_OSFP_MSS_DC) ? &quot;*&quot; : &quot;&quot;,
+<span class="lineNum">     250 </span>            :             fp.fp_mss,
+<span class="lineNum">     251 </span>            :             (fp.fp_flags &amp; PF_OSFP_WSCALE_MOD) ? &quot;%&quot; :
+<span class="lineNum">     252 </span>            :             (fp.fp_flags &amp; PF_OSFP_WSCALE_DC) ? &quot;*&quot; : &quot;&quot;,
+<span class="lineNum">     253 </span>            :             fp.fp_wscale);
+<span class="lineNum">     254 </span>            : 
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         if ((fpresult = pf_osfp_find(&amp;pf_osfp_list, &amp;fp,</span>
+<span class="lineNum">     256 </span>            :             PF_OSFP_MAXTTL_OFFSET)))
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :                 return (&amp;fpresult-&gt;fp_oses);</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     260 </span>            : 
+<a name="261"><span class="lineNum">     261 </span>            : /* Match a fingerprint ID against a list of OSes */</a>
+<span class="lineNum">     262 </span>            : int
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 : pf_osfp_match(struct pf_osfp_enlist *list, pf_osfp_t os)</span>
+<span class="lineNum">     264 </span>            : {
+<span class="lineNum">     265 </span>            :         struct pf_osfp_entry *entry;
+<span class="lineNum">     266 </span>            :         int os_class, os_version, os_subtype;
+<span class="lineNum">     267 </span>            :         int en_class, en_version, en_subtype;
+<span class="lineNum">     268 </span>            : 
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         if (os == PF_OSFP_ANY)</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         if (list == NULL) {</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                 DPFPRINTF(LOG_INFO, &quot;osfp no match against %x&quot;, os);</span>
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                 return (os == PF_OSFP_UNKNOWN);</span>
+<span class="lineNum">     274 </span>            :         }
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         PF_OSFP_UNPACK(os, os_class, os_version, os_subtype);</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(entry, list, fp_entry) {</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :                 PF_OSFP_UNPACK(entry-&gt;fp_os, en_class, en_version, en_subtype);</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :                 if ((os_class == PF_OSFP_ANY || en_class == os_class) &amp;&amp;</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                     (os_version == PF_OSFP_ANY || en_version == os_version) &amp;&amp;</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                     (os_subtype == PF_OSFP_ANY || en_subtype == os_subtype)) {</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                         DPFPRINTF(LOG_INFO,</span>
+<span class="lineNum">     282 </span>            :                             &quot;osfp matched %s %s %s  %x==%x&quot;,
+<span class="lineNum">     283 </span>            :                             entry-&gt;fp_class_nm, entry-&gt;fp_version_nm,
+<span class="lineNum">     284 </span>            :                             entry-&gt;fp_subtype_nm, os, entry-&gt;fp_os);
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                         return (1);</span>
+<span class="lineNum">     286 </span>            :                 }
+<span class="lineNum">     287 </span>            :         }
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         DPFPRINTF(LOG_INFO, &quot;fingerprint 0x%x didn't match&quot;, os);</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     291 </span>            : 
+<a name="292"><span class="lineNum">     292 </span>            : /* Initialize the OS fingerprint system */</a>
+<span class="lineNum">     293 </span>            : void
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 : pf_osfp_initialize(void)</span>
+<span class="lineNum">     295 </span>            : {
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         pool_init(&amp;pf_osfp_entry_pl, sizeof(struct pf_osfp_entry), 0,</span>
+<span class="lineNum">     297 </span>            :             IPL_NONE, PR_WAITOK, &quot;pfosfpen&quot;, NULL);
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         pool_init(&amp;pf_osfp_pl, sizeof(struct pf_os_fingerprint), 0,</span>
+<span class="lineNum">     299 </span>            :             IPL_NONE, PR_WAITOK, &quot;pfosfp&quot;, NULL);
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         SLIST_INIT(&amp;pf_osfp_list);</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     302 </span>            : 
+<a name="303"><span class="lineNum">     303 </span>            : /* Flush the fingerprint list */</a>
+<span class="lineNum">     304 </span>            : void
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 : pf_osfp_flush(void)</span>
+<span class="lineNum">     306 </span>            : {
+<span class="lineNum">     307 </span>            :         struct pf_os_fingerprint *fp;
+<span class="lineNum">     308 </span>            :         struct pf_osfp_entry *entry;
+<span class="lineNum">     309 </span>            : 
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         while ((fp = SLIST_FIRST(&amp;pf_osfp_list))) {</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 SLIST_REMOVE_HEAD(&amp;pf_osfp_list, fp_next);</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                 while ((entry = SLIST_FIRST(&amp;fp-&gt;fp_oses))) {</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :                         SLIST_REMOVE_HEAD(&amp;fp-&gt;fp_oses, fp_entry);</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                         pool_put(&amp;pf_osfp_entry_pl, entry);</span>
+<span class="lineNum">     315 </span>            :                 }
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                 pool_put(&amp;pf_osfp_pl, fp);</span>
+<span class="lineNum">     317 </span>            :         }
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     319 </span>            : 
+<span class="lineNum">     320 </span>            : 
+<a name="321"><span class="lineNum">     321 </span>            : /* Add a fingerprint */</a>
+<span class="lineNum">     322 </span>            : int
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 : pf_osfp_add(struct pf_osfp_ioctl *fpioc)</span>
+<span class="lineNum">     324 </span>            : {
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         struct pf_os_fingerprint *fp, fpadd;</span>
+<span class="lineNum">     326 </span>            :         struct pf_osfp_entry *entry;
+<span class="lineNum">     327 </span>            : 
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :         memset(&amp;fpadd, 0, sizeof(fpadd));</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :         fpadd.fp_tcpopts = fpioc-&gt;fp_tcpopts;</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         fpadd.fp_wsize = fpioc-&gt;fp_wsize;</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         fpadd.fp_psize = fpioc-&gt;fp_psize;</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         fpadd.fp_mss = fpioc-&gt;fp_mss;</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         fpadd.fp_flags = fpioc-&gt;fp_flags;</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :         fpadd.fp_optcnt = fpioc-&gt;fp_optcnt;</span>
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         fpadd.fp_wscale = fpioc-&gt;fp_wscale;</span>
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         fpadd.fp_ttl = fpioc-&gt;fp_ttl;</span>
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         DPFPRINTF(LOG_DEBUG,</span>
+<span class="lineNum">     339 </span>            :             &quot;adding osfp %s %s %s = %s%d:%d:%d:%s%d:0x%llx %d &quot;
+<span class="lineNum">     340 </span>            :             &quot;(TS=%s,M=%s%d,W=%s%d) %x&quot;,
+<span class="lineNum">     341 </span>            :             fpioc-&gt;fp_os.fp_class_nm, fpioc-&gt;fp_os.fp_version_nm,
+<span class="lineNum">     342 </span>            :             fpioc-&gt;fp_os.fp_subtype_nm,
+<span class="lineNum">     343 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_WSIZE_MOD) ? &quot;%&quot; :
+<span class="lineNum">     344 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_WSIZE_MSS) ? &quot;S&quot; :
+<span class="lineNum">     345 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_WSIZE_MTU) ? &quot;T&quot; :
+<span class="lineNum">     346 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_WSIZE_DC) ? &quot;*&quot; : &quot;&quot;,
+<span class="lineNum">     347 </span>            :             fpadd.fp_wsize,
+<span class="lineNum">     348 </span>            :             fpadd.fp_ttl,
+<span class="lineNum">     349 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_DF) ? 1 : 0,
+<span class="lineNum">     350 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_PSIZE_MOD) ? &quot;%&quot; :
+<span class="lineNum">     351 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_PSIZE_DC) ? &quot;*&quot; : &quot;&quot;,
+<span class="lineNum">     352 </span>            :             fpadd.fp_psize,
+<span class="lineNum">     353 </span>            :             (long long int)fpadd.fp_tcpopts, fpadd.fp_optcnt,
+<span class="lineNum">     354 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_TS0) ? &quot;0&quot; : &quot;&quot;,
+<span class="lineNum">     355 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_MSS_MOD) ? &quot;%&quot; :
+<span class="lineNum">     356 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_MSS_DC) ? &quot;*&quot; : &quot;&quot;,
+<span class="lineNum">     357 </span>            :             fpadd.fp_mss,
+<span class="lineNum">     358 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_WSCALE_MOD) ? &quot;%&quot; :
+<span class="lineNum">     359 </span>            :             (fpadd.fp_flags &amp; PF_OSFP_WSCALE_DC) ? &quot;*&quot; : &quot;&quot;,
+<span class="lineNum">     360 </span>            :             fpadd.fp_wscale,
+<span class="lineNum">     361 </span>            :             fpioc-&gt;fp_os.fp_os);
+<span class="lineNum">     362 </span>            : 
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :         if ((fp = pf_osfp_find_exact(&amp;pf_osfp_list, &amp;fpadd))) {</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :                  SLIST_FOREACH(entry, &amp;fp-&gt;fp_oses, fp_entry) {</span>
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                         if (PF_OSFP_ENTRY_EQ(entry, &amp;fpioc-&gt;fp_os))</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :                                 return (EEXIST);</span>
+<span class="lineNum">     367 </span>            :                 }
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :                 if ((entry = pool_get(&amp;pf_osfp_entry_pl,</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                     PR_WAITOK|PR_LIMITFAIL)) == NULL)</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                         return (ENOMEM);</span>
+<span class="lineNum">     371 </span>            :         } else {
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                 if ((fp = pool_get(&amp;pf_osfp_pl,</span>
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                     PR_WAITOK|PR_ZERO|PR_LIMITFAIL)) == NULL)</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                         return (ENOMEM);</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                 fp-&gt;fp_tcpopts = fpioc-&gt;fp_tcpopts;</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                 fp-&gt;fp_wsize = fpioc-&gt;fp_wsize;</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                 fp-&gt;fp_psize = fpioc-&gt;fp_psize;</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                 fp-&gt;fp_mss = fpioc-&gt;fp_mss;</span>
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :                 fp-&gt;fp_flags = fpioc-&gt;fp_flags;</span>
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :                 fp-&gt;fp_optcnt = fpioc-&gt;fp_optcnt;</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                 fp-&gt;fp_wscale = fpioc-&gt;fp_wscale;</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                 fp-&gt;fp_ttl = fpioc-&gt;fp_ttl;</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :                 SLIST_INIT(&amp;fp-&gt;fp_oses);</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :                 if ((entry = pool_get(&amp;pf_osfp_entry_pl,</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                     PR_WAITOK|PR_LIMITFAIL)) == NULL) {</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                         pool_put(&amp;pf_osfp_pl, fp);</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :                         return (ENOMEM);</span>
+<span class="lineNum">     388 </span>            :                 }
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :                 pf_osfp_insert(&amp;pf_osfp_list, fp);</span>
+<span class="lineNum">     390 </span>            :         }
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :         memcpy(entry, &amp;fpioc-&gt;fp_os, sizeof(*entry));</span>
+<span class="lineNum">     392 </span>            : 
+<span class="lineNum">     393 </span>            :         /* Make sure the strings are NUL terminated */
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :         entry-&gt;fp_class_nm[sizeof(entry-&gt;fp_class_nm)-1] = '\0';</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         entry-&gt;fp_version_nm[sizeof(entry-&gt;fp_version_nm)-1] = '\0';</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         entry-&gt;fp_subtype_nm[sizeof(entry-&gt;fp_subtype_nm)-1] = '\0';</span>
+<span class="lineNum">     397 </span>            : 
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :         SLIST_INSERT_HEAD(&amp;fp-&gt;fp_oses, entry, fp_entry);</span>
+<span class="lineNum">     399 </span>            : 
+<span class="lineNum">     400 </span>            : #ifdef PFDEBUG
+<span class="lineNum">     401 </span>            :         if ((fp = pf_osfp_validate()))
+<span class="lineNum">     402 </span>            :                 DPFPRINTF(LOG_NOTICE,
+<span class="lineNum">     403 </span>            :                     &quot;Invalid fingerprint list&quot;);
+<span class="lineNum">     404 </span>            : #endif /* PFDEBUG */
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     407 </span>            : 
+<span class="lineNum">     408 </span>            : 
+<a name="409"><span class="lineNum">     409 </span>            : /* Find a fingerprint in the list */</a>
+<span class="lineNum">     410 </span>            : struct pf_os_fingerprint *
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 : pf_osfp_find(struct pf_osfp_list *list, struct pf_os_fingerprint *find,</span>
+<span class="lineNum">     412 </span>            :     u_int8_t ttldiff)
+<span class="lineNum">     413 </span>            : {
+<span class="lineNum">     414 </span>            :         struct pf_os_fingerprint *f;
+<span class="lineNum">     415 </span>            : 
+<span class="lineNum">     416 </span>            : #define MATCH_INT(_MOD, _DC, _field)                                    \
+<span class="lineNum">     417 </span>            :         if ((f-&gt;fp_flags &amp; _DC) == 0) {                                  \
+<span class="lineNum">     418 </span>            :                 if ((f-&gt;fp_flags &amp; _MOD) == 0) {                 \
+<span class="lineNum">     419 </span>            :                         if (f-&gt;_field != find-&gt;_field)                    \
+<span class="lineNum">     420 </span>            :                                 continue;                               \
+<span class="lineNum">     421 </span>            :                 } else {                                                \
+<span class="lineNum">     422 </span>            :                         if (f-&gt;_field == 0 || find-&gt;_field % f-&gt;_field)        \
+<span class="lineNum">     423 </span>            :                                 continue;                               \
+<span class="lineNum">     424 </span>            :                 }                                                       \
+<span class="lineNum">     425 </span>            :         }
+<span class="lineNum">     426 </span>            : 
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(f, list, fp_next) {</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                 if (f-&gt;fp_tcpopts != find-&gt;fp_tcpopts ||</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :                     f-&gt;fp_optcnt != find-&gt;fp_optcnt ||</span>
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :                     f-&gt;fp_ttl &lt; find-&gt;fp_ttl ||</span>
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :                     f-&gt;fp_ttl - find-&gt;fp_ttl &gt; ttldiff ||</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                     (f-&gt;fp_flags &amp; (PF_OSFP_DF|PF_OSFP_TS0)) !=</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :                     (find-&gt;fp_flags &amp; (PF_OSFP_DF|PF_OSFP_TS0)))</span>
+<span class="lineNum">     434 </span>            :                         continue;
+<span class="lineNum">     435 </span>            : 
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :                 MATCH_INT(PF_OSFP_PSIZE_MOD, PF_OSFP_PSIZE_DC, fp_psize)</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :                 MATCH_INT(PF_OSFP_MSS_MOD, PF_OSFP_MSS_DC, fp_mss)</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                 MATCH_INT(PF_OSFP_WSCALE_MOD, PF_OSFP_WSCALE_DC, fp_wscale)</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :                 if ((f-&gt;fp_flags &amp; PF_OSFP_WSIZE_DC) == 0) {</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :                         if (f-&gt;fp_flags &amp; PF_OSFP_WSIZE_MSS) {</span>
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                                 if (find-&gt;fp_mss == 0)</span>
+<span class="lineNum">     442 </span>            :                                         continue;
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span>            : /* Some &quot;smart&quot; NAT devices and DSL routers will tweak the MSS size and
+<span class="lineNum">     445 </span>            :  * will set it to whatever is suitable for the link type.
+<span class="lineNum">     446 </span>            :  */
+<span class="lineNum">     447 </span>            : #define SMART_MSS       1460
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                                 if ((find-&gt;fp_wsize % find-&gt;fp_mss ||</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                                     find-&gt;fp_wsize / find-&gt;fp_mss !=</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                                     f-&gt;fp_wsize) &amp;&amp;</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                                     (find-&gt;fp_wsize % SMART_MSS ||</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                                     find-&gt;fp_wsize / SMART_MSS !=</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                                     f-&gt;fp_wsize))</span>
+<span class="lineNum">     454 </span>            :                                         continue;
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :                         } else if (f-&gt;fp_flags &amp; PF_OSFP_WSIZE_MTU) {</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :                                 if (find-&gt;fp_mss == 0)</span>
+<span class="lineNum">     457 </span>            :                                         continue;
+<span class="lineNum">     458 </span>            : 
+<span class="lineNum">     459 </span>            : #define MTUOFF  (sizeof(struct ip) + sizeof(struct tcphdr))
+<span class="lineNum">     460 </span>            : #define SMART_MTU       (SMART_MSS + MTUOFF)
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                                 if ((find-&gt;fp_wsize % (find-&gt;fp_mss + MTUOFF) ||</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                                     find-&gt;fp_wsize / (find-&gt;fp_mss + MTUOFF) !=</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                                     f-&gt;fp_wsize) &amp;&amp;</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :                                     (find-&gt;fp_wsize % SMART_MTU ||</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                                     find-&gt;fp_wsize / SMART_MTU !=</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                                     f-&gt;fp_wsize))</span>
+<span class="lineNum">     467 </span>            :                                         continue;
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :                         } else if (f-&gt;fp_flags &amp; PF_OSFP_WSIZE_MOD) {</span>
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :                                 if (f-&gt;fp_wsize == 0 || find-&gt;fp_wsize %</span>
+<span class="lineNum">     470 </span>            :                                     f-&gt;fp_wsize)
+<span class="lineNum">     471 </span>            :                                         continue;
+<span class="lineNum">     472 </span>            :                         } else {
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :                                 if (f-&gt;fp_wsize != find-&gt;fp_wsize)</span>
+<span class="lineNum">     474 </span>            :                                         continue;
+<span class="lineNum">     475 </span>            :                         }
+<span class="lineNum">     476 </span>            :                 }
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :                 return (f);</span>
+<span class="lineNum">     478 </span>            :         }
+<span class="lineNum">     479 </span>            : 
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     482 </span>            : 
+<a name="483"><span class="lineNum">     483 </span>            : /* Find an exact fingerprint in the list */</a>
+<span class="lineNum">     484 </span>            : struct pf_os_fingerprint *
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 : pf_osfp_find_exact(struct pf_osfp_list *list, struct pf_os_fingerprint *find)</span>
+<span class="lineNum">     486 </span>            : {
+<span class="lineNum">     487 </span>            :         struct pf_os_fingerprint *f;
+<span class="lineNum">     488 </span>            : 
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(f, list, fp_next) {</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :                 if (f-&gt;fp_tcpopts == find-&gt;fp_tcpopts &amp;&amp;</span>
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :                     f-&gt;fp_wsize == find-&gt;fp_wsize &amp;&amp;</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :                     f-&gt;fp_psize == find-&gt;fp_psize &amp;&amp;</span>
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :                     f-&gt;fp_mss == find-&gt;fp_mss &amp;&amp;</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                     f-&gt;fp_flags == find-&gt;fp_flags &amp;&amp;</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :                     f-&gt;fp_optcnt == find-&gt;fp_optcnt &amp;&amp;</span>
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                     f-&gt;fp_wscale == find-&gt;fp_wscale &amp;&amp;</span>
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :                     f-&gt;fp_ttl == find-&gt;fp_ttl)</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :                         return (f);</span>
+<span class="lineNum">     499 </span>            :         }
+<span class="lineNum">     500 </span>            : 
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     503 </span>            : 
+<a name="504"><span class="lineNum">     504 </span>            : /* Insert a fingerprint into the list */</a>
+<span class="lineNum">     505 </span>            : void
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 : pf_osfp_insert(struct pf_osfp_list *list, struct pf_os_fingerprint *ins)</span>
+<span class="lineNum">     507 </span>            : {
+<span class="lineNum">     508 </span>            :         struct pf_os_fingerprint *f, *prev = NULL;
+<span class="lineNum">     509 </span>            : 
+<span class="lineNum">     510 </span>            :         /* XXX need to go semi tree based.  can key on tcp options */
+<span class="lineNum">     511 </span>            : 
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(f, list, fp_next)</span>
+<span class="lineNum">     513 </span>            :                 prev = f;
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :         if (prev)</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :                 SLIST_INSERT_AFTER(prev, ins, fp_next);</span>
+<span class="lineNum">     516 </span>            :         else
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :                 SLIST_INSERT_HEAD(list, ins, fp_next);</span>
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     519 </span>            : 
+<a name="520"><span class="lineNum">     520 </span>            : /* Fill a fingerprint by its number (from an ioctl) */</a>
+<span class="lineNum">     521 </span>            : int
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 : pf_osfp_get(struct pf_osfp_ioctl *fpioc)</span>
+<span class="lineNum">     523 </span>            : {
+<span class="lineNum">     524 </span>            :         struct pf_os_fingerprint *fp;
+<span class="lineNum">     525 </span>            :         struct pf_osfp_entry *entry;
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :         int num = fpioc-&gt;fp_getnum;</span>
+<span class="lineNum">     527 </span>            :         int i = 0;
+<span class="lineNum">     528 </span>            : 
+<span class="lineNum">     529 </span>            : 
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :         memset(fpioc, 0, sizeof(*fpioc));</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(fp, &amp;pf_osfp_list, fp_next) {</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :                 SLIST_FOREACH(entry, &amp;fp-&gt;fp_oses, fp_entry) {</span>
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :                         if (i++ == num) {</span>
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :                                 fpioc-&gt;fp_mss = fp-&gt;fp_mss;</span>
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                                 fpioc-&gt;fp_wsize = fp-&gt;fp_wsize;</span>
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :                                 fpioc-&gt;fp_flags = fp-&gt;fp_flags;</span>
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                                 fpioc-&gt;fp_psize = fp-&gt;fp_psize;</span>
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :                                 fpioc-&gt;fp_ttl = fp-&gt;fp_ttl;</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :                                 fpioc-&gt;fp_wscale = fp-&gt;fp_wscale;</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                                 fpioc-&gt;fp_getnum = num;</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                                 memcpy(&amp;fpioc-&gt;fp_os, entry,</span>
+<span class="lineNum">     542 </span>            :                                     sizeof(fpioc-&gt;fp_os));
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">     544 </span>            :                         }
+<span class="lineNum">     545 </span>            :                 }
+<span class="lineNum">     546 </span>            :         }
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         return (EBUSY);</span>
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     550 </span>            : 
+<span class="lineNum">     551 </span>            : 
+<a name="552"><span class="lineNum">     552 </span>            : /* Validate that each signature is reachable */</a>
+<span class="lineNum">     553 </span>            : struct pf_os_fingerprint *
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 : pf_osfp_validate(void)</span>
+<span class="lineNum">     555 </span>            : {
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :         struct pf_os_fingerprint *f, *f2, find;</span>
+<span class="lineNum">     557 </span>            : 
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(f, &amp;pf_osfp_list, fp_next) {</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :                 memcpy(&amp;find, f, sizeof(find));</span>
+<span class="lineNum">     560 </span>            : 
+<span class="lineNum">     561 </span>            :                 /* We do a few MSS/th_win percolations to make things unique */
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :                 if (find.fp_mss == 0)</span>
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                         find.fp_mss = 128;</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :                 if (f-&gt;fp_flags &amp; PF_OSFP_WSIZE_MSS)</span>
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :                         find.fp_wsize *= find.fp_mss;</span>
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :                 else if (f-&gt;fp_flags &amp; PF_OSFP_WSIZE_MTU)</span>
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :                         find.fp_wsize *= (find.fp_mss + 40);</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                 else if (f-&gt;fp_flags &amp; PF_OSFP_WSIZE_MOD)</span>
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :                         find.fp_wsize *= 2;</span>
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :                 if (f != (f2 = pf_osfp_find(&amp;pf_osfp_list, &amp;find, 0))) {</span>
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :                         if (f2)</span>
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :                                 DPFPRINTF(LOG_NOTICE,</span>
+<span class="lineNum">     573 </span>            :                                     &quot;Found \&quot;%s %s %s\&quot; instead of &quot;
+<span class="lineNum">     574 </span>            :                                     &quot;\&quot;%s %s %s\&quot;\n&quot;,
+<span class="lineNum">     575 </span>            :                                     SLIST_FIRST(&amp;f2-&gt;fp_oses)-&gt;fp_class_nm,
+<span class="lineNum">     576 </span>            :                                     SLIST_FIRST(&amp;f2-&gt;fp_oses)-&gt;fp_version_nm,
+<span class="lineNum">     577 </span>            :                                     SLIST_FIRST(&amp;f2-&gt;fp_oses)-&gt;fp_subtype_nm,
+<span class="lineNum">     578 </span>            :                                     SLIST_FIRST(&amp;f-&gt;fp_oses)-&gt;fp_class_nm,
+<span class="lineNum">     579 </span>            :                                     SLIST_FIRST(&amp;f-&gt;fp_oses)-&gt;fp_version_nm,
+<span class="lineNum">     580 </span>            :                                     SLIST_FIRST(&amp;f-&gt;fp_oses)-&gt;fp_subtype_nm);
+<span class="lineNum">     581 </span>            :                         else
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :                                 DPFPRINTF(LOG_NOTICE,</span>
+<span class="lineNum">     583 </span>            :                                     &quot;Couldn't find \&quot;%s %s %s\&quot;\n&quot;,
+<span class="lineNum">     584 </span>            :                                     SLIST_FIRST(&amp;f-&gt;fp_oses)-&gt;fp_class_nm,
+<span class="lineNum">     585 </span>            :                                     SLIST_FIRST(&amp;f-&gt;fp_oses)-&gt;fp_version_nm,
+<span class="lineNum">     586 </span>            :                                     SLIST_FIRST(&amp;f-&gt;fp_oses)-&gt;fp_subtype_nm);
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :                         return (f);</span>
+<span class="lineNum">     588 </span>            :                 }
+<span class="lineNum">     589 </span>            :         }
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

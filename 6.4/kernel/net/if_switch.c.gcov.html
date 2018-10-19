@@ -1,0 +1,1606 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - net/if_switch.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">net</a> - if_switch.c<span style="font-size: 80%;"> (source / <a href="if_switch.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">801</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">34</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: if_switch.c,v 1.23 2018/02/19 08:59:52 mpi Exp $      */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2016 Kazuya GODA &lt;goda@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2016 Reyk Floeter &lt;reyk@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       8 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       9 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      12 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      13 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      14 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      15 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      16 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      17 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      18 </span>            :  */
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : #include &quot;bpfilter.h&quot;
+<span class="lineNum">      21 </span>            : #include &quot;pf.h&quot;
+<span class="lineNum">      22 </span>            : #include &quot;vlan.h&quot;
+<span class="lineNum">      23 </span>            : 
+<span class="lineNum">      24 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/selinfo.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/syslog.h&gt;
+<span class="lineNum">      33 </span>            : 
+<span class="lineNum">      34 </span>            : #include &lt;net/if_types.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;net/netisr.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;netinet/if_ether.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;net/ethertypes.h&gt;
+<span class="lineNum">      41 </span>            : #include &lt;netinet/ip.h&gt;
+<span class="lineNum">      42 </span>            : #include &lt;netinet/ip6.h&gt;
+<span class="lineNum">      43 </span>            : #include &lt;netinet/icmp6.h&gt;
+<span class="lineNum">      44 </span>            : #include &lt;netinet6/nd6.h&gt;
+<span class="lineNum">      45 </span>            : #include &lt;netinet/udp.h&gt;
+<span class="lineNum">      46 </span>            : #include &lt;netinet/tcp.h&gt;
+<span class="lineNum">      47 </span>            : #include &lt;netinet/ip_icmp.h&gt;
+<span class="lineNum">      48 </span>            : 
+<span class="lineNum">      49 </span>            : #if NPF &gt; 0
+<span class="lineNum">      50 </span>            : #include &lt;net/pfvar.h&gt;
+<span class="lineNum">      51 </span>            : #endif
+<span class="lineNum">      52 </span>            : 
+<span class="lineNum">      53 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">      54 </span>            : #include &lt;net/bpf.h&gt;
+<span class="lineNum">      55 </span>            : #endif
+<span class="lineNum">      56 </span>            : 
+<span class="lineNum">      57 </span>            : #include &lt;net/ofp.h&gt;
+<span class="lineNum">      58 </span>            : #include &lt;net/if_bridge.h&gt;
+<span class="lineNum">      59 </span>            : #include &lt;net/if_switch.h&gt;
+<span class="lineNum">      60 </span>            : 
+<span class="lineNum">      61 </span>            : int      switch_clone_create(struct if_clone *, int);
+<span class="lineNum">      62 </span>            : int      switch_clone_destroy(struct ifnet *);
+<span class="lineNum">      63 </span>            : void     switch_process(struct ifnet *, struct mbuf *);
+<span class="lineNum">      64 </span>            : int      switch_port_set_local(struct switch_softc *, struct switch_port *);
+<span class="lineNum">      65 </span>            : int      switch_port_unset_local(struct switch_softc *, struct switch_port *);
+<span class="lineNum">      66 </span>            : int      switch_ioctl(struct ifnet *, unsigned long, caddr_t);
+<span class="lineNum">      67 </span>            : int      switch_port_add(struct switch_softc *, struct ifbreq *);
+<span class="lineNum">      68 </span>            : void     switch_port_detach(void *);
+<span class="lineNum">      69 </span>            : int      switch_port_del(struct switch_softc *, struct ifbreq *);
+<span class="lineNum">      70 </span>            : int      switch_port_list(struct switch_softc *, struct ifbifconf *);
+<span class="lineNum">      71 </span>            : int      switch_input(struct ifnet *, struct mbuf *, void *);
+<span class="lineNum">      72 </span>            : struct mbuf
+<span class="lineNum">      73 </span>            :         *switch_port_ingress(struct switch_softc *, struct ifnet *,
+<span class="lineNum">      74 </span>            :             struct mbuf *);
+<span class="lineNum">      75 </span>            : int      switch_ifenqueue(struct switch_softc *, struct ifnet *,
+<span class="lineNum">      76 </span>            :             struct mbuf *, int);
+<span class="lineNum">      77 </span>            : void     switch_port_ifb_start(struct ifnet *);
+<span class="lineNum">      78 </span>            : 
+<span class="lineNum">      79 </span>            : struct mbuf
+<span class="lineNum">      80 </span>            :         *switch_flow_classifier_udp(struct mbuf *, int *,
+<span class="lineNum">      81 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">      82 </span>            : struct mbuf
+<span class="lineNum">      83 </span>            :         *switch_flow_classifier_tcp(struct mbuf *, int *,
+<span class="lineNum">      84 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">      85 </span>            : struct mbuf
+<span class="lineNum">      86 </span>            :         *switch_flow_classifier_icmpv4(struct mbuf *, int *,
+<span class="lineNum">      87 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">      88 </span>            : struct mbuf
+<span class="lineNum">      89 </span>            :         *switch_flow_classifier_nd6(struct mbuf *, int *,
+<span class="lineNum">      90 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">      91 </span>            : struct mbuf
+<span class="lineNum">      92 </span>            :         *switch_flow_classifier_icmpv6(struct mbuf *, int *,
+<span class="lineNum">      93 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">      94 </span>            : struct mbuf
+<span class="lineNum">      95 </span>            :         *switch_flow_classifier_ipv4(struct mbuf *, int *,
+<span class="lineNum">      96 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">      97 </span>            : struct mbuf
+<span class="lineNum">      98 </span>            :         *switch_flow_classifier_ipv6(struct mbuf *, int *,
+<span class="lineNum">      99 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">     100 </span>            : struct mbuf
+<span class="lineNum">     101 </span>            :         *switch_flow_classifier_arp(struct mbuf *, int *,
+<span class="lineNum">     102 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">     103 </span>            : struct mbuf
+<span class="lineNum">     104 </span>            :         *switch_flow_classifier_ether(struct mbuf *, int *,
+<span class="lineNum">     105 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">     106 </span>            : struct mbuf
+<span class="lineNum">     107 </span>            :         *switch_flow_classifier_tunnel(struct mbuf *, int *,
+<span class="lineNum">     108 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">     109 </span>            : void     switch_flow_classifier_dump(struct switch_softc *,
+<span class="lineNum">     110 </span>            :             struct switch_flow_classify *);
+<span class="lineNum">     111 </span>            : void     switchattach(int);
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span>            : struct if_clone switch_cloner =
+<span class="lineNum">     114 </span>            :     IF_CLONE_INITIALIZER(&quot;switch&quot;, switch_clone_create, switch_clone_destroy);
+<span class="lineNum">     115 </span>            : 
+<span class="lineNum">     116 </span>            : LIST_HEAD(, switch_softc) switch_list;
+<span class="lineNum">     117 </span>            : struct niqueue switchintrq = NIQUEUE_INITIALIZER(1024, NETISR_SWITCH);
+<span class="lineNum">     118 </span>            : struct rwlock switch_ifs_lk = RWLOCK_INITIALIZER(&quot;switchifs&quot;);
+<span class="lineNum">     119 </span>            : 
+<span class="lineNum">     120 </span>            : struct pool swfcl_pool;
+<a name="121"><span class="lineNum">     121 </span>            : </a>
+<span class="lineNum">     122 </span>            : void
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 : switchattach(int n)</span>
+<span class="lineNum">     124 </span>            : {
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         pool_init(&amp;swfcl_pool, sizeof(union switch_field), 0, 0, 0,</span>
+<span class="lineNum">     126 </span>            :             &quot;swfcl&quot;, NULL);
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :         swofp_attach();</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         LIST_INIT(&amp;switch_list);</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :         if_clone_attach(&amp;switch_cloner);</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 : }</span>
+<a name="131"><span class="lineNum">     131 </span>            : </a>
+<span class="lineNum">     132 </span>            : struct switch_softc *
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 : switch_lookup(int unit)</span>
+<span class="lineNum">     134 </span>            : {
+<span class="lineNum">     135 </span>            :         struct switch_softc     *sc;
+<span class="lineNum">     136 </span>            : 
+<span class="lineNum">     137 </span>            :         /* must hold switch_ifs_lk */
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :         LIST_FOREACH(sc, &amp;switch_list, sc_switch_next) {</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_unit == unit)</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :                         return (sc);</span>
+<span class="lineNum">     141 </span>            :         }
+<span class="lineNum">     142 </span>            : 
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 : }</span>
+<a name="145"><span class="lineNum">     145 </span>            : </a>
+<span class="lineNum">     146 </span>            : int
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 : switch_clone_create(struct if_clone *ifc, int unit)</span>
+<span class="lineNum">     148 </span>            : {
+<span class="lineNum">     149 </span>            :         struct switch_softc     *sc;
+<span class="lineNum">     150 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">     151 </span>            : 
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         sc = malloc(sizeof(struct switch_softc), M_DEVBUF, M_WAITOK|M_ZERO);</span>
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         ifp = &amp;sc-&gt;sc_if;</span>
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         snprintf(ifp-&gt;if_xname, sizeof ifp-&gt;if_xname, &quot;switch%d&quot;, unit);</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         ifp-&gt;if_softc = sc;</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         ifp-&gt;if_mtu = ETHERMTU;</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ioctl = switch_ioctl;</span>
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :         ifp-&gt;if_output = NULL;</span>
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         ifp-&gt;if_start = NULL;</span>
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         ifp-&gt;if_type = IFT_BRIDGE;</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         ifp-&gt;if_hdrlen = ETHER_HDR_LEN;</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :         TAILQ_INIT(&amp;sc-&gt;sc_swpo_list);</span>
+<span class="lineNum">     163 </span>            : 
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :         sc-&gt;sc_unit = unit;</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         sc-&gt;sc_stp = bstp_create(&amp;sc-&gt;sc_if);</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :         if (!sc-&gt;sc_stp) {</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :                 free(sc, M_DEVBUF, sizeof(*sc));</span>
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     169 </span>            :         }
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         if_attach(ifp);</span>
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :         if_alloc_sadl(ifp);</span>
+<span class="lineNum">     173 </span>            : 
+<span class="lineNum">     174 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :         bpfattach(&amp;ifp-&gt;if_bpf, ifp, DLT_EN10MB, ETHER_HDR_LEN);</span>
+<span class="lineNum">     176 </span>            : #endif
+<span class="lineNum">     177 </span>            : 
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :         swofp_create(sc);</span>
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         LIST_INSERT_HEAD(&amp;switch_list, sc, sc_switch_next);</span>
+<span class="lineNum">     181 </span>            : 
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 : }</span>
+<a name="184"><span class="lineNum">     184 </span>            : </a>
+<span class="lineNum">     185 </span>            : int
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 : switch_clone_destroy(struct ifnet *ifp)</span>
+<span class="lineNum">     187 </span>            : {
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         struct switch_softc     *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     189 </span>            :         struct switch_port      *swpo, *tp;
+<span class="lineNum">     190 </span>            :         struct ifnet            *ifs;
+<span class="lineNum">     191 </span>            : 
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH_SAFE(swpo, &amp;sc-&gt;sc_swpo_list, swpo_list_next, tp) {</span>
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :                 if ((ifs = if_get(swpo-&gt;swpo_ifindex)) != NULL) {</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                         switch_port_detach(ifs);</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                         if_put(ifs);</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :                         log(LOG_ERR, &quot;failed to cleanup on ifindex(%d)\n&quot;,</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                             swpo-&gt;swpo_ifindex);</span>
+<span class="lineNum">     199 </span>            :         }
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :         LIST_REMOVE(sc, sc_switch_next);</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :         bstp_destroy(sc-&gt;sc_stp);</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :         swofp_destroy(sc);</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :         switch_dev_destroy(sc);</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :         if_deactivate(ifp);</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         if_detach(ifp);</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         free(sc, M_DEVBUF, sizeof(*sc));</span>
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     209 </span>            : }
+<span class="lineNum">     210 </span>            : 
+<a name="211"><span class="lineNum">     211 </span>            : </a>
+<span class="lineNum">     212 </span>            : void
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 : switchintr(void)</span>
+<span class="lineNum">     214 </span>            : {
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         struct mbuf_list         ml;</span>
+<span class="lineNum">     216 </span>            :         struct mbuf             *m;
+<span class="lineNum">     217 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">     218 </span>            : 
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         niq_delist(&amp;switchintrq, &amp;ml);</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         if (ml_empty(&amp;ml))</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     222 </span>            : 
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :         while ((m = ml_dequeue(&amp;ml)) != NULL) {</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :                 ifp = if_get(m-&gt;m_pkthdr.ph_ifidx);</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                 if (ifp == NULL) {</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                         m_freem(m);</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     228 </span>            :                 }
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                 switch_process(ifp, m);</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                 if_put(ifp);</span>
+<span class="lineNum">     231 </span>            :         }
+<span class="lineNum">     232 </span>            : 
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 : }</span>
+<a name="234"><span class="lineNum">     234 </span>            : </a>
+<span class="lineNum">     235 </span>            : void
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 : switch_process(struct ifnet *ifp, struct mbuf *m)</span>
+<span class="lineNum">     237 </span>            : {
+<span class="lineNum">     238 </span>            :         struct switch_softc             *sc = NULL;
+<span class="lineNum">     239 </span>            :         struct switch_port              *swpo;
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :         struct switch_flow_classify      swfcl = { 0 };</span>
+<span class="lineNum">     241 </span>            : 
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         swpo = (struct switch_port *)ifp-&gt;if_switchport;</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         if (swpo == NULL)</span>
+<span class="lineNum">     244 </span>            :                 goto discard;
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         sc = swpo-&gt;swpo_switch;</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         if ((sc-&gt;sc_if.if_flags &amp; (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))</span>
+<span class="lineNum">     247 </span>            :                 goto discard;
+<span class="lineNum">     248 </span>            : 
+<span class="lineNum">     249 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_if.if_bpf)</span>
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :                 bpf_mtap_ether(sc-&gt;sc_if.if_bpf, m, BPF_DIRECTION_IN);</span>
+<span class="lineNum">     252 </span>            : #endif
+<span class="lineNum">     253 </span>            : 
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         if (m-&gt;m_pkthdr.len &lt; sizeof(struct ether_header))</span>
+<span class="lineNum">     255 </span>            :                 goto discard;
+<span class="lineNum">     256 </span>            : 
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         if ((m = switch_port_ingress(sc, ifp, m)) == NULL)</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :                 return; /* m was freed in switch_process_ingress */</span>
+<span class="lineNum">     259 </span>            : 
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         if ((m = switch_flow_classifier(m, swpo-&gt;swpo_port_no,</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :             &amp;swfcl)) == NULL) {</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :                 switch_swfcl_free(&amp;swfcl);</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :                 return;  /* m was freed in switch_flow_classifier */</span>
+<span class="lineNum">     264 </span>            :         }
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_if.if_flags &amp; IFF_DEBUG)</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :                 switch_flow_classifier_dump(sc, &amp;swfcl);</span>
+<span class="lineNum">     268 </span>            : 
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         if (!sc-&gt;switch_process_forward)</span>
+<span class="lineNum">     270 </span>            :                 goto discard;
+<span class="lineNum">     271 </span>            : 
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :         (sc-&gt;switch_process_forward)(sc, &amp;swfcl, m);</span>
+<span class="lineNum">     273 </span>            : 
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :         switch_swfcl_free(&amp;swfcl);</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span>            : discard:
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :         m_freem(m);</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :         switch_swfcl_free(&amp;swfcl);</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         if (sc)</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_if.if_oerrors++;</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 : }</span>
+<a name="283"><span class="lineNum">     283 </span>            : </a>
+<span class="lineNum">     284 </span>            : int
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 : switch_port_set_local(struct switch_softc *sc, struct switch_port *swpo)</span>
+<span class="lineNum">     286 </span>            : {
+<span class="lineNum">     287 </span>            :         struct switch_port      *tswpo;
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         struct ifreq             ifreq;</span>
+<span class="lineNum">     289 </span>            :         struct ifnet            *ifs;
+<span class="lineNum">     290 </span>            :         int                     error = 0, re_up = 0;
+<span class="lineNum">     291 </span>            : 
+<span class="lineNum">     292 </span>            :         /*
+<span class="lineNum">     293 </span>            :          * Only one local interface can exist per switch device.
+<span class="lineNum">     294 </span>            :          */
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(tswpo, &amp;sc-&gt;sc_swpo_list, swpo_list_next) {</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :                 if (tswpo-&gt;swpo_flags &amp; IFBIF_LOCAL)</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                         return (EEXIST);</span>
+<span class="lineNum">     298 </span>            :         }
+<span class="lineNum">     299 </span>            : 
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         ifs = if_get(swpo-&gt;swpo_ifindex);</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         if (ifs == NULL)</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                 return (ENOENT);</span>
+<span class="lineNum">     303 </span>            : 
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         if (ifs-&gt;if_flags &amp; IFF_UP) {</span>
+<span class="lineNum">     305 </span>            :                 re_up = 1;
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :                 memset(&amp;ifreq, 0, sizeof(ifreq));</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :                 strlcpy(ifreq.ifr_name, ifs-&gt;if_xname, IFNAMSIZ);</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :                 ifs-&gt;if_flags &amp;= ~IFF_UP;</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :                 ifreq.ifr_flags = ifs-&gt;if_flags;</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :                 error = (*ifs-&gt;if_ioctl)(ifs, SIOCSIFFLAGS, (caddr_t)&amp;ifreq);</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 if (error)</span>
+<span class="lineNum">     312 </span>            :                         goto error;
+<span class="lineNum">     313 </span>            :         }
+<span class="lineNum">     314 </span>            : 
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :         swpo-&gt;swpo_flags |= IFBIF_LOCAL;</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         swpo-&gt;swpo_port_no = OFP_PORT_LOCAL;</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :         swpo-&gt;swop_bk_start = ifs-&gt;if_start;</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :         ifs-&gt;if_start = switch_port_ifb_start;</span>
+<span class="lineNum">     319 </span>            : 
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         if (re_up) {</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :                 memset(&amp;ifreq, 0, sizeof(ifreq));</span>
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :                 strlcpy(ifreq.ifr_name, ifs-&gt;if_xname, IFNAMSIZ);</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :                 ifs-&gt;if_flags &amp;= IFF_UP;</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :                 ifreq.ifr_flags = ifs-&gt;if_flags;</span>
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :                 error = (*ifs-&gt;if_ioctl)(ifs, SIOCSIFFLAGS, (caddr_t)&amp;ifreq);</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :                 if (error)</span>
+<span class="lineNum">     327 </span>            :                         goto error;
+<span class="lineNum">     328 </span>            :         }
+<span class="lineNum">     329 </span>            : 
+<span class="lineNum">     330 </span>            :  error:
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         if_put(ifs);</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 : }</span>
+<a name="334"><span class="lineNum">     334 </span>            : </a>
+<span class="lineNum">     335 </span>            : int
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 : switch_port_unset_local(struct switch_softc *sc, struct switch_port *swpo)</span>
+<span class="lineNum">     337 </span>            : {
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         struct ifreq    ifreq;</span>
+<span class="lineNum">     339 </span>            :         struct ifnet    *ifs;
+<span class="lineNum">     340 </span>            :         int             error = 0, re_up = 0;
+<span class="lineNum">     341 </span>            : 
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :         ifs = if_get(swpo-&gt;swpo_ifindex);</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :         if (ifs == NULL)</span>
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :                 return (ENOENT);</span>
+<span class="lineNum">     345 </span>            : 
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         if (ifs-&gt;if_flags &amp; IFF_UP) {</span>
+<span class="lineNum">     347 </span>            :                 re_up = 1;
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :                 memset(&amp;ifreq, 0, sizeof(ifreq));</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                 strlcpy(ifreq.ifr_name, ifs-&gt;if_xname, IFNAMSIZ);</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                 ifs-&gt;if_flags &amp;= ~IFF_UP;</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                 ifreq.ifr_flags = ifs-&gt;if_flags;</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                 error = (*ifs-&gt;if_ioctl)(ifs, SIOCSIFFLAGS, (caddr_t)&amp;ifreq);</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :                 if (error)</span>
+<span class="lineNum">     354 </span>            :                         goto error;
+<span class="lineNum">     355 </span>            :         }
+<span class="lineNum">     356 </span>            : 
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :         swpo-&gt;swpo_flags &amp;= ~IFBIF_LOCAL;</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :         swpo-&gt;swpo_port_no = swofp_assign_portno(sc, ifs-&gt;if_index);</span>
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :         ifs-&gt;if_start = swpo-&gt;swop_bk_start;</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         swpo-&gt;swop_bk_start = NULL;</span>
+<span class="lineNum">     361 </span>            : 
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :         if (re_up) {</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :                 memset(&amp;ifreq, 0, sizeof(ifreq));</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :                 strlcpy(ifreq.ifr_name, ifs-&gt;if_xname, IFNAMSIZ);</span>
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                 ifs-&gt;if_flags &amp;= IFF_UP;</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :                 ifreq.ifr_flags = ifs-&gt;if_flags;</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :                 error = (*ifs-&gt;if_ioctl)(ifs, SIOCSIFFLAGS, (caddr_t)&amp;ifreq);</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :                 if (error)</span>
+<span class="lineNum">     369 </span>            :                         goto error;
+<span class="lineNum">     370 </span>            :         }
+<span class="lineNum">     371 </span>            : 
+<span class="lineNum">     372 </span>            :  error:
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :         if_put(ifs);</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 : }</span>
+<a name="376"><span class="lineNum">     376 </span>            : </a>
+<span class="lineNum">     377 </span>            : int
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 : switch_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)</span>
+<span class="lineNum">     379 </span>            : {
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :         struct ifbaconf         *baconf = (struct ifbaconf *)data;</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :         struct ifbropreq        *brop = (struct ifbropreq *)data;</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :         struct ifbrlconf        *bc = (struct ifbrlconf *)data;</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :         struct ifbreq           *breq = (struct ifbreq *)data;</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :         struct switch_softc     *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :         struct bstp_state       *bs = sc-&gt;sc_stp;</span>
+<span class="lineNum">     386 </span>            :         struct bstp_port        *bp;
+<span class="lineNum">     387 </span>            :         struct ifnet            *ifs;
+<span class="lineNum">     388 </span>            :         struct switch_port      *swpo;
+<span class="lineNum">     389 </span>            :         int                      error = 0;
+<span class="lineNum">     390 </span>            : 
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     392 </span>            :         case SIOCBRDGADD:
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :                 if ((error = suser(curproc)) != 0)</span>
+<span class="lineNum">     394 </span>            :                         break;
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                 error = switch_port_add(sc, (struct ifbreq *)data);</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     397 </span>            :         case SIOCBRDGDEL:
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                 if ((error = suser(curproc)) != 0)</span>
+<span class="lineNum">     399 </span>            :                         break;
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :                 error = switch_port_del(sc, (struct ifbreq *)data);</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     402 </span>            :         case SIOCBRDGIFS:
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                 error = switch_port_list(sc, (struct ifbifconf *)data);</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     405 </span>            :         case SIOCBRDGADDL:
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :                 if ((error = suser(curproc)) != 0)</span>
+<span class="lineNum">     407 </span>            :                         break;
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 error = switch_port_add(sc, (struct ifbreq *)data);</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                 if (error &amp;&amp; error != EEXIST)</span>
+<span class="lineNum">     410 </span>            :                         break;
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                 ifs = ifunit(breq-&gt;ifbr_ifsname);</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :                 if (ifs == NULL) {</span>
+<span class="lineNum">     413 </span>            :                         error = ENOENT;
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     415 </span>            :                 }
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :                 swpo = (struct switch_port *)ifs-&gt;if_switchport;</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 if (swpo == NULL || swpo-&gt;swpo_switch != sc) {</span>
+<span class="lineNum">     418 </span>            :                         error = ESRCH;
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     420 </span>            :                 }
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                 error = switch_port_set_local(sc, swpo);</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     423 </span>            :         case SIOCBRDGGIFFLGS:
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :                 ifs = ifunit(breq-&gt;ifbr_ifsname);</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :                 if (ifs == NULL) {</span>
+<span class="lineNum">     426 </span>            :                         error = ENOENT;
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     428 </span>            :                 }
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :                 swpo = (struct switch_port *)ifs-&gt;if_switchport;</span>
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :                 if (swpo == NULL || swpo-&gt;swpo_switch != sc) {</span>
+<span class="lineNum">     431 </span>            :                         error = ESRCH;
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     433 </span>            :                 }
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :                 breq-&gt;ifbr_ifsflags = swpo-&gt;swpo_flags;</span>
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :                 breq-&gt;ifbr_portno = swpo-&gt;swpo_port_no;</span>
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     437 </span>            :         case SIOCSIFFLAGS:
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                 if ((ifp-&gt;if_flags &amp; IFF_UP) == IFF_UP)</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_flags |= IFF_RUNNING;</span>
+<span class="lineNum">     440 </span>            : 
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                 if ((ifp-&gt;if_flags &amp; IFF_UP) == 0)</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_flags &amp;= ~IFF_RUNNING;</span>
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span>            :                 break;
+<span class="lineNum">     445 </span>            :         case SIOCBRDGRTS:
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                 baconf-&gt;ifbac_len = 0;</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     448 </span>            :         case SIOCBRDGGRL:
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                 bc-&gt;ifbrl_len = 0;</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     451 </span>            :         case SIOCBRDGGPARAM:
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                 if ((bp = bs-&gt;bs_root_port) == NULL)</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                         brop-&gt;ifbop_root_port = 0;</span>
+<span class="lineNum">     454 </span>            :                 else
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :                         brop-&gt;ifbop_root_port = bp-&gt;bp_ifp-&gt;if_index;</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_maxage = bs-&gt;bs_bridge_max_age &gt;&gt; 8;</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_hellotime = bs-&gt;bs_bridge_htime &gt;&gt; 8;</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_fwddelay = bs-&gt;bs_bridge_fdelay &gt;&gt; 8;</span>
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_holdcount = bs-&gt;bs_txholdcount;</span>
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_priority = bs-&gt;bs_bridge_priority;</span>
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_protocol = bs-&gt;bs_protover;</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_root_bridge = bs-&gt;bs_root_pv.pv_root_id;</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_root_path_cost = bs-&gt;bs_root_pv.pv_cost;</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_root_port = bs-&gt;bs_root_pv.pv_port_id;</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_desg_bridge = bs-&gt;bs_root_pv.pv_dbridge_id;</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_last_tc_time.tv_sec = bs-&gt;bs_last_tc_time.tv_sec;</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :                 brop-&gt;ifbop_last_tc_time.tv_usec = bs-&gt;bs_last_tc_time.tv_usec;</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     469 </span>            :         case SIOCSWGDPID:
+<span class="lineNum">     470 </span>            :         case SIOCSWSDPID:
+<span class="lineNum">     471 </span>            :         case SIOCSWGMAXFLOW:
+<span class="lineNum">     472 </span>            :         case SIOCSWGMAXGROUP:
+<span class="lineNum">     473 </span>            :         case SIOCSWSPORTNO:
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :                 error = swofp_ioctl(ifp, cmd, data);</span>
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     476 </span>            :         default:
+<span class="lineNum">     477 </span>            :                 error = ENOTTY;
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     479 </span>            :         }
+<span class="lineNum">     480 </span>            : 
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     482 </span>            : }
+<a name="483"><span class="lineNum">     483 </span>            : </a>
+<span class="lineNum">     484 </span>            : int
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 : switch_port_add(struct switch_softc *sc, struct ifbreq *req)</span>
+<span class="lineNum">     486 </span>            : {
+<span class="lineNum">     487 </span>            :         struct ifnet            *ifs;
+<span class="lineNum">     488 </span>            :         struct switch_port      *swpo;
+<span class="lineNum">     489 </span>            :         int                      error;
+<span class="lineNum">     490 </span>            : 
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :         if ((ifs = ifunit(req-&gt;ifbr_ifsname)) == NULL)</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :                 return (ENOENT);</span>
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :         if (ifs-&gt;if_bridgeport != NULL)</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :                 return (EBUSY);</span>
+<span class="lineNum">     496 </span>            : 
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :         if (ifs-&gt;if_switchport != NULL) {</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :                 swpo = (struct switch_port *)ifs-&gt;if_switchport;</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :                 if (swpo-&gt;swpo_switch == sc)</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :                         return (EEXIST);</span>
+<span class="lineNum">     501 </span>            :                 else
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                         return (EBUSY);</span>
+<span class="lineNum">     503 </span>            :         }
+<span class="lineNum">     504 </span>            : 
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         if (ifs-&gt;if_type == IFT_ETHER) {</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :                 if ((error = ifpromisc(ifs, 1)) != 0)</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     508 </span>            :         }
+<span class="lineNum">     509 </span>            : 
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :         swpo = malloc(sizeof(*swpo), M_DEVBUF, M_NOWAIT|M_ZERO);</span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :         if (swpo == NULL) {</span>
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :                 if (ifs-&gt;if_type == IFT_ETHER)</span>
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :                         ifpromisc(ifs, 0);</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     515 </span>            :         }
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :         swpo-&gt;swpo_switch = sc;</span>
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :         swpo-&gt;swpo_ifindex = ifs-&gt;if_index;</span>
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :         ifs-&gt;if_switchport = (caddr_t)swpo;</span>
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :         if_ih_insert(ifs, switch_input, NULL);</span>
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         swpo-&gt;swpo_port_no = swofp_assign_portno(sc, ifs-&gt;if_index);</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :         swpo-&gt;swpo_dhcookie = hook_establish(ifs-&gt;if_detachhooks, 0,</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :             switch_port_detach, ifs);</span>
+<span class="lineNum">     523 </span>            : 
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :         nanouptime(&amp;swpo-&gt;swpo_appended);</span>
+<span class="lineNum">     525 </span>            : 
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :         TAILQ_INSERT_TAIL(&amp;sc-&gt;sc_swpo_list, swpo, swpo_list_next);</span>
+<span class="lineNum">     527 </span>            : 
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 : }</span>
+<a name="530"><span class="lineNum">     530 </span>            : </a>
+<span class="lineNum">     531 </span>            : int
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 : switch_port_list(struct switch_softc *sc, struct ifbifconf *bifc)</span>
+<span class="lineNum">     533 </span>            : {
+<span class="lineNum">     534 </span>            :         struct switch_port      *swpo;
+<span class="lineNum">     535 </span>            :         struct ifnet            *ifs;
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         struct ifbreq            breq;</span>
+<span class="lineNum">     537 </span>            :         int                      total = 0, n = 0, error = 0;
+<span class="lineNum">     538 </span>            : 
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(swpo, &amp;sc-&gt;sc_swpo_list, swpo_list_next)</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                 total++;</span>
+<span class="lineNum">     541 </span>            : 
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :         if (bifc-&gt;ifbic_len == 0)</span>
+<span class="lineNum">     543 </span>            :                 goto done;
+<span class="lineNum">     544 </span>            : 
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(swpo, &amp;sc-&gt;sc_swpo_list, swpo_list_next) {</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :                 memset(&amp;breq, 0, sizeof(breq));</span>
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :                 if (bifc-&gt;ifbic_len &lt; sizeof(breq))</span>
+<span class="lineNum">     549 </span>            :                         break;
+<span class="lineNum">     550 </span>            : 
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :                 ifs = if_get(swpo-&gt;swpo_ifindex);</span>
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :                 if (ifs == NULL) {</span>
+<span class="lineNum">     553 </span>            :                         error = ENOENT;
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :                         goto done;</span>
+<span class="lineNum">     555 </span>            :                 }
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :                 strlcpy(breq.ifbr_ifsname, ifs-&gt;if_xname, IFNAMSIZ);</span>
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :                 if_put(ifs);</span>
+<span class="lineNum">     558 </span>            : 
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :                 strlcpy(breq.ifbr_name, sc-&gt;sc_if.if_xname, IFNAMSIZ);</span>
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :                 breq.ifbr_ifsflags = swpo-&gt;swpo_flags;</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                 breq.ifbr_portno = swpo-&gt;swpo_port_no;</span>
+<span class="lineNum">     562 </span>            : 
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                 if ((error = copyout((caddr_t)&amp;breq,</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :                     (caddr_t)(bifc-&gt;ifbic_req + n), sizeof(breq))) != 0)</span>
+<span class="lineNum">     565 </span>            :                         goto done;
+<span class="lineNum">     566 </span>            : 
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :                 bifc-&gt;ifbic_len -= sizeof(breq);</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                 n++;</span>
+<span class="lineNum">     569 </span>            :         }
+<span class="lineNum">     570 </span>            : 
+<span class="lineNum">     571 </span>            : done:
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :         bifc-&gt;ifbic_len = n * sizeof(breq);</span>
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 : }</span>
+<a name="575"><span class="lineNum">     575 </span>            : </a>
+<span class="lineNum">     576 </span>            : void
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 : switch_port_detach(void *arg)</span>
+<span class="lineNum">     578 </span>            : {
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :         struct ifnet            *ifp = (struct ifnet *)arg;</span>
+<span class="lineNum">     580 </span>            :         struct switch_softc     *sc;
+<span class="lineNum">     581 </span>            :         struct switch_port      *swpo;
+<span class="lineNum">     582 </span>            : 
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :         swpo = (struct switch_port *)ifp-&gt;if_switchport;</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :         sc = swpo-&gt;swpo_switch;</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :         if (swpo-&gt;swpo_flags &amp; IFBIF_LOCAL)</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 switch_port_unset_local(sc, swpo);</span>
+<span class="lineNum">     587 </span>            : 
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :         ifp-&gt;if_switchport = NULL;</span>
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :         hook_disestablish(ifp-&gt;if_detachhooks, swpo-&gt;swpo_dhcookie);</span>
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :         ifpromisc(ifp, 0);</span>
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :         if_ih_remove(ifp, switch_input, NULL);</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :         TAILQ_REMOVE(&amp;sc-&gt;sc_swpo_list, swpo, swpo_list_next);</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :         free(swpo, M_DEVBUF, sizeof(*swpo));</span>
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 : }</span>
+<a name="595"><span class="lineNum">     595 </span>            : </a>
+<span class="lineNum">     596 </span>            : int
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 : switch_port_del(struct switch_softc *sc, struct ifbreq *req)</span>
+<span class="lineNum">     598 </span>            : {
+<span class="lineNum">     599 </span>            :         struct switch_port      *swpo;
+<span class="lineNum">     600 </span>            :         struct ifnet            *ifs;
+<span class="lineNum">     601 </span>            :         int                      error = 0;
+<span class="lineNum">     602 </span>            : 
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(swpo, &amp;sc-&gt;sc_swpo_list, swpo_list_next) {</span>
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :                 if ((ifs = if_get(swpo-&gt;swpo_ifindex)) == NULL)</span>
+<span class="lineNum">     605 </span>            :                         continue;
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :                 if (strncmp(ifs-&gt;if_xname, req-&gt;ifbr_ifsname, IFNAMSIZ) == 0)</span>
+<span class="lineNum">     607 </span>            :                         break;
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                 if_put(ifs);</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     610 </span>            : 
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :         if (swpo) {</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                 switch_port_detach(ifs);</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :                 if_put(ifs);</span>
+<span class="lineNum">     614 </span>            :                 error = 0;
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     616 </span>            :                 error = ENOENT;
+<span class="lineNum">     617 </span>            : 
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     619 </span>            : }
+<a name="620"><span class="lineNum">     620 </span>            : </a>
+<span class="lineNum">     621 </span>            : int
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 : switch_input(struct ifnet *ifp, struct mbuf *m, void *cookie)</span>
+<span class="lineNum">     623 </span>            : {
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :         KASSERT(m-&gt;m_flags &amp; M_PKTHDR);</span>
+<span class="lineNum">     625 </span>            : 
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :         if (m-&gt;m_flags &amp; M_PROTO1) {</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :                 m-&gt;m_flags &amp;= ~M_PROTO1;</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     629 </span>            :         }
+<span class="lineNum">     630 </span>            : 
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :         niq_enqueue(&amp;switchintrq, m);</span>
+<span class="lineNum">     632 </span>            : 
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     635 </span>            : 
+<a name="636"><span class="lineNum">     636 </span>            : </a>
+<span class="lineNum">     637 </span>            : struct mbuf *
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 : switch_port_ingress(struct switch_softc *sc, struct ifnet *src_if,</span>
+<span class="lineNum">     639 </span>            :     struct mbuf *m)
+<span class="lineNum">     640 </span>            : {
+<span class="lineNum">     641 </span>            :         struct switch_port      *swpo;
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         struct ether_header      eh;</span>
+<span class="lineNum">     643 </span>            : 
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :         swpo = (struct switch_port *)src_if-&gt;if_switchport;</span>
+<span class="lineNum">     645 </span>            : 
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_ipackets++;</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_ibytes += m-&gt;m_pkthdr.len;</span>
+<span class="lineNum">     648 </span>            : 
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :         m_copydata(m, 0, ETHER_HDR_LEN, (caddr_t)&amp;eh);</span>
+<span class="lineNum">     650 </span>            : #if 0
+<span class="lineNum">     651 </span>            :         /* It's the &quot;#if 0&quot; because it doesn't test switch(4) with pf(4)
+<span class="lineNum">     652 </span>            :          * or with ipsec(4).
+<span class="lineNum">     653 </span>            :          */
+<span class="lineNum">     654 </span>            :         if ((m = bridge_ip((struct bridge_softc *)sc,
+<span class="lineNum">     655 </span>            :             PF_IN, src_if, &amp;eh, m)) == NULL) {
+<span class="lineNum">     656 </span>            :                 sc-&gt;sc_if.if_ierrors++;
+<span class="lineNum">     657 </span>            :                 return (NULL);
+<span class="lineNum">     658 </span>            :         }
+<span class="lineNum">     659 </span>            : #endif /* NPF */
+<span class="lineNum">     660 </span>            : 
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 : }</span>
+<a name="663"><span class="lineNum">     663 </span>            : </a>
+<span class="lineNum">     664 </span>            : void
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 : switch_port_egress(struct switch_softc *sc, struct switch_fwdp_queue *fwdp_q,</span>
+<span class="lineNum">     666 </span>            :     struct mbuf *m)
+<span class="lineNum">     667 </span>            : {
+<span class="lineNum">     668 </span>            :         struct switch_port      *swpo;
+<span class="lineNum">     669 </span>            :         struct ifnet            *dst_if;
+<span class="lineNum">     670 </span>            :         struct mbuf             *mc;
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :         struct ether_header      eh;</span>
+<span class="lineNum">     672 </span>            :         int                      len, used = 0;
+<span class="lineNum">     673 </span>            : 
+<span class="lineNum">     674 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_if.if_bpf)</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :                 bpf_mtap(sc-&gt;sc_if.if_bpf, m, BPF_DIRECTION_OUT);</span>
+<span class="lineNum">     677 </span>            : #endif
+<span class="lineNum">     678 </span>            : 
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :         m_copydata(m, 0, ETHER_HDR_LEN, (caddr_t)&amp;eh);</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(swpo, fwdp_q, swpo_fwdp_next) {</span>
+<span class="lineNum">     681 </span>            : 
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :                 if ((dst_if = if_get(swpo-&gt;swpo_ifindex)) == NULL)</span>
+<span class="lineNum">     683 </span>            :                         continue;
+<span class="lineNum">     684 </span>            : 
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :                 if ((dst_if-&gt;if_flags &amp; IFF_RUNNING) == 0)</span>
+<span class="lineNum">     686 </span>            :                         goto out;
+<span class="lineNum">     687 </span>            : 
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :                 if (TAILQ_NEXT(swpo, swpo_fwdp_next) == NULL) {</span>
+<span class="lineNum">     689 </span>            :                         mc = m;
+<span class="lineNum">     690 </span>            :                         used = 1;
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :                         mc = m_dup_pkt(m, ETHER_ALIGN, M_NOWAIT);</span>
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :                         if (mc == NULL)</span>
+<span class="lineNum">     694 </span>            :                                 goto out;
+<span class="lineNum">     695 </span>            :                 }
+<span class="lineNum">     696 </span>            : 
+<span class="lineNum">     697 </span>            : #if 0
+<span class="lineNum">     698 </span>            :                 /* It's the &quot;#if 0&quot; because it doesn't test switch(4) with pf(4)
+<span class="lineNum">     699 </span>            :                  * or with ipsec(4).
+<span class="lineNum">     700 </span>            :                  */
+<span class="lineNum">     701 </span>            :                 if ((mc = bridge_ip((struct bridge_softc *)sc,
+<span class="lineNum">     702 </span>            :                     PF_OUT, dst_if, &amp;eh, mc)) == NULL) {
+<span class="lineNum">     703 </span>            :                         sc-&gt;sc_if.if_ierrors++;
+<span class="lineNum">     704 </span>            :                         goto out;
+<span class="lineNum">     705 </span>            :                 }
+<span class="lineNum">     706 </span>            : #endif
+<span class="lineNum">     707 </span>            : 
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :                 len = mc-&gt;m_pkthdr.len;</span>
+<span class="lineNum">     709 </span>            : #if NVLAN &gt; 0
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :                 if ((mc-&gt;m_flags &amp; M_VLANTAG) &amp;&amp;</span>
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                     (dst_if-&gt;if_capabilities &amp; IFCAP_VLAN_HWTAGGING) == 0)</span>
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :                         len += ETHER_VLAN_ENCAP_LEN;</span>
+<span class="lineNum">     713 </span>            : #endif
+<span class="lineNum">     714 </span>            : 
+<span class="lineNum">     715 </span>            :                 /*
+<span class="lineNum">     716 </span>            :                  * Only if egress port has local port capabilities, it doesn't
+<span class="lineNum">     717 </span>            :                  * need fragment because a frame sends up local network stack.
+<span class="lineNum">     718 </span>            :                  */
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :                 if (!(swpo-&gt;swpo_flags &amp; IFBIF_LOCAL) &amp;&amp;</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :                     ((len - ETHER_HDR_LEN) &gt; dst_if-&gt;if_mtu))</span>
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :                         bridge_fragment((struct bridge_softc *)sc,</span>
+<span class="lineNum">     722 </span>            :                             dst_if, &amp;eh, mc);
+<span class="lineNum">     723 </span>            :                 else
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :                         switch_ifenqueue(sc, dst_if, mc,</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :                             (swpo-&gt;swpo_flags &amp; IFBIF_LOCAL));</span>
+<span class="lineNum">     726 </span>            :  out:
+<span class="lineNum">     727 </span>            : 
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :                 if_put(dst_if);</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     730 </span>            : 
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :         if (!used)</span>
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 : }</span>
+<a name="734"><span class="lineNum">     734 </span>            : </a>
+<span class="lineNum">     735 </span>            : int
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 : switch_ifenqueue(struct switch_softc *sc, struct ifnet *ifp,</span>
+<span class="lineNum">     737 </span>            :     struct mbuf *m, int local)
+<span class="lineNum">     738 </span>            : {
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :         struct mbuf_list         ml = MBUF_LIST_INITIALIZER();</span>
+<span class="lineNum">     740 </span>            :         int                      error, len;
+<span class="lineNum">     741 </span>            : 
+<span class="lineNum">     742 </span>            :         /* Loop prevention. */
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :         m-&gt;m_flags |= M_PROTO1;</span>
+<span class="lineNum">     744 </span>            : 
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :         len = m-&gt;m_pkthdr.len;</span>
+<span class="lineNum">     746 </span>            : 
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :         if (local) {</span>
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :                 ml_enqueue(&amp;ml, m);</span>
+<span class="lineNum">     749 </span><span class="lineNoCov">          0 :                 if_input(ifp, &amp;ml);</span>
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :                 error = if_enqueue(ifp, m);</span>
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :                 if (error) {</span>
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_if.if_oerrors++;</span>
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     755 </span>            :                 }
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_if.if_opackets++;</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_if.if_obytes += len;</span>
+<span class="lineNum">     758 </span>            :         }
+<span class="lineNum">     759 </span>            : 
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 : }</span>
+<a name="762"><span class="lineNum">     762 </span>            : </a>
+<span class="lineNum">     763 </span>            : void
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 : switch_port_ifb_start(struct ifnet *ifp)</span>
+<span class="lineNum">     765 </span>            : {
+<span class="lineNum">     766 </span>            :         struct mbuf             *m;
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :         struct mbuf_list         ml = MBUF_LIST_INITIALIZER();</span>
+<span class="lineNum">     768 </span>            : 
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :         for (;;) {</span>
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :                 IFQ_DEQUEUE(&amp;ifp-&gt;if_snd, m);</span>
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :                 if (m == NULL)</span>
+<span class="lineNum">     772 </span>            :                         return;
+<span class="lineNum">     773 </span>            : 
+<span class="lineNum">     774 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     775 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_bpf)</span>
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :                         bpf_mtap(ifp-&gt;if_bpf, m, BPF_DIRECTION_OUT);</span>
+<span class="lineNum">     777 </span>            : #endif /* NBPFILTER &gt; 0 */
+<span class="lineNum">     778 </span>            : 
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :                 ml_enqueue(&amp;ml, m);</span>
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :                 if_input(ifp, &amp;ml);</span>
+<span class="lineNum">     781 </span>            :         }
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     783 </span>            : 
+<span class="lineNum">     784 </span>            : /*
+<span class="lineNum">     785 </span>            :  * Flow Classifier
+<span class="lineNum">     786 </span>            :  */
+<a name="787"><span class="lineNum">     787 </span>            : </a>
+<span class="lineNum">     788 </span>            : int
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 : switch_swfcl_dup(struct switch_flow_classify *from,</span>
+<span class="lineNum">     790 </span>            :     struct switch_flow_classify *to)
+<span class="lineNum">     791 </span>            : {
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :         memset(to, 0, sizeof(*to));</span>
+<span class="lineNum">     793 </span>            : 
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :         to-&gt;swfcl_flow_hash = from-&gt;swfcl_flow_hash;</span>
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :         to-&gt;swfcl_metadata = from-&gt;swfcl_metadata;</span>
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 :         to-&gt;swfcl_cookie = from-&gt;swfcl_cookie;</span>
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :         to-&gt;swfcl_table_id = from-&gt;swfcl_table_id;</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :         to-&gt;swfcl_in_port = from-&gt;swfcl_in_port;</span>
+<span class="lineNum">     799 </span>            : 
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_tunnel) {</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_tunnel = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_tunnel == NULL)</span>
+<span class="lineNum">     803 </span>            :                         goto failed;
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_tunnel, from-&gt;swfcl_tunnel,</span>
+<span class="lineNum">     805 </span>            :                     sizeof(*from-&gt;swfcl_tunnel));
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_ether) {</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_ether = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_ether == NULL)</span>
+<span class="lineNum">     810 </span>            :                         goto failed;
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_ether, from-&gt;swfcl_ether,</span>
+<span class="lineNum">     812 </span>            :                     sizeof(*from-&gt;swfcl_ether));
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_vlan) {</span>
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_vlan = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_vlan == NULL)</span>
+<span class="lineNum">     817 </span>            :                         goto failed;
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_vlan, from-&gt;swfcl_vlan,</span>
+<span class="lineNum">     819 </span>            :                     sizeof(*from-&gt;swfcl_vlan));
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_ipv4) {</span>
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_ipv4 = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_ipv4 == NULL)</span>
+<span class="lineNum">     824 </span>            :                         goto failed;
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_ipv4, from-&gt;swfcl_ipv4,</span>
+<span class="lineNum">     826 </span>            :                     sizeof(*from-&gt;swfcl_ipv4));
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_ipv6) {</span>
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_ipv6 = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_ipv6 == NULL)</span>
+<span class="lineNum">     831 </span>            :                         goto failed;
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_ipv6, from-&gt;swfcl_ipv6,</span>
+<span class="lineNum">     833 </span>            :                     sizeof(*from-&gt;swfcl_ipv6));
+<span class="lineNum">     834 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_arp) {</span>
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_arp = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_arp == NULL)</span>
+<span class="lineNum">     838 </span>            :                         goto failed;
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_arp, from-&gt;swfcl_arp,</span>
+<span class="lineNum">     840 </span>            :                     sizeof(*from-&gt;swfcl_arp));
+<span class="lineNum">     841 </span>            : 
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     843 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_nd6) {</span>
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_nd6 = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_nd6 == NULL)</span>
+<span class="lineNum">     846 </span>            :                         goto failed;
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_nd6, from-&gt;swfcl_nd6,</span>
+<span class="lineNum">     848 </span>            :                     sizeof(*from-&gt;swfcl_nd6));
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_icmpv4) {</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_icmpv4 = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_icmpv4 == NULL)</span>
+<span class="lineNum">     853 </span>            :                         goto failed;
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_icmpv4, from-&gt;swfcl_icmpv4,</span>
+<span class="lineNum">     855 </span>            :                     sizeof(*from-&gt;swfcl_icmpv4));
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_icmpv6) {</span>
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_icmpv6 = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_icmpv6 == NULL)</span>
+<span class="lineNum">     860 </span>            :                         goto failed;
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_icmpv6, from-&gt;swfcl_icmpv6,</span>
+<span class="lineNum">     862 </span>            :                     sizeof(*from-&gt;swfcl_icmpv6));
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_tcp) {</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_tcp = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_tcp == NULL)</span>
+<span class="lineNum">     867 </span>            :                         goto failed;
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_tcp, from-&gt;swfcl_tcp,</span>
+<span class="lineNum">     869 </span>            :                     sizeof(*from-&gt;swfcl_tcp));
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_udp) {</span>
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_udp = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     873 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_udp == NULL)</span>
+<span class="lineNum">     874 </span>            :                         goto failed;
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_udp, from-&gt;swfcl_udp,</span>
+<span class="lineNum">     876 </span>            :                     sizeof(*from-&gt;swfcl_udp));
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :         if (from-&gt;swfcl_sctp) {</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :                 to-&gt;swfcl_sctp = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 :                 if (to-&gt;swfcl_sctp == NULL)</span>
+<span class="lineNum">     881 </span>            :                         goto failed;
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :                 memcpy(to-&gt;swfcl_sctp, from-&gt;swfcl_sctp,</span>
+<span class="lineNum">     883 </span>            :                     sizeof(*from-&gt;swfcl_sctp));
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     885 </span>            : 
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     887 </span>            :  failed:
+<span class="lineNum">     888 </span><span class="lineNoCov">          0 :         switch_swfcl_free(to);</span>
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :         return (ENOBUFS);</span>
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 : }</span>
+<a name="891"><span class="lineNum">     891 </span>            : </a>
+<span class="lineNum">     892 </span>            : void
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 : switch_swfcl_free(struct switch_flow_classify *swfcl)</span>
+<span class="lineNum">     894 </span>            : {
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_tunnel)</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_tunnel);</span>
+<span class="lineNum">     897 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_ether)</span>
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_ether);</span>
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_vlan)</span>
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_vlan);</span>
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_ipv4)</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_ipv4);</span>
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_ipv6)</span>
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_ipv6);</span>
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_arp)</span>
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_arp);</span>
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_nd6)</span>
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_nd6);</span>
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_icmpv4)</span>
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_icmpv4);</span>
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_icmpv6)</span>
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_icmpv6);</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_tcp)</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_tcp);</span>
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_udp)</span>
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_udp);</span>
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_sctp)</span>
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :                 pool_put(&amp;swfcl_pool, swfcl-&gt;swfcl_sctp);</span>
+<span class="lineNum">     919 </span>            : 
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :         memset(swfcl, 0, sizeof(*swfcl));</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 : }</span>
+<a name="922"><span class="lineNum">     922 </span>            : </a>
+<span class="lineNum">     923 </span>            : struct mbuf *
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 : switch_flow_classifier_udp(struct mbuf *m, int *offset,</span>
+<span class="lineNum">     925 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">     926 </span>            : {
+<span class="lineNum">     927 </span>            :         struct udphdr   *uh;
+<span class="lineNum">     928 </span>            : 
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_udp = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_udp == NULL) {</span>
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     933 </span>            :         }
+<span class="lineNum">     934 </span>            : 
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :         if (m-&gt;m_len &lt; (*offset + sizeof(*uh)) &amp;&amp;</span>
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :             (m = m_pullup(m, *offset + sizeof(*uh))) == NULL)</span>
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     938 </span>            : 
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :         uh = (struct udphdr *)((m)-&gt;m_data + *offset);</span>
+<span class="lineNum">     940 </span>            : 
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_udp-&gt;udp_src = uh-&gt;uh_sport;</span>
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_udp-&gt;udp_dst = uh-&gt;uh_dport;</span>
+<span class="lineNum">     943 </span>            : 
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 : }</span>
+<a name="946"><span class="lineNum">     946 </span>            : </a>
+<span class="lineNum">     947 </span>            : struct mbuf *
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 : switch_flow_classifier_tcp(struct mbuf *m, int *offset,</span>
+<span class="lineNum">     949 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">     950 </span>            : {
+<span class="lineNum">     951 </span>            :         struct tcphdr   *th;
+<span class="lineNum">     952 </span>            : 
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_tcp = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     954 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_tcp == NULL) {</span>
+<span class="lineNum">     955 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     957 </span>            :         }
+<span class="lineNum">     958 </span>            : 
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :         if (m-&gt;m_len &lt; (*offset + sizeof(*th)) &amp;&amp;</span>
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :             (m = m_pullup(m, *offset + sizeof(*th))) == NULL)</span>
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     962 </span>            : 
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         th = (struct tcphdr *)((m)-&gt;m_data + *offset);</span>
+<span class="lineNum">     964 </span>            : 
+<span class="lineNum">     965 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_tcp-&gt;tcp_src = th-&gt;th_sport;</span>
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_tcp-&gt;tcp_dst = th-&gt;th_dport;</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_tcp-&gt;tcp_flags = th-&gt;th_flags;</span>
+<span class="lineNum">     968 </span>            : 
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 : }</span>
+<a name="971"><span class="lineNum">     971 </span>            : </a>
+<span class="lineNum">     972 </span>            : struct mbuf *
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 : switch_flow_classifier_icmpv4(struct mbuf *m, int *offset,</span>
+<span class="lineNum">     974 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">     975 </span>            : {
+<span class="lineNum">     976 </span>            :         struct icmp     *icmp;
+<span class="lineNum">     977 </span>            : 
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_icmpv4 = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     979 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_icmpv4 == NULL) {</span>
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     982 </span>            :         }
+<span class="lineNum">     983 </span>            : 
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 :         if (m-&gt;m_len &lt; (*offset + ICMP_MINLEN) &amp;&amp;</span>
+<span class="lineNum">     985 </span><span class="lineNoCov">          0 :             (m = m_pullup(m, (*offset + ICMP_MINLEN))) == NULL)</span>
+<span class="lineNum">     986 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     987 </span>            : 
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :         icmp = (struct icmp *)((m)-&gt;m_data + *offset);</span>
+<span class="lineNum">     989 </span>            : 
+<span class="lineNum">     990 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_icmpv4-&gt;icmpv4_type = icmp-&gt;icmp_type;</span>
+<span class="lineNum">     991 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_icmpv4-&gt;icmpv4_code = icmp-&gt;icmp_code;</span>
+<span class="lineNum">     992 </span>            : 
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     995 </span>            : 
+<a name="996"><span class="lineNum">     996 </span>            : #ifdef INET6</a>
+<span class="lineNum">     997 </span>            : struct mbuf *
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 : switch_flow_classifier_nd6(struct mbuf *m, int *offset,</span>
+<span class="lineNum">     999 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">    1000 </span>            : {
+<span class="lineNum">    1001 </span>            :         struct icmp6_hdr                *icmp6;
+<span class="lineNum">    1002 </span>            :         struct nd_neighbor_advert       *nd_na;
+<span class="lineNum">    1003 </span>            :         struct nd_neighbor_solicit      *nd_ns;
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :         union nd_opts                    ndopts;</span>
+<span class="lineNum">    1005 </span>            :         uint8_t                         *lladdr;
+<span class="lineNum">    1006 </span>            :         int                              lladdrlen;
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 :         int                              icmp6len = m-&gt;m_pkthdr.len - *offset;</span>
+<span class="lineNum">    1008 </span>            : 
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 :         IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, *offset, sizeof(*icmp6));</span>
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :         if (icmp6 == NULL)</span>
+<span class="lineNum">    1011 </span>            :                 goto failed;
+<span class="lineNum">    1012 </span>            : 
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :         switch (icmp6-&gt;icmp6_type) {</span>
+<span class="lineNum">    1014 </span>            :         case ND_NEIGHBOR_ADVERT:
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :                 if (icmp6len &lt; sizeof(struct nd_neighbor_advert))</span>
+<span class="lineNum">    1016 </span>            :                         goto failed;
+<span class="lineNum">    1017 </span>            :                 break;
+<span class="lineNum">    1018 </span>            :         case ND_NEIGHBOR_SOLICIT:
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :                 if (icmp6len &lt; sizeof(struct nd_neighbor_solicit))</span>
+<span class="lineNum">    1020 </span>            :                         goto failed;
+<span class="lineNum">    1021 </span>            :                 break;
+<span class="lineNum">    1022 </span>            :         }
+<span class="lineNum">    1023 </span>            : 
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_nd6 = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_nd6 == NULL)</span>
+<span class="lineNum">    1026 </span>            :                 goto failed;
+<span class="lineNum">    1027 </span>            : 
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :         switch (icmp6-&gt;icmp6_type) {</span>
+<span class="lineNum">    1029 </span>            :         case ND_NEIGHBOR_ADVERT:
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :                 IP6_EXTHDR_GET(nd_na, struct nd_neighbor_advert *, m,</span>
+<span class="lineNum">    1031 </span>            :                     *offset, icmp6len);
+<span class="lineNum">    1032 </span>            : 
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :                 if (nd_na == NULL)</span>
+<span class="lineNum">    1034 </span>            :                         goto failed;
+<span class="lineNum">    1035 </span>            : 
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_nd6-&gt;nd6_target = nd_na-&gt;nd_na_target;</span>
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :                 icmp6len -= sizeof(*nd_na);</span>
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 :                 nd6_option_init(nd_na + 1, icmp6len, &amp;ndopts);</span>
+<span class="lineNum">    1039 </span><span class="lineNoCov">          0 :                 if (nd6_options(&amp;ndopts) &lt; 0)</span>
+<span class="lineNum">    1040 </span>            :                         goto failed;
+<span class="lineNum">    1041 </span>            : 
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :                 if (!ndopts.nd_opts_tgt_lladdr)</span>
+<span class="lineNum">    1043 </span>            :                         goto failed;
+<span class="lineNum">    1044 </span>            : 
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :                 lladdr = (char *)(ndopts.nd_opts_tgt_lladdr + 1);</span>
+<span class="lineNum">    1046 </span><span class="lineNoCov">          0 :                 lladdrlen = (ndopts.nd_opts_tgt_lladdr-&gt;nd_opt_len &lt;&lt; 3) - 2;</span>
+<span class="lineNum">    1047 </span>            : 
+<span class="lineNum">    1048 </span>            :                 /* switch(4) only supports Ethernet interfaces */
+<span class="lineNum">    1049 </span><span class="lineNoCov">          0 :                 if (lladdrlen != ETHER_ADDR_LEN)</span>
+<span class="lineNum">    1050 </span>            :                         goto failed;
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :                 memcpy(swfcl-&gt;swfcl_nd6-&gt;nd6_lladdr, lladdr, ETHER_ADDR_LEN);</span>
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1053 </span>            :         case ND_NEIGHBOR_SOLICIT:
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :                 IP6_EXTHDR_GET(nd_ns, struct nd_neighbor_solicit *, m,</span>
+<span class="lineNum">    1055 </span>            :                     *offset, icmp6len);
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :                 if (nd_ns == NULL)</span>
+<span class="lineNum">    1057 </span>            :                         goto failed;
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_nd6-&gt;nd6_target = nd_ns-&gt;nd_ns_target;</span>
+<span class="lineNum">    1059 </span><span class="lineNoCov">          0 :                 icmp6len -= sizeof(*nd_ns);</span>
+<span class="lineNum">    1060 </span>            : 
+<span class="lineNum">    1061 </span><span class="lineNoCov">          0 :                 nd6_option_init(nd_ns + 1, icmp6len, &amp;ndopts);</span>
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 :                 if (nd6_options(&amp;ndopts) &lt; 0)</span>
+<span class="lineNum">    1063 </span>            :                         goto failed;
+<span class="lineNum">    1064 </span>            : 
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 :                 if (!ndopts.nd_opts_src_lladdr)</span>
+<span class="lineNum">    1066 </span>            :                         goto failed;
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :                 lladdr = (char *)(ndopts.nd_opts_src_lladdr + 1);</span>
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 :                 lladdrlen = (ndopts.nd_opts_src_lladdr-&gt;nd_opt_len &lt;&lt; 3) - 2;</span>
+<span class="lineNum">    1069 </span>            : 
+<span class="lineNum">    1070 </span>            :                 /* switch(4) only supports Ethernet interfaces */
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :                 if (lladdrlen != ETHER_ADDR_LEN)</span>
+<span class="lineNum">    1072 </span>            :                         goto failed;
+<span class="lineNum">    1073 </span><span class="lineNoCov">          0 :                 memcpy(swfcl-&gt;swfcl_nd6-&gt;nd6_lladdr, lladdr, ETHER_ADDR_LEN);</span>
+<span class="lineNum">    1074 </span>            : 
+<span class="lineNum">    1075 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1076 </span>            :         }
+<span class="lineNum">    1077 </span>            : 
+<span class="lineNum">    1078 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">    1079 </span>            : 
+<span class="lineNum">    1080 </span>            :  failed:
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :         m_freem(m);</span>
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">    1083 </span><span class="lineNoCov">          0 : }</span>
+<a name="1084"><span class="lineNum">    1084 </span>            : </a>
+<span class="lineNum">    1085 </span>            : struct mbuf *
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 : switch_flow_classifier_icmpv6(struct mbuf *m, int *offset,</span>
+<span class="lineNum">    1087 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">    1088 </span>            : {
+<span class="lineNum">    1089 </span>            :         struct icmp6_hdr        *icmp6;
+<span class="lineNum">    1090 </span>            : 
+<span class="lineNum">    1091 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_icmpv6 = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_icmpv6 == NULL) {</span>
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1095 </span>            :         }
+<span class="lineNum">    1096 </span>            : 
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :         IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, *offset, sizeof(*icmp6));</span>
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 :         if (icmp6 == NULL)</span>
+<span class="lineNum">    1099 </span><span class="lineNoCov">          0 :                 return (NULL); /* m was already freed */</span>
+<span class="lineNum">    1100 </span>            : 
+<span class="lineNum">    1101 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_icmpv6-&gt;icmpv6_type = icmp6-&gt;icmp6_type;</span>
+<span class="lineNum">    1102 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_icmpv6-&gt;icmpv6_code = icmp6-&gt;icmp6_code;</span>
+<span class="lineNum">    1103 </span>            : 
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 :         switch (icmp6-&gt;icmp6_type) {</span>
+<span class="lineNum">    1105 </span>            :         case ND_NEIGHBOR_SOLICIT:
+<span class="lineNum">    1106 </span>            :         case ND_NEIGHBOR_ADVERT:
+<span class="lineNum">    1107 </span><span class="lineNoCov">          0 :                 return switch_flow_classifier_nd6(m, offset, swfcl);</span>
+<span class="lineNum">    1108 </span>            :         }
+<span class="lineNum">    1109 </span>            : 
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1112 </span>            : #endif /* INET6 */
+<a name="1113"><span class="lineNum">    1113 </span>            : </a>
+<span class="lineNum">    1114 </span>            : struct mbuf *
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 : switch_flow_classifier_ipv4(struct mbuf *m, int *offset,</span>
+<span class="lineNum">    1116 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">    1117 </span>            : {
+<span class="lineNum">    1118 </span>            :         struct ip       *ip;
+<span class="lineNum">    1119 </span>            : 
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv4 = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">    1121 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_ipv4 == NULL) {</span>
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1124 </span>            :         }
+<span class="lineNum">    1125 </span>            : 
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 :         if (m-&gt;m_len &lt; (*offset + sizeof(*ip)) &amp;&amp;</span>
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :             (m = m_pullup(m, *offset + sizeof(*ip))) == NULL)</span>
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1129 </span>            : 
+<span class="lineNum">    1130 </span><span class="lineNoCov">          0 :         ip = (struct ip *)((m)-&gt;m_data + *offset);</span>
+<span class="lineNum">    1131 </span>            : 
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv4-&gt;ipv4_tos = ip-&gt;ip_tos;</span>
+<span class="lineNum">    1133 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv4-&gt;ipv4_ttl = ip-&gt;ip_ttl;</span>
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv4-&gt;ipv4_proto = ip-&gt;ip_p;</span>
+<span class="lineNum">    1135 </span>            : 
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         memcpy(&amp;swfcl-&gt;swfcl_ipv4-&gt;ipv4_src, &amp;ip-&gt;ip_src.s_addr,</span>
+<span class="lineNum">    1137 </span>            :             sizeof(uint32_t));
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :         memcpy(&amp;swfcl-&gt;swfcl_ipv4-&gt;ipv4_dst, &amp;ip-&gt;ip_dst.s_addr,</span>
+<span class="lineNum">    1139 </span>            :             sizeof(uint32_t));
+<span class="lineNum">    1140 </span>            : 
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :         *offset += (ip-&gt;ip_hl &lt;&lt; 2);</span>
+<span class="lineNum">    1142 </span>            : 
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 :         switch (ip-&gt;ip_p) {</span>
+<span class="lineNum">    1144 </span>            :         case IPPROTO_UDP:
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :                 return switch_flow_classifier_udp(m, offset, swfcl);</span>
+<span class="lineNum">    1146 </span>            :         case IPPROTO_TCP:
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 :                 return switch_flow_classifier_tcp(m, offset, swfcl);</span>
+<span class="lineNum">    1148 </span>            :         case IPPROTO_ICMP:
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 :                 return switch_flow_classifier_icmpv4(m, offset, swfcl);</span>
+<span class="lineNum">    1150 </span>            :         }
+<span class="lineNum">    1151 </span>            : 
+<span class="lineNum">    1152 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">    1153 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1154 </span>            : 
+<a name="1155"><span class="lineNum">    1155 </span>            : #ifdef INET6</a>
+<span class="lineNum">    1156 </span>            : struct mbuf *
+<span class="lineNum">    1157 </span><span class="lineNoCov">          0 : switch_flow_classifier_ipv6(struct mbuf *m, int *offset,</span>
+<span class="lineNum">    1158 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">    1159 </span>            : {
+<span class="lineNum">    1160 </span>            :         struct ip6_hdr  *ip6;
+<span class="lineNum">    1161 </span>            : 
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv6 = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">    1163 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_ipv6 == NULL) {</span>
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1166 </span>            :         }
+<span class="lineNum">    1167 </span>            : 
+<span class="lineNum">    1168 </span><span class="lineNoCov">          0 :         if (m-&gt;m_len &lt; (*offset + sizeof(*ip6)) &amp;&amp;</span>
+<span class="lineNum">    1169 </span><span class="lineNoCov">          0 :             (m = m_pullup(m, *offset + sizeof(*ip6))) == NULL)</span>
+<span class="lineNum">    1170 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1171 </span>            : 
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :         ip6 = (struct ip6_hdr *)((m)-&gt;m_data + *offset);</span>
+<span class="lineNum">    1173 </span>            : 
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv6-&gt;ipv6_src = ip6-&gt;ip6_src;</span>
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv6-&gt;ipv6_dst = ip6-&gt;ip6_dst;</span>
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv6-&gt;ipv6_flow_label =</span>
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :             (ip6-&gt;ip6_flow &amp; IPV6_FLOWLABEL_MASK);</span>
+<span class="lineNum">    1178 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv6-&gt;ipv6_tclass = (ntohl(ip6-&gt;ip6_flow) &gt;&gt; 20);</span>
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv6-&gt;ipv6_hlimit = ip6-&gt;ip6_hlim;</span>
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ipv6-&gt;ipv6_nxt = ip6-&gt;ip6_nxt;</span>
+<span class="lineNum">    1181 </span>            : 
+<span class="lineNum">    1182 </span><span class="lineNoCov">          0 :         *offset += sizeof(*ip6);</span>
+<span class="lineNum">    1183 </span>            : 
+<span class="lineNum">    1184 </span><span class="lineNoCov">          0 :         switch (ip6-&gt;ip6_nxt) {</span>
+<span class="lineNum">    1185 </span>            :         case IPPROTO_UDP:
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :                 return switch_flow_classifier_udp(m, offset, swfcl);</span>
+<span class="lineNum">    1187 </span>            :         case IPPROTO_TCP:
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :                 return switch_flow_classifier_tcp(m, offset, swfcl);</span>
+<span class="lineNum">    1189 </span>            :         case IPPROTO_ICMPV6:
+<span class="lineNum">    1190 </span><span class="lineNoCov">          0 :                 return switch_flow_classifier_icmpv6(m, offset, swfcl);</span>
+<span class="lineNum">    1191 </span>            :         }
+<span class="lineNum">    1192 </span>            : 
+<span class="lineNum">    1193 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1195 </span>            : #endif /* INET6 */
+<a name="1196"><span class="lineNum">    1196 </span>            : </a>
+<span class="lineNum">    1197 </span>            : struct mbuf *
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 : switch_flow_classifier_arp(struct mbuf *m, int *offset,</span>
+<span class="lineNum">    1199 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">    1200 </span>            : {
+<span class="lineNum">    1201 </span>            :         struct ether_arp        *ea;
+<span class="lineNum">    1202 </span>            : 
+<span class="lineNum">    1203 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_arp = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">    1204 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_arp == NULL) {</span>
+<span class="lineNum">    1205 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1206 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1207 </span>            :         }
+<span class="lineNum">    1208 </span>            : 
+<span class="lineNum">    1209 </span><span class="lineNoCov">          0 :         if (m-&gt;m_len &lt; (*offset + sizeof(*ea)) &amp;&amp;</span>
+<span class="lineNum">    1210 </span><span class="lineNoCov">          0 :             (m = m_pullup(m, *offset + sizeof(*ea))) == NULL)</span>
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1212 </span>            : 
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :         ea = (struct ether_arp *)((m)-&gt;m_data + *offset);</span>
+<span class="lineNum">    1214 </span>            : 
+<span class="lineNum">    1215 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_arp-&gt;_arp_op = ea-&gt;arp_op;</span>
+<span class="lineNum">    1216 </span>            : 
+<span class="lineNum">    1217 </span><span class="lineNoCov">          0 :         memcpy(swfcl-&gt;swfcl_arp-&gt;arp_sha, &amp;ea-&gt;arp_sha, ETHER_ADDR_LEN);</span>
+<span class="lineNum">    1218 </span><span class="lineNoCov">          0 :         memcpy(swfcl-&gt;swfcl_arp-&gt;arp_tha, &amp;ea-&gt;arp_tha, ETHER_ADDR_LEN);</span>
+<span class="lineNum">    1219 </span><span class="lineNoCov">          0 :         memcpy(&amp;swfcl-&gt;swfcl_arp-&gt;arp_sip, &amp;ea-&gt;arp_spa, sizeof(uint32_t));</span>
+<span class="lineNum">    1220 </span><span class="lineNoCov">          0 :         memcpy(&amp;swfcl-&gt;swfcl_arp-&gt;arp_tip, &amp;ea-&gt;arp_tpa, sizeof(uint32_t));</span>
+<span class="lineNum">    1221 </span>            : 
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">    1223 </span><span class="lineNoCov">          0 : }</span>
+<a name="1224"><span class="lineNum">    1224 </span>            : </a>
+<span class="lineNum">    1225 </span>            : struct mbuf *
+<span class="lineNum">    1226 </span><span class="lineNoCov">          0 : switch_flow_classifier_ether(struct mbuf *m, int *offset,</span>
+<span class="lineNum">    1227 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">    1228 </span>            : {
+<span class="lineNum">    1229 </span>            :         struct ether_header             *eh;
+<span class="lineNum">    1230 </span>            :         struct ether_vlan_header        *evl;
+<span class="lineNum">    1231 </span>            :         uint16_t                         ether_type;
+<span class="lineNum">    1232 </span>            : 
+<span class="lineNum">    1233 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ether = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">    1234 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_ether == NULL) {</span>
+<span class="lineNum">    1235 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1237 </span>            :         }
+<span class="lineNum">    1238 </span>            : 
+<span class="lineNum">    1239 </span><span class="lineNoCov">          0 :         if (m-&gt;m_len &lt; sizeof(*eh) &amp;&amp; (m = m_pullup(m, sizeof(*eh))) == NULL)</span>
+<span class="lineNum">    1240 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1241 </span><span class="lineNoCov">          0 :         eh = mtod(m, struct ether_header *);</span>
+<span class="lineNum">    1242 </span>            : 
+<span class="lineNum">    1243 </span><span class="lineNoCov">          0 :         memcpy(swfcl-&gt;swfcl_ether-&gt;eth_src, eh-&gt;ether_shost, ETHER_ADDR_LEN);</span>
+<span class="lineNum">    1244 </span><span class="lineNoCov">          0 :         memcpy(swfcl-&gt;swfcl_ether-&gt;eth_dst, eh-&gt;ether_dhost, ETHER_ADDR_LEN);</span>
+<span class="lineNum">    1245 </span>            : 
+<span class="lineNum">    1246 </span><span class="lineNoCov">          0 :         if ((m-&gt;m_flags &amp; M_VLANTAG) ||</span>
+<span class="lineNum">    1247 </span><span class="lineNoCov">          0 :             (ntohs(eh-&gt;ether_type) == ETHERTYPE_VLAN) ||</span>
+<span class="lineNum">    1248 </span><span class="lineNoCov">          0 :             (ntohs(eh-&gt;ether_type) == ETHERTYPE_QINQ)) {</span>
+<span class="lineNum">    1249 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_vlan = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">    1250 </span><span class="lineNoCov">          0 :                 if (swfcl-&gt;swfcl_vlan == NULL) {</span>
+<span class="lineNum">    1251 </span><span class="lineNoCov">          0 :                         m_freem(m);</span>
+<span class="lineNum">    1252 </span><span class="lineNoCov">          0 :                         return (NULL);</span>
+<span class="lineNum">    1253 </span>            :                 }
+<span class="lineNum">    1254 </span>            :         }
+<span class="lineNum">    1255 </span>            : 
+<span class="lineNum">    1256 </span><span class="lineNoCov">          0 :         if (m-&gt;m_flags &amp; M_VLANTAG) {</span>
+<span class="lineNum">    1257 </span>            :                 /*
+<span class="lineNum">    1258 </span>            :                  * Hardware VLAN tagging is only supported for 801.1Q VLAN,
+<span class="lineNum">    1259 </span>            :                  * but not for 802.1ad QinQ.
+<span class="lineNum">    1260 </span>            :                  */
+<span class="lineNum">    1261 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_vlan-&gt;vlan_tpid = htons(ETHERTYPE_VLAN);</span>
+<span class="lineNum">    1262 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_vlan-&gt;vlan_vid =</span>
+<span class="lineNum">    1263 </span><span class="lineNoCov">          0 :                     htons(EVL_VLANOFTAG(m-&gt;m_pkthdr.ether_vtag));</span>
+<span class="lineNum">    1264 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_vlan-&gt;vlan_pcp =</span>
+<span class="lineNum">    1265 </span><span class="lineNoCov">          0 :                     EVL_PRIOFTAG(m-&gt;m_pkthdr.ether_vtag);</span>
+<span class="lineNum">    1266 </span><span class="lineNoCov">          0 :                 ether_type = eh-&gt;ether_type;</span>
+<span class="lineNum">    1267 </span><span class="lineNoCov">          0 :                 *offset += sizeof(*eh);</span>
+<span class="lineNum">    1268 </span><span class="lineNoCov">          0 :         } else if (ntohs(eh-&gt;ether_type) == ETHERTYPE_VLAN) {</span>
+<span class="lineNum">    1269 </span><span class="lineNoCov">          0 :                 if (m-&gt;m_len &lt; sizeof(*evl) &amp;&amp;</span>
+<span class="lineNum">    1270 </span><span class="lineNoCov">          0 :                     (m = m_pullup(m, sizeof(*evl))) == NULL)</span>
+<span class="lineNum">    1271 </span><span class="lineNoCov">          0 :                         return (NULL);</span>
+<span class="lineNum">    1272 </span><span class="lineNoCov">          0 :                 evl = mtod(m, struct ether_vlan_header *);</span>
+<span class="lineNum">    1273 </span>            : 
+<span class="lineNum">    1274 </span>            :                 /*
+<span class="lineNum">    1275 </span>            :                  * Software VLAN tagging is currently only supported for
+<span class="lineNum">    1276 </span>            :                  * 801.1Q VLAN, but not for 802.1ad QinQ.
+<span class="lineNum">    1277 </span>            :                  */
+<span class="lineNum">    1278 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_vlan-&gt;vlan_tpid = htons(ETHERTYPE_VLAN);</span>
+<span class="lineNum">    1279 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_vlan-&gt;vlan_vid =</span>
+<span class="lineNum">    1280 </span><span class="lineNoCov">          0 :                     (evl-&gt;evl_tag &amp; htons(EVL_VLID_MASK));</span>
+<span class="lineNum">    1281 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_vlan-&gt;vlan_pcp =</span>
+<span class="lineNum">    1282 </span><span class="lineNoCov">          0 :                     EVL_PRIOFTAG(ntohs(evl-&gt;evl_tag));</span>
+<span class="lineNum">    1283 </span><span class="lineNoCov">          0 :                 ether_type = evl-&gt;evl_proto;</span>
+<span class="lineNum">    1284 </span><span class="lineNoCov">          0 :                 *offset += sizeof(*evl);</span>
+<span class="lineNum">    1285 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1286 </span>            :                 ether_type = eh-&gt;ether_type;
+<span class="lineNum">    1287 </span><span class="lineNoCov">          0 :                 *offset += sizeof(*eh);</span>
+<span class="lineNum">    1288 </span>            :         }
+<span class="lineNum">    1289 </span>            : 
+<span class="lineNum">    1290 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_ether-&gt;eth_type = ether_type;</span>
+<span class="lineNum">    1291 </span>            : 
+<span class="lineNum">    1292 </span><span class="lineNoCov">          0 :         ether_type = ntohs(ether_type);</span>
+<span class="lineNum">    1293 </span><span class="lineNoCov">          0 :         switch (ether_type) {</span>
+<span class="lineNum">    1294 </span>            :         case ETHERTYPE_ARP:
+<span class="lineNum">    1295 </span><span class="lineNoCov">          0 :                 return switch_flow_classifier_arp(m, offset, swfcl);</span>
+<span class="lineNum">    1296 </span>            :         case ETHERTYPE_IP:
+<span class="lineNum">    1297 </span><span class="lineNoCov">          0 :                 return switch_flow_classifier_ipv4(m, offset, swfcl);</span>
+<span class="lineNum">    1298 </span>            : #ifdef INET6
+<span class="lineNum">    1299 </span>            :         case ETHERTYPE_IPV6:
+<span class="lineNum">    1300 </span><span class="lineNoCov">          0 :                 return switch_flow_classifier_ipv6(m, offset, swfcl);</span>
+<span class="lineNum">    1301 </span>            : #endif /* INET6 */
+<span class="lineNum">    1302 </span>            :         case ETHERTYPE_MPLS:
+<span class="lineNum">    1303 </span>            :                 /* unsupported yet */
+<span class="lineNum">    1304 </span>            :                 break;
+<span class="lineNum">    1305 </span>            :         }
+<span class="lineNum">    1306 </span>            : 
+<span class="lineNum">    1307 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">    1308 </span><span class="lineNoCov">          0 : }</span>
+<a name="1309"><span class="lineNum">    1309 </span>            : </a>
+<span class="lineNum">    1310 </span>            : struct mbuf *
+<span class="lineNum">    1311 </span><span class="lineNoCov">          0 : switch_flow_classifier_tunnel(struct mbuf *m, int *offset,</span>
+<span class="lineNum">    1312 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">    1313 </span>            : {
+<span class="lineNum">    1314 </span>            :         struct bridge_tunneltag *brtag;
+<span class="lineNum">    1315 </span>            : 
+<span class="lineNum">    1316 </span><span class="lineNoCov">          0 :         if ((brtag = bridge_tunnel(m)) == NULL)</span>
+<span class="lineNum">    1317 </span>            :                 goto out;
+<span class="lineNum">    1318 </span>            : 
+<span class="lineNum">    1319 </span><span class="lineNoCov">          0 :         if ((brtag-&gt;brtag_peer.sa.sa_family != AF_INET) &amp;&amp;</span>
+<span class="lineNum">    1320 </span><span class="lineNoCov">          0 :             (brtag-&gt;brtag_peer.sa.sa_family != AF_INET6))</span>
+<span class="lineNum">    1321 </span>            :                 goto out;
+<span class="lineNum">    1322 </span>            : 
+<span class="lineNum">    1323 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_tunnel = pool_get(&amp;swfcl_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">    1324 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_tunnel == NULL) {</span>
+<span class="lineNum">    1325 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1326 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1327 </span>            :         }
+<span class="lineNum">    1328 </span>            : 
+<span class="lineNum">    1329 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_tunnel-&gt;tun_af = brtag-&gt;brtag_peer.sa.sa_family;</span>
+<span class="lineNum">    1330 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_tunnel-&gt;tun_key = htobe64(brtag-&gt;brtag_id);</span>
+<span class="lineNum">    1331 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_tunnel-&gt;tun_af == AF_INET) {</span>
+<span class="lineNum">    1332 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_tunnel-&gt;tun_ipv4_src =</span>
+<span class="lineNum">    1333 </span><span class="lineNoCov">          0 :                     brtag-&gt;brtag_local.sin.sin_addr;</span>
+<span class="lineNum">    1334 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_tunnel-&gt;tun_ipv4_dst =</span>
+<span class="lineNum">    1335 </span><span class="lineNoCov">          0 :                     brtag-&gt;brtag_peer.sin.sin_addr;</span>
+<span class="lineNum">    1336 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1337 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_tunnel-&gt;tun_ipv6_src =</span>
+<span class="lineNum">    1338 </span><span class="lineNoCov">          0 :                     brtag-&gt;brtag_local.sin6.sin6_addr;</span>
+<span class="lineNum">    1339 </span><span class="lineNoCov">          0 :                 swfcl-&gt;swfcl_tunnel-&gt;tun_ipv6_dst =</span>
+<span class="lineNum">    1340 </span><span class="lineNoCov">          0 :                     brtag-&gt;brtag_peer.sin6.sin6_addr;</span>
+<span class="lineNum">    1341 </span>            :         }
+<span class="lineNum">    1342 </span><span class="lineNoCov">          0 :         bridge_tunneluntag(m);</span>
+<span class="lineNum">    1343 </span>            :  out:
+<span class="lineNum">    1344 </span><span class="lineNoCov">          0 :         return switch_flow_classifier_ether(m, offset, swfcl);</span>
+<span class="lineNum">    1345 </span><span class="lineNoCov">          0 : }</span>
+<a name="1346"><span class="lineNum">    1346 </span>            : </a>
+<span class="lineNum">    1347 </span>            : struct mbuf *
+<span class="lineNum">    1348 </span><span class="lineNoCov">          0 : switch_flow_classifier(struct mbuf *m, uint32_t in_port,</span>
+<span class="lineNum">    1349 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">    1350 </span>            : {
+<span class="lineNum">    1351 </span><span class="lineNoCov">          0 :         int      offset = 0;</span>
+<span class="lineNum">    1352 </span>            : 
+<span class="lineNum">    1353 </span><span class="lineNoCov">          0 :         memset(swfcl, 0, sizeof(*swfcl));</span>
+<span class="lineNum">    1354 </span><span class="lineNoCov">          0 :         swfcl-&gt;swfcl_in_port = in_port;</span>
+<span class="lineNum">    1355 </span>            : 
+<span class="lineNum">    1356 </span><span class="lineNoCov">          0 :         return switch_flow_classifier_tunnel(m, &amp;offset, swfcl);</span>
+<span class="lineNum">    1357 </span><span class="lineNoCov">          0 : }</span>
+<a name="1358"><span class="lineNum">    1358 </span>            : </a>
+<span class="lineNum">    1359 </span>            : void
+<span class="lineNum">    1360 </span><span class="lineNoCov">          0 : switch_flow_classifier_dump(struct switch_softc *sc,</span>
+<span class="lineNum">    1361 </span>            :     struct switch_flow_classify *swfcl)
+<span class="lineNum">    1362 </span>            : {
+<span class="lineNum">    1363 </span><span class="lineNoCov">          0 :         char    saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];</span>
+<span class="lineNum">    1364 </span>            : 
+<span class="lineNum">    1365 </span><span class="lineNoCov">          0 :         log(LOG_DEBUG, &quot;%s: &quot;, sc-&gt;sc_if.if_xname);</span>
+<span class="lineNum">    1366 </span><span class="lineNoCov">          0 :         addlog(&quot;in_port(%u),&quot;, swfcl-&gt;swfcl_in_port);</span>
+<span class="lineNum">    1367 </span>            : 
+<span class="lineNum">    1368 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_tunnel) {</span>
+<span class="lineNum">    1369 </span><span class="lineNoCov">          0 :                 if (swfcl-&gt;swfcl_tunnel-&gt;tun_af == AF_INET) {</span>
+<span class="lineNum">    1370 </span><span class="lineNoCov">          0 :                         inet_ntop(AF_INET,</span>
+<span class="lineNum">    1371 </span><span class="lineNoCov">          0 :                             (void *)&amp;swfcl-&gt;swfcl_tunnel-&gt;tun_ipv4_src,</span>
+<span class="lineNum">    1372 </span><span class="lineNoCov">          0 :                             saddr, sizeof(saddr));</span>
+<span class="lineNum">    1373 </span><span class="lineNoCov">          0 :                         inet_ntop(AF_INET,</span>
+<span class="lineNum">    1374 </span><span class="lineNoCov">          0 :                             (void *)&amp;swfcl-&gt;swfcl_tunnel-&gt;tun_ipv4_dst,</span>
+<span class="lineNum">    1375 </span><span class="lineNoCov">          0 :                             daddr, sizeof(daddr));</span>
+<span class="lineNum">    1376 </span><span class="lineNoCov">          0 :                         addlog(&quot;tun_ipv4_src(%s),tun_ipv4_dst(%s),&quot;</span>
+<span class="lineNum">    1377 </span>            :                             &quot;tun_id(%llu),&quot;, saddr, daddr,
+<span class="lineNum">    1378 </span><span class="lineNoCov">          0 :                             be64toh(swfcl-&gt;swfcl_tunnel-&gt;tun_key));</span>
+<span class="lineNum">    1379 </span><span class="lineNoCov">          0 :                 } else if (swfcl-&gt;swfcl_tunnel-&gt;tun_af == AF_INET6) {</span>
+<span class="lineNum">    1380 </span><span class="lineNoCov">          0 :                         inet_ntop(AF_INET6,</span>
+<span class="lineNum">    1381 </span><span class="lineNoCov">          0 :                             (void *)&amp;swfcl-&gt;swfcl_tunnel-&gt;tun_ipv6_src,</span>
+<span class="lineNum">    1382 </span><span class="lineNoCov">          0 :                             saddr, sizeof(saddr));</span>
+<span class="lineNum">    1383 </span><span class="lineNoCov">          0 :                         inet_ntop(AF_INET6,</span>
+<span class="lineNum">    1384 </span><span class="lineNoCov">          0 :                             (void *)&amp;swfcl-&gt;swfcl_tunnel-&gt;tun_ipv6_dst,</span>
+<span class="lineNum">    1385 </span><span class="lineNoCov">          0 :                             daddr, sizeof(daddr));</span>
+<span class="lineNum">    1386 </span><span class="lineNoCov">          0 :                         addlog(&quot;tun_ipv6_src(%s) tun_ipv6_dst(%s),&quot;</span>
+<span class="lineNum">    1387 </span>            :                             &quot;tun_id(%llu),&quot;, saddr, daddr,
+<span class="lineNum">    1388 </span><span class="lineNoCov">          0 :                             be64toh(swfcl-&gt;swfcl_tunnel-&gt;tun_key));</span>
+<span class="lineNum">    1389 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1390 </span>            :         }
+<span class="lineNum">    1391 </span>            : 
+<span class="lineNum">    1392 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_vlan) {</span>
+<span class="lineNum">    1393 </span><span class="lineNoCov">          0 :                 addlog(&quot;vlan_tpid(0x%0x4x),vlan_pcp(%u),vlan_vid(%u),&quot;,</span>
+<span class="lineNum">    1394 </span><span class="lineNoCov">          0 :                     ntohs(swfcl-&gt;swfcl_vlan-&gt;vlan_tpid),</span>
+<span class="lineNum">    1395 </span><span class="lineNoCov">          0 :                     swfcl-&gt;swfcl_vlan-&gt;vlan_pcp,</span>
+<span class="lineNum">    1396 </span><span class="lineNoCov">          0 :                     ntohs(swfcl-&gt;swfcl_vlan-&gt;vlan_vid));</span>
+<span class="lineNum">    1397 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1398 </span>            : 
+<span class="lineNum">    1399 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_ether) {</span>
+<span class="lineNum">    1400 </span><span class="lineNoCov">          0 :                 addlog(&quot;eth_dst(%s),eth_src(%s),eth_type(0x%04x)&quot;,</span>
+<span class="lineNum">    1401 </span><span class="lineNoCov">          0 :                     ether_sprintf(swfcl-&gt;swfcl_ether-&gt;eth_dst),</span>
+<span class="lineNum">    1402 </span><span class="lineNoCov">          0 :                     ether_sprintf(swfcl-&gt;swfcl_ether-&gt;eth_src),</span>
+<span class="lineNum">    1403 </span><span class="lineNoCov">          0 :                     ntohs(swfcl-&gt;swfcl_ether-&gt;eth_type));</span>
+<span class="lineNum">    1404 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1405 </span>            : 
+<span class="lineNum">    1406 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_arp) {</span>
+<span class="lineNum">    1407 </span><span class="lineNoCov">          0 :                 inet_ntop(AF_INET, (void *)&amp;swfcl-&gt;swfcl_arp-&gt;arp_sip,</span>
+<span class="lineNum">    1408 </span><span class="lineNoCov">          0 :                     saddr, sizeof(saddr));</span>
+<span class="lineNum">    1409 </span><span class="lineNoCov">          0 :                 inet_ntop(AF_INET, (void *)&amp;swfcl-&gt;swfcl_arp-&gt;arp_tip,</span>
+<span class="lineNum">    1410 </span><span class="lineNoCov">          0 :                     daddr, sizeof(daddr));</span>
+<span class="lineNum">    1411 </span><span class="lineNoCov">          0 :                 addlog(&quot;arp_op(%x),arp_tha(%s),arp_sha(%s),arp_sip(%s),&quot;</span>
+<span class="lineNum">    1412 </span><span class="lineNoCov">          0 :                     &quot;arp_tip(%s),&quot;, swfcl-&gt;swfcl_arp-&gt;_arp_op,</span>
+<span class="lineNum">    1413 </span><span class="lineNoCov">          0 :                     ether_sprintf(swfcl-&gt;swfcl_arp-&gt;arp_tha),</span>
+<span class="lineNum">    1414 </span><span class="lineNoCov">          0 :                     ether_sprintf(swfcl-&gt;swfcl_arp-&gt;arp_sha), saddr, daddr);</span>
+<span class="lineNum">    1415 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1416 </span>            : 
+<span class="lineNum">    1417 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_ipv4) {</span>
+<span class="lineNum">    1418 </span><span class="lineNoCov">          0 :                 inet_ntop(AF_INET, (void *)&amp;swfcl-&gt;swfcl_ipv4-&gt;ipv4_src,</span>
+<span class="lineNum">    1419 </span><span class="lineNoCov">          0 :                     saddr, sizeof(saddr));</span>
+<span class="lineNum">    1420 </span><span class="lineNoCov">          0 :                 inet_ntop(AF_INET, (void *)&amp;swfcl-&gt;swfcl_ipv4-&gt;ipv4_dst,</span>
+<span class="lineNum">    1421 </span><span class="lineNoCov">          0 :                     daddr, sizeof(daddr));</span>
+<span class="lineNum">    1422 </span><span class="lineNoCov">          0 :                 addlog(&quot;ip_proto(%u),ip_tos(%u),ip_ttl(%u),ip_src(%s),&quot;</span>
+<span class="lineNum">    1423 </span><span class="lineNoCov">          0 :                     &quot;ip_dst(%s),&quot;, swfcl-&gt;swfcl_ipv4-&gt;ipv4_proto,</span>
+<span class="lineNum">    1424 </span><span class="lineNoCov">          0 :                     swfcl-&gt;swfcl_ipv4-&gt;ipv4_tos, swfcl-&gt;swfcl_ipv4-&gt;ipv4_ttl,</span>
+<span class="lineNum">    1425 </span>            :                     saddr, daddr);
+<span class="lineNum">    1426 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1427 </span>            : 
+<span class="lineNum">    1428 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_ipv6) {</span>
+<span class="lineNum">    1429 </span><span class="lineNoCov">          0 :                 inet_ntop(AF_INET6, (void *)&amp;swfcl-&gt;swfcl_ipv6-&gt;ipv6_src,</span>
+<span class="lineNum">    1430 </span><span class="lineNoCov">          0 :                     saddr, sizeof(saddr));</span>
+<span class="lineNum">    1431 </span><span class="lineNoCov">          0 :                 inet_ntop(AF_INET6, (void *)&amp;swfcl-&gt;swfcl_ipv6-&gt;ipv6_dst,</span>
+<span class="lineNum">    1432 </span><span class="lineNoCov">          0 :                     daddr, sizeof(daddr));</span>
+<span class="lineNum">    1433 </span><span class="lineNoCov">          0 :                 addlog(&quot;ip6_nxt(%u),ip6_flow_label(%u),ip6_tclass(%d),&quot;</span>
+<span class="lineNum">    1434 </span>            :                     &quot;ip6_hlimit(%u),ip6_src(%s),ip6_dst(%s),&quot;,
+<span class="lineNum">    1435 </span><span class="lineNoCov">          0 :                     swfcl-&gt;swfcl_ipv6-&gt;ipv6_nxt,</span>
+<span class="lineNum">    1436 </span><span class="lineNoCov">          0 :                     ntohl(swfcl-&gt;swfcl_ipv6-&gt;ipv6_flow_label),</span>
+<span class="lineNum">    1437 </span><span class="lineNoCov">          0 :                     swfcl-&gt;swfcl_ipv6-&gt;ipv6_tclass,</span>
+<span class="lineNum">    1438 </span><span class="lineNoCov">          0 :                     swfcl-&gt;swfcl_ipv6-&gt;ipv6_hlimit, saddr, daddr);</span>
+<span class="lineNum">    1439 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1440 </span>            : 
+<span class="lineNum">    1441 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_icmpv4) {</span>
+<span class="lineNum">    1442 </span><span class="lineNoCov">          0 :                 addlog(&quot;icmp_type(%u),icmp_code(%u),&quot;,</span>
+<span class="lineNum">    1443 </span><span class="lineNoCov">          0 :                     swfcl-&gt;swfcl_icmpv4-&gt;icmpv4_type,</span>
+<span class="lineNum">    1444 </span><span class="lineNoCov">          0 :                     swfcl-&gt;swfcl_icmpv4-&gt;icmpv4_code);</span>
+<span class="lineNum">    1445 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1446 </span>            : 
+<span class="lineNum">    1447 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_icmpv6) {</span>
+<span class="lineNum">    1448 </span><span class="lineNoCov">          0 :                 addlog(&quot;icmp6_type(%u),icmp6_code(%u),&quot;,</span>
+<span class="lineNum">    1449 </span><span class="lineNoCov">          0 :                     swfcl-&gt;swfcl_icmpv6-&gt;icmpv6_type,</span>
+<span class="lineNum">    1450 </span><span class="lineNoCov">          0 :                     swfcl-&gt;swfcl_icmpv6-&gt;icmpv6_code);</span>
+<span class="lineNum">    1451 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1452 </span>            : 
+<span class="lineNum">    1453 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_nd6) {</span>
+<span class="lineNum">    1454 </span><span class="lineNoCov">          0 :                 inet_ntop(AF_INET6, (void *)&amp;swfcl-&gt;swfcl_nd6-&gt;nd6_target,</span>
+<span class="lineNum">    1455 </span><span class="lineNoCov">          0 :                     saddr, sizeof(saddr));</span>
+<span class="lineNum">    1456 </span><span class="lineNoCov">          0 :                 addlog(&quot;nd_target(%s),nd_lladdr(%s),&quot;, saddr,</span>
+<span class="lineNum">    1457 </span><span class="lineNoCov">          0 :                     ether_sprintf(swfcl-&gt;swfcl_nd6-&gt;nd6_lladdr));</span>
+<span class="lineNum">    1458 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1459 </span>            : 
+<span class="lineNum">    1460 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_tcp) {</span>
+<span class="lineNum">    1461 </span><span class="lineNoCov">          0 :                 addlog(&quot;tcp_src(%u),tcp_dst(%u),tcp_flags(%x),&quot;,</span>
+<span class="lineNum">    1462 </span><span class="lineNoCov">          0 :                     ntohs(swfcl-&gt;swfcl_tcp-&gt;tcp_src),</span>
+<span class="lineNum">    1463 </span><span class="lineNoCov">          0 :                     ntohs(swfcl-&gt;swfcl_tcp-&gt;tcp_dst),</span>
+<span class="lineNum">    1464 </span><span class="lineNoCov">          0 :                     swfcl-&gt;swfcl_tcp-&gt;tcp_flags);</span>
+<span class="lineNum">    1465 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1466 </span>            : 
+<span class="lineNum">    1467 </span><span class="lineNoCov">          0 :         if (swfcl-&gt;swfcl_udp) {</span>
+<span class="lineNum">    1468 </span><span class="lineNoCov">          0 :                 addlog(&quot;udp_src(%u),udp_dst(%u),&quot;,</span>
+<span class="lineNum">    1469 </span><span class="lineNoCov">          0 :                     ntohs(swfcl-&gt;swfcl_udp-&gt;udp_src),</span>
+<span class="lineNum">    1470 </span><span class="lineNoCov">          0 :                     ntohs(swfcl-&gt;swfcl_udp-&gt;udp_dst));</span>
+<span class="lineNum">    1471 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1472 </span>            : 
+<span class="lineNum">    1473 </span><span class="lineNoCov">          0 :         addlog(&quot;\n&quot;);</span>
+<span class="lineNum">    1474 </span><span class="lineNoCov">          0 : }</span>
+<a name="1475"><span class="lineNum">    1475 </span>            : </a>
+<span class="lineNum">    1476 </span>            : int
+<span class="lineNum">    1477 </span><span class="lineNoCov">          0 : switch_mtap(caddr_t arg, struct mbuf *m, int dir, uint64_t datapath_id)</span>
+<span class="lineNum">    1478 </span>            : {
+<span class="lineNum">    1479 </span><span class="lineNoCov">          0 :         struct dlt_openflow_hdr  of;</span>
+<span class="lineNum">    1480 </span>            : 
+<span class="lineNum">    1481 </span><span class="lineNoCov">          0 :         of.of_datapath_id = htobe64(datapath_id);</span>
+<span class="lineNum">    1482 </span><span class="lineNoCov">          0 :         of.of_direction = htonl(dir == BPF_DIRECTION_IN ?</span>
+<span class="lineNum">    1483 </span>            :             DLT_OPENFLOW_TO_SWITCH : DLT_OPENFLOW_TO_CONTROLLER);
+<span class="lineNum">    1484 </span>            : 
+<span class="lineNum">    1485 </span><span class="lineNoCov">          0 :         return (bpf_mtap_hdr(arg, (caddr_t)&amp;of, sizeof(of), m, dir, NULL));</span>
+<span class="lineNum">    1486 </span><span class="lineNoCov">          0 : }</span>
+<a name="1487"><span class="lineNum">    1487 </span>            : </a>
+<span class="lineNum">    1488 </span>            : int
+<span class="lineNum">    1489 </span><span class="lineNoCov">          0 : ofp_split_mbuf(struct mbuf *m, struct mbuf **mtail)</span>
+<span class="lineNum">    1490 </span>            : {
+<span class="lineNum">    1491 </span>            :         struct ofp_header       *oh;
+<span class="lineNum">    1492 </span>            :         uint16_t                 ohlen;
+<span class="lineNum">    1493 </span>            : 
+<span class="lineNum">    1494 </span><span class="lineNoCov">          0 :         *mtail = NULL;</span>
+<span class="lineNum">    1495 </span>            : 
+<span class="lineNum">    1496 </span>            :  again:
+<span class="lineNum">    1497 </span>            :         /* We need more data. */
+<span class="lineNum">    1498 </span><span class="lineNoCov">          0 :         if (m-&gt;m_pkthdr.len &lt; sizeof(*oh))</span>
+<span class="lineNum">    1499 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">    1500 </span>            : 
+<span class="lineNum">    1501 </span><span class="lineNoCov">          0 :         oh = mtod(m, struct ofp_header *);</span>
+<span class="lineNum">    1502 </span><span class="lineNoCov">          0 :         ohlen = ntohs(oh-&gt;oh_length);</span>
+<span class="lineNum">    1503 </span>            : 
+<span class="lineNum">    1504 </span>            :         /* We got an invalid packet header, skip it. */
+<span class="lineNum">    1505 </span><span class="lineNoCov">          0 :         if (ohlen &lt; sizeof(*oh)) {</span>
+<span class="lineNum">    1506 </span><span class="lineNoCov">          0 :                 m_adj(m, sizeof(*oh));</span>
+<span class="lineNum">    1507 </span><span class="lineNoCov">          0 :                 goto again;</span>
+<span class="lineNum">    1508 </span>            :         }
+<span class="lineNum">    1509 </span>            : 
+<span class="lineNum">    1510 </span>            :         /* Nothing to split. */
+<span class="lineNum">    1511 </span><span class="lineNoCov">          0 :         if (m-&gt;m_pkthdr.len == ohlen)</span>
+<span class="lineNum">    1512 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1513 </span><span class="lineNoCov">          0 :         else if (m-&gt;m_pkthdr.len &lt; ohlen)</span>
+<span class="lineNum">    1514 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">    1515 </span>            : 
+<span class="lineNum">    1516 </span><span class="lineNoCov">          0 :         *mtail = m_split(m, ohlen, M_NOWAIT);</span>
+<span class="lineNum">    1517 </span>            :         /* No memory, try again later. */
+<span class="lineNum">    1518 </span><span class="lineNoCov">          0 :         if (*mtail == NULL)</span>
+<span class="lineNum">    1519 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">    1520 </span>            : 
+<span class="lineNum">    1521 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1522 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

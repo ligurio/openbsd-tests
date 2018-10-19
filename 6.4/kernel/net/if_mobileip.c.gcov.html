@@ -1,0 +1,743 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - net/if_mobileip.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">net</a> - if_mobileip.c<span style="font-size: 80%;"> (source / <a href="if_mobileip.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">288</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">17</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: if_mobileip.c,v 1.8 2018/02/18 23:53:17 dlg Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2016 David Gwynne &lt;dlg@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : #include &quot;mobileip.h&quot;
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #include &quot;bpfilter.h&quot;
+<span class="lineNum">      22 </span>            : #include &quot;pf.h&quot;
+<span class="lineNum">      23 </span>            : 
+<span class="lineNum">      24 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/sockio.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;net/if_types.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;net/if_var.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;net/route.h&gt;
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;netinet/ip.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;netinet/ip_var.h&gt;
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">      43 </span>            : #include &lt;net/bpf.h&gt;
+<span class="lineNum">      44 </span>            : #endif
+<span class="lineNum">      45 </span>            : 
+<span class="lineNum">      46 </span>            : #if NPF &gt; 0
+<span class="lineNum">      47 </span>            : #include &lt;net/pfvar.h&gt;
+<span class="lineNum">      48 </span>            : #endif
+<span class="lineNum">      49 </span>            : 
+<span class="lineNum">      50 </span>            : #include &lt;net/if_mobileip.h&gt;
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : struct mobileip_tunnel {
+<span class="lineNum">      53 </span>            :         unsigned int            t_rtableid;
+<span class="lineNum">      54 </span>            :         struct in_addr          t_src;
+<span class="lineNum">      55 </span>            :         struct in_addr          t_dst;
+<span class="lineNum">      56 </span>            : 
+<span class="lineNum">      57 </span>            :         TAILQ_ENTRY(mobileip_tunnel)
+<span class="lineNum">      58 </span>            :                                 t_entry;
+<span class="lineNum">      59 </span>            : };
+<span class="lineNum">      60 </span>            : 
+<span class="lineNum">      61 </span>            : TAILQ_HEAD(mobileip_list, mobileip_tunnel);
+<span class="lineNum">      62 </span>            : 
+<span class="lineNum">      63 </span>            : struct mobileip_softc {
+<span class="lineNum">      64 </span>            :         struct mobileip_tunnel  sc_tunnel;
+<span class="lineNum">      65 </span>            :         struct ifnet            sc_if;
+<span class="lineNum">      66 </span>            : };
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            : static int      mobileip_clone_create(struct if_clone *, int);
+<span class="lineNum">      69 </span>            : static int      mobileip_clone_destroy(struct ifnet *);
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : static struct if_clone mobileip_cloner = IF_CLONE_INITIALIZER(&quot;mobileip&quot;,
+<span class="lineNum">      72 </span>            :     mobileip_clone_create, mobileip_clone_destroy);
+<span class="lineNum">      73 </span>            : 
+<span class="lineNum">      74 </span>            : static inline int
+<span class="lineNum">      75 </span>            :                 mobileip_cmp(const struct mobileip_tunnel *,
+<span class="lineNum">      76 </span>            :                     const struct mobileip_tunnel *);
+<span class="lineNum">      77 </span>            : 
+<span class="lineNum">      78 </span>            : struct mobileip_list mobileip_list = TAILQ_HEAD_INITIALIZER(mobileip_list);
+<span class="lineNum">      79 </span>            : 
+<span class="lineNum">      80 </span>            : #define MOBILEIPMTU     (1500 - (sizeof(struct mobileip_header) +       \
+<span class="lineNum">      81 </span>            :                             sizeof(struct mobileip_h_src)))             \
+<span class="lineNum">      82 </span>            : 
+<span class="lineNum">      83 </span>            : static int      mobileip_ioctl(struct ifnet *, u_long, caddr_t);
+<span class="lineNum">      84 </span>            : static int      mobileip_up(struct mobileip_softc *);
+<span class="lineNum">      85 </span>            : static int      mobileip_down(struct mobileip_softc *);
+<span class="lineNum">      86 </span>            : static int      mobileip_set_tunnel(struct mobileip_softc *,
+<span class="lineNum">      87 </span>            :                     struct if_laddrreq *);
+<span class="lineNum">      88 </span>            : static int      mobileip_get_tunnel(struct mobileip_softc *,
+<span class="lineNum">      89 </span>            :                     struct if_laddrreq *);
+<span class="lineNum">      90 </span>            : static int      mobileip_del_tunnel(struct mobileip_softc *);
+<span class="lineNum">      91 </span>            : 
+<span class="lineNum">      92 </span>            : static int      mobileip_output(struct ifnet *, struct mbuf *,
+<span class="lineNum">      93 </span>            :                     struct sockaddr *, struct rtentry *);
+<span class="lineNum">      94 </span>            : static void     mobileip_start(struct ifnet *);
+<span class="lineNum">      95 </span>            : static int      mobileip_encap(struct mobileip_softc *, struct mbuf *);
+<span class="lineNum">      96 </span>            : static struct mobileip_softc *
+<span class="lineNum">      97 </span>            :                 mobileip_find(const struct mobileip_tunnel *);
+<span class="lineNum">      98 </span>            : 
+<span class="lineNum">      99 </span>            : /*
+<span class="lineNum">     100 </span>            :  * let's begin
+<span class="lineNum">     101 </span>            :  */
+<span class="lineNum">     102 </span>            : 
+<span class="lineNum">     103 </span>            : int     mobileip_allow = 0;
+<a name="104"><span class="lineNum">     104 </span>            : </a>
+<span class="lineNum">     105 </span>            : void
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 : mobileipattach(int n)</span>
+<span class="lineNum">     107 </span>            : {
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :         if_clone_attach(&amp;mobileip_cloner);</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 : }</span>
+<a name="110"><span class="lineNum">     110 </span>            : </a>
+<span class="lineNum">     111 </span>            : int
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 : mobileip_clone_create(struct if_clone *ifc, int unit)</span>
+<span class="lineNum">     113 </span>            : {
+<span class="lineNum">     114 </span>            :         struct mobileip_softc *sc;
+<span class="lineNum">     115 </span>            : 
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         sc = malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT|M_ZERO);</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         if (!sc)</span>
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     119 </span>            : 
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tunnel.t_rtableid = 0;</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tunnel.t_src.s_addr = INADDR_ANY;</span>
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tunnel.t_dst.s_addr = INADDR_ANY;</span>
+<span class="lineNum">     123 </span>            : 
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         snprintf(sc-&gt;sc_if.if_xname, sizeof sc-&gt;sc_if.if_xname, &quot;%s%d&quot;,</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :             ifc-&gt;ifc_name, unit);</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_softc = sc;</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_type = IFT_TUNNEL;</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_addrlen = 0;</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_mtu = MOBILEIPMTU;</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_flags = IFF_POINTOPOINT|IFF_MULTICAST;</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_output = mobileip_output;</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_start = mobileip_start;</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_ioctl = mobileip_ioctl;</span>
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_rtrequest = p2p_rtrequest;</span>
+<span class="lineNum">     135 </span>            : 
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         if_attach(&amp;sc-&gt;sc_if);</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :         if_alloc_sadl(&amp;sc-&gt;sc_if);</span>
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :         bpfattach(&amp;sc-&gt;sc_if.if_bpf, &amp;sc-&gt;sc_if, DLT_LOOP, sizeof(uint32_t));</span>
+<span class="lineNum">     141 </span>            : #endif
+<span class="lineNum">     142 </span>            : 
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         NET_LOCK();</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         TAILQ_INSERT_TAIL(&amp;mobileip_list, &amp;sc-&gt;sc_tunnel, t_entry);</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         NET_UNLOCK();</span>
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 : }</span>
+<a name="149"><span class="lineNum">     149 </span>            : </a>
+<span class="lineNum">     150 </span>            : int
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 : mobileip_clone_destroy(struct ifnet *ifp)</span>
+<span class="lineNum">     152 </span>            : {
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         struct mobileip_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     154 </span>            : 
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         if_detach(ifp);</span>
+<span class="lineNum">     156 </span>            : 
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         NET_LOCK();</span>
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :         if (ISSET(ifp-&gt;if_flags, IFF_RUNNING))</span>
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :                 mobileip_down(sc);</span>
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         TAILQ_REMOVE(&amp;mobileip_list, &amp;sc-&gt;sc_tunnel, t_entry);</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :         NET_UNLOCK();</span>
+<span class="lineNum">     163 </span>            : 
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :         free(sc, M_DEVBUF, sizeof(*sc));</span>
+<span class="lineNum">     165 </span>            : 
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     167 </span>            : }
+<span class="lineNum">     168 </span>            : 
+<span class="lineNum">     169 </span>            : /*
+<span class="lineNum">     170 </span>            :  * do a checksum of a header.
+<span class="lineNum">     171 </span>            :  *
+<span class="lineNum">     172 </span>            :  * assumes len is aligned correctly, and not an odd number of bytes.
+<a name="173"><span class="lineNum">     173 </span>            :  */</a>
+<span class="lineNum">     174 </span>            : static inline uint16_t
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 : mobileip_cksum(const void *buf, size_t len)</span>
+<span class="lineNum">     176 </span>            : {
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :         const uint16_t *p = buf;</span>
+<span class="lineNum">     178 </span>            :         uint32_t sum = 0;
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                 sum += bemtoh16(p++);</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         } while (len -= 2);</span>
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span>            :         /* end-around-carry */
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         sum = (sum &gt;&gt; 16) + (sum &amp; 0xffff);</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :         sum += (sum &gt;&gt; 16);</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         return (~sum);</span>
+<span class="lineNum">     188 </span>            : }
+<a name="189"><span class="lineNum">     189 </span>            : </a>
+<span class="lineNum">     190 </span>            : static inline int
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 : mobileip_cmp(const struct mobileip_tunnel *a, const struct mobileip_tunnel *b)</span>
+<span class="lineNum">     192 </span>            : {
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         if (a-&gt;t_src.s_addr &gt; b-&gt;t_src.s_addr)</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         if (a-&gt;t_src.s_addr &lt; b-&gt;t_src.s_addr)</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     197 </span>            : 
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         if (a-&gt;t_dst.s_addr &gt; b-&gt;t_dst.s_addr)</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :         if (a-&gt;t_dst.s_addr &lt; b-&gt;t_dst.s_addr)</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     202 </span>            : 
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :         if (a-&gt;t_rtableid &gt; b-&gt;t_rtableid)</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         if (a-&gt;t_rtableid &lt; b-&gt;t_rtableid)</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 : }</span>
+<a name="210"><span class="lineNum">     210 </span>            : </a>
+<span class="lineNum">     211 </span>            : static int
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 : mobileip_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,</span>
+<span class="lineNum">     213 </span>            :     struct rtentry *rt)
+<span class="lineNum">     214 </span>            : {
+<span class="lineNum">     215 </span>            :         struct m_tag *mtag;
+<span class="lineNum">     216 </span>            :         int error = 0;
+<span class="lineNum">     217 </span>            : 
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :         if (!mobileip_allow) {</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">     220 </span>            :                 error = EACCES;
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                 goto end;</span>
+<span class="lineNum">     222 </span>            :         }
+<span class="lineNum">     223 </span>            : 
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :         if (!ISSET(ifp-&gt;if_flags, IFF_RUNNING)) {</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">     226 </span>            :                 error = ENETDOWN;
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                 goto end;</span>
+<span class="lineNum">     228 </span>            :         }
+<span class="lineNum">     229 </span>            : 
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         if (dst-&gt;sa_family != AF_INET) {</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">     232 </span>            :                 error = EAFNOSUPPORT;
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :                 goto end;</span>
+<span class="lineNum">     234 </span>            :         }
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span>            :         /* Try to limit infinite recursion through misconfiguration. */
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :         for (mtag = m_tag_find(m, PACKET_TAG_GRE, NULL); mtag;</span>
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :              mtag = m_tag_find(m, PACKET_TAG_GRE, mtag)) {</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :                 if (memcmp(mtag + 1, &amp;ifp-&gt;if_index,</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                     sizeof(ifp-&gt;if_index)) == 0) {</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                         m_freem(m);</span>
+<span class="lineNum">     242 </span>            :                         error = EIO;
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :                         goto end;</span>
+<span class="lineNum">     244 </span>            :                 }
+<span class="lineNum">     245 </span>            :         }
+<span class="lineNum">     246 </span>            : 
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         mtag = m_tag_get(PACKET_TAG_GRE, sizeof(ifp-&gt;if_index), M_NOWAIT);</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :         if (mtag == NULL) {</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">     250 </span>            :                 error = ENOBUFS;
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :                 goto end;</span>
+<span class="lineNum">     252 </span>            :         }
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         memcpy(mtag + 1, &amp;ifp-&gt;if_index, sizeof(ifp-&gt;if_index));</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         m_tag_prepend(m, mtag);</span>
+<span class="lineNum">     255 </span>            : 
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         error = if_enqueue(ifp, m);</span>
+<span class="lineNum">     257 </span>            :   end:
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_oerrors++;</span>
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     261 </span>            : }
+<a name="262"><span class="lineNum">     262 </span>            : </a>
+<span class="lineNum">     263 </span>            : static void
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 : mobileip_start(struct ifnet *ifp)</span>
+<span class="lineNum">     265 </span>            : {
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         struct mobileip_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     267 </span>            :         struct mbuf *m;
+<span class="lineNum">     268 </span>            : 
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         while ((m = ifq_dequeue(&amp;ifp-&gt;if_snd)) != NULL) {</span>
+<span class="lineNum">     270 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_bpf)</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                         bpf_mtap_af(ifp-&gt;if_bpf, AF_INET, m, BPF_DIRECTION_OUT);</span>
+<span class="lineNum">     273 </span>            : #endif
+<span class="lineNum">     274 </span>            : 
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :                 if (mobileip_encap(sc, m) != 0)</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_oerrors++;</span>
+<span class="lineNum">     277 </span>            :         }
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 : }</span>
+<a name="279"><span class="lineNum">     279 </span>            : </a>
+<span class="lineNum">     280 </span>            : static int
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 : mobileip_encap(struct mobileip_softc *sc, struct mbuf *m)</span>
+<span class="lineNum">     282 </span>            : {
+<span class="lineNum">     283 </span>            :         struct ip *ip;
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         struct mobileip_tunnel *tunnel = &amp;sc-&gt;sc_tunnel;</span>
+<span class="lineNum">     285 </span>            :         struct mobileip_header *mh;
+<span class="lineNum">     286 </span>            :         struct mobileip_h_src *msh;
+<span class="lineNum">     287 </span>            :         caddr_t hdr;
+<span class="lineNum">     288 </span>            :         int iphlen, hlen;
+<span class="lineNum">     289 </span>            : 
+<span class="lineNum">     290 </span>            :         /* look at the current IP header */
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         m = m_pullup(m, sizeof(*ip));</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :         if (m == NULL)</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">     294 </span>            : 
+<span class="lineNum">     295 </span>            :         /* figure out how long it is */
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         ip = mtod(m, struct ip *);</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         iphlen = ip-&gt;ip_hl &lt;&lt; 2;</span>
+<span class="lineNum">     298 </span>            : 
+<span class="lineNum">     299 </span>            :         /* figure out how much extra space we'll need */
+<span class="lineNum">     300 </span>            :         hlen = sizeof(*mh);
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         if (ip-&gt;ip_src.s_addr != tunnel-&gt;t_src.s_addr)</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                 hlen += sizeof(*msh);</span>
+<span class="lineNum">     303 </span>            : 
+<span class="lineNum">     304 </span>            :         /* add the space */
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         m = m_prepend(m, hlen, M_DONTWAIT);</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :         if (m == NULL)</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">     308 </span>            : 
+<span class="lineNum">     309 </span>            :         /* make the IP and mobileip headers contig */
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         m = m_pullup(m, iphlen + hlen);</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :         if (m == NULL)</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">     313 </span>            : 
+<span class="lineNum">     314 </span>            :         /* move the IP header to the front */
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :         hdr = mtod(m, caddr_t);</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         memmove(hdr, hdr + hlen, iphlen);</span>
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span>            :         /* fill in the headers */
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :         ip = (struct ip *)hdr;</span>
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         mh = (struct mobileip_header *)(hdr + iphlen);</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :         mh-&gt;mip_proto = ip-&gt;ip_p;</span>
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         mh-&gt;mip_flags = 0;</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         mh-&gt;mip_hcrc = 0;</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :         mh-&gt;mip_dst = ip-&gt;ip_dst.s_addr;</span>
+<span class="lineNum">     325 </span>            : 
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :         if (ip-&gt;ip_src.s_addr != tunnel-&gt;t_src.s_addr) {</span>
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :                 mh-&gt;mip_flags |= MOBILEIP_SP;</span>
+<span class="lineNum">     328 </span>            : 
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                 msh = (struct mobileip_h_src *)(mh + 1);</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                 msh-&gt;mip_src = ip-&gt;ip_src.s_addr;</span>
+<span class="lineNum">     331 </span>            : 
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                 ip-&gt;ip_src.s_addr = tunnel-&gt;t_src.s_addr;</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     334 </span>            : 
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         htobem16(&amp;mh-&gt;mip_hcrc, mobileip_cksum(mh, hlen));</span>
+<span class="lineNum">     336 </span>            : 
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :         ip-&gt;ip_p = IPPROTO_MOBILE;</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         htobem16(&amp;ip-&gt;ip_len, bemtoh16(&amp;ip-&gt;ip_len) + hlen);</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         ip-&gt;ip_dst = tunnel-&gt;t_dst;</span>
+<span class="lineNum">     340 </span>            : 
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         m-&gt;m_flags &amp;= ~(M_BCAST|M_MCAST);</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :         m-&gt;m_pkthdr.ph_rtableid = tunnel-&gt;t_rtableid;</span>
+<span class="lineNum">     343 </span>            : 
+<span class="lineNum">     344 </span>            : #if NPF &gt; 0
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :         pf_pkt_addr_changed(m);</span>
+<span class="lineNum">     346 </span>            : #endif
+<span class="lineNum">     347 </span>            : 
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         ip_send(m);</span>
+<span class="lineNum">     349 </span>            : 
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 : }</span>
+<a name="352"><span class="lineNum">     352 </span>            : </a>
+<span class="lineNum">     353 </span>            : int
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 : mobileip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)</span>
+<span class="lineNum">     355 </span>            : {
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :         struct mobileip_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :         struct ifreq *ifr = (struct ifreq *)data;</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :         struct ifaddr *ifa = (struct ifaddr *)data;</span>
+<span class="lineNum">     359 </span>            :         int error = 0;
+<span class="lineNum">     360 </span>            : 
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         switch(cmd) {</span>
+<span class="lineNum">     362 </span>            :         case SIOCSIFADDR:
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :                 if (ifa-&gt;ifa_addr-&gt;sa_family != AF_INET) {</span>
+<span class="lineNum">     364 </span>            :                         error = EAFNOSUPPORT;
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     366 </span>            :                 }
+<span class="lineNum">     367 </span>            : 
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_flags |= IFF_UP;</span>
+<span class="lineNum">     369 </span>            :                 /* FALLTHROUGH */
+<span class="lineNum">     370 </span>            :         case SIOCSIFFLAGS:
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                 if (ISSET(ifp-&gt;if_flags, IFF_UP)) {</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                         if (!ISSET(ifp-&gt;if_flags, IFF_RUNNING))</span>
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                                 error = mobileip_up(sc);</span>
+<span class="lineNum">     374 </span>            :                         else
+<span class="lineNum">     375 </span>            :                                 error = 0;
+<span class="lineNum">     376 </span>            :                 } else {
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                         if (ISSET(ifp-&gt;if_flags, IFF_RUNNING))</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                                 error = mobileip_down(sc);</span>
+<span class="lineNum">     379 </span>            :                 }
+<span class="lineNum">     380 </span>            :                 break;
+<span class="lineNum">     381 </span>            :         case SIOCSIFDSTADDR:
+<span class="lineNum">     382 </span>            :                 break;
+<span class="lineNum">     383 </span>            :         case SIOCSIFMTU:
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :                 if (ifr-&gt;ifr_mtu &lt; 576) {</span>
+<span class="lineNum">     385 </span>            :                         error = EINVAL;
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     387 </span>            :                 }
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_mtu = ifr-&gt;ifr_mtu;</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     390 </span>            :         case SIOCGIFMTU:
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :                 ifr-&gt;ifr_mtu = sc-&gt;sc_if.if_mtu;</span>
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     393 </span>            :         case SIOCADDMULTI:
+<span class="lineNum">     394 </span>            :         case SIOCDELMULTI:
+<span class="lineNum">     395 </span>            :                 break;
+<span class="lineNum">     396 </span>            : 
+<span class="lineNum">     397 </span>            :         case SIOCSLIFPHYADDR:
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                 error = mobileip_set_tunnel(sc, (struct if_laddrreq *)data);</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     400 </span>            :         case SIOCGLIFPHYADDR:
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :                 error = mobileip_get_tunnel(sc, (struct if_laddrreq *)data);</span>
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     403 </span>            :         case SIOCDIFPHYADDR:
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                 error = mobileip_del_tunnel(sc);</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     406 </span>            : 
+<span class="lineNum">     407 </span>            :         case SIOCGLIFPHYTTL:
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 ifr-&gt;ifr_ttl = -1;</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     410 </span>            : 
+<span class="lineNum">     411 </span>            :         case SIOCSLIFPHYRTABLE:
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :                 if (ifr-&gt;ifr_rdomainid &lt; 0 ||</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :                     ifr-&gt;ifr_rdomainid &gt; RT_TABLEID_MAX ||</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :                     !rtable_exists(ifr-&gt;ifr_rdomainid)) {</span>
+<span class="lineNum">     415 </span>            :                         error = EINVAL;
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     417 </span>            :                 }
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_tunnel.t_rtableid = ifr-&gt;ifr_rdomainid;</span>
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     420 </span>            :         case SIOCGLIFPHYRTABLE:
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                 ifr-&gt;ifr_rdomainid = sc-&gt;sc_tunnel.t_rtableid;</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     423 </span>            : 
+<span class="lineNum">     424 </span>            :         default:
+<span class="lineNum">     425 </span>            :                 error = ENOTTY;
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     427 </span>            :         }
+<span class="lineNum">     428 </span>            : 
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     430 </span>            : }
+<a name="431"><span class="lineNum">     431 </span>            : </a>
+<span class="lineNum">     432 </span>            : static int
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 : mobileip_up(struct mobileip_softc *sc)</span>
+<span class="lineNum">     434 </span>            : {
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :         NET_ASSERT_LOCKED();</span>
+<span class="lineNum">     436 </span>            : 
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         SET(sc-&gt;sc_if.if_flags, IFF_RUNNING);</span>
+<span class="lineNum">     438 </span>            : 
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     440 </span>            : }
+<a name="441"><span class="lineNum">     441 </span>            : </a>
+<span class="lineNum">     442 </span>            : static int
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 : mobileip_down(struct mobileip_softc *sc)</span>
+<span class="lineNum">     444 </span>            : {
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :         NET_ASSERT_LOCKED();</span>
+<span class="lineNum">     446 </span>            : 
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :         CLR(sc-&gt;sc_if.if_flags, IFF_RUNNING);</span>
+<span class="lineNum">     448 </span>            : 
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :         ifq_barrier(&amp;sc-&gt;sc_if.if_snd);</span>
+<span class="lineNum">     450 </span>            : 
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     452 </span>            : }
+<a name="453"><span class="lineNum">     453 </span>            : </a>
+<span class="lineNum">     454 </span>            : static int
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 : mobileip_set_tunnel(struct mobileip_softc *sc, struct if_laddrreq *req)</span>
+<span class="lineNum">     456 </span>            : {
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :         struct sockaddr_in *src = (struct sockaddr_in *)&amp;req-&gt;addr;</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :         struct sockaddr_in *dst = (struct sockaddr_in *)&amp;req-&gt;dstaddr;</span>
+<span class="lineNum">     459 </span>            : 
+<span class="lineNum">     460 </span>            :         /* sa_family and sa_len must be equal */
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :         if (src-&gt;sin_family != dst-&gt;sin_family || src-&gt;sin_len != dst-&gt;sin_len)</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     463 </span>            : 
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :         if (dst-&gt;sin_family != AF_INET)</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                 return (EAFNOSUPPORT);</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :         if (dst-&gt;sin_len != sizeof(*dst))</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     468 </span>            : 
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :         if (in_nullhost(src-&gt;sin_addr) ||</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :             IN_MULTICAST(src-&gt;sin_addr.s_addr) ||</span>
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :             in_nullhost(dst-&gt;sin_addr) ||</span>
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :             IN_MULTICAST(dst-&gt;sin_addr.s_addr))</span>
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     474 </span>            : 
+<span class="lineNum">     475 </span>            :         /* commit */
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tunnel.t_src = src-&gt;sin_addr;</span>
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tunnel.t_dst = dst-&gt;sin_addr;</span>
+<span class="lineNum">     478 </span>            : 
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 : }</span>
+<a name="481"><span class="lineNum">     481 </span>            : </a>
+<span class="lineNum">     482 </span>            : static int
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 : mobileip_get_tunnel(struct mobileip_softc *sc, struct if_laddrreq *req)</span>
+<span class="lineNum">     484 </span>            : {
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :         struct sockaddr_in *src = (struct sockaddr_in *)&amp;req-&gt;addr;</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :         struct sockaddr_in *dst = (struct sockaddr_in *)&amp;req-&gt;dstaddr;</span>
+<span class="lineNum">     487 </span>            : 
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tunnel.t_dst.s_addr == INADDR_ANY)</span>
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                 return (EADDRNOTAVAIL);</span>
+<span class="lineNum">     490 </span>            : 
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :         memset(src, 0, sizeof(*src));</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :         src-&gt;sin_family = AF_INET;</span>
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         src-&gt;sin_len = sizeof(*src);</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :         src-&gt;sin_addr = sc-&gt;sc_tunnel.t_src;</span>
+<span class="lineNum">     495 </span>            : 
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :         memset(dst, 0, sizeof(*dst));</span>
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :         dst-&gt;sin_family = AF_INET;</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :         dst-&gt;sin_len = sizeof(*dst);</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :         dst-&gt;sin_addr = sc-&gt;sc_tunnel.t_dst;</span>
+<span class="lineNum">     500 </span>            : 
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 : }</span>
+<a name="503"><span class="lineNum">     503 </span>            : </a>
+<span class="lineNum">     504 </span>            : static int
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 : mobileip_del_tunnel(struct mobileip_softc *sc)</span>
+<span class="lineNum">     506 </span>            : {
+<span class="lineNum">     507 </span>            :         /* commit */
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tunnel.t_src.s_addr = INADDR_ANY;</span>
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tunnel.t_dst.s_addr = INADDR_ANY;</span>
+<span class="lineNum">     510 </span>            : 
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     512 </span>            : }
+<a name="513"><span class="lineNum">     513 </span>            : </a>
+<span class="lineNum">     514 </span>            : static struct mobileip_softc *
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 : mobileip_find(const struct mobileip_tunnel *key)</span>
+<span class="lineNum">     516 </span>            : {
+<span class="lineNum">     517 </span>            :         struct mobileip_tunnel *t;
+<span class="lineNum">     518 </span>            :         struct mobileip_softc *sc;
+<span class="lineNum">     519 </span>            : 
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(t, &amp;mobileip_list, t_entry) {</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                 if (mobileip_cmp(key, t) != 0)</span>
+<span class="lineNum">     522 </span>            :                         continue;
+<span class="lineNum">     523 </span>            : 
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :                 sc = (struct mobileip_softc *)t;</span>
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                 if (!ISSET(sc-&gt;sc_if.if_flags, IFF_RUNNING))</span>
+<span class="lineNum">     526 </span>            :                         continue;
+<span class="lineNum">     527 </span>            : 
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :                 return (sc);</span>
+<span class="lineNum">     529 </span>            :         }
+<span class="lineNum">     530 </span>            : 
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 : }</span>
+<a name="533"><span class="lineNum">     533 </span>            : </a>
+<span class="lineNum">     534 </span>            : int
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 : mobileip_input(struct mbuf **mp, int *offp, int type, int af)</span>
+<span class="lineNum">     536 </span>            : {
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :         struct mobileip_tunnel key;</span>
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :         struct mbuf *m = *mp;</span>
+<span class="lineNum">     539 </span>            :         struct ifnet *ifp;
+<span class="lineNum">     540 </span>            :         struct mobileip_softc *sc;
+<span class="lineNum">     541 </span>            :         caddr_t hdr;
+<span class="lineNum">     542 </span>            :         struct ip *ip;
+<span class="lineNum">     543 </span>            :         struct mobileip_header *mh;
+<span class="lineNum">     544 </span>            :         struct mobileip_h_src *msh;
+<span class="lineNum">     545 </span>            :         int iphlen = 0;
+<span class="lineNum">     546 </span>            :         int hlen;
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         if (!mobileip_allow)</span>
+<span class="lineNum">     549 </span>            :                 goto drop;
+<span class="lineNum">     550 </span>            : 
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :         ip = mtod(m, struct ip *);</span>
+<span class="lineNum">     552 </span>            : 
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 :         key.t_rtableid = m-&gt;m_pkthdr.ph_rtableid;</span>
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :         key.t_src = ip-&gt;ip_dst;</span>
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 :         key.t_dst = ip-&gt;ip_src;</span>
+<span class="lineNum">     556 </span>            : 
+<span class="lineNum">     557 </span>            :         /* NET_ASSERT_READ_LOCKED() */
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :         sc = mobileip_find(&amp;key);</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :         if (sc == NULL)</span>
+<span class="lineNum">     560 </span>            :                 goto drop;
+<span class="lineNum">     561 </span>            : 
+<span class="lineNum">     562 </span>            :         /* it's ours now, we can do what we want */
+<span class="lineNum">     563 </span>            : 
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :         iphlen = ip-&gt;ip_hl &lt;&lt; 2;</span>
+<span class="lineNum">     565 </span>            :         hlen = sizeof(*mh);
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :         m = m_pullup(m, iphlen + hlen);</span>
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :         if (m == NULL)</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                 return (IPPROTO_DONE);</span>
+<span class="lineNum">     569 </span>            : 
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :         hdr = mtod(m, caddr_t);</span>
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :         ip = (struct ip *)hdr;</span>
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :         mh = (struct mobileip_header *)(hdr + iphlen);</span>
+<span class="lineNum">     573 </span>            : 
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :         if (mh-&gt;mip_flags &amp; ~MOBILEIP_SP)</span>
+<span class="lineNum">     575 </span>            :                 goto drop;
+<span class="lineNum">     576 </span>            : 
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :         if (ISSET(mh-&gt;mip_flags, MOBILEIP_SP)) {</span>
+<span class="lineNum">     578 </span>            :                 hlen += sizeof(*msh);
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :                 m = m_pullup(m, iphlen + hlen);</span>
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :                 if (m == NULL)</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :                         return (IPPROTO_DONE);</span>
+<span class="lineNum">     582 </span>            : 
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :                 hdr = mtod(m, caddr_t);</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                 ip = (struct ip *)hdr;</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :                 mh = (struct mobileip_header *)(hdr + iphlen);</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 msh = (struct mobileip_h_src *)(mh + 1);</span>
+<span class="lineNum">     587 </span>            : 
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :                 ip-&gt;ip_src.s_addr = msh-&gt;mip_src;</span>
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     590 </span>            : 
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :         if (mobileip_cksum(mh, hlen) != 0)</span>
+<span class="lineNum">     592 </span>            :                 goto drop;
+<span class="lineNum">     593 </span>            : 
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :         ip-&gt;ip_p = mh-&gt;mip_proto;</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :         htobem16(&amp;ip-&gt;ip_len, bemtoh16(&amp;ip-&gt;ip_len) - hlen);</span>
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :         ip-&gt;ip_dst.s_addr = mh-&gt;mip_dst;</span>
+<span class="lineNum">     597 </span>            : 
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :         memmove(hdr + hlen, hdr, iphlen);</span>
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :         m_adj(m, hlen);</span>
+<span class="lineNum">     600 </span>            : 
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :         ifp = &amp;sc-&gt;sc_if;</span>
+<span class="lineNum">     602 </span>            : 
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :         CLR(m-&gt;m_flags, M_MCAST|M_BCAST);</span>
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :         SET(m-&gt;m_pkthdr.csum_flags, M_IPV4_CSUM_IN_OK);</span>
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :         m-&gt;m_pkthdr.ph_ifidx = ifp-&gt;if_index;</span>
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :         m-&gt;m_pkthdr.ph_rtableid = ifp-&gt;if_rdomain;</span>
+<span class="lineNum">     607 </span>            : 
+<span class="lineNum">     608 </span>            : #if NPF &gt; 0
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         pf_pkt_addr_changed(m);</span>
+<span class="lineNum">     610 </span>            : #endif
+<span class="lineNum">     611 </span>            : 
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ipackets++;</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ibytes += m-&gt;m_pkthdr.len;</span>
+<span class="lineNum">     614 </span>            : 
+<span class="lineNum">     615 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_bpf)</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                 bpf_mtap_af(ifp-&gt;if_bpf, AF_INET, m, BPF_DIRECTION_IN);</span>
+<span class="lineNum">     618 </span>            : #endif
+<span class="lineNum">     619 </span>            : 
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :         ipv4_input(ifp, m);</span>
+<span class="lineNum">     621 </span>            : 
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :         return (IPPROTO_DONE);</span>
+<span class="lineNum">     623 </span>            : 
+<span class="lineNum">     624 </span>            : drop:
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :         m_freem(m);</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :         return (IPPROTO_DONE);</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     628 </span>            : 
+<span class="lineNum">     629 </span>            : #include &lt;sys/sysctl.h&gt;
+<span class="lineNum">     630 </span>            : #include &lt;netinet/ip_gre.h&gt;
+<a name="631"><span class="lineNum">     631 </span>            : </a>
+<span class="lineNum">     632 </span>            : int
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 : mobileip_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,</span>
+<span class="lineNum">     634 </span>            :     void *newp, size_t newlen)
+<span class="lineNum">     635 </span>            : {
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :         int allow;</span>
+<span class="lineNum">     637 </span>            :         int error;
+<span class="lineNum">     638 </span>            : 
+<span class="lineNum">     639 </span>            :         /* All sysctl names at this level are terminal. */
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :         if (namelen != 1)</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :                 return (ENOTDIR);</span>
+<span class="lineNum">     642 </span>            : 
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :         switch (name[0]) {</span>
+<span class="lineNum">     644 </span>            :         case MOBILEIPCTL_ALLOW:
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :                 allow = mobileip_allow;</span>
+<span class="lineNum">     646 </span>            : 
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :                 error = sysctl_int(oldp, oldlenp, newp, newlen,</span>
+<span class="lineNum">     648 </span>            :                     &amp;allow);
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :                 if (error != 0)</span>
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     651 </span>            : 
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :                 mobileip_allow = allow;</span>
+<span class="lineNum">     653 </span>            :                 break;
+<span class="lineNum">     654 </span>            :         default:
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                 return (ENOPROTOOPT);</span>
+<span class="lineNum">     656 </span>            :         }
+<span class="lineNum">     657 </span>            : 
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

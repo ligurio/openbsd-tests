@@ -1,0 +1,514 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/drm_vma_manager.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../index.html">top level</a> - <a href="index.html">dev/pci/drm</a> - drm_vma_manager.c<span style="font-size: 80%;"> (source / <a href="drm_vma_manager.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">109</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: drm_vma_manager.c,v 1.3 2017/07/01 16:14:10 kettenis Exp $    */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2006-2009 VMware, Inc., Palo Alto, CA., USA
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2012 David Airlie &lt;airlied@linux.ie&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2013 David Herrmann &lt;dh.herrmann@gmail.com&gt;
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       8 </span>            :  * copy of this software and associated documentation files (the &quot;Software&quot;),
+<span class="lineNum">       9 </span>            :  * to deal in the Software without restriction, including without limitation
+<span class="lineNum">      10 </span>            :  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+<span class="lineNum">      11 </span>            :  * and/or sell copies of the Software, and to permit persons to whom the
+<span class="lineNum">      12 </span>            :  * Software is furnished to do so, subject to the following conditions:
+<span class="lineNum">      13 </span>            :  *
+<span class="lineNum">      14 </span>            :  * The above copyright notice and this permission notice shall be included in
+<span class="lineNum">      15 </span>            :  * all copies or substantial portions of the Software.
+<span class="lineNum">      16 </span>            :  *
+<span class="lineNum">      17 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      18 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      19 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+<span class="lineNum">      20 </span>            :  * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+<span class="lineNum">      21 </span>            :  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+<span class="lineNum">      22 </span>            :  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+<span class="lineNum">      23 </span>            :  * OTHER DEALINGS IN THE SOFTWARE.
+<span class="lineNum">      24 </span>            :  */
+<span class="lineNum">      25 </span>            : 
+<span class="lineNum">      26 </span>            : #include &quot;drmP.h&quot;
+<span class="lineNum">      27 </span>            : #include &quot;drm_mm.h&quot;
+<span class="lineNum">      28 </span>            : #include &quot;drm_vma_manager.h&quot;
+<span class="lineNum">      29 </span>            : #include &quot;drm_linux_rbtree.h&quot;
+<span class="lineNum">      30 </span>            : 
+<span class="lineNum">      31 </span>            : /**
+<span class="lineNum">      32 </span>            :  * DOC: vma offset manager
+<span class="lineNum">      33 </span>            :  *
+<span class="lineNum">      34 </span>            :  * The vma-manager is responsible to map arbitrary driver-dependent memory
+<span class="lineNum">      35 </span>            :  * regions into the linear user address-space. It provides offsets to the
+<span class="lineNum">      36 </span>            :  * caller which can then be used on the address_space of the drm-device. It
+<span class="lineNum">      37 </span>            :  * takes care to not overlap regions, size them appropriately and to not
+<span class="lineNum">      38 </span>            :  * confuse mm-core by inconsistent fake vm_pgoff fields.
+<span class="lineNum">      39 </span>            :  * Drivers shouldn't use this for object placement in VMEM. This manager should
+<span class="lineNum">      40 </span>            :  * only be used to manage mappings into linear user-space VMs.
+<span class="lineNum">      41 </span>            :  *
+<span class="lineNum">      42 </span>            :  * We use drm_mm as backend to manage object allocations. But it is highly
+<span class="lineNum">      43 </span>            :  * optimized for alloc/free calls, not lookups. Hence, we use an rb-tree to
+<span class="lineNum">      44 </span>            :  * speed up offset lookups.
+<span class="lineNum">      45 </span>            :  *
+<span class="lineNum">      46 </span>            :  * You must not use multiple offset managers on a single address_space.
+<span class="lineNum">      47 </span>            :  * Otherwise, mm-core will be unable to tear down memory mappings as the VM will
+<span class="lineNum">      48 </span>            :  * no longer be linear.
+<span class="lineNum">      49 </span>            :  *
+<span class="lineNum">      50 </span>            :  * This offset manager works on page-based addresses. That is, every argument
+<span class="lineNum">      51 </span>            :  * and return code (with the exception of drm_vma_node_offset_addr()) is given
+<span class="lineNum">      52 </span>            :  * in number of pages, not number of bytes. That means, object sizes and offsets
+<span class="lineNum">      53 </span>            :  * must always be page-aligned (as usual).
+<span class="lineNum">      54 </span>            :  * If you want to get a valid byte-based user-space address for a given offset,
+<span class="lineNum">      55 </span>            :  * please see drm_vma_node_offset_addr().
+<span class="lineNum">      56 </span>            :  *
+<span class="lineNum">      57 </span>            :  * Additionally to offset management, the vma offset manager also handles access
+<span class="lineNum">      58 </span>            :  * management. For every open-file context that is allowed to access a given
+<span class="lineNum">      59 </span>            :  * node, you must call drm_vma_node_allow(). Otherwise, an mmap() call on this
+<span class="lineNum">      60 </span>            :  * open-file with the offset of the node will fail with -EACCES. To revoke
+<span class="lineNum">      61 </span>            :  * access again, use drm_vma_node_revoke(). However, the caller is responsible
+<span class="lineNum">      62 </span>            :  * for destroying already existing mappings, if required.
+<span class="lineNum">      63 </span>            :  */
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span>            : /**
+<span class="lineNum">      66 </span>            :  * drm_vma_offset_manager_init - Initialize new offset-manager
+<span class="lineNum">      67 </span>            :  * @mgr: Manager object
+<span class="lineNum">      68 </span>            :  * @page_offset: Offset of available memory area (page-based)
+<span class="lineNum">      69 </span>            :  * @size: Size of available address space range (page-based)
+<span class="lineNum">      70 </span>            :  *
+<span class="lineNum">      71 </span>            :  * Initialize a new offset-manager. The offset and area size available for the
+<span class="lineNum">      72 </span>            :  * manager are given as @page_offset and @size. Both are interpreted as
+<span class="lineNum">      73 </span>            :  * page-numbers, not bytes.
+<span class="lineNum">      74 </span>            :  *
+<span class="lineNum">      75 </span>            :  * Adding/removing nodes from the manager is locked internally and protected
+<span class="lineNum">      76 </span>            :  * against concurrent access. However, node allocation and destruction is left
+<span class="lineNum">      77 </span>            :  * for the caller. While calling into the vma-manager, a given node must
+<a name="78"><span class="lineNum">      78 </span>            :  * always be guaranteed to be referenced.</a>
+<span class="lineNum">      79 </span>            :  */
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 : void drm_vma_offset_manager_init(struct drm_vma_offset_manager *mgr,</span>
+<span class="lineNum">      81 </span>            :                                  unsigned long page_offset, unsigned long size)
+<span class="lineNum">      82 </span>            : {
+<span class="lineNum">      83 </span><span class="lineNoCov">          0 :         rw_init(&amp;mgr-&gt;vm_lock, &quot;drmvmo&quot;);</span>
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 :         mgr-&gt;vm_addr_space_rb = RB_ROOT;</span>
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :         drm_mm_init(&amp;mgr-&gt;vm_addr_space_mm, page_offset, size);</span>
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      87 </span>            : EXPORT_SYMBOL(drm_vma_offset_manager_init);
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span>            : /**
+<span class="lineNum">      90 </span>            :  * drm_vma_offset_manager_destroy() - Destroy offset manager
+<span class="lineNum">      91 </span>            :  * @mgr: Manager object
+<span class="lineNum">      92 </span>            :  *
+<span class="lineNum">      93 </span>            :  * Destroy an object manager which was previously created via
+<span class="lineNum">      94 </span>            :  * drm_vma_offset_manager_init(). The caller must remove all allocated nodes
+<span class="lineNum">      95 </span>            :  * before destroying the manager. Otherwise, drm_mm will refuse to free the
+<span class="lineNum">      96 </span>            :  * requested resources.
+<span class="lineNum">      97 </span>            :  *
+<a name="98"><span class="lineNum">      98 </span>            :  * The manager must not be accessed after this function is called.</a>
+<span class="lineNum">      99 </span>            :  */
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 : void drm_vma_offset_manager_destroy(struct drm_vma_offset_manager *mgr)</span>
+<span class="lineNum">     101 </span>            : {
+<span class="lineNum">     102 </span>            :         /* take the lock to protect against buggy drivers */
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :         write_lock(&amp;mgr-&gt;vm_lock);</span>
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 :         drm_mm_takedown(&amp;mgr-&gt;vm_addr_space_mm);</span>
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :         write_unlock(&amp;mgr-&gt;vm_lock);</span>
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     107 </span>            : EXPORT_SYMBOL(drm_vma_offset_manager_destroy);
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span>            : /**
+<span class="lineNum">     110 </span>            :  * drm_vma_offset_lookup() - Find node in offset space
+<span class="lineNum">     111 </span>            :  * @mgr: Manager object
+<span class="lineNum">     112 </span>            :  * @start: Start address for object (page-based)
+<span class="lineNum">     113 </span>            :  * @pages: Size of object (page-based)
+<span class="lineNum">     114 </span>            :  *
+<span class="lineNum">     115 </span>            :  * Find a node given a start address and object size. This returns the _best_
+<span class="lineNum">     116 </span>            :  * match for the given node. That is, @start may point somewhere into a valid
+<span class="lineNum">     117 </span>            :  * region and the given node will be returned, as long as the node spans the
+<span class="lineNum">     118 </span>            :  * whole requested area (given the size in number of pages as @pages).
+<span class="lineNum">     119 </span>            :  *
+<span class="lineNum">     120 </span>            :  * RETURNS:
+<span class="lineNum">     121 </span>            :  * Returns NULL if no suitable node can be found. Otherwise, the best match
+<span class="lineNum">     122 </span>            :  * is returned. It's the caller's responsibility to make sure the node doesn't
+<a name="123"><span class="lineNum">     123 </span>            :  * get destroyed before the caller can access it.</a>
+<span class="lineNum">     124 </span>            :  */
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 : struct drm_vma_offset_node *drm_vma_offset_lookup(struct drm_vma_offset_manager *mgr,</span>
+<span class="lineNum">     126 </span>            :                                                   unsigned long start,
+<span class="lineNum">     127 </span>            :                                                   unsigned long pages)
+<span class="lineNum">     128 </span>            : {
+<span class="lineNum">     129 </span>            :         struct drm_vma_offset_node *node;
+<span class="lineNum">     130 </span>            : 
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :         read_lock(&amp;mgr-&gt;vm_lock);</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :         node = drm_vma_offset_lookup_locked(mgr, start, pages);</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :         read_unlock(&amp;mgr-&gt;vm_lock);</span>
+<span class="lineNum">     134 </span>            : 
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :         return node;</span>
+<span class="lineNum">     136 </span>            : }
+<span class="lineNum">     137 </span>            : EXPORT_SYMBOL(drm_vma_offset_lookup);
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span>            : /**
+<span class="lineNum">     140 </span>            :  * drm_vma_offset_lookup_locked() - Find node in offset space
+<span class="lineNum">     141 </span>            :  * @mgr: Manager object
+<span class="lineNum">     142 </span>            :  * @start: Start address for object (page-based)
+<span class="lineNum">     143 </span>            :  * @pages: Size of object (page-based)
+<span class="lineNum">     144 </span>            :  *
+<span class="lineNum">     145 </span>            :  * Same as drm_vma_offset_lookup() but requires the caller to lock offset lookup
+<span class="lineNum">     146 </span>            :  * manually. See drm_vma_offset_lock_lookup() for an example.
+<span class="lineNum">     147 </span>            :  *
+<span class="lineNum">     148 </span>            :  * RETURNS:
+<span class="lineNum">     149 </span>            :  * Returns NULL if no suitable node can be found. Otherwise, the best match
+<a name="150"><span class="lineNum">     150 </span>            :  * is returned.</a>
+<span class="lineNum">     151 </span>            :  */
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 : struct drm_vma_offset_node *drm_vma_offset_lookup_locked(struct drm_vma_offset_manager *mgr,</span>
+<span class="lineNum">     153 </span>            :                                                          unsigned long start,
+<span class="lineNum">     154 </span>            :                                                          unsigned long pages)
+<span class="lineNum">     155 </span>            : {
+<span class="lineNum">     156 </span>            :         struct drm_vma_offset_node *node, *best;
+<span class="lineNum">     157 </span>            :         struct rb_node *iter;
+<span class="lineNum">     158 </span>            :         unsigned long offset;
+<span class="lineNum">     159 </span>            : 
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         iter = mgr-&gt;vm_addr_space_rb.rb_node;</span>
+<span class="lineNum">     161 </span>            :         best = NULL;
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         while (likely(iter)) {</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                 node = rb_entry(iter, struct drm_vma_offset_node, vm_rb);</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :                 offset = node-&gt;vm_node.start;</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 if (start &gt;= offset) {</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :                         iter = iter-&gt;rb_right;</span>
+<span class="lineNum">     168 </span>            :                         best = node;
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :                         if (start == offset)</span>
+<span class="lineNum">     170 </span>            :                                 break;
+<span class="lineNum">     171 </span>            :                 } else {
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :                         iter = iter-&gt;rb_left;</span>
+<span class="lineNum">     173 </span>            :                 }
+<span class="lineNum">     174 </span>            :         }
+<span class="lineNum">     175 </span>            : 
+<span class="lineNum">     176 </span>            :         /* verify that the node spans the requested area */
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :         if (best) {</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                 offset = best-&gt;vm_node.start + best-&gt;vm_node.size;</span>
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                 if (offset &lt; start + pages)</span>
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :                         best = NULL;</span>
+<span class="lineNum">     181 </span>            :         }
+<span class="lineNum">     182 </span>            : 
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         return best;</span>
+<span class="lineNum">     184 </span>            : }
+<span class="lineNum">     185 </span>            : EXPORT_SYMBOL(drm_vma_offset_lookup_locked);
+<a name="186"><span class="lineNum">     186 </span>            : </a>
+<span class="lineNum">     187 </span>            : /* internal helper to link @node into the rb-tree */
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 : static void _drm_vma_offset_add_rb(struct drm_vma_offset_manager *mgr,</span>
+<span class="lineNum">     189 </span>            :                                    struct drm_vma_offset_node *node)
+<span class="lineNum">     190 </span>            : {
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         struct rb_node **iter = &amp;mgr-&gt;vm_addr_space_rb.rb_node;</span>
+<span class="lineNum">     192 </span>            :         struct rb_node *parent = NULL;
+<span class="lineNum">     193 </span>            :         struct drm_vma_offset_node *iter_node;
+<span class="lineNum">     194 </span>            : 
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         while (likely(*iter)) {</span>
+<span class="lineNum">     196 </span>            :                 parent = *iter;
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :                 iter_node = rb_entry(*iter, struct drm_vma_offset_node, vm_rb);</span>
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                 if (node-&gt;vm_node.start &lt; iter_node-&gt;vm_node.start)</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                         iter = &amp;(*iter)-&gt;rb_left;</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                 else if (node-&gt;vm_node.start &gt; iter_node-&gt;vm_node.start)</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                         iter = &amp;(*iter)-&gt;rb_right;</span>
+<span class="lineNum">     203 </span>            :                 else
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                         BUG();</span>
+<span class="lineNum">     205 </span>            :         }
+<span class="lineNum">     206 </span>            : 
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :         rb_link_node(&amp;node-&gt;vm_rb, parent, iter);</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         rb_insert_color(&amp;node-&gt;vm_rb, &amp;mgr-&gt;vm_addr_space_rb);</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     210 </span>            : 
+<span class="lineNum">     211 </span>            : /**
+<span class="lineNum">     212 </span>            :  * drm_vma_offset_add() - Add offset node to manager
+<span class="lineNum">     213 </span>            :  * @mgr: Manager object
+<span class="lineNum">     214 </span>            :  * @node: Node to be added
+<span class="lineNum">     215 </span>            :  * @pages: Allocation size visible to user-space (in number of pages)
+<span class="lineNum">     216 </span>            :  *
+<span class="lineNum">     217 </span>            :  * Add a node to the offset-manager. If the node was already added, this does
+<span class="lineNum">     218 </span>            :  * nothing and return 0. @pages is the size of the object given in number of
+<span class="lineNum">     219 </span>            :  * pages.
+<span class="lineNum">     220 </span>            :  * After this call succeeds, you can access the offset of the node until it
+<span class="lineNum">     221 </span>            :  * is removed again.
+<span class="lineNum">     222 </span>            :  *
+<span class="lineNum">     223 </span>            :  * If this call fails, it is safe to retry the operation or call
+<span class="lineNum">     224 </span>            :  * drm_vma_offset_remove(), anyway. However, no cleanup is required in that
+<span class="lineNum">     225 </span>            :  * case.
+<span class="lineNum">     226 </span>            :  *
+<span class="lineNum">     227 </span>            :  * @pages is not required to be the same size as the underlying memory object
+<span class="lineNum">     228 </span>            :  * that you want to map. It only limits the size that user-space can map into
+<span class="lineNum">     229 </span>            :  * their address space.
+<span class="lineNum">     230 </span>            :  *
+<span class="lineNum">     231 </span>            :  * RETURNS:
+<a name="232"><span class="lineNum">     232 </span>            :  * 0 on success, negative error code on failure.</a>
+<span class="lineNum">     233 </span>            :  */
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 : int drm_vma_offset_add(struct drm_vma_offset_manager *mgr,</span>
+<span class="lineNum">     235 </span>            :                        struct drm_vma_offset_node *node, unsigned long pages)
+<span class="lineNum">     236 </span>            : {
+<span class="lineNum">     237 </span>            :         int ret;
+<span class="lineNum">     238 </span>            : 
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :         write_lock(&amp;mgr-&gt;vm_lock);</span>
+<span class="lineNum">     240 </span>            : 
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :         if (drm_mm_node_allocated(&amp;node-&gt;vm_node)) {</span>
+<span class="lineNum">     242 </span>            :                 ret = 0;
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :                 goto out_unlock;</span>
+<span class="lineNum">     244 </span>            :         }
+<span class="lineNum">     245 </span>            : 
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         ret = drm_mm_insert_node(&amp;mgr-&gt;vm_addr_space_mm, &amp;node-&gt;vm_node,</span>
+<span class="lineNum">     247 </span>            :                                  pages, 0, DRM_MM_SEARCH_DEFAULT);
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     249 </span>            :                 goto out_unlock;
+<span class="lineNum">     250 </span>            : 
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :         _drm_vma_offset_add_rb(mgr, node);</span>
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span>            : out_unlock:
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         write_unlock(&amp;mgr-&gt;vm_lock);</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         return ret;</span>
+<span class="lineNum">     256 </span>            : }
+<span class="lineNum">     257 </span>            : EXPORT_SYMBOL(drm_vma_offset_add);
+<span class="lineNum">     258 </span>            : 
+<span class="lineNum">     259 </span>            : /**
+<span class="lineNum">     260 </span>            :  * drm_vma_offset_remove() - Remove offset node from manager
+<span class="lineNum">     261 </span>            :  * @mgr: Manager object
+<span class="lineNum">     262 </span>            :  * @node: Node to be removed
+<span class="lineNum">     263 </span>            :  *
+<span class="lineNum">     264 </span>            :  * Remove a node from the offset manager. If the node wasn't added before, this
+<span class="lineNum">     265 </span>            :  * does nothing. After this call returns, the offset and size will be 0 until a
+<span class="lineNum">     266 </span>            :  * new offset is allocated via drm_vma_offset_add() again. Helper functions like
+<span class="lineNum">     267 </span>            :  * drm_vma_node_start() and drm_vma_node_offset_addr() will return 0 if no
+<a name="268"><span class="lineNum">     268 </span>            :  * offset is allocated.</a>
+<span class="lineNum">     269 </span>            :  */
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 : void drm_vma_offset_remove(struct drm_vma_offset_manager *mgr,</span>
+<span class="lineNum">     271 </span>            :                            struct drm_vma_offset_node *node)
+<span class="lineNum">     272 </span>            : {
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         write_lock(&amp;mgr-&gt;vm_lock);</span>
+<span class="lineNum">     274 </span>            : 
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         if (drm_mm_node_allocated(&amp;node-&gt;vm_node)) {</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :                 rb_erase(&amp;node-&gt;vm_rb, &amp;mgr-&gt;vm_addr_space_rb);</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :                 drm_mm_remove_node(&amp;node-&gt;vm_node);</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :                 memset(&amp;node-&gt;vm_node, 0, sizeof(node-&gt;vm_node));</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     280 </span>            : 
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         write_unlock(&amp;mgr-&gt;vm_lock);</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     283 </span>            : EXPORT_SYMBOL(drm_vma_offset_remove);
+<span class="lineNum">     284 </span>            : 
+<span class="lineNum">     285 </span>            : /**
+<span class="lineNum">     286 </span>            :  * drm_vma_node_allow - Add open-file to list of allowed users
+<span class="lineNum">     287 </span>            :  * @node: Node to modify
+<span class="lineNum">     288 </span>            :  * @filp: Open file to add
+<span class="lineNum">     289 </span>            :  *
+<span class="lineNum">     290 </span>            :  * Add @filp to the list of allowed open-files for this node. If @filp is
+<span class="lineNum">     291 </span>            :  * already on this list, the ref-count is incremented.
+<span class="lineNum">     292 </span>            :  *
+<span class="lineNum">     293 </span>            :  * The list of allowed-users is preserved across drm_vma_offset_add() and
+<span class="lineNum">     294 </span>            :  * drm_vma_offset_remove() calls. You may even call it if the node is currently
+<span class="lineNum">     295 </span>            :  * not added to any offset-manager.
+<span class="lineNum">     296 </span>            :  *
+<span class="lineNum">     297 </span>            :  * You must remove all open-files the same number of times as you added them
+<span class="lineNum">     298 </span>            :  * before destroying the node. Otherwise, you will leak memory.
+<span class="lineNum">     299 </span>            :  *
+<span class="lineNum">     300 </span>            :  * This is locked against concurrent access internally.
+<span class="lineNum">     301 </span>            :  *
+<span class="lineNum">     302 </span>            :  * RETURNS:
+<a name="303"><span class="lineNum">     303 </span>            :  * 0 on success, negative error code on internal failure (out-of-mem)</a>
+<span class="lineNum">     304 </span>            :  */
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 : int drm_vma_node_allow(struct drm_vma_offset_node *node, struct file *filp)</span>
+<span class="lineNum">     306 </span>            : {
+<span class="lineNum">     307 </span>            :         struct rb_node **iter;
+<span class="lineNum">     308 </span>            :         struct rb_node *parent = NULL;
+<span class="lineNum">     309 </span>            :         struct drm_vma_offset_file *new, *entry;
+<span class="lineNum">     310 </span>            :         int ret = 0;
+<span class="lineNum">     311 </span>            : 
+<span class="lineNum">     312 </span>            :         /* Preallocate entry to avoid atomic allocations below. It is quite
+<span class="lineNum">     313 </span>            :          * unlikely that an open-file is added twice to a single node so we
+<span class="lineNum">     314 </span>            :          * don't optimize for this case. OOM is checked below only if the entry
+<span class="lineNum">     315 </span>            :          * is actually used. */
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         new = kmalloc(sizeof(*entry), GFP_KERNEL);</span>
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :         write_lock(&amp;node-&gt;vm_lock);</span>
+<span class="lineNum">     319 </span>            : 
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         iter = &amp;node-&gt;vm_files.rb_node;</span>
+<span class="lineNum">     321 </span>            : 
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         while (likely(*iter)) {</span>
+<span class="lineNum">     323 </span>            :                 parent = *iter;
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :                 entry = rb_entry(*iter, struct drm_vma_offset_file, vm_rb);</span>
+<span class="lineNum">     325 </span>            : 
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :                 if (filp == entry-&gt;vm_filp) {</span>
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :                         entry-&gt;vm_count++;</span>
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :                         goto unlock;</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                 } else if (filp &gt; entry-&gt;vm_filp) {</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                         iter = &amp;(*iter)-&gt;rb_right;</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                         iter = &amp;(*iter)-&gt;rb_left;</span>
+<span class="lineNum">     333 </span>            :                 }
+<span class="lineNum">     334 </span>            :         }
+<span class="lineNum">     335 </span>            : 
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         if (!new) {</span>
+<span class="lineNum">     337 </span>            :                 ret = -ENOMEM;
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                 goto unlock;</span>
+<span class="lineNum">     339 </span>            :         }
+<span class="lineNum">     340 </span>            : 
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         new-&gt;vm_filp = filp;</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :         new-&gt;vm_count = 1;</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :         rb_link_node(&amp;new-&gt;vm_rb, parent, iter);</span>
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         rb_insert_color(&amp;new-&gt;vm_rb, &amp;node-&gt;vm_files);</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :         new = NULL;</span>
+<span class="lineNum">     346 </span>            : 
+<span class="lineNum">     347 </span>            : unlock:
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         write_unlock(&amp;node-&gt;vm_lock);</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :         kfree(new);</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         return ret;</span>
+<span class="lineNum">     351 </span>            : }
+<span class="lineNum">     352 </span>            : EXPORT_SYMBOL(drm_vma_node_allow);
+<span class="lineNum">     353 </span>            : 
+<span class="lineNum">     354 </span>            : /**
+<span class="lineNum">     355 </span>            :  * drm_vma_node_revoke - Remove open-file from list of allowed users
+<span class="lineNum">     356 </span>            :  * @node: Node to modify
+<span class="lineNum">     357 </span>            :  * @filp: Open file to remove
+<span class="lineNum">     358 </span>            :  *
+<span class="lineNum">     359 </span>            :  * Decrement the ref-count of @filp in the list of allowed open-files on @node.
+<span class="lineNum">     360 </span>            :  * If the ref-count drops to zero, remove @filp from the list. You must call
+<span class="lineNum">     361 </span>            :  * this once for every drm_vma_node_allow() on @filp.
+<span class="lineNum">     362 </span>            :  *
+<span class="lineNum">     363 </span>            :  * This is locked against concurrent access internally.
+<span class="lineNum">     364 </span>            :  *
+<a name="365"><span class="lineNum">     365 </span>            :  * If @filp is not on the list, nothing is done.</a>
+<span class="lineNum">     366 </span>            :  */
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 : void drm_vma_node_revoke(struct drm_vma_offset_node *node, struct file *filp)</span>
+<span class="lineNum">     368 </span>            : {
+<span class="lineNum">     369 </span>            :         struct drm_vma_offset_file *entry;
+<span class="lineNum">     370 </span>            :         struct rb_node *iter;
+<span class="lineNum">     371 </span>            : 
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :         write_lock(&amp;node-&gt;vm_lock);</span>
+<span class="lineNum">     373 </span>            : 
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :         iter = node-&gt;vm_files.rb_node;</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :         while (likely(iter)) {</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                 entry = rb_entry(iter, struct drm_vma_offset_file, vm_rb);</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                 if (filp == entry-&gt;vm_filp) {</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                         if (!--entry-&gt;vm_count) {</span>
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :                                 rb_erase(&amp;entry-&gt;vm_rb, &amp;node-&gt;vm_files);</span>
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :                                 kfree(entry);</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     382 </span>            :                         break;
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :                 } else if (filp &gt; entry-&gt;vm_filp) {</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :                         iter = iter-&gt;rb_right;</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                         iter = iter-&gt;rb_left;</span>
+<span class="lineNum">     387 </span>            :                 }
+<span class="lineNum">     388 </span>            :         }
+<span class="lineNum">     389 </span>            : 
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         write_unlock(&amp;node-&gt;vm_lock);</span>
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     392 </span>            : EXPORT_SYMBOL(drm_vma_node_revoke);
+<span class="lineNum">     393 </span>            : 
+<span class="lineNum">     394 </span>            : /**
+<span class="lineNum">     395 </span>            :  * drm_vma_node_is_allowed - Check whether an open-file is granted access
+<span class="lineNum">     396 </span>            :  * @node: Node to check
+<span class="lineNum">     397 </span>            :  * @filp: Open-file to check for
+<span class="lineNum">     398 </span>            :  *
+<span class="lineNum">     399 </span>            :  * Search the list in @node whether @filp is currently on the list of allowed
+<span class="lineNum">     400 </span>            :  * open-files (see drm_vma_node_allow()).
+<span class="lineNum">     401 </span>            :  *
+<span class="lineNum">     402 </span>            :  * This is locked against concurrent access internally.
+<span class="lineNum">     403 </span>            :  *
+<span class="lineNum">     404 </span>            :  * RETURNS:
+<a name="405"><span class="lineNum">     405 </span>            :  * true iff @filp is on the list</a>
+<span class="lineNum">     406 </span>            :  */
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 : bool drm_vma_node_is_allowed(struct drm_vma_offset_node *node,</span>
+<span class="lineNum">     408 </span>            :                              struct file *filp)
+<span class="lineNum">     409 </span>            : {
+<span class="lineNum">     410 </span>            :         struct drm_vma_offset_file *entry;
+<span class="lineNum">     411 </span>            :         struct rb_node *iter;
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         read_lock(&amp;node-&gt;vm_lock);</span>
+<span class="lineNum">     414 </span>            : 
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :         iter = node-&gt;vm_files.rb_node;</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         while (likely(iter)) {</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 entry = rb_entry(iter, struct drm_vma_offset_file, vm_rb);</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                 if (filp == entry-&gt;vm_filp)</span>
+<span class="lineNum">     419 </span>            :                         break;
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :                 else if (filp &gt; entry-&gt;vm_filp)</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                         iter = iter-&gt;rb_right;</span>
+<span class="lineNum">     422 </span>            :                 else
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :                         iter = iter-&gt;rb_left;</span>
+<span class="lineNum">     424 </span>            :         }
+<span class="lineNum">     425 </span>            : 
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :         read_unlock(&amp;node-&gt;vm_lock);</span>
+<span class="lineNum">     427 </span>            : 
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :         return iter;</span>
+<span class="lineNum">     429 </span>            : }
+<span class="lineNum">     430 </span>            : EXPORT_SYMBOL(drm_vma_node_is_allowed);
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

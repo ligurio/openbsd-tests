@@ -1,0 +1,620 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - ddb/db_dwarf.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">ddb</a> - db_dwarf.c<span style="font-size: 80%;"> (source / <a href="db_dwarf.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">185</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: db_dwarf.c,v 1.7 2017/10/27 08:40:15 mpi Exp $         */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2014 Matthew Dempsky &lt;matthew@dempsky.org&gt;
+<span class="lineNum">       4 </span>            :  *
+<span class="lineNum">       5 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       6 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       7 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       8 </span>            :  *
+<span class="lineNum">       9 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      10 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      11 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      12 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      13 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      14 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      15 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      16 </span>            :  */
+<span class="lineNum">      17 </span>            : 
+<span class="lineNum">      18 </span>            : #ifdef _KERNEL
+<span class="lineNum">      19 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      20 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;machine/db_machdep.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;ddb/db_sym.h&gt;
+<span class="lineNum">      23 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">      24 </span>            : #define DWARN(fmt, ...) printf(&quot;ddb: &quot; fmt &quot;\n&quot;, __VA_ARGS__)
+<span class="lineNum">      25 </span>            : #else
+<span class="lineNum">      26 </span>            : #define DWARN(fmt, ...) ((void)0)
+<span class="lineNum">      27 </span>            : #endif
+<span class="lineNum">      28 </span>            : #else /* _KERNEL */
+<span class="lineNum">      29 </span>            : #include &lt;err.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;stdbool.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;stdint.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;string.h&gt;
+<span class="lineNum">      33 </span>            : #define DWARN warnx
+<span class="lineNum">      34 </span>            : #endif /* _KERNEL */
+<span class="lineNum">      35 </span>            : 
+<span class="lineNum">      36 </span>            : enum {
+<span class="lineNum">      37 </span>            :         DW_LNS_copy                     = 1,
+<span class="lineNum">      38 </span>            :         DW_LNS_advance_pc               = 2,
+<span class="lineNum">      39 </span>            :         DW_LNS_advance_line             = 3,
+<span class="lineNum">      40 </span>            :         DW_LNS_set_file                 = 4,
+<span class="lineNum">      41 </span>            :         DW_LNS_set_column               = 5,
+<span class="lineNum">      42 </span>            :         DW_LNS_negate_stmt              = 6,
+<span class="lineNum">      43 </span>            :         DW_LNS_set_basic_block          = 7,
+<span class="lineNum">      44 </span>            :         DW_LNS_const_add_pc             = 8,
+<span class="lineNum">      45 </span>            :         DW_LNS_fixed_advance_pc         = 9,
+<span class="lineNum">      46 </span>            :         DW_LNS_set_prologue_end         = 10,
+<span class="lineNum">      47 </span>            :         DW_LNS_set_epilogue_begin       = 11,
+<span class="lineNum">      48 </span>            : };
+<span class="lineNum">      49 </span>            : 
+<span class="lineNum">      50 </span>            : enum {
+<span class="lineNum">      51 </span>            :         DW_LNE_end_sequence             = 1,
+<span class="lineNum">      52 </span>            :         DW_LNE_set_address              = 2,
+<span class="lineNum">      53 </span>            :         DW_LNE_define_file              = 3,
+<span class="lineNum">      54 </span>            : };
+<span class="lineNum">      55 </span>            : 
+<span class="lineNum">      56 </span>            : struct dwbuf {
+<span class="lineNum">      57 </span>            :         const char *buf;
+<span class="lineNum">      58 </span>            :         size_t len;
+<span class="lineNum">      59 </span>            : };
+<a name="60"><span class="lineNum">      60 </span>            : </a>
+<span class="lineNum">      61 </span>            : static inline bool
+<span class="lineNum">      62 </span><span class="lineNoCov">          0 : read_bytes(struct dwbuf *d, void *v, size_t n)</span>
+<span class="lineNum">      63 </span>            : {
+<span class="lineNum">      64 </span><span class="lineNoCov">          0 :         if (d-&gt;len &lt; n)</span>
+<span class="lineNum">      65 </span><span class="lineNoCov">          0 :                 return (false);</span>
+<span class="lineNum">      66 </span><span class="lineNoCov">          0 :         memcpy(v, d-&gt;buf, n);</span>
+<span class="lineNum">      67 </span><span class="lineNoCov">          0 :         d-&gt;buf += n;</span>
+<span class="lineNum">      68 </span><span class="lineNoCov">          0 :         d-&gt;len -= n;</span>
+<span class="lineNum">      69 </span><span class="lineNoCov">          0 :         return (true);</span>
+<span class="lineNum">      70 </span><span class="lineNoCov">          0 : }</span>
+<a name="71"><span class="lineNum">      71 </span>            : </a>
+<span class="lineNum">      72 </span>            : static bool
+<span class="lineNum">      73 </span><span class="lineNoCov">          0 : read_s8(struct dwbuf *d, int8_t *v)</span>
+<span class="lineNum">      74 </span>            : {
+<span class="lineNum">      75 </span><span class="lineNoCov">          0 :         return (read_bytes(d, v, sizeof(*v)));</span>
+<span class="lineNum">      76 </span>            : }
+<a name="77"><span class="lineNum">      77 </span>            : </a>
+<span class="lineNum">      78 </span>            : static bool
+<span class="lineNum">      79 </span><span class="lineNoCov">          0 : read_u8(struct dwbuf *d, uint8_t *v)</span>
+<span class="lineNum">      80 </span>            : {
+<span class="lineNum">      81 </span><span class="lineNoCov">          0 :         return (read_bytes(d, v, sizeof(*v)));</span>
+<span class="lineNum">      82 </span>            : }
+<a name="83"><span class="lineNum">      83 </span>            : </a>
+<span class="lineNum">      84 </span>            : static bool
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 : read_u16(struct dwbuf *d, uint16_t *v)</span>
+<span class="lineNum">      86 </span>            : {
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :         return (read_bytes(d, v, sizeof(*v)));</span>
+<span class="lineNum">      88 </span>            : }
+<a name="89"><span class="lineNum">      89 </span>            : </a>
+<span class="lineNum">      90 </span>            : static bool
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 : read_u32(struct dwbuf *d, uint32_t *v)</span>
+<span class="lineNum">      92 </span>            : {
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :         return (read_bytes(d, v, sizeof(*v)));</span>
+<span class="lineNum">      94 </span>            : }
+<a name="95"><span class="lineNum">      95 </span>            : </a>
+<span class="lineNum">      96 </span>            : static bool
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 : read_u64(struct dwbuf *d, uint64_t *v)</span>
+<span class="lineNum">      98 </span>            : {
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :         return (read_bytes(d, v, sizeof(*v)));</span>
+<span class="lineNum">     100 </span>            : }
+<span class="lineNum">     101 </span>            : 
+<a name="102"><span class="lineNum">     102 </span>            : /* Read a DWARF LEB128 (little-endian base-128) value. */</a>
+<span class="lineNum">     103 </span>            : static bool
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 : read_leb128(struct dwbuf *d, uint64_t *v, bool signextend)</span>
+<span class="lineNum">     105 </span>            : {
+<span class="lineNum">     106 </span>            :         unsigned int shift = 0;
+<span class="lineNum">     107 </span>            :         uint64_t res = 0;
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :         uint8_t x;</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         while (shift &lt; 64 &amp;&amp; read_u8(d, &amp;x)) {</span>
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :                 res |= (uint64_t)(x &amp; 0x7f) &lt;&lt; shift;</span>
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :                 shift += 7;</span>
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :                 if ((x &amp; 0x80) == 0) {</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :                         if (signextend &amp;&amp; shift &lt; 64 &amp;&amp; (x &amp; 0x40) != 0)</span>
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :                                 res |= ~(uint64_t)0 &lt;&lt; shift;</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :                         *v = res;</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :                         return (true);</span>
+<span class="lineNum">     117 </span>            :                 }
+<span class="lineNum">     118 </span>            :         }
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :         return (false);</span>
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 : }</span>
+<a name="121"><span class="lineNum">     121 </span>            : </a>
+<span class="lineNum">     122 </span>            : static bool
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 : read_sleb128(struct dwbuf *d, int64_t *v)</span>
+<span class="lineNum">     124 </span>            : {
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         return (read_leb128(d, (uint64_t *)v, true));</span>
+<span class="lineNum">     126 </span>            : }
+<a name="127"><span class="lineNum">     127 </span>            : </a>
+<span class="lineNum">     128 </span>            : static bool
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 : read_uleb128(struct dwbuf *d, uint64_t *v)</span>
+<span class="lineNum">     130 </span>            : {
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :         return (read_leb128(d, v, false));</span>
+<span class="lineNum">     132 </span>            : }
+<span class="lineNum">     133 </span>            : 
+<a name="134"><span class="lineNum">     134 </span>            : /* Read a NUL terminated string. */</a>
+<span class="lineNum">     135 </span>            : static bool
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 : read_string(struct dwbuf *d, const char **s)</span>
+<span class="lineNum">     137 </span>            : {
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :         const char *end = memchr(d-&gt;buf, '\0', d-&gt;len);</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         if (end == NULL)</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :                 return (false);</span>
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         size_t n = end - d-&gt;buf + 1;</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         *s = d-&gt;buf;</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         d-&gt;buf += n;</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         d-&gt;len -= n;</span>
+<span class="lineNum">     145 </span>            :         return (true);
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 : }</span>
+<a name="147"><span class="lineNum">     147 </span>            : </a>
+<span class="lineNum">     148 </span>            : static bool
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 : read_buf(struct dwbuf *d, struct dwbuf *v, size_t n)</span>
+<span class="lineNum">     150 </span>            : {
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         if (d-&gt;len &lt; n)</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :                 return (false);</span>
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         v-&gt;buf = d-&gt;buf;</span>
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         v-&gt;len = n;</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         d-&gt;buf += n;</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         d-&gt;len -= n;</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         return (true);</span>
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 : }</span>
+<a name="159"><span class="lineNum">     159 </span>            : </a>
+<span class="lineNum">     160 </span>            : static bool
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 : skip_bytes(struct dwbuf *d, size_t n)</span>
+<span class="lineNum">     162 </span>            : {
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         if (d-&gt;len &lt; n)</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                 return (false);</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         d-&gt;buf += n;</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :         d-&gt;len -= n;</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :         return (true);</span>
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 : }</span>
+<a name="169"><span class="lineNum">     169 </span>            : </a>
+<span class="lineNum">     170 </span>            : static bool
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 : read_filename(struct dwbuf *names, const char **outdirname,</span>
+<span class="lineNum">     172 </span>            :     const char **outbasename, uint8_t opcode_base, uint64_t file)
+<span class="lineNum">     173 </span>            : {
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         if (file == 0)</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                 return (false);</span>
+<span class="lineNum">     176 </span>            : 
+<span class="lineNum">     177 </span>            :         /* Skip over opcode table. */
+<span class="lineNum">     178 </span>            :         size_t i;
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :         for (i = 1; i &lt; opcode_base; i++) {</span>
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :                 uint64_t dummy;</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                 if (!read_uleb128(names, &amp;dummy))</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :                         return (false);</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     184 </span>            : 
+<span class="lineNum">     185 </span>            :         /* Skip over directory name table for now. */
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :         struct dwbuf dirnames = *names;</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         for (;;) {</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :                 const char *name;</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                 if (!read_string(names, &amp;name))</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :                         return (false);</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :                 if (*name == '\0')</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     194 </span>            : 
+<span class="lineNum">     195 </span>            :         /* Locate file entry. */
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         const char *basename = NULL;</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         uint64_t dir = 0;</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; file; i++) {</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                 uint64_t mtime, size;</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                 if (!read_string(names, &amp;basename) || *basename == '\0' ||</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                     !read_uleb128(names, &amp;dir) ||</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                     !read_uleb128(names, &amp;mtime) ||</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :                     !read_uleb128(names, &amp;size))</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                         return (false);</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     206 </span>            : 
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :         const char *dirname = NULL;</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; dir; i++) {</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :                 if (!read_string(&amp;dirnames, &amp;dirname) || *dirname == '\0')</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                         return (false);</span>
+<span class="lineNum">     211 </span>            :         }
+<span class="lineNum">     212 </span>            : 
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         *outdirname = dirname;</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :         *outbasename = basename;</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         return (true);</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 : }</span>
+<a name="217"><span class="lineNum">     217 </span>            : </a>
+<span class="lineNum">     218 </span>            : bool
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 : db_dwarf_line_at_pc(const char *linetab, size_t linetabsize, uintptr_t pc,</span>
+<span class="lineNum">     220 </span>            :     const char **outdirname, const char **outbasename, int *outline)
+<span class="lineNum">     221 </span>            : {
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         struct dwbuf table = { .buf = linetab, .len = linetabsize };</span>
+<span class="lineNum">     223 </span>            : 
+<span class="lineNum">     224 </span>            :         /*
+<span class="lineNum">     225 </span>            :          * For simplicity, we simply brute force search through the entire
+<span class="lineNum">     226 </span>            :          * line table each time.
+<span class="lineNum">     227 </span>            :          */
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :         uint32_t unitsize;</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         struct dwbuf unit;</span>
+<span class="lineNum">     230 </span>            : next:
+<span class="lineNum">     231 </span>            :         /* Line tables are a sequence of compilation unit entries. */
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :         if (!read_u32(&amp;table, &amp;unitsize) || unitsize &gt;= 0xfffffff0 ||</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :             !read_buf(&amp;table, &amp;unit, unitsize))</span>
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :                 return (false);</span>
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span>            :         uint16_t version;
+<span class="lineNum">     237 </span>            :         uint32_t header_size;
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :         if (!read_u16(&amp;unit, &amp;version) || version &gt; 2 ||</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :             !read_u32(&amp;unit, &amp;header_size))</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                 goto next;</span>
+<span class="lineNum">     241 </span>            : 
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         struct dwbuf headerstart = unit;</span>
+<span class="lineNum">     243 </span>            :         uint8_t min_insn_length, default_is_stmt, line_range, opcode_base;
+<span class="lineNum">     244 </span>            :         int8_t line_base;
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         if (!read_u8(&amp;unit, &amp;min_insn_length) ||</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :             !read_u8(&amp;unit, &amp;default_is_stmt) ||</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :             !read_s8(&amp;unit, &amp;line_base) ||</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :             !read_u8(&amp;unit, &amp;line_range) ||</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :             !read_u8(&amp;unit, &amp;opcode_base))</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :                 goto next;</span>
+<span class="lineNum">     251 </span>            : 
+<span class="lineNum">     252 </span>            :         /*
+<span class="lineNum">     253 </span>            :          * Directory and file names are next in the header, but for now we
+<span class="lineNum">     254 </span>            :          * skip directly to the line number program.
+<span class="lineNum">     255 </span>            :          */
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         struct dwbuf names = unit;</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         unit = headerstart;</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         if (!skip_bytes(&amp;unit, header_size))</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :                 return (false);</span>
+<span class="lineNum">     260 </span>            : 
+<span class="lineNum">     261 </span>            :         /* VM registers. */
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :         uint64_t address = 0, file = 1, line = 1, column = 0;</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :         uint8_t is_stmt = default_is_stmt;</span>
+<span class="lineNum">     264 </span>            :         bool basic_block = false, end_sequence = false;
+<span class="lineNum">     265 </span>            :         bool prologue_end = false, epilogue_begin = false;
+<span class="lineNum">     266 </span>            : 
+<span class="lineNum">     267 </span>            :         /* Last line table entry emitted, if any. */
+<span class="lineNum">     268 </span>            :         bool have_last = false;
+<span class="lineNum">     269 </span>            :         uint64_t last_line = 0, last_file = 0;
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span>            :         /* Time to run the line program. */
+<span class="lineNum">     272 </span>            :         uint8_t opcode;
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         while (read_u8(&amp;unit, &amp;opcode)) {</span>
+<span class="lineNum">     274 </span>            :                 bool emit = false, reset_basic_block = false;
+<span class="lineNum">     275 </span>            : 
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :                 if (opcode &gt;= opcode_base) {</span>
+<span class="lineNum">     277 </span>            :                         /* &quot;Special&quot; opcodes. */
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :                         uint8_t diff = opcode - opcode_base;</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                         address += diff / line_range;</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                         line += line_base + diff % line_range;</span>
+<span class="lineNum">     281 </span>            :                         emit = true;
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :                 } else if (opcode == 0) {</span>
+<span class="lineNum">     283 </span>            :                         /* &quot;Extended&quot; opcodes. */
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :                         uint64_t extsize;</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                         struct dwbuf extra;</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                         if (!read_uleb128(&amp;unit, &amp;extsize) ||</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                             !read_buf(&amp;unit, &amp;extra, extsize) ||</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                             !read_u8(&amp;extra, &amp;opcode))</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :                                 goto next;</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                         switch (opcode) {</span>
+<span class="lineNum">     291 </span>            :                         case DW_LNE_end_sequence:
+<span class="lineNum">     292 </span>            :                                 emit = true;
+<span class="lineNum">     293 </span>            :                                 end_sequence = true;
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     295 </span>            :                         case DW_LNE_set_address:
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :                                 switch (extra.len) {</span>
+<span class="lineNum">     297 </span>            :                                 case 4: {
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :                                         uint32_t address32;</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                                         if (!read_u32(&amp;extra, &amp;address32))</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                                                 goto next;</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :                                         address = address32;</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                                         break;</span>
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :                                 }</span>
+<span class="lineNum">     304 </span>            :                                 case 8:
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                                         if (!read_u64(&amp;extra, &amp;address))</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :                                                 goto next;</span>
+<span class="lineNum">     307 </span>            :                                         break;
+<span class="lineNum">     308 </span>            :                                 default:
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :                                         DWARN(&quot;unexpected address length: %zu&quot;,</span>
+<span class="lineNum">     310 </span>            :                                             extra.len);
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                                         goto next;</span>
+<span class="lineNum">     312 </span>            :                                 }
+<span class="lineNum">     313 </span>            :                                 break;
+<span class="lineNum">     314 </span>            :                         case DW_LNE_define_file:
+<span class="lineNum">     315 </span>            :                                 /* XXX: hope this isn't needed */
+<span class="lineNum">     316 </span>            :                         default:
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :                                 DWARN(&quot;unknown extended opcode: %d&quot;, opcode);</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :                                 goto next;</span>
+<span class="lineNum">     319 </span>            :                         }
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     321 </span>            :                         /* &quot;Standard&quot; opcodes. */
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :                         switch (opcode) {</span>
+<span class="lineNum">     323 </span>            :                         case DW_LNS_copy:
+<span class="lineNum">     324 </span>            :                                 emit = true;
+<span class="lineNum">     325 </span>            :                                 reset_basic_block = true;
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     327 </span>            :                         case DW_LNS_advance_pc: {
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :                                 uint64_t delta;</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                                 if (!read_uleb128(&amp;unit, &amp;delta))</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                                         goto next;</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :                                 address += delta * min_insn_length;</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     334 </span>            :                         case DW_LNS_advance_line: {
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                                 int64_t delta;</span>
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :                                 if (!read_sleb128(&amp;unit, &amp;delta))</span>
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :                                         goto next;</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                                 line += delta;</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     341 </span>            :                         case DW_LNS_set_file:
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :                                 if (!read_uleb128(&amp;unit, &amp;file))</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :                                         goto next;</span>
+<span class="lineNum">     344 </span>            :                                 break;
+<span class="lineNum">     345 </span>            :                         case DW_LNS_set_column:
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :                                 if (!read_uleb128(&amp;unit, &amp;column))</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :                                         goto next;</span>
+<span class="lineNum">     348 </span>            :                                 break;
+<span class="lineNum">     349 </span>            :                         case DW_LNS_negate_stmt:
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                                 is_stmt = !is_stmt;</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     352 </span>            :                         case DW_LNS_set_basic_block:
+<span class="lineNum">     353 </span>            :                                 basic_block = true;
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     355 </span>            :                         case DW_LNS_const_add_pc:
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :                                 address += (255 - opcode_base) / line_range;</span>
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     358 </span>            :                         case DW_LNS_set_prologue_end:
+<span class="lineNum">     359 </span>            :                                 prologue_end = true;
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     361 </span>            :                         case DW_LNS_set_epilogue_begin:
+<span class="lineNum">     362 </span>            :                                 epilogue_begin = true;
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     364 </span>            :                         default:
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                                 DWARN(&quot;unknown standard opcode: %d&quot;, opcode);</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :                                 goto next;</span>
+<span class="lineNum">     367 </span>            :                         }
+<span class="lineNum">     368 </span>            :                 }
+<span class="lineNum">     369 </span>            : 
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                 if (emit) {</span>
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                         if (address &gt; pc) {</span>
+<span class="lineNum">     372 </span>            :                                 /* Found an entry after our target PC. */
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                                 if (!have_last) {</span>
+<span class="lineNum">     374 </span>            :                                         /* Give up on this program. */
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                                         break;</span>
+<span class="lineNum">     376 </span>            :                                 }
+<span class="lineNum">     377 </span>            :                                 /* Return the last entry. */
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                                 *outline = last_line;</span>
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :                                 return (read_filename(&amp;names, outdirname,</span>
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :                                     outbasename, opcode_base, last_file));</span>
+<span class="lineNum">     381 </span>            :                         }
+<span class="lineNum">     382 </span>            : 
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :                         last_file = file;</span>
+<span class="lineNum">     384 </span>            :                         last_line = line;
+<span class="lineNum">     385 </span>            :                         have_last = true;
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     387 </span>            : 
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                 if (reset_basic_block)</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :                         basic_block = false;</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     391 </span>            : 
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         goto next;</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span>            : #ifndef _KERNEL
+<span class="lineNum">     396 </span>            : #include &lt;sys/endian.h&gt;
+<span class="lineNum">     397 </span>            : #include &lt;sys/mman.h&gt;
+<span class="lineNum">     398 </span>            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">     399 </span>            : #include &lt;elf.h&gt;
+<span class="lineNum">     400 </span>            : #include &lt;fcntl.h&gt;
+<span class="lineNum">     401 </span>            : #include &lt;stdio.h&gt;
+<span class="lineNum">     402 </span>            : #include &lt;stdlib.h&gt;
+<span class="lineNum">     403 </span>            : #include &lt;unistd.h&gt;
+<span class="lineNum">     404 </span>            : 
+<span class="lineNum">     405 </span>            : #ifndef ELFDATA
+<span class="lineNum">     406 </span>            : #if BYTE_ORDER == LITTLE_ENDIAN
+<span class="lineNum">     407 </span>            : #define ELFDATA ELFDATA2LSB
+<span class="lineNum">     408 </span>            : #elif BYTE_ORDER == BIG_ENDIAN
+<span class="lineNum">     409 </span>            : #define ELFDATA ELFDATA2MSB
+<span class="lineNum">     410 </span>            : #else
+<span class="lineNum">     411 </span>            : #error Unsupported byte order
+<span class="lineNum">     412 </span>            : #endif
+<span class="lineNum">     413 </span>            : #endif /* !ELFDATA */
+<span class="lineNum">     414 </span>            : 
+<span class="lineNum">     415 </span>            : static void
+<span class="lineNum">     416 </span>            : usage(void)
+<span class="lineNum">     417 </span>            : {
+<span class="lineNum">     418 </span>            :         extern const char *__progname;
+<span class="lineNum">     419 </span>            :         errx(1, &quot;usage: %s [-s] [-e filename] [addr addr ...]&quot;, __progname);
+<span class="lineNum">     420 </span>            : }
+<span class="lineNum">     421 </span>            : 
+<span class="lineNum">     422 </span>            : /*
+<span class="lineNum">     423 </span>            :  * Basic addr2line clone for stand-alone testing.
+<span class="lineNum">     424 </span>            :  */
+<span class="lineNum">     425 </span>            : int
+<span class="lineNum">     426 </span>            : main(int argc, char *argv[])
+<span class="lineNum">     427 </span>            : {
+<span class="lineNum">     428 </span>            :         const char *filename = &quot;a.out&quot;;
+<span class="lineNum">     429 </span>            : 
+<span class="lineNum">     430 </span>            :         int ch;
+<span class="lineNum">     431 </span>            :         bool showdir = true;
+<span class="lineNum">     432 </span>            :         while ((ch = getopt(argc, argv, &quot;e:s&quot;)) != EOF) {
+<span class="lineNum">     433 </span>            :                 switch (ch) {
+<span class="lineNum">     434 </span>            :                 case 'e':
+<span class="lineNum">     435 </span>            :                         filename = optarg;
+<span class="lineNum">     436 </span>            :                         break;
+<span class="lineNum">     437 </span>            :                 case 's':
+<span class="lineNum">     438 </span>            :                         showdir = false;
+<span class="lineNum">     439 </span>            :                         break;
+<span class="lineNum">     440 </span>            :                 default:
+<span class="lineNum">     441 </span>            :                         usage();
+<span class="lineNum">     442 </span>            :                 }
+<span class="lineNum">     443 </span>            :         }
+<span class="lineNum">     444 </span>            : 
+<span class="lineNum">     445 </span>            :         argc -= optind;
+<span class="lineNum">     446 </span>            :         argv += optind;
+<span class="lineNum">     447 </span>            : 
+<span class="lineNum">     448 </span>            :         /* Start by mapping the full file into memory. */
+<span class="lineNum">     449 </span>            :         int fd = open(filename, O_RDONLY);
+<span class="lineNum">     450 </span>            :         if (fd == -1)
+<span class="lineNum">     451 </span>            :                 err(1, &quot;open&quot;);
+<span class="lineNum">     452 </span>            : 
+<span class="lineNum">     453 </span>            :         struct stat st;
+<span class="lineNum">     454 </span>            :         if (fstat(fd, &amp;st) == -1)
+<span class="lineNum">     455 </span>            :                 err(1, &quot;fstat&quot;);
+<span class="lineNum">     456 </span>            :         if (st.st_size &lt; (off_t)sizeof(Elf_Ehdr))
+<span class="lineNum">     457 </span>            :                 errx(1, &quot;file too small to be ELF&quot;);
+<span class="lineNum">     458 </span>            :         if ((uintmax_t)st.st_size &gt; SIZE_MAX)
+<span class="lineNum">     459 </span>            :                 errx(1, &quot;file too big to fit memory&quot;);
+<span class="lineNum">     460 </span>            :         size_t filesize = st.st_size;
+<span class="lineNum">     461 </span>            : 
+<span class="lineNum">     462 </span>            :         const char *p = mmap(NULL, filesize, PROT_READ, MAP_SHARED, fd, 0);
+<span class="lineNum">     463 </span>            :         if (p == MAP_FAILED)
+<span class="lineNum">     464 </span>            :                 err(1, &quot;mmap&quot;);
+<span class="lineNum">     465 </span>            : 
+<span class="lineNum">     466 </span>            :         close(fd);
+<span class="lineNum">     467 </span>            : 
+<span class="lineNum">     468 </span>            :         /* Read and validate ELF header. */
+<span class="lineNum">     469 </span>            :         Elf_Ehdr ehdr;
+<span class="lineNum">     470 </span>            :         memcpy(&amp;ehdr, p, sizeof(ehdr));
+<span class="lineNum">     471 </span>            :         if (!IS_ELF(ehdr))
+<span class="lineNum">     472 </span>            :                 errx(1, &quot;file is not ELF&quot;);
+<span class="lineNum">     473 </span>            :         if (ehdr.e_ident[EI_CLASS] != ELFCLASS)
+<span class="lineNum">     474 </span>            :                 errx(1, &quot;unexpected word size&quot;);
+<span class="lineNum">     475 </span>            :         if (ehdr.e_ident[EI_DATA] != ELFDATA)
+<span class="lineNum">     476 </span>            :                 errx(1, &quot;unexpected data format&quot;);
+<span class="lineNum">     477 </span>            :         if (ehdr.e_shoff &gt; filesize)
+<span class="lineNum">     478 </span>            :                 errx(1, &quot;bogus section table offset&quot;);
+<span class="lineNum">     479 </span>            :         if (ehdr.e_shentsize &lt; sizeof(Elf_Shdr))
+<span class="lineNum">     480 </span>            :                 errx(1, &quot;unexpected section header size&quot;);
+<span class="lineNum">     481 </span>            :         if (ehdr.e_shnum &gt; (filesize - ehdr.e_shoff) / ehdr.e_shentsize)
+<span class="lineNum">     482 </span>            :                 errx(1, &quot;bogus section header count&quot;);
+<span class="lineNum">     483 </span>            :         if (ehdr.e_shstrndx &gt;= ehdr.e_shnum)
+<span class="lineNum">     484 </span>            :                 errx(1, &quot;bogus string table index&quot;);
+<span class="lineNum">     485 </span>            : 
+<span class="lineNum">     486 </span>            :         /* Find section header string table location and size. */
+<span class="lineNum">     487 </span>            :         Elf_Shdr shdr;
+<span class="lineNum">     488 </span>            :         memcpy(&amp;shdr, p + ehdr.e_shoff + ehdr.e_shstrndx * ehdr.e_shentsize,
+<span class="lineNum">     489 </span>            :             sizeof(shdr));
+<span class="lineNum">     490 </span>            :         if (shdr.sh_type != SHT_STRTAB)
+<span class="lineNum">     491 </span>            :                 errx(1, &quot;unexpected string table type&quot;);
+<span class="lineNum">     492 </span>            :         if (shdr.sh_offset &gt; filesize)
+<span class="lineNum">     493 </span>            :                 errx(1, &quot;bogus string table offset&quot;);
+<span class="lineNum">     494 </span>            :         if (shdr.sh_size &gt; filesize - shdr.sh_offset)
+<span class="lineNum">     495 </span>            :                 errx(1, &quot;bogus string table size&quot;);
+<span class="lineNum">     496 </span>            :         const char *shstrtab = p + shdr.sh_offset;
+<span class="lineNum">     497 </span>            :         size_t shstrtabsize = shdr.sh_size;
+<span class="lineNum">     498 </span>            : 
+<span class="lineNum">     499 </span>            :         /* Search through section table for .debug_line section. */
+<span class="lineNum">     500 </span>            :         size_t i;
+<span class="lineNum">     501 </span>            :         for (i = 0; i &lt; ehdr.e_shnum; i++) {
+<span class="lineNum">     502 </span>            :                 memcpy(&amp;shdr, p + ehdr.e_shoff + i * ehdr.e_shentsize,
+<span class="lineNum">     503 </span>            :                     sizeof(shdr));
+<span class="lineNum">     504 </span>            :                 if (0 == strncmp(&quot;.debug_line&quot;, shstrtab + shdr.sh_name,
+<span class="lineNum">     505 </span>            :                     shstrtabsize - shdr.sh_name))
+<span class="lineNum">     506 </span>            :                         break;
+<span class="lineNum">     507 </span>            :         }
+<span class="lineNum">     508 </span>            :         if (i == ehdr.e_shnum)
+<span class="lineNum">     509 </span>            :                 errx(1, &quot;no DWARF line number table found&quot;);
+<span class="lineNum">     510 </span>            :         if (shdr.sh_offset &gt; filesize)
+<span class="lineNum">     511 </span>            :                 errx(1, &quot;bogus line table offset&quot;);
+<span class="lineNum">     512 </span>            :         if (shdr.sh_size &gt; filesize - shdr.sh_offset)
+<span class="lineNum">     513 </span>            :                 errx(1, &quot;bogus line table size&quot;);
+<span class="lineNum">     514 </span>            :         const char *linetab = p + shdr.sh_offset;
+<span class="lineNum">     515 </span>            :         size_t linetabsize = shdr.sh_size;
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span>            :         const char *addrstr;
+<span class="lineNum">     518 </span>            :         while ((addrstr = *argv++) != NULL) {
+<span class="lineNum">     519 </span>            :                 unsigned long addr = strtoul(addrstr, NULL, 16);
+<span class="lineNum">     520 </span>            : 
+<span class="lineNum">     521 </span>            :                 const char *dir, *file;
+<span class="lineNum">     522 </span>            :                 int line;
+<span class="lineNum">     523 </span>            :                 if (!db_dwarf_line_at_pc(linetab, linetabsize, addr,
+<span class="lineNum">     524 </span>            :                     &amp;dir, &amp;file, &amp;line)) {
+<span class="lineNum">     525 </span>            :                         dir = NULL;
+<span class="lineNum">     526 </span>            :                         file = &quot;??&quot;;
+<span class="lineNum">     527 </span>            :                         line = 0;
+<span class="lineNum">     528 </span>            :                 }
+<span class="lineNum">     529 </span>            :                 if (showdir &amp;&amp; dir != NULL)
+<span class="lineNum">     530 </span>            :                         printf(&quot;%s/&quot;, dir);
+<span class="lineNum">     531 </span>            :                 printf(&quot;%s:%d\n&quot;, file, line);
+<span class="lineNum">     532 </span>            :         }
+<span class="lineNum">     533 </span>            : 
+<span class="lineNum">     534 </span>            :         return (0);
+<span class="lineNum">     535 </span>            : }
+<span class="lineNum">     536 </span>            : #endif /* !_KERNEL */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,1054 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - net/art.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">net</a> - art.c<span style="font-size: 80%;"> (source / <a href="art.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">388</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: art.c,v 1.27 2017/02/28 09:50:13 mpi Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2015 Martin Pieuchot
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2001 Yoichi Hariguchi
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       8 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       9 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      12 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      13 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      14 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      15 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      16 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      17 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      18 </span>            :  */
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : /*
+<span class="lineNum">      21 </span>            :  * Allotment Routing Table (ART).
+<span class="lineNum">      22 </span>            :  *
+<span class="lineNum">      23 </span>            :  * Yoichi Hariguchi paper can be found at:
+<span class="lineNum">      24 </span>            :  *      http://www.hariguchi.org/art/art.pdf
+<span class="lineNum">      25 </span>            :  */
+<span class="lineNum">      26 </span>            : 
+<span class="lineNum">      27 </span>            : #ifndef _KERNEL
+<span class="lineNum">      28 </span>            : #include &quot;kern_compat.h&quot;
+<span class="lineNum">      29 </span>            : #else
+<span class="lineNum">      30 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;sys/task.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      36 </span>            : #endif
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : #include &lt;net/art.h&gt;
+<span class="lineNum">      39 </span>            : 
+<span class="lineNum">      40 </span>            : #define ISLEAF(e)       (((unsigned long)(e) &amp; 1) == 0)
+<span class="lineNum">      41 </span>            : #define SUBTABLE(e)     ((struct art_table *)((unsigned long)(e) &amp; ~1))
+<span class="lineNum">      42 </span>            : #define ASNODE(t)       ((struct art_node *)((unsigned long)(t) | 1))
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : /*
+<span class="lineNum">      45 </span>            :  * Allotment Table.
+<span class="lineNum">      46 </span>            :  */
+<span class="lineNum">      47 </span>            : struct art_table {
+<span class="lineNum">      48 </span>            :         struct art_table        *at_parent;     /* Parent table */
+<span class="lineNum">      49 </span>            :         uint32_t                 at_index;      /* Index in the parent table */
+<span class="lineNum">      50 </span>            :         uint32_t                 at_minfringe;  /* Index that fringe begins */
+<span class="lineNum">      51 </span>            :         uint32_t                 at_level;      /* Level of the table */
+<span class="lineNum">      52 </span>            :         uint8_t                  at_bits;       /* Stride length of the table */
+<span class="lineNum">      53 </span>            :         uint8_t                  at_offset;     /* Sum of parents' stride len */
+<span class="lineNum">      54 </span>            : 
+<span class="lineNum">      55 </span>            :         /*
+<span class="lineNum">      56 </span>            :          * Items stored in the heap are pointers to nodes, in the leaf
+<span class="lineNum">      57 </span>            :          * case, or tables otherwise.  One exception is index 0 which
+<span class="lineNum">      58 </span>            :          * is a route counter.
+<span class="lineNum">      59 </span>            :          */
+<span class="lineNum">      60 </span>            :         union {
+<span class="lineNum">      61 </span>            :                 struct srp               node;
+<span class="lineNum">      62 </span>            :                 unsigned long            count;
+<span class="lineNum">      63 </span>            :         } *at_heap;                             /* Array of 2^(slen+1) items */
+<span class="lineNum">      64 </span>            : };
+<span class="lineNum">      65 </span>            : #define at_refcnt       at_heap[0].count/* Refcounter (1 per different route) */
+<span class="lineNum">      66 </span>            : #define at_default      at_heap[1].node /* Default route (was in parent heap) */
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            : /* Heap size for an ART table of stride length ``slen''. */
+<span class="lineNum">      69 </span>            : #define AT_HEAPSIZE(slen)       ((1 &lt;&lt; ((slen) + 1)) * sizeof(void *))
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : int                      art_bindex(struct art_table *, uint8_t *, int);
+<span class="lineNum">      72 </span>            : void                     art_allot(struct art_table *at, int, struct art_node *,
+<span class="lineNum">      73 </span>            :                              struct art_node *);
+<span class="lineNum">      74 </span>            : struct art_table        *art_table_get(struct art_root *, struct art_table *,
+<span class="lineNum">      75 </span>            :                              int);
+<span class="lineNum">      76 </span>            : struct art_table        *art_table_put(struct art_root *, struct art_table *);
+<span class="lineNum">      77 </span>            : struct art_node         *art_table_insert(struct art_root *, struct art_table *,
+<span class="lineNum">      78 </span>            :                              int, struct art_node *);
+<span class="lineNum">      79 </span>            : struct art_node         *art_table_delete(struct art_root *, struct art_table *,
+<span class="lineNum">      80 </span>            :                              int, struct art_node *);
+<span class="lineNum">      81 </span>            : struct art_table        *art_table_ref(struct art_root *, struct art_table *);
+<span class="lineNum">      82 </span>            : int                      art_table_free(struct art_root *, struct art_table *);
+<span class="lineNum">      83 </span>            : int                      art_table_walk(struct art_root *, struct art_table *,
+<span class="lineNum">      84 </span>            :                              int (*f)(struct art_node *, void *), void *);
+<span class="lineNum">      85 </span>            : int                      art_walk_apply(struct art_root *,
+<span class="lineNum">      86 </span>            :                              struct art_node *, struct art_node *,
+<span class="lineNum">      87 </span>            :                              int (*f)(struct art_node *, void *), void *);
+<span class="lineNum">      88 </span>            : void                     art_table_gc(void *);
+<span class="lineNum">      89 </span>            : void                     art_gc(void *);
+<span class="lineNum">      90 </span>            : 
+<span class="lineNum">      91 </span>            : struct pool             an_pool, at_pool, at_heap_4_pool, at_heap_8_pool;
+<span class="lineNum">      92 </span>            : 
+<span class="lineNum">      93 </span>            : struct art_table        *art_table_gc_list = NULL;
+<span class="lineNum">      94 </span>            : struct mutex             art_table_gc_mtx = MUTEX_INITIALIZER(IPL_SOFTNET);
+<span class="lineNum">      95 </span>            : struct task              art_table_gc_task =
+<span class="lineNum">      96 </span>            :                              TASK_INITIALIZER(art_table_gc, NULL);
+<span class="lineNum">      97 </span>            : 
+<span class="lineNum">      98 </span>            : struct art_node         *art_node_gc_list = NULL;
+<span class="lineNum">      99 </span>            : struct mutex             art_node_gc_mtx = MUTEX_INITIALIZER(IPL_SOFTNET);
+<span class="lineNum">     100 </span>            : struct task              art_node_gc_task = TASK_INITIALIZER(art_gc, NULL);
+<a name="101"><span class="lineNum">     101 </span>            : </a>
+<span class="lineNum">     102 </span>            : void
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 : art_init(void)</span>
+<span class="lineNum">     104 </span>            : {
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :         pool_init(&amp;an_pool, sizeof(struct art_node), 0, IPL_SOFTNET, 0,</span>
+<span class="lineNum">     106 </span>            :             &quot;art_node&quot;, NULL);
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         pool_init(&amp;at_pool, sizeof(struct art_table), 0, IPL_SOFTNET, 0,</span>
+<span class="lineNum">     108 </span>            :             &quot;art_table&quot;, NULL);
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         pool_init(&amp;at_heap_4_pool, AT_HEAPSIZE(4), 0, IPL_SOFTNET, 0,</span>
+<span class="lineNum">     110 </span>            :             &quot;art_heap4&quot;, NULL);
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :         pool_init(&amp;at_heap_8_pool, AT_HEAPSIZE(8), 0, IPL_SOFTNET, 0,</span>
+<span class="lineNum">     112 </span>            :             &quot;art_heap8&quot;, &amp;pool_allocator_single);
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     114 </span>            : 
+<span class="lineNum">     115 </span>            : /*
+<span class="lineNum">     116 </span>            :  * Per routing table initialization API function.
+<a name="117"><span class="lineNum">     117 </span>            :  */</a>
+<span class="lineNum">     118 </span>            : struct art_root *
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 : art_alloc(unsigned int rtableid, unsigned int alen, unsigned int off)</span>
+<span class="lineNum">     120 </span>            : {
+<span class="lineNum">     121 </span>            :         struct art_root         *ar;
+<span class="lineNum">     122 </span>            :         int                      i;
+<span class="lineNum">     123 </span>            : 
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         ar = malloc(sizeof(*ar), M_RTABLE, M_NOWAIT|M_ZERO);</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         if (ar == NULL)</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     127 </span>            : 
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         switch (alen) {</span>
+<span class="lineNum">     129 </span>            :         case 32:
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :                 ar-&gt;ar_alen = 32;</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :                 ar-&gt;ar_nlvl = 7;</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :                 ar-&gt;ar_bits[0] = 8;</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :                 for (i = 1; i &lt; ar-&gt;ar_nlvl; i++)</span>
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :                         ar-&gt;ar_bits[i] = 4;</span>
+<span class="lineNum">     135 </span>            :                 break;
+<span class="lineNum">     136 </span>            :         case 128:
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :                 ar-&gt;ar_alen = 128;</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :                 ar-&gt;ar_nlvl = 32;</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; ar-&gt;ar_nlvl; i++)</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :                         ar-&gt;ar_bits[i] = 4;</span>
+<span class="lineNum">     141 </span>            :                 break;
+<span class="lineNum">     142 </span>            :         default:
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: incorrect address length %u\n&quot;, __func__, alen);</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :                 free(ar, M_RTABLE, sizeof(*ar));</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     146 </span>            :         }
+<span class="lineNum">     147 </span>            : 
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         ar-&gt;ar_off = off;</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         ar-&gt;ar_rtableid = rtableid;</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         rw_init(&amp;ar-&gt;ar_lock, &quot;art&quot;);</span>
+<span class="lineNum">     151 </span>            : 
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         return (ar);</span>
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     154 </span>            : 
+<span class="lineNum">     155 </span>            : /*
+<span class="lineNum">     156 </span>            :  * Return 1 if ``old'' and ``new`` are identical, 0 otherwise.
+<a name="157"><span class="lineNum">     157 </span>            :  */</a>
+<span class="lineNum">     158 </span>            : static inline int
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 : art_check_duplicate(struct art_root *ar, struct art_node *old,</span>
+<span class="lineNum">     160 </span>            :     struct art_node *new)
+<span class="lineNum">     161 </span>            : {
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :         if (old == NULL)</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     164 </span>            : 
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         if (old-&gt;an_plen == new-&gt;an_plen)</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     167 </span>            : 
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span>            : /*
+<span class="lineNum">     172 </span>            :  * Return the base index of the part of ``addr'' and ``plen''
+<span class="lineNum">     173 </span>            :  * corresponding to the range covered by the table ``at''.
+<span class="lineNum">     174 </span>            :  *
+<span class="lineNum">     175 </span>            :  * In other words, this function take the multi-level (complete)
+<span class="lineNum">     176 </span>            :  * address ``addr'' and prefix length ``plen'' and return the
+<span class="lineNum">     177 </span>            :  * single level base index for the table ``at''.
+<span class="lineNum">     178 </span>            :  *
+<span class="lineNum">     179 </span>            :  * For example with an address size of 32bit divided into four
+<span class="lineNum">     180 </span>            :  * 8bit-long tables, there's a maximum of 4 base indexes if the
+<span class="lineNum">     181 </span>            :  * prefix length is &gt; 24.
+<a name="182"><span class="lineNum">     182 </span>            :  */</a>
+<span class="lineNum">     183 </span>            : int
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 : art_bindex(struct art_table *at, uint8_t *addr, int plen)</span>
+<span class="lineNum">     185 </span>            : {
+<span class="lineNum">     186 </span>            :         uint8_t                 boff, bend;
+<span class="lineNum">     187 </span>            :         uint32_t                k;
+<span class="lineNum">     188 </span>            : 
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :         if (plen &lt; at-&gt;at_offset || plen &gt; (at-&gt;at_offset + at-&gt;at_bits))</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     191 </span>            : 
+<span class="lineNum">     192 </span>            :         /*
+<span class="lineNum">     193 </span>            :          * We are only interested in the part of the prefix length
+<span class="lineNum">     194 </span>            :          * corresponding to the range of this table.
+<span class="lineNum">     195 </span>            :          */
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         plen -= at-&gt;at_offset;</span>
+<span class="lineNum">     197 </span>            : 
+<span class="lineNum">     198 </span>            :         /*
+<span class="lineNum">     199 </span>            :          * Jump to the first byte of the address containing bits
+<span class="lineNum">     200 </span>            :          * covered by this table.
+<span class="lineNum">     201 </span>            :          */
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :         addr += (at-&gt;at_offset / 8);</span>
+<span class="lineNum">     203 </span>            : 
+<span class="lineNum">     204 </span>            :         /* ``at'' covers the bit range between ``boff'' &amp; ``bend''. */
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         boff = (at-&gt;at_offset % 8);</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         bend = (at-&gt;at_bits + boff);</span>
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         KASSERT(bend &lt;= 32);</span>
+<span class="lineNum">     209 </span>            : 
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :         if (bend &gt; 24) {</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                 k = (addr[0] &amp; ((1 &lt;&lt; (8 - boff)) - 1)) &lt;&lt; (bend - 8);</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :                 k |= addr[1] &lt;&lt; (bend - 16);</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :                 k |= addr[2] &lt;&lt; (bend - 24);</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                 k |= addr[3] &gt;&gt; (32 - bend);</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         } else if (bend &gt; 16) {</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                 k = (addr[0] &amp; ((1 &lt;&lt; (8 - boff)) - 1)) &lt;&lt; (bend - 8);</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :                 k |= addr[1] &lt;&lt; (bend - 16);</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                 k |= addr[2] &gt;&gt; (24 - bend);</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         } else if (bend &gt; 8) {</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :                 k = (addr[0] &amp; ((1 &lt;&lt; (8 - boff)) - 1)) &lt;&lt; (bend - 8);</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                 k |= addr[1] &gt;&gt; (16 - bend);</span>
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                 k = (addr[0] &gt;&gt; (8 - bend)) &amp; ((1 &lt;&lt; at-&gt;at_bits) - 1);</span>
+<span class="lineNum">     224 </span>            :         }
+<span class="lineNum">     225 </span>            : 
+<span class="lineNum">     226 </span>            :         /*
+<span class="lineNum">     227 </span>            :          * Single level base index formula:
+<span class="lineNum">     228 </span>            :          */
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         return ((k &gt;&gt; (at-&gt;at_bits - plen)) + (1 &lt;&lt; plen));</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     231 </span>            : 
+<span class="lineNum">     232 </span>            : /*
+<span class="lineNum">     233 </span>            :  * Single level lookup function.
+<span class="lineNum">     234 </span>            :  *
+<span class="lineNum">     235 </span>            :  * Return the fringe index of the part of ``addr''
+<span class="lineNum">     236 </span>            :  * corresponding to the range covered by the table ``at''.
+<a name="237"><span class="lineNum">     237 </span>            :  */</a>
+<span class="lineNum">     238 </span>            : static inline int
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 : art_findex(struct art_table *at, uint8_t *addr)</span>
+<span class="lineNum">     240 </span>            : {
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :         return art_bindex(at, addr, (at-&gt;at_offset + at-&gt;at_bits));</span>
+<span class="lineNum">     242 </span>            : }
+<span class="lineNum">     243 </span>            : 
+<span class="lineNum">     244 </span>            : /*
+<span class="lineNum">     245 </span>            :  * (Non-perfect) lookup API function.
+<span class="lineNum">     246 </span>            :  *
+<span class="lineNum">     247 </span>            :  * Return the best existing match for a destination.
+<a name="248"><span class="lineNum">     248 </span>            :  */</a>
+<span class="lineNum">     249 </span>            : struct art_node *
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 : art_match(struct art_root *ar, void *addr, struct srp_ref *nsr)</span>
+<span class="lineNum">     251 </span>            : {
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         struct srp_ref          dsr, ndsr;</span>
+<span class="lineNum">     253 </span>            :         void                    *entry;
+<span class="lineNum">     254 </span>            :         struct art_table        *at;
+<span class="lineNum">     255 </span>            :         struct art_node         *dflt, *ndflt;
+<span class="lineNum">     256 </span>            :         int                     j;
+<span class="lineNum">     257 </span>            : 
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         entry = srp_enter(nsr, &amp;ar-&gt;ar_root);</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         at = entry;</span>
+<span class="lineNum">     260 </span>            : 
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         if (at == NULL)</span>
+<span class="lineNum">     262 </span>            :                 goto done;
+<span class="lineNum">     263 </span>            : 
+<span class="lineNum">     264 </span>            :         /*
+<span class="lineNum">     265 </span>            :          * Remember the default route of each table we visit in case
+<span class="lineNum">     266 </span>            :          * we do not find a better matching route.
+<span class="lineNum">     267 </span>            :          */
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         dflt = srp_enter(&amp;dsr, &amp;at-&gt;at_default);</span>
+<span class="lineNum">     269 </span>            : 
+<span class="lineNum">     270 </span>            :         /*
+<span class="lineNum">     271 </span>            :          * Iterate until we find a leaf.
+<span class="lineNum">     272 </span>            :          */
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         while (1) {</span>
+<span class="lineNum">     274 </span>            :                 /* Do a single level route lookup. */
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :                 j = art_findex(at, addr);</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :                 entry = srp_follow(nsr, &amp;at-&gt;at_heap[j].node);</span>
+<span class="lineNum">     277 </span>            : 
+<span class="lineNum">     278 </span>            :                 /* If this is a leaf (NULL is a leaf) we're done. */
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                 if (ISLEAF(entry))</span>
+<span class="lineNum">     280 </span>            :                         break;
+<span class="lineNum">     281 </span>            : 
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :                 at = SUBTABLE(entry);</span>
+<span class="lineNum">     283 </span>            : 
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :                 ndflt = srp_enter(&amp;ndsr, &amp;at-&gt;at_default);</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                 if (ndflt != NULL) {</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                         srp_leave(&amp;dsr);</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                         dsr = ndsr;</span>
+<span class="lineNum">     288 </span>            :                         dflt = ndflt;
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                         srp_leave(&amp;ndsr);</span>
+<span class="lineNum">     291 </span>            :         }
+<span class="lineNum">     292 </span>            : 
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :         if (entry == NULL) {</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :                 srp_leave(nsr);</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :                 *nsr = dsr;</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :                 KASSERT(ISLEAF(dflt));</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                 return (dflt);</span>
+<span class="lineNum">     298 </span>            :         }
+<span class="lineNum">     299 </span>            : 
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         srp_leave(&amp;dsr);</span>
+<span class="lineNum">     301 </span>            : done:
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :         KASSERT(ISLEAF(entry));</span>
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         return (entry);</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     305 </span>            : 
+<span class="lineNum">     306 </span>            : /*
+<span class="lineNum">     307 </span>            :  * Perfect lookup API function.
+<span class="lineNum">     308 </span>            :  *
+<span class="lineNum">     309 </span>            :  * Return a perfect match for a destination/prefix-length pair or NULL if
+<span class="lineNum">     310 </span>            :  * it does not exist.
+<a name="311"><span class="lineNum">     311 </span>            :  */</a>
+<span class="lineNum">     312 </span>            : struct art_node *
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 : art_lookup(struct art_root *ar, void *addr, int plen, struct srp_ref *nsr)</span>
+<span class="lineNum">     314 </span>            : {
+<span class="lineNum">     315 </span>            :         void                    *entry;
+<span class="lineNum">     316 </span>            :         struct art_table        *at;
+<span class="lineNum">     317 </span>            :         int                      i, j;
+<span class="lineNum">     318 </span>            : 
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :         KASSERT(plen &gt;= 0 &amp;&amp; plen &lt;= ar-&gt;ar_alen);</span>
+<span class="lineNum">     320 </span>            : 
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :         entry = srp_enter(nsr, &amp;ar-&gt;ar_root);</span>
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         at = entry;</span>
+<span class="lineNum">     323 </span>            : 
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :         if (at == NULL)</span>
+<span class="lineNum">     325 </span>            :                 goto done;
+<span class="lineNum">     326 </span>            : 
+<span class="lineNum">     327 </span>            :         /* Default route */
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :         if (plen == 0) {</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                 entry = srp_follow(nsr, &amp;at-&gt;at_default);</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     331 </span>            :         }
+<span class="lineNum">     332 </span>            : 
+<span class="lineNum">     333 </span>            :         /*
+<span class="lineNum">     334 </span>            :          * If the prefix length is smaller than the sum of
+<span class="lineNum">     335 </span>            :          * the stride length at this level the entry must
+<span class="lineNum">     336 </span>            :          * be in the current table.
+<span class="lineNum">     337 </span>            :          */
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         while (plen &gt; (at-&gt;at_offset + at-&gt;at_bits)) {</span>
+<span class="lineNum">     339 </span>            :                 /* Do a single level route lookup. */
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :                 j = art_findex(at, addr);</span>
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :                 entry = srp_follow(nsr, &amp;at-&gt;at_heap[j].node);</span>
+<span class="lineNum">     342 </span>            : 
+<span class="lineNum">     343 </span>            :                 /* A leaf is a match, but not a perfect one, or NULL */
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :                 if (ISLEAF(entry))</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :                         return (NULL);</span>
+<span class="lineNum">     346 </span>            : 
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :                 at = SUBTABLE(entry);</span>
+<span class="lineNum">     348 </span>            :         }
+<span class="lineNum">     349 </span>            : 
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         i = art_bindex(at, addr, plen);</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         if (i == -1)</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     353 </span>            : 
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         entry = srp_follow(nsr, &amp;at-&gt;at_heap[i].node);</span>
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :         if (!ISLEAF(entry))</span>
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :                 entry = srp_follow(nsr, &amp;SUBTABLE(entry)-&gt;at_default);</span>
+<span class="lineNum">     357 </span>            : 
+<span class="lineNum">     358 </span>            : done:
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :         KASSERT(ISLEAF(entry));</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         return (entry);</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     362 </span>            : 
+<span class="lineNum">     363 </span>            : 
+<span class="lineNum">     364 </span>            : /*
+<span class="lineNum">     365 </span>            :  * Insertion API function.
+<span class="lineNum">     366 </span>            :  *
+<span class="lineNum">     367 </span>            :  * Insert the given node or return an existing one if a node with the
+<span class="lineNum">     368 </span>            :  * same destination/mask pair is already present.
+<a name="369"><span class="lineNum">     369 </span>            :  */</a>
+<span class="lineNum">     370 </span>            : struct art_node *
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 : art_insert(struct art_root *ar, struct art_node *an, void *addr, int plen)</span>
+<span class="lineNum">     372 </span>            : {
+<span class="lineNum">     373 </span>            :         struct art_table        *at, *child;
+<span class="lineNum">     374 </span>            :         struct art_node         *node;
+<span class="lineNum">     375 </span>            :         int                      i, j;
+<span class="lineNum">     376 </span>            : 
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :         rw_assert_wrlock(&amp;ar-&gt;ar_lock);</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :         KASSERT(plen &gt;= 0 &amp;&amp; plen &lt;= ar-&gt;ar_alen);</span>
+<span class="lineNum">     379 </span>            : 
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :         at = srp_get_locked(&amp;ar-&gt;ar_root);</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :         if (at == NULL) {</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                 at = art_table_get(ar, NULL, -1);</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :                 if (at == NULL)</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :                         return (NULL);</span>
+<span class="lineNum">     385 </span>            : 
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                 srp_swap_locked(&amp;ar-&gt;ar_root, at);</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     388 </span>            : 
+<span class="lineNum">     389 </span>            :         /* Default route */
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         if (plen == 0) {</span>
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :                 node = srp_get_locked(&amp;at-&gt;at_default);</span>
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                 if (node != NULL)</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :                         return (node);</span>
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                 art_table_ref(ar, at);</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :                 srp_swap_locked(&amp;at-&gt;at_default, an);</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 return (an);</span>
+<span class="lineNum">     398 </span>            :         }
+<span class="lineNum">     399 </span>            : 
+<span class="lineNum">     400 </span>            :         /*
+<span class="lineNum">     401 </span>            :          * If the prefix length is smaller than the sum of
+<span class="lineNum">     402 </span>            :          * the stride length at this level the entry must
+<span class="lineNum">     403 </span>            :          * be in the current table.
+<span class="lineNum">     404 </span>            :          */
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         while (plen &gt; (at-&gt;at_offset + at-&gt;at_bits)) {</span>
+<span class="lineNum">     406 </span>            :                 /* Do a single level route lookup. */
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :                 j = art_findex(at, addr);</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 node = srp_get_locked(&amp;at-&gt;at_heap[j].node);</span>
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span>            :                 /*
+<span class="lineNum">     411 </span>            :                  * If the node corresponding to the fringe index is
+<span class="lineNum">     412 </span>            :                  * a leaf we need to allocate a subtable.  The route
+<span class="lineNum">     413 </span>            :                  * entry of this node will then become the default
+<span class="lineNum">     414 </span>            :                  * route of the subtable.
+<span class="lineNum">     415 </span>            :                  */
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :                 if (ISLEAF(node)) {</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                         child = art_table_get(ar, at, j);</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                         if (child == NULL)</span>
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :                                 return (NULL);</span>
+<span class="lineNum">     420 </span>            : 
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                         art_table_ref(ar, at);</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :                         srp_swap_locked(&amp;at-&gt;at_heap[j].node, ASNODE(child));</span>
+<span class="lineNum">     423 </span>            :                         at = child;
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :                         at = SUBTABLE(node);</span>
+<span class="lineNum">     426 </span>            :         }
+<span class="lineNum">     427 </span>            : 
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :         i = art_bindex(at, addr, plen);</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :         if (i == -1)</span>
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     431 </span>            : 
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :         return (art_table_insert(ar, at, i, an));</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     434 </span>            : 
+<span class="lineNum">     435 </span>            : /*
+<span class="lineNum">     436 </span>            :  * Single level insertion.
+<a name="437"><span class="lineNum">     437 </span>            :  */</a>
+<span class="lineNum">     438 </span>            : struct art_node *
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 : art_table_insert(struct art_root *ar, struct art_table *at, int i,</span>
+<span class="lineNum">     440 </span>            :     struct art_node *an)
+<span class="lineNum">     441 </span>            : {
+<span class="lineNum">     442 </span>            :         struct art_node *prev, *node;
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :         node = srp_get_locked(&amp;at-&gt;at_heap[i].node);</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :         if (!ISLEAF(node))</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                 prev = srp_get_locked(&amp;SUBTABLE(node)-&gt;at_default);</span>
+<span class="lineNum">     447 </span>            :         else
+<span class="lineNum">     448 </span>            :                 prev = node;
+<span class="lineNum">     449 </span>            : 
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :         if (art_check_duplicate(ar, prev, an))</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                 return (prev);</span>
+<span class="lineNum">     452 </span>            : 
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :         art_table_ref(ar, at);</span>
+<span class="lineNum">     454 </span>            : 
+<span class="lineNum">     455 </span>            :         /*
+<span class="lineNum">     456 </span>            :          * If the index `i' of the route that we are inserting is not
+<span class="lineNum">     457 </span>            :          * a fringe index, we need to allot this new route pointer to
+<span class="lineNum">     458 </span>            :          * all the corresponding fringe indices.
+<span class="lineNum">     459 </span>            :          */
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :         if (i &lt; at-&gt;at_minfringe)</span>
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                 art_allot(at, i, prev, an);</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :         else if (!ISLEAF(node))</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                 srp_swap_locked(&amp;SUBTABLE(node)-&gt;at_default, an);</span>
+<span class="lineNum">     464 </span>            :         else
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                 srp_swap_locked(&amp;at-&gt;at_heap[i].node, an);</span>
+<span class="lineNum">     466 </span>            : 
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :         return (an);</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     469 </span>            : 
+<span class="lineNum">     470 </span>            : 
+<span class="lineNum">     471 </span>            : /*
+<span class="lineNum">     472 </span>            :  * Deletion API function.
+<a name="473"><span class="lineNum">     473 </span>            :  */</a>
+<span class="lineNum">     474 </span>            : struct art_node *
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 : art_delete(struct art_root *ar, struct art_node *an, void *addr, int plen)</span>
+<span class="lineNum">     476 </span>            : {
+<span class="lineNum">     477 </span>            :         struct art_table        *at;
+<span class="lineNum">     478 </span>            :         struct art_node         *node;
+<span class="lineNum">     479 </span>            :         int                      i, j;
+<span class="lineNum">     480 </span>            : 
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :         rw_assert_wrlock(&amp;ar-&gt;ar_lock);</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :         KASSERT(plen &gt;= 0 &amp;&amp; plen &lt;= ar-&gt;ar_alen);</span>
+<span class="lineNum">     483 </span>            : 
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         at = srp_get_locked(&amp;ar-&gt;ar_root);</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :         if (at == NULL)</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     487 </span>            : 
+<span class="lineNum">     488 </span>            :         /* Default route */
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :         if (plen == 0) {</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :                 node = srp_get_locked(&amp;at-&gt;at_default);</span>
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :                 srp_swap_locked(&amp;at-&gt;at_default, NULL);</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :                 art_table_free(ar, at);</span>
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :                 return (node);</span>
+<span class="lineNum">     494 </span>            :         }
+<span class="lineNum">     495 </span>            : 
+<span class="lineNum">     496 </span>            :         /*
+<span class="lineNum">     497 </span>            :          * If the prefix length is smaller than the sum of
+<span class="lineNum">     498 </span>            :          * the stride length at this level the entry must
+<span class="lineNum">     499 </span>            :          * be in the current table.
+<span class="lineNum">     500 </span>            :          */
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         while (plen &gt; (at-&gt;at_offset + at-&gt;at_bits)) {</span>
+<span class="lineNum">     502 </span>            :                 /* Do a single level route lookup. */
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :                 j = art_findex(at, addr);</span>
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :                 node = srp_get_locked(&amp;at-&gt;at_heap[j].node);</span>
+<span class="lineNum">     505 </span>            : 
+<span class="lineNum">     506 </span>            :                 /* If this is a leaf, there is no route to delete. */
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :                 if (ISLEAF(node))</span>
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :                         return (NULL);</span>
+<span class="lineNum">     509 </span>            : 
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :                 at = SUBTABLE(node);</span>
+<span class="lineNum">     511 </span>            :         }
+<span class="lineNum">     512 </span>            : 
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :         i = art_bindex(at, addr, plen);</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :         if (i == -1)</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :         return (art_table_delete(ar, at, i, an));</span>
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     519 </span>            : 
+<span class="lineNum">     520 </span>            : /*
+<span class="lineNum">     521 </span>            :  * Single level deletion.
+<a name="522"><span class="lineNum">     522 </span>            :  */</a>
+<span class="lineNum">     523 </span>            : struct art_node *
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 : art_table_delete(struct art_root *ar, struct art_table *at, int i,</span>
+<span class="lineNum">     525 </span>            :     struct art_node *an)
+<span class="lineNum">     526 </span>            : {
+<span class="lineNum">     527 </span>            :         struct art_node         *next, *node;
+<span class="lineNum">     528 </span>            : 
+<span class="lineNum">     529 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     530 </span>            :         struct art_node         *prev;
+<span class="lineNum">     531 </span>            : #endif
+<span class="lineNum">     532 </span>            : 
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :         node = srp_get_locked(&amp;at-&gt;at_heap[i].node);</span>
+<span class="lineNum">     534 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :         if (!ISLEAF(node))</span>
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :                 prev = srp_get_locked(&amp;SUBTABLE(node)-&gt;at_default);</span>
+<span class="lineNum">     537 </span>            :         else
+<span class="lineNum">     538 </span>            :                 prev = node;
+<span class="lineNum">     539 </span>            : 
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :         KASSERT(prev == an);</span>
+<span class="lineNum">     541 </span>            : #endif
+<span class="lineNum">     542 </span>            : 
+<span class="lineNum">     543 </span>            :         /* Get the next most specific route for the index `i'. */
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :         if ((i &gt;&gt; 1) &gt; 1)</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :                 next = srp_get_locked(&amp;at-&gt;at_heap[i &gt;&gt; 1].node);</span>
+<span class="lineNum">     546 </span>            :         else
+<span class="lineNum">     547 </span>            :                 next = NULL;
+<span class="lineNum">     548 </span>            : 
+<span class="lineNum">     549 </span>            :         /*
+<span class="lineNum">     550 </span>            :          * If the index `i' of the route that we are removing is not
+<span class="lineNum">     551 </span>            :          * a fringe index, we need to allot the next most specific
+<span class="lineNum">     552 </span>            :          * route pointer to all the corresponding fringe indices.
+<span class="lineNum">     553 </span>            :          */
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :         if (i &lt; at-&gt;at_minfringe)</span>
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 :                 art_allot(at, i, an, next);</span>
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :         else if (!ISLEAF(node))</span>
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :                 srp_swap_locked(&amp;SUBTABLE(node)-&gt;at_default, next);</span>
+<span class="lineNum">     558 </span>            :         else
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :                 srp_swap_locked(&amp;at-&gt;at_heap[i].node, next);</span>
+<span class="lineNum">     560 </span>            : 
+<span class="lineNum">     561 </span>            :         /* We have removed an entry from this table. */
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :         art_table_free(ar, at);</span>
+<span class="lineNum">     563 </span>            : 
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :         return (an);</span>
+<span class="lineNum">     565 </span>            : }
+<a name="566"><span class="lineNum">     566 </span>            : </a>
+<span class="lineNum">     567 </span>            : struct art_table *
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 : art_table_ref(struct art_root *ar, struct art_table *at)</span>
+<span class="lineNum">     569 </span>            : {
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :         at-&gt;at_refcnt++;</span>
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :         return (at);</span>
+<span class="lineNum">     572 </span>            : }
+<a name="573"><span class="lineNum">     573 </span>            : </a>
+<span class="lineNum">     574 </span>            : static inline int
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 : art_table_rele(struct art_table *at)</span>
+<span class="lineNum">     576 </span>            : {
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :         if (at == NULL)</span>
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     579 </span>            : 
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         return (--at-&gt;at_refcnt == 0);</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 : }</span>
+<a name="582"><span class="lineNum">     582 </span>            : </a>
+<span class="lineNum">     583 </span>            : int
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 : art_table_free(struct art_root *ar, struct art_table *at)</span>
+<span class="lineNum">     585 </span>            : {
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :         if (art_table_rele(at)) {</span>
+<span class="lineNum">     587 </span>            :                 /*
+<span class="lineNum">     588 </span>            :                  * Garbage collect this table and all its parents
+<span class="lineNum">     589 </span>            :                  * that are empty.
+<span class="lineNum">     590 </span>            :                  */
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :                 do {</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :                         at = art_table_put(ar, at);</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :                 } while (art_table_rele(at));</span>
+<span class="lineNum">     594 </span>            : 
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     596 </span>            :         }
+<span class="lineNum">     597 </span>            : 
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     600 </span>            : 
+<span class="lineNum">     601 </span>            : /*
+<span class="lineNum">     602 </span>            :  * Iteration API function.
+<a name="603"><span class="lineNum">     603 </span>            :  */</a>
+<span class="lineNum">     604 </span>            : int
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 : art_walk(struct art_root *ar, int (*f)(struct art_node *, void *), void *arg)</span>
+<span class="lineNum">     606 </span>            : {
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :         struct srp_ref           sr;</span>
+<span class="lineNum">     608 </span>            :         struct art_table        *at;
+<span class="lineNum">     609 </span>            :         struct art_node         *node;
+<span class="lineNum">     610 </span>            :         int                      error = 0;
+<span class="lineNum">     611 </span>            : 
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :         rw_enter_write(&amp;ar-&gt;ar_lock);</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         at = srp_get_locked(&amp;ar-&gt;ar_root);</span>
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :         if (at != NULL) {</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :                 art_table_ref(ar, at);</span>
+<span class="lineNum">     616 </span>            : 
+<span class="lineNum">     617 </span>            :                 /*
+<span class="lineNum">     618 </span>            :                  * The default route should be processed here because the root
+<span class="lineNum">     619 </span>            :                  * table does not have a parent.
+<span class="lineNum">     620 </span>            :                  */
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :                 node = srp_enter(&amp;sr, &amp;at-&gt;at_default);</span>
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :                 error = art_walk_apply(ar, node, NULL, f, arg);</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :                 srp_leave(&amp;sr);</span>
+<span class="lineNum">     624 </span>            : 
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :                 if (error == 0)</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                         error = art_table_walk(ar, at, f, arg);</span>
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                 art_table_free(ar, at);</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :         rw_exit_write(&amp;ar-&gt;ar_lock);</span>
+<span class="lineNum">     631 </span>            : 
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 : }</span>
+<a name="634"><span class="lineNum">     634 </span>            : </a>
+<span class="lineNum">     635 </span>            : int
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 : art_table_walk(struct art_root *ar, struct art_table *at,</span>
+<span class="lineNum">     637 </span>            :     int (*f)(struct art_node *, void *), void *arg)
+<span class="lineNum">     638 </span>            : {
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :         struct srp_ref           sr;</span>
+<span class="lineNum">     640 </span>            :         struct art_node         *node, *next;
+<span class="lineNum">     641 </span>            :         struct art_table        *nat;
+<span class="lineNum">     642 </span>            :         int                      i, j, error = 0;
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :         uint32_t                 maxfringe = (at-&gt;at_minfringe &lt;&lt; 1);</span>
+<span class="lineNum">     644 </span>            : 
+<span class="lineNum">     645 </span>            :         /*
+<span class="lineNum">     646 </span>            :          * Iterate non-fringe nodes in ``natural'' order.
+<span class="lineNum">     647 </span>            :          */
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :         for (j = 1; j &lt; at-&gt;at_minfringe; j += 2) {</span>
+<span class="lineNum">     649 </span>            :                 /*
+<span class="lineNum">     650 </span>            :                  * The default route (index 1) is processed by the
+<span class="lineNum">     651 </span>            :                  * parent table (where it belongs) otherwise it could
+<span class="lineNum">     652 </span>            :                  * be processed more than once.
+<span class="lineNum">     653 </span>            :                  */
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :                 for (i = max(j, 2); i &lt; at-&gt;at_minfringe; i &lt;&lt;= 1) {</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                         next = srp_get_locked(&amp;at-&gt;at_heap[i &gt;&gt; 1].node);</span>
+<span class="lineNum">     656 </span>            : 
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                         node = srp_enter(&amp;sr, &amp;at-&gt;at_heap[i].node);</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                         error = art_walk_apply(ar, node, next, f, arg);</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                         srp_leave(&amp;sr);</span>
+<span class="lineNum">     660 </span>            : 
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                         if (error != 0)</span>
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :                                 return (error);</span>
+<span class="lineNum">     663 </span>            :                 }
+<span class="lineNum">     664 </span>            :         }
+<span class="lineNum">     665 </span>            : 
+<span class="lineNum">     666 </span>            :         /*
+<span class="lineNum">     667 </span>            :          * Iterate fringe nodes.
+<span class="lineNum">     668 </span>            :          */
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :         for (i = at-&gt;at_minfringe; i &lt; maxfringe; i++) {</span>
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :                 next = srp_get_locked(&amp;at-&gt;at_heap[i &gt;&gt; 1].node);</span>
+<span class="lineNum">     671 </span>            : 
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :                 node = srp_enter(&amp;sr, &amp;at-&gt;at_heap[i].node);</span>
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :                 if (!ISLEAF(node)) {</span>
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :                         nat = art_table_ref(ar, SUBTABLE(node));</span>
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :                         node = srp_follow(&amp;sr, &amp;nat-&gt;at_default);</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">     677 </span>            :                         nat = NULL;
+<span class="lineNum">     678 </span>            : 
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :                 error = art_walk_apply(ar, node, next, f, arg);</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :                 srp_leave(&amp;sr);</span>
+<span class="lineNum">     681 </span>            : 
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :                 if (error != 0) {</span>
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :                         art_table_free(ar, nat);</span>
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     685 </span>            :                 }
+<span class="lineNum">     686 </span>            : 
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :                 if (nat != NULL) {</span>
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :                         error = art_table_walk(ar, nat, f, arg);</span>
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :                         art_table_free(ar, nat);</span>
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :                         if (error != 0)</span>
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :                                 return (error);</span>
+<span class="lineNum">     692 </span>            :                 }
+<span class="lineNum">     693 </span>            :         }
+<span class="lineNum">     694 </span>            : 
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 : }</span>
+<a name="697"><span class="lineNum">     697 </span>            : </a>
+<span class="lineNum">     698 </span>            : int
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 : art_walk_apply(struct art_root *ar,</span>
+<span class="lineNum">     700 </span>            :     struct art_node *an, struct art_node *next,
+<span class="lineNum">     701 </span>            :     int (*f)(struct art_node *, void *), void *arg)
+<span class="lineNum">     702 </span>            : {
+<span class="lineNum">     703 </span>            :         int error = 0;
+<span class="lineNum">     704 </span>            : 
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :         if ((an != NULL) &amp;&amp; (an != next)) {</span>
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :                 rw_exit_write(&amp;ar-&gt;ar_lock);</span>
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :                 error = (*f)(an, arg);</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :                 rw_enter_write(&amp;ar-&gt;ar_lock);</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     710 </span>            : 
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     712 </span>            : }
+<span class="lineNum">     713 </span>            : 
+<span class="lineNum">     714 </span>            : 
+<span class="lineNum">     715 </span>            : /*
+<span class="lineNum">     716 </span>            :  * Create a table and use the given index to set its default route.
+<span class="lineNum">     717 </span>            :  *
+<span class="lineNum">     718 </span>            :  * Note:  This function does not modify the root or the parent.
+<a name="719"><span class="lineNum">     719 </span>            :  */</a>
+<span class="lineNum">     720 </span>            : struct art_table *
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 : art_table_get(struct art_root *ar, struct art_table *parent, int j)</span>
+<span class="lineNum">     722 </span>            : {
+<span class="lineNum">     723 </span>            :         struct art_table        *at;
+<span class="lineNum">     724 </span>            :         struct art_node         *node;
+<span class="lineNum">     725 </span>            :         void                    *at_heap;
+<span class="lineNum">     726 </span>            :         uint32_t                 lvl;
+<span class="lineNum">     727 </span>            : 
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :         KASSERT(j != 0 &amp;&amp; j != 1);</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :         KASSERT(parent != NULL || j == -1);</span>
+<span class="lineNum">     730 </span>            : 
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :         if (parent != NULL)</span>
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :                 lvl = parent-&gt;at_level + 1;</span>
+<span class="lineNum">     733 </span>            :         else
+<span class="lineNum">     734 </span>            :                 lvl = 0;
+<span class="lineNum">     735 </span>            : 
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :         KASSERT(lvl &lt; ar-&gt;ar_nlvl);</span>
+<span class="lineNum">     737 </span>            : 
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :         at = pool_get(&amp;at_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :         if (at == NULL)</span>
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     741 </span>            : 
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :         switch (AT_HEAPSIZE(ar-&gt;ar_bits[lvl])) {</span>
+<span class="lineNum">     743 </span>            :         case AT_HEAPSIZE(4):
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :                 at_heap = pool_get(&amp;at_heap_4_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     746 </span>            :         case AT_HEAPSIZE(8):
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :                 at_heap = pool_get(&amp;at_heap_8_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     749 </span>            :         default:
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :                 panic(&quot;incorrect stride length %u&quot;, ar-&gt;ar_bits[lvl]);</span>
+<span class="lineNum">     751 </span>            :         }
+<span class="lineNum">     752 </span>            : 
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :         if (at_heap == NULL) {</span>
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :                 pool_put(&amp;at_pool, at);</span>
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     756 </span>            :         }
+<span class="lineNum">     757 </span>            : 
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :         at-&gt;at_parent = parent;</span>
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :         at-&gt;at_index = j;</span>
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         at-&gt;at_minfringe = (1 &lt;&lt; ar-&gt;ar_bits[lvl]);</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :         at-&gt;at_level = lvl;</span>
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :         at-&gt;at_bits = ar-&gt;ar_bits[lvl];</span>
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :         at-&gt;at_heap = at_heap;</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :         at-&gt;at_refcnt = 0;</span>
+<span class="lineNum">     765 </span>            : 
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :         if (parent != NULL) {</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :                 node = srp_get_locked(&amp;parent-&gt;at_heap[j].node);</span>
+<span class="lineNum">     768 </span>            :                 /* node isn't being deleted, no srp_finalize needed */
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :                 srp_swap_locked(&amp;at-&gt;at_default, node);</span>
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :                 at-&gt;at_offset = (parent-&gt;at_offset + parent-&gt;at_bits);</span>
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     772 </span>            : 
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 :         return (at);</span>
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     775 </span>            : 
+<span class="lineNum">     776 </span>            : 
+<span class="lineNum">     777 </span>            : /*
+<span class="lineNum">     778 </span>            :  * Delete a table and use its index to restore its parent's default route.
+<span class="lineNum">     779 </span>            :  *
+<span class="lineNum">     780 </span>            :  * Note:  Modify its parent to unlink the table from it.
+<a name="781"><span class="lineNum">     781 </span>            :  */</a>
+<span class="lineNum">     782 </span>            : struct art_table *
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 : art_table_put(struct art_root *ar, struct art_table *at)</span>
+<span class="lineNum">     784 </span>            : {
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         struct art_table        *parent = at-&gt;at_parent;</span>
+<span class="lineNum">     786 </span>            :         struct art_node         *node;
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :         uint32_t                 j = at-&gt;at_index;</span>
+<span class="lineNum">     788 </span>            : 
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 :         KASSERT(at-&gt;at_refcnt == 0);</span>
+<span class="lineNum">     790 </span><span class="lineNoCov">          0 :         KASSERT(j != 0 &amp;&amp; j != 1);</span>
+<span class="lineNum">     791 </span>            : 
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :         if (parent != NULL) {</span>
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :                 KASSERT(j != -1);</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :                 KASSERT(at-&gt;at_level == parent-&gt;at_level + 1);</span>
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :                 KASSERT(parent-&gt;at_refcnt &gt;= 1);</span>
+<span class="lineNum">     796 </span>            : 
+<span class="lineNum">     797 </span>            :                 /* Give the route back to its parent. */
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :                 node = srp_get_locked(&amp;at-&gt;at_default);</span>
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :                 srp_swap_locked(&amp;parent-&gt;at_heap[j].node, node);</span>
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :                 KASSERT(j == -1);</span>
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :                 KASSERT(at-&gt;at_level == 0);</span>
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :                 srp_swap_locked(&amp;ar-&gt;ar_root, NULL);</span>
+<span class="lineNum">     804 </span>            :         }
+<span class="lineNum">     805 </span>            : 
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;art_table_gc_mtx);</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :         at-&gt;at_parent = art_table_gc_list;</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :         art_table_gc_list = at;</span>
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;art_table_gc_mtx);</span>
+<span class="lineNum">     810 </span>            : 
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :         task_add(systqmp, &amp;art_table_gc_task);</span>
+<span class="lineNum">     812 </span>            : 
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :         return (parent);</span>
+<span class="lineNum">     814 </span>            : }
+<a name="815"><span class="lineNum">     815 </span>            : </a>
+<span class="lineNum">     816 </span>            : void
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 : art_table_gc(void *null)</span>
+<span class="lineNum">     818 </span>            : {
+<span class="lineNum">     819 </span>            :         struct art_table *at, *next;
+<span class="lineNum">     820 </span>            : 
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;art_table_gc_mtx);</span>
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :         at = art_table_gc_list;</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :         art_table_gc_list = NULL;</span>
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;art_table_gc_mtx);</span>
+<span class="lineNum">     825 </span>            : 
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         while (at != NULL) {</span>
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :                 next = at-&gt;at_parent;</span>
+<span class="lineNum">     828 </span>            : 
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :                 if (at-&gt;at_level == 0)</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :                         srp_finalize(at, &quot;arttfini&quot;);</span>
+<span class="lineNum">     831 </span>            :                 else
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                         srp_finalize(ASNODE(at), &quot;arttfini&quot;);</span>
+<span class="lineNum">     833 </span>            : 
+<span class="lineNum">     834 </span><span class="lineNoCov">          0 :                 switch (AT_HEAPSIZE(at-&gt;at_bits)) {</span>
+<span class="lineNum">     835 </span>            :                 case AT_HEAPSIZE(4):
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :                         pool_put(&amp;at_heap_4_pool, at-&gt;at_heap);</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     838 </span>            :                 case AT_HEAPSIZE(8):
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :                         pool_put(&amp;at_heap_8_pool, at-&gt;at_heap);</span>
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     841 </span>            :                 default:
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :                         panic(&quot;incorrect stride length %u&quot;, at-&gt;at_bits);</span>
+<span class="lineNum">     843 </span>            :                 }
+<span class="lineNum">     844 </span>            : 
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                 pool_put(&amp;at_pool, at);</span>
+<span class="lineNum">     846 </span>            : 
+<span class="lineNum">     847 </span>            :                 at = next;
+<span class="lineNum">     848 </span>            :         }
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     850 </span>            : 
+<span class="lineNum">     851 </span>            : /*
+<span class="lineNum">     852 </span>            :  * Substitute a node by another in the subtree whose root index is given.
+<span class="lineNum">     853 </span>            :  *
+<span class="lineNum">     854 </span>            :  * This function iterates on the table ``at'' at index ``i'' until no
+<span class="lineNum">     855 </span>            :  * more ``old'' node can be replaced by ``new''.
+<span class="lineNum">     856 </span>            :  *
+<span class="lineNum">     857 </span>            :  * This function was originally written by Don Knuth in CWEB. The
+<span class="lineNum">     858 </span>            :  * complicated ``goto''s are the result of expansion of the two
+<span class="lineNum">     859 </span>            :  * following recursions:
+<span class="lineNum">     860 </span>            :  *
+<span class="lineNum">     861 </span>            :  *      art_allot(at, i, old, new)
+<span class="lineNum">     862 </span>            :  *      {
+<span class="lineNum">     863 </span>            :  *              int k = i;
+<span class="lineNum">     864 </span>            :  *              if (at-&gt;at_heap[k] == old)
+<span class="lineNum">     865 </span>            :  *                      at-&gt;at_heap[k] = new;
+<span class="lineNum">     866 </span>            :  *              if (k &gt;= at-&gt;at_minfringe)
+<span class="lineNum">     867 </span>            :  *                       return;
+<span class="lineNum">     868 </span>            :  *              k &lt;&lt;= 1;
+<span class="lineNum">     869 </span>            :  *              art_allot(at, k, old, new);
+<span class="lineNum">     870 </span>            :  *              k++;
+<span class="lineNum">     871 </span>            :  *              art_allot(at, k, old, new);
+<span class="lineNum">     872 </span>            :  *      }
+<a name="873"><span class="lineNum">     873 </span>            :  */</a>
+<span class="lineNum">     874 </span>            : void
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 : art_allot(struct art_table *at, int i, struct art_node *old,</span>
+<span class="lineNum">     876 </span>            :     struct art_node *new)
+<span class="lineNum">     877 </span>            : {
+<span class="lineNum">     878 </span>            :         struct art_node         *node, *dflt;
+<span class="lineNum">     879 </span>            :         int                      k = i;
+<span class="lineNum">     880 </span>            : 
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :         KASSERT(i &lt; at-&gt;at_minfringe);</span>
+<span class="lineNum">     882 </span>            : 
+<span class="lineNum">     883 </span>            : again:
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :         k &lt;&lt;= 1;</span>
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :         if (k &lt; at-&gt;at_minfringe)</span>
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :                 goto nonfringe;</span>
+<span class="lineNum">     887 </span>            : 
+<span class="lineNum">     888 </span>            :         /* Change fringe nodes. */
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :         while (1) {</span>
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 :                 node = srp_get_locked(&amp;at-&gt;at_heap[k].node);</span>
+<span class="lineNum">     891 </span><span class="lineNoCov">          0 :                 if (!ISLEAF(node)) {</span>
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :                         dflt = srp_get_locked(&amp;SUBTABLE(node)-&gt;at_default);</span>
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 :                         if (dflt == old) {</span>
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :                                 srp_swap_locked(&amp;SUBTABLE(node)-&gt;at_default,</span>
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :                                     new);</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     897 </span><span class="lineNoCov">          0 :                 } else if (node == old) {</span>
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :                         srp_swap_locked(&amp;at-&gt;at_heap[k].node, new);</span>
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :                 if (k % 2)</span>
+<span class="lineNum">     901 </span>            :                         goto moveup;
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :                 k++;</span>
+<span class="lineNum">     903 </span>            :         }
+<span class="lineNum">     904 </span>            : 
+<span class="lineNum">     905 </span>            : nonfringe:
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :         node = srp_get_locked(&amp;at-&gt;at_heap[k].node);</span>
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :         if (node == old)</span>
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :                 goto again;</span>
+<span class="lineNum">     909 </span>            : moveon:
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :         if (k % 2)</span>
+<span class="lineNum">     911 </span>            :                 goto moveup;
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :         k++;</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :         goto nonfringe;</span>
+<span class="lineNum">     914 </span>            : moveup:
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :         k &gt;&gt;= 1;</span>
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :         srp_swap_locked(&amp;at-&gt;at_heap[k].node, new);</span>
+<span class="lineNum">     917 </span>            : 
+<span class="lineNum">     918 </span>            :         /* Change non-fringe node. */
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :         if (k != i)</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :                 goto moveon;</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 : }</span>
+<a name="922"><span class="lineNum">     922 </span>            : </a>
+<span class="lineNum">     923 </span>            : struct art_node *
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 : art_get(void *dst, uint8_t plen)</span>
+<span class="lineNum">     925 </span>            : {
+<span class="lineNum">     926 </span>            :         struct art_node         *an;
+<span class="lineNum">     927 </span>            : 
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :         an = pool_get(&amp;an_pool, PR_NOWAIT | PR_ZERO);</span>
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :         if (an == NULL)</span>
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     931 </span>            : 
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :         an-&gt;an_plen = plen;</span>
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :         SRPL_INIT(&amp;an-&gt;an_rtlist);</span>
+<span class="lineNum">     934 </span>            : 
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :         return (an);</span>
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 : }</span>
+<a name="937"><span class="lineNum">     937 </span>            : </a>
+<span class="lineNum">     938 </span>            : void
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 : art_put(struct art_node *an)</span>
+<span class="lineNum">     940 </span>            : {
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :         KASSERT(SRPL_EMPTY_LOCKED(&amp;an-&gt;an_rtlist));</span>
+<span class="lineNum">     942 </span>            : 
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;art_node_gc_mtx);</span>
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         an-&gt;an_gc = art_node_gc_list;</span>
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 :         art_node_gc_list = an;</span>
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;art_node_gc_mtx);</span>
+<span class="lineNum">     947 </span>            : 
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 :         task_add(systqmp, &amp;art_node_gc_task);</span>
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 : }</span>
+<a name="950"><span class="lineNum">     950 </span>            : </a>
+<span class="lineNum">     951 </span>            : void
+<span class="lineNum">     952 </span><span class="lineNoCov">          0 : art_gc(void *null)</span>
+<span class="lineNum">     953 </span>            : {
+<span class="lineNum">     954 </span>            :         struct art_node         *an, *next;
+<span class="lineNum">     955 </span>            : 
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;art_node_gc_mtx);</span>
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :         an = art_node_gc_list;</span>
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :         art_node_gc_list = NULL;</span>
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;art_node_gc_mtx);</span>
+<span class="lineNum">     960 </span>            : 
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :         while (an != NULL) {</span>
+<span class="lineNum">     962 </span><span class="lineNoCov">          0 :                 next = an-&gt;an_gc;</span>
+<span class="lineNum">     963 </span>            : 
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :                 srp_finalize(an, &quot;artnfini&quot;);</span>
+<span class="lineNum">     965 </span>            : 
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :                 pool_put(&amp;an_pool, an);</span>
+<span class="lineNum">     967 </span>            : 
+<span class="lineNum">     968 </span>            :                 an = next;
+<span class="lineNum">     969 </span>            :         }
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

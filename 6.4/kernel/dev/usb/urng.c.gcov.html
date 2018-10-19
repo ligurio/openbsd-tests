@@ -1,0 +1,388 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/usb/urng.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/usb</a> - urng.c<span style="font-size: 80%;"> (source / <a href="urng.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">89</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: urng.c,v 1.9 2018/07/09 20:09:00 jasper Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2017 Jasper Lievisse Adriaanse &lt;jasper@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2017 Aaron Bieber &lt;abieber@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  * Copyright (C) 2015 Sean Levy &lt;attila@stalphonsos.com&gt;
+<span class="lineNum">       7 </span>            :  * Copyright (c) 2007 Marc Balmer &lt;mbalmer@openbsd.org&gt;
+<span class="lineNum">       8 </span>            :  * Copyright (c) 2006 Alexander Yurchenko &lt;grange@openbsd.org&gt;
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">      11 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">      12 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      13 </span>            :  *
+<span class="lineNum">      14 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      15 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      16 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      17 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      18 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      19 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      20 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      21 </span>            :  */
+<span class="lineNum">      22 </span>            : 
+<span class="lineNum">      23 </span>            : /*
+<span class="lineNum">      24 </span>            :  * Universal TRNG driver for a collection of TRNG devices:
+<span class="lineNum">      25 </span>            :  * - ChaosKey TRNG
+<span class="lineNum">      26 </span>            :  *   http://altusmetrum.org/ChaosKey/
+<span class="lineNum">      27 </span>            :  * - Alea II TRNG.  Produces 100kbit/sec of entropy by black magic
+<span class="lineNum">      28 </span>            :  *   http://www.araneus.fi/products/alea2/en/
+<span class="lineNum">      29 </span>            :  */
+<span class="lineNum">      30 </span>            : 
+<span class="lineNum">      31 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;sys/time.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span>            : #include &lt;dev/usb/usb.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;dev/usb/usbdi.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;dev/usb/usbdevs.h&gt;
+<span class="lineNum">      40 </span>            : 
+<span class="lineNum">      41 </span>            : #include &lt;dev/rndvar.h&gt;
+<span class="lineNum">      42 </span>            : 
+<span class="lineNum">      43 </span>            : #define DEVNAME(_sc) ((_sc)-&gt;sc_dev.dv_xname)
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : #ifdef URNG_DEBUG
+<span class="lineNum">      46 </span>            : #define DPRINTF(x)      printf x
+<span class="lineNum">      47 </span>            : #else
+<span class="lineNum">      48 </span>            : #define DPRINTF(x)
+<span class="lineNum">      49 </span>            : #endif
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span>            : /*
+<span class="lineNum">      52 </span>            :  * Define URNG_MEASURE_RATE to periodically log rate at which we provide
+<span class="lineNum">      53 </span>            :  * random data to the kernel.
+<span class="lineNum">      54 </span>            :  */
+<span class="lineNum">      55 </span>            : #ifdef URNG_MEASURE_RATE
+<span class="lineNum">      56 </span>            : #define URNG_RATE_SECONDS 30
+<span class="lineNum">      57 </span>            : #endif
+<span class="lineNum">      58 </span>            : 
+<span class="lineNum">      59 </span>            : struct urng_chip {
+<span class="lineNum">      60 </span>            :         int     bufsiz;
+<span class="lineNum">      61 </span>            :         int     endpoint;
+<span class="lineNum">      62 </span>            :         int     ctl_iface_idx;
+<span class="lineNum">      63 </span>            :         int     msecs;
+<span class="lineNum">      64 </span>            :         int     read_timeout;
+<span class="lineNum">      65 </span>            : };
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span>            : struct urng_softc {
+<span class="lineNum">      68 </span>            :         struct  device           sc_dev;
+<span class="lineNum">      69 </span>            :         struct  usbd_device     *sc_udev;
+<span class="lineNum">      70 </span>            :         struct  usbd_pipe       *sc_inpipe;
+<span class="lineNum">      71 </span>            :         struct  timeout          sc_timeout;
+<span class="lineNum">      72 </span>            :         struct  usb_task         sc_task;
+<span class="lineNum">      73 </span>            :         struct  usbd_xfer       *sc_xfer;
+<span class="lineNum">      74 </span>            :         struct  urng_chip        sc_chip;
+<span class="lineNum">      75 </span>            :         int                     *sc_buf;
+<span class="lineNum">      76 </span>            :         int                      sc_product;
+<span class="lineNum">      77 </span>            : #ifdef URNG_MEASURE_RATE
+<span class="lineNum">      78 </span>            :         struct  timeval          sc_start;
+<span class="lineNum">      79 </span>            :         struct  timeval          sc_cur;
+<span class="lineNum">      80 </span>            :         int                      sc_counted_bytes;
+<span class="lineNum">      81 </span>            :         u_char                   sc_first_run;
+<span class="lineNum">      82 </span>            : #endif
+<span class="lineNum">      83 </span>            : };
+<span class="lineNum">      84 </span>            : 
+<span class="lineNum">      85 </span>            : int urng_match(struct device *, void *, void *);
+<span class="lineNum">      86 </span>            : void urng_attach(struct device *, struct device *, void *);
+<span class="lineNum">      87 </span>            : int urng_detach(struct device *, int);
+<span class="lineNum">      88 </span>            : void urng_task(void *);
+<span class="lineNum">      89 </span>            : void urng_timeout(void *);
+<span class="lineNum">      90 </span>            : 
+<span class="lineNum">      91 </span>            : struct cfdriver urng_cd = {
+<span class="lineNum">      92 </span>            :         NULL, &quot;urng&quot;, DV_DULL
+<span class="lineNum">      93 </span>            : };
+<span class="lineNum">      94 </span>            : 
+<span class="lineNum">      95 </span>            : const struct cfattach urng_ca = {
+<span class="lineNum">      96 </span>            :         sizeof(struct urng_softc), urng_match, urng_attach, urng_detach
+<span class="lineNum">      97 </span>            : };
+<span class="lineNum">      98 </span>            : 
+<span class="lineNum">      99 </span>            : struct urng_type {
+<span class="lineNum">     100 </span>            :         struct usb_devno        urng_dev;
+<span class="lineNum">     101 </span>            :         struct urng_chip        urng_chip;
+<span class="lineNum">     102 </span>            : };
+<span class="lineNum">     103 </span>            : 
+<span class="lineNum">     104 </span>            : static const struct urng_type urng_devs[] = {
+<span class="lineNum">     105 </span>            :         { { USB_VENDOR_OPENMOKO2, USB_PRODUCT_OPENMOKO2_CHAOSKEY },
+<span class="lineNum">     106 </span>            :           {64, 5, 0, 100, 5000} },
+<span class="lineNum">     107 </span>            :         { { USB_VENDOR_ARANEUS, USB_PRODUCT_ARANEUS_ALEA },
+<span class="lineNum">     108 </span>            :           {128, 1, 0, 100, 5000} },
+<span class="lineNum">     109 </span>            : };
+<span class="lineNum">     110 </span>            : #define urng_lookup(v, p) ((struct urng_type *)usb_lookup(urng_devs, v, p))
+<a name="111"><span class="lineNum">     111 </span>            : </a>
+<span class="lineNum">     112 </span>            : int
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 : urng_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     114 </span>            : {
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         struct usb_attach_arg *uaa = aux;</span>
+<span class="lineNum">     116 </span>            : 
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         if (uaa-&gt;iface == NULL)</span>
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :                 return (UMATCH_NONE);</span>
+<span class="lineNum">     119 </span>            : 
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         if (urng_lookup(uaa-&gt;vendor, uaa-&gt;product) != NULL)</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :                 return (UMATCH_VENDOR_PRODUCT);</span>
+<span class="lineNum">     122 </span>            : 
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         return (UMATCH_NONE);</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 : }</span>
+<a name="125"><span class="lineNum">     125 </span>            : </a>
+<span class="lineNum">     126 </span>            : void
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 : urng_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     128 </span>            : {
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :         struct urng_softc *sc = (struct urng_softc *)self;</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         struct usb_attach_arg *uaa = aux;</span>
+<span class="lineNum">     131 </span>            :         usb_interface_descriptor_t *id;
+<span class="lineNum">     132 </span>            :         usb_endpoint_descriptor_t *ed;
+<span class="lineNum">     133 </span>            :         int ep_ibulk = -1;
+<span class="lineNum">     134 </span>            :         usbd_status error;
+<span class="lineNum">     135 </span>            :         int i, ep_addr;
+<span class="lineNum">     136 </span>            : 
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :         sc-&gt;sc_udev = uaa-&gt;device;</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :         sc-&gt;sc_chip = urng_lookup(uaa-&gt;vendor, uaa-&gt;product)-&gt;urng_chip;</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         sc-&gt;sc_product = uaa-&gt;product;</span>
+<span class="lineNum">     140 </span>            : #ifdef URNG_MEASURE_RATE
+<span class="lineNum">     141 </span>            :         sc-&gt;sc_first_run = 1;
+<span class="lineNum">     142 </span>            : #endif
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span>            :         DPRINTF((&quot;%s: bufsiz: %d, endpoint: %d ctl iface: %d, msecs: %d, read_timeout: %d\n&quot;,
+<span class="lineNum">     145 </span>            :                 DEVNAME(sc),
+<span class="lineNum">     146 </span>            :                 sc-&gt;sc_chip.bufsiz,
+<span class="lineNum">     147 </span>            :                 sc-&gt;sc_chip.endpoint,
+<span class="lineNum">     148 </span>            :                 sc-&gt;sc_chip.ctl_iface_idx,
+<span class="lineNum">     149 </span>            :                 sc-&gt;sc_chip.msecs,
+<span class="lineNum">     150 </span>            :                 sc-&gt;sc_chip.read_timeout));
+<span class="lineNum">     151 </span>            : 
+<span class="lineNum">     152 </span>            :         /* Find the bulk endpoints. */
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         id = usbd_get_interface_descriptor(uaa-&gt;iface);</span>
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; id-&gt;bNumEndpoints; i++) {</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :                 ed = usbd_interface2endpoint_descriptor(uaa-&gt;iface, i);</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :                 if (ed == NULL) {</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: failed to get endpoint %d descriptor\n&quot;,</span>
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :                             DEVNAME(sc), i);</span>
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :                         goto fail;</span>
+<span class="lineNum">     160 </span>            :                 }
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :                 if (UE_GET_DIR(ed-&gt;bEndpointAddress) == UE_DIR_IN &amp;&amp;</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                     UE_GET_XFERTYPE(ed-&gt;bmAttributes) == UE_BULK) {</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                         ep_addr = UE_GET_ADDR(ed-&gt;bEndpointAddress);</span>
+<span class="lineNum">     164 </span>            : 
+<span class="lineNum">     165 </span>            :                         DPRINTF((&quot;%s: bulk endpoint %d\n&quot;,
+<span class="lineNum">     166 </span>            :                             DEVNAME(sc), ep_addr));
+<span class="lineNum">     167 </span>            : 
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                         if (ep_addr == sc-&gt;sc_chip.endpoint) {</span>
+<span class="lineNum">     169 </span>            :                                 ep_ibulk = ed-&gt;bEndpointAddress;
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     171 </span>            :                         }
+<span class="lineNum">     172 </span>            :                 }
+<span class="lineNum">     173 </span>            :         }
+<span class="lineNum">     174 </span>            : 
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :         if (ep_ibulk == -1) {</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: missing bulk input endpoint\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :                 goto fail;</span>
+<span class="lineNum">     178 </span>            :         }
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span>            :         /* Open the pipes. */
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :         error = usbd_open_pipe(uaa-&gt;iface, ep_ibulk, USBD_EXCLUSIVE_USE,</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :                     &amp;sc-&gt;sc_inpipe);</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to open bulk-in pipe: %s\n&quot;,</span>
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :                                 DEVNAME(sc), usbd_errstr(error));</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                 goto fail;</span>
+<span class="lineNum">     187 </span>            :         }
+<span class="lineNum">     188 </span>            : 
+<span class="lineNum">     189 </span>            :         /* Allocate the transfer buffers. */
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         sc-&gt;sc_xfer = usbd_alloc_xfer(sc-&gt;sc_udev);</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_xfer == NULL) {</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: could not alloc xfer\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :                 goto fail;</span>
+<span class="lineNum">     194 </span>            :         }
+<span class="lineNum">     195 </span>            : 
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         sc-&gt;sc_buf = usbd_alloc_buffer(sc-&gt;sc_xfer, sc-&gt;sc_chip.bufsiz);</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_buf == NULL) {</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: could not alloc %d-byte buffer\n&quot;, DEVNAME(sc),</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                                 sc-&gt;sc_chip.bufsiz);</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                 goto fail;</span>
+<span class="lineNum">     201 </span>            :         }
+<span class="lineNum">     202 </span>            : 
+<span class="lineNum">     203 </span>            :         /* And off we go! */
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :         usb_init_task(&amp;sc-&gt;sc_task, urng_task, sc, USB_TASK_TYPE_GENERIC);</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         timeout_set(&amp;sc-&gt;sc_timeout, urng_timeout, sc);</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         usb_add_task(sc-&gt;sc_udev, &amp;sc-&gt;sc_task);</span>
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     209 </span>            : 
+<span class="lineNum">     210 </span>            : fail:
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :         usbd_deactivate(sc-&gt;sc_udev);</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 : }</span>
+<a name="213"><span class="lineNum">     213 </span>            : </a>
+<span class="lineNum">     214 </span>            : int
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 : urng_detach(struct device *self, int flags)</span>
+<span class="lineNum">     216 </span>            : {
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         struct urng_softc *sc = (struct urng_softc *)self;</span>
+<span class="lineNum">     218 </span>            : 
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         usb_rem_task(sc-&gt;sc_udev, &amp;sc-&gt;sc_task);</span>
+<span class="lineNum">     220 </span>            : 
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :         if (timeout_initialized(&amp;sc-&gt;sc_timeout))</span>
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :                 timeout_del(&amp;sc-&gt;sc_timeout);</span>
+<span class="lineNum">     223 </span>            : 
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_xfer != NULL) {</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                 usbd_free_xfer(sc-&gt;sc_xfer);</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_xfer = NULL;</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     228 </span>            : 
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_inpipe != NULL) {</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                 usbd_close_pipe(sc-&gt;sc_inpipe);</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_inpipe = NULL;</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     235 </span>            : }
+<span class="lineNum">     236 </span>            : 
+<a name="237"><span class="lineNum">     237 </span>            : </a>
+<span class="lineNum">     238 </span>            : void
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 : urng_task(void *arg)</span>
+<span class="lineNum">     240 </span>            : {
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :         struct urng_softc *sc = (struct urng_softc *)arg;</span>
+<span class="lineNum">     242 </span>            :         usbd_status error;
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         u_int32_t len, i;</span>
+<span class="lineNum">     244 </span>            : #ifdef URNG_MEASURE_RATE
+<span class="lineNum">     245 </span>            :         time_t elapsed;
+<span class="lineNum">     246 </span>            :         int rate;
+<span class="lineNum">     247 </span>            : #endif
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :         usbd_setup_xfer(sc-&gt;sc_xfer, sc-&gt;sc_inpipe, NULL, sc-&gt;sc_buf,</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :             sc-&gt;sc_chip.bufsiz, USBD_SHORT_XFER_OK | USBD_SYNCHRONOUS,</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :             sc-&gt;sc_chip.read_timeout, NULL);</span>
+<span class="lineNum">     251 </span>            : 
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         error = usbd_transfer(sc-&gt;sc_xfer);</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: xfer failed: %s\n&quot;, DEVNAME(sc),</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :                     usbd_errstr(error));</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :                 goto bail;</span>
+<span class="lineNum">     257 </span>            :         }
+<span class="lineNum">     258 </span>            : 
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         usbd_get_xfer_status(sc-&gt;sc_xfer, NULL, NULL, &amp;len, NULL);</span>
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         if (len &lt; sizeof(int)) {</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: xfer too short (%u bytes) - dropping\n&quot;,</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :                     DEVNAME(sc), len);</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :                 goto bail;</span>
+<span class="lineNum">     264 </span>            :         }
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span>            : #ifdef URNG_MEASURE_RATE
+<span class="lineNum">     267 </span>            :         if (sc-&gt;sc_first_run) {
+<span class="lineNum">     268 </span>            :                 sc-&gt;sc_counted_bytes = 0;
+<span class="lineNum">     269 </span>            :                 getmicrotime(&amp;(sc-&gt;sc_start));
+<span class="lineNum">     270 </span>            :         }
+<span class="lineNum">     271 </span>            :         sc-&gt;sc_counted_bytes += len;
+<span class="lineNum">     272 </span>            :         getmicrotime(&amp;(sc-&gt;sc_cur));
+<span class="lineNum">     273 </span>            :         elapsed = sc-&gt;sc_cur.tv_sec - sc-&gt;sc_start.tv_sec;
+<span class="lineNum">     274 </span>            :         if (elapsed &gt;= URNG_RATE_SECONDS) {
+<span class="lineNum">     275 </span>            :                 rate = (8 * sc-&gt;sc_counted_bytes) / (elapsed * 1024);
+<span class="lineNum">     276 </span>            :                 printf(&quot;%s: transfer rate = %d kb/s\n&quot;, DEVNAME(sc), rate);
+<span class="lineNum">     277 </span>            : 
+<span class="lineNum">     278 </span>            :                 /* set up for next measurement */
+<span class="lineNum">     279 </span>            :                 sc-&gt;sc_counted_bytes = 0;
+<span class="lineNum">     280 </span>            :                 getmicrotime(&amp;(sc-&gt;sc_start));
+<span class="lineNum">     281 </span>            :         }
+<span class="lineNum">     282 </span>            : #endif
+<span class="lineNum">     283 </span>            : 
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         len /= sizeof(int);</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; len; i++) {</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                 enqueue_randomness(sc-&gt;sc_buf[i]);</span>
+<span class="lineNum">     287 </span>            :         }
+<span class="lineNum">     288 </span>            : bail:
+<span class="lineNum">     289 </span>            : #ifdef URNG_MEASURE_RATE
+<span class="lineNum">     290 </span>            :         if (sc-&gt;sc_first_run) {
+<span class="lineNum">     291 </span>            :                 sc-&gt;sc_first_run = 0;
+<span class="lineNum">     292 </span>            :         }
+<span class="lineNum">     293 </span>            : #endif
+<span class="lineNum">     294 </span>            : 
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :         timeout_add_msec(&amp;sc-&gt;sc_timeout, sc-&gt;sc_chip.msecs);</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 : }</span>
+<a name="297"><span class="lineNum">     297 </span>            : </a>
+<span class="lineNum">     298 </span>            : void
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 : urng_timeout(void *arg)</span>
+<span class="lineNum">     300 </span>            : {
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         struct urng_softc *sc = arg;</span>
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         usb_add_task(sc-&gt;sc_udev, &amp;sc-&gt;sc_task);</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/onewire/owtemp.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/onewire</a> - owtemp.c<span style="font-size: 80%;"> (source / <a href="owtemp.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">63</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: owtemp.c,v 1.16 2014/09/14 14:17:25 jsg Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2006, 2009 Alexander Yurchenko &lt;grange@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /*
+<span class="lineNum">      20 </span>            :  * 1-Wire temperature family type device driver.
+<span class="lineNum">      21 </span>            :  */
+<span class="lineNum">      22 </span>            : 
+<span class="lineNum">      23 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/rwlock.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/sensors.h&gt;
+<span class="lineNum">      29 </span>            : 
+<span class="lineNum">      30 </span>            : #include &lt;dev/onewire/onewiredevs.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;dev/onewire/onewirereg.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;dev/onewire/onewirevar.h&gt;
+<span class="lineNum">      33 </span>            : 
+<span class="lineNum">      34 </span>            : /* Commands */
+<span class="lineNum">      35 </span>            : #define DS1920_CMD_CONVERT              0x44
+<span class="lineNum">      36 </span>            : #define DS1920_CMD_READ_SCRATCHPAD      0xbe
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : /* Scratchpad layout */
+<span class="lineNum">      39 </span>            : #define DS1920_SP_TEMP_LSB              0
+<span class="lineNum">      40 </span>            : #define DS1920_SP_TEMP_MSB              1
+<span class="lineNum">      41 </span>            : #define DS1920_SP_TH                    2
+<span class="lineNum">      42 </span>            : #define DS1920_SP_TL                    3
+<span class="lineNum">      43 </span>            : #define DS18B20_SP_CONFIG               4
+<span class="lineNum">      44 </span>            : #define DS1920_SP_COUNT_REMAIN          6
+<span class="lineNum">      45 </span>            : #define DS1920_SP_COUNT_PERC            7
+<span class="lineNum">      46 </span>            : #define DS1920_SP_CRC                   8
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : struct owtemp_softc {
+<span class="lineNum">      49 </span>            :         struct device           sc_dev;
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span>            :         void *                  sc_onewire;
+<span class="lineNum">      52 </span>            :         u_int64_t               sc_rom;
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span>            :         struct ksensor          sc_sensor;
+<span class="lineNum">      55 </span>            :         struct ksensordev       sc_sensordev;
+<span class="lineNum">      56 </span>            :         struct sensor_task      *sc_sensortask;
+<span class="lineNum">      57 </span>            :         struct rwlock           sc_lock;
+<span class="lineNum">      58 </span>            : };
+<span class="lineNum">      59 </span>            : 
+<span class="lineNum">      60 </span>            : int     owtemp_match(struct device *, void *, void *);
+<span class="lineNum">      61 </span>            : void    owtemp_attach(struct device *, struct device *, void *);
+<span class="lineNum">      62 </span>            : int     owtemp_detach(struct device *, int);
+<span class="lineNum">      63 </span>            : int     owtemp_activate(struct device *, int);
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span>            : void    owtemp_update(void *);
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span>            : struct cfattach owtemp_ca = {
+<span class="lineNum">      68 </span>            :         sizeof(struct owtemp_softc),
+<span class="lineNum">      69 </span>            :         owtemp_match,
+<span class="lineNum">      70 </span>            :         owtemp_attach,
+<span class="lineNum">      71 </span>            :         owtemp_detach,
+<span class="lineNum">      72 </span>            :         owtemp_activate
+<span class="lineNum">      73 </span>            : };
+<span class="lineNum">      74 </span>            : 
+<span class="lineNum">      75 </span>            : struct cfdriver owtemp_cd = {
+<span class="lineNum">      76 </span>            :         NULL, &quot;owtemp&quot;, DV_DULL
+<span class="lineNum">      77 </span>            : };
+<span class="lineNum">      78 </span>            : 
+<span class="lineNum">      79 </span>            : static const struct onewire_matchfam owtemp_fams[] = {
+<span class="lineNum">      80 </span>            :         { ONEWIRE_FAMILY_DS1920 },
+<span class="lineNum">      81 </span>            :         { ONEWIRE_FAMILY_DS18B20 },
+<span class="lineNum">      82 </span>            :         { ONEWIRE_FAMILY_DS1822 }
+<span class="lineNum">      83 </span>            : };
+<a name="84"><span class="lineNum">      84 </span>            : </a>
+<span class="lineNum">      85 </span>            : int
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 : owtemp_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">      87 </span>            : {
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :         return (onewire_matchbyfam(aux, owtemp_fams, nitems(owtemp_fams)));</span>
+<span class="lineNum">      89 </span>            : }
+<a name="90"><span class="lineNum">      90 </span>            : </a>
+<span class="lineNum">      91 </span>            : void
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 : owtemp_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">      93 </span>            : {
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :         struct owtemp_softc *sc = (struct owtemp_softc *)self;</span>
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         struct onewire_attach_args *oa = aux;</span>
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :         sc-&gt;sc_onewire = oa-&gt;oa_onewire;</span>
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :         sc-&gt;sc_rom = oa-&gt;oa_rom;</span>
+<span class="lineNum">      99 </span>            : 
+<span class="lineNum">     100 </span>            :         /* Initialize sensor */
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :         strlcpy(sc-&gt;sc_sensordev.xname, sc-&gt;sc_dev.dv_xname,</span>
+<span class="lineNum">     102 </span>            :             sizeof(sc-&gt;sc_sensordev.xname));
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :         sc-&gt;sc_sensor.type = SENSOR_TEMP;</span>
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 :         snprintf(sc-&gt;sc_sensor.desc, sizeof(sc-&gt;sc_sensor.desc), &quot;sn %012llx&quot;,</span>
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :             ONEWIRE_ROM_SN(oa-&gt;oa_rom));</span>
+<span class="lineNum">     106 </span>            : 
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         sc-&gt;sc_sensortask = sensor_task_register(sc, owtemp_update, 5);</span>
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_sensortask == NULL) {</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :                 printf(&quot;: unable to register update task\n&quot;);</span>
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     111 </span>            :         }
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :         sensor_attach(&amp;sc-&gt;sc_sensordev, &amp;sc-&gt;sc_sensor);</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         sensordev_install(&amp;sc-&gt;sc_sensordev);</span>
+<span class="lineNum">     114 </span>            : 
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         rw_init(&amp;sc-&gt;sc_lock, sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 : }</span>
+<a name="118"><span class="lineNum">     118 </span>            : </a>
+<span class="lineNum">     119 </span>            : int
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 : owtemp_detach(struct device *self, int flags)</span>
+<span class="lineNum">     121 </span>            : {
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :         struct owtemp_softc *sc = (struct owtemp_softc *)self;</span>
+<span class="lineNum">     123 </span>            : 
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         rw_enter_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         sensordev_deinstall(&amp;sc-&gt;sc_sensordev);</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_sensortask != NULL)</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :                 sensor_task_unregister(sc-&gt;sc_sensortask);</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         rw_exit_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     129 </span>            : 
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     131 </span>            : }
+<a name="132"><span class="lineNum">     132 </span>            : </a>
+<span class="lineNum">     133 </span>            : int
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 : owtemp_activate(struct device *self, int act)</span>
+<span class="lineNum">     135 </span>            : {
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     137 </span>            : }
+<a name="138"><span class="lineNum">     138 </span>            : </a>
+<span class="lineNum">     139 </span>            : void
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 : owtemp_update(void *arg)</span>
+<span class="lineNum">     141 </span>            : {
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         struct owtemp_softc *sc = arg;</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         u_int8_t data[9];</span>
+<span class="lineNum">     144 </span>            :         int16_t temp;
+<span class="lineNum">     145 </span>            :         int count_perc, count_remain, val;
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         rw_enter_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         onewire_lock(sc-&gt;sc_onewire, 0);</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         if (onewire_reset(sc-&gt;sc_onewire) != 0)</span>
+<span class="lineNum">     150 </span>            :                 goto done;
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         onewire_matchrom(sc-&gt;sc_onewire, sc-&gt;sc_rom);</span>
+<span class="lineNum">     152 </span>            : 
+<span class="lineNum">     153 </span>            :         /*
+<span class="lineNum">     154 </span>            :          * Start temperature conversion. The conversion takes up to 750ms.
+<span class="lineNum">     155 </span>            :          * After sending the command, the data line must be held high for
+<span class="lineNum">     156 </span>            :          * at least 750ms to provide power during the conversion process.
+<span class="lineNum">     157 </span>            :          * As such, no other activity may take place on the 1-Wire bus for
+<span class="lineNum">     158 </span>            :          * at least this period.
+<span class="lineNum">     159 </span>            :          */
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         onewire_write_byte(sc-&gt;sc_onewire, DS1920_CMD_CONVERT);</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         tsleep(sc, PRIBIO, &quot;owtemp&quot;, hz);</span>
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         if (onewire_reset(sc-&gt;sc_onewire) != 0)</span>
+<span class="lineNum">     164 </span>            :                 goto done;
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         onewire_matchrom(sc-&gt;sc_onewire, sc-&gt;sc_rom);</span>
+<span class="lineNum">     166 </span>            : 
+<span class="lineNum">     167 </span>            :         /*
+<span class="lineNum">     168 </span>            :          * The result of the temperature measurement is placed in the
+<span class="lineNum">     169 </span>            :          * first two bytes of the scratchpad.
+<span class="lineNum">     170 </span>            :          */
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         onewire_write_byte(sc-&gt;sc_onewire, DS1920_CMD_READ_SCRATCHPAD);</span>
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :         onewire_read_block(sc-&gt;sc_onewire, data, 9);</span>
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :         if (onewire_crc(data, 8) == data[DS1920_SP_CRC]) {</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :                 temp = data[DS1920_SP_TEMP_MSB] &lt;&lt; 8 |</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                     data[DS1920_SP_TEMP_LSB];</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                 if (ONEWIRE_ROM_FAMILY(sc-&gt;sc_rom) == ONEWIRE_FAMILY_DS18B20 ||</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :                     ONEWIRE_ROM_FAMILY(sc-&gt;sc_rom) == ONEWIRE_FAMILY_DS1822) {</span>
+<span class="lineNum">     178 </span>            :                         /*
+<span class="lineNum">     179 </span>            :                          * DS18B20 decoding
+<span class="lineNum">     180 </span>            :                          * default 12 bit 0.0625 C resolution
+<span class="lineNum">     181 </span>            :                          */
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :                         val = temp * (1000000 / 16);</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     184 </span>            :                         /* DS1920 decoding */
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :                         count_perc = data[DS1920_SP_COUNT_PERC];</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                         count_remain = data[DS1920_SP_COUNT_REMAIN];</span>
+<span class="lineNum">     187 </span>            : 
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :                         if (count_perc != 0) {</span>
+<span class="lineNum">     189 </span>            :                                 /* High resolution algorithm */
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :                                 temp &amp;= ~0x0001;</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :                                 val = temp * 500000 - 250000 +</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                                     ((count_perc - count_remain) * 1000000) /</span>
+<span class="lineNum">     193 </span>            :                                     count_perc;
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                         } else {</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                                 val = temp * 500000;</span>
+<span class="lineNum">     196 </span>            :                         }
+<span class="lineNum">     197 </span>            :                 }
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_sensor.value = 273150000 + val;</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span>            : done:
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :         onewire_unlock(sc-&gt;sc_onewire);</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :         rw_exit_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

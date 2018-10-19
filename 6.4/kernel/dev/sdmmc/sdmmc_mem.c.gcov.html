@@ -1,0 +1,1234 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/sdmmc/sdmmc_mem.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/sdmmc</a> - sdmmc_mem.c<span style="font-size: 80%;"> (source / <a href="sdmmc_mem.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">538</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">23</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: sdmmc_mem.c,v 1.33 2018/06/04 13:33:10 patrick Exp $  */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2006 Uwe Stuehler &lt;uwe@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /* Routines for SD/MMC memory cards. */
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      26 </span>            : 
+<span class="lineNum">      27 </span>            : #include &lt;dev/sdmmc/sdmmcchip.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;dev/sdmmc/sdmmcreg.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;dev/sdmmc/sdmmcvar.h&gt;
+<span class="lineNum">      30 </span>            : 
+<span class="lineNum">      31 </span>            : #ifdef HIBERNATE
+<span class="lineNum">      32 </span>            : #include &lt;uvm/uvm_extern.h&gt;
+<span class="lineNum">      33 </span>            : #endif
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : typedef struct { uint32_t _bits[512/32]; } __packed __aligned(4) sdmmc_bitfield512_t;
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span>            : void    sdmmc_be512_to_bitfield512(sdmmc_bitfield512_t *);
+<span class="lineNum">      38 </span>            : 
+<span class="lineNum">      39 </span>            : int     sdmmc_decode_csd(struct sdmmc_softc *, sdmmc_response,
+<span class="lineNum">      40 </span>            :             struct sdmmc_function *);
+<span class="lineNum">      41 </span>            : int     sdmmc_decode_cid(struct sdmmc_softc *, sdmmc_response,
+<span class="lineNum">      42 </span>            :             struct sdmmc_function *);
+<span class="lineNum">      43 </span>            : void    sdmmc_print_cid(struct sdmmc_cid *);
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : int     sdmmc_mem_send_op_cond(struct sdmmc_softc *, u_int32_t, u_int32_t *);
+<span class="lineNum">      46 </span>            : int     sdmmc_mem_set_blocklen(struct sdmmc_softc *, struct sdmmc_function *);
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : int     sdmmc_mem_send_scr(struct sdmmc_softc *, uint32_t *);
+<span class="lineNum">      49 </span>            : int     sdmmc_mem_decode_scr(struct sdmmc_softc *, uint32_t *,
+<span class="lineNum">      50 </span>            :             struct sdmmc_function *);
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : int     sdmmc_mem_send_cxd_data(struct sdmmc_softc *, int, void *, size_t);
+<span class="lineNum">      53 </span>            : int     sdmmc_mem_set_bus_width(struct sdmmc_function *, int);
+<span class="lineNum">      54 </span>            : int     sdmmc_mem_mmc_switch(struct sdmmc_function *, uint8_t, uint8_t, uint8_t);
+<span class="lineNum">      55 </span>            : 
+<span class="lineNum">      56 </span>            : int     sdmmc_mem_sd_init(struct sdmmc_softc *, struct sdmmc_function *);
+<span class="lineNum">      57 </span>            : int     sdmmc_mem_mmc_init(struct sdmmc_softc *, struct sdmmc_function *);
+<span class="lineNum">      58 </span>            : int     sdmmc_mem_single_read_block(struct sdmmc_function *, int, u_char *,
+<span class="lineNum">      59 </span>            :         size_t);
+<span class="lineNum">      60 </span>            : int     sdmmc_mem_read_block_subr(struct sdmmc_function *, bus_dmamap_t,
+<span class="lineNum">      61 </span>            :         int, u_char *, size_t);
+<span class="lineNum">      62 </span>            : int     sdmmc_mem_single_write_block(struct sdmmc_function *, int, u_char *,
+<span class="lineNum">      63 </span>            :         size_t);
+<span class="lineNum">      64 </span>            : int     sdmmc_mem_write_block_subr(struct sdmmc_function *, bus_dmamap_t,
+<span class="lineNum">      65 </span>            :         int, u_char *, size_t);
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span>            : #ifdef SDMMC_DEBUG
+<span class="lineNum">      68 </span>            : #define DPRINTF(s)      printf s
+<span class="lineNum">      69 </span>            : #else
+<span class="lineNum">      70 </span>            : #define DPRINTF(s)      /**/
+<span class="lineNum">      71 </span>            : #endif
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span>            : /*
+<span class="lineNum">      74 </span>            :  * Initialize SD/MMC memory cards and memory in SDIO &quot;combo&quot; cards.
+<a name="75"><span class="lineNum">      75 </span>            :  */</a>
+<span class="lineNum">      76 </span>            : int
+<span class="lineNum">      77 </span><span class="lineNoCov">          0 : sdmmc_mem_enable(struct sdmmc_softc *sc)</span>
+<span class="lineNum">      78 </span>            : {
+<span class="lineNum">      79 </span>            :         u_int32_t host_ocr;
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 :         u_int32_t card_ocr;</span>
+<span class="lineNum">      81 </span>            : 
+<span class="lineNum">      82 </span><span class="lineNoCov">          0 :         rw_assert_wrlock(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">      83 </span>            : 
+<span class="lineNum">      84 </span>            :         /* Set host mode to SD &quot;combo&quot; card or SD memory-only. */
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :         SET(sc-&gt;sc_flags, SMF_SD_MODE|SMF_MEM_MODE);</span>
+<span class="lineNum">      86 </span>            : 
+<span class="lineNum">      87 </span>            :         /* Reset memory (*must* do that before CMD55 or CMD1). */
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :         sdmmc_go_idle_state(sc);</span>
+<span class="lineNum">      89 </span>            : 
+<span class="lineNum">      90 </span>            :         /*
+<span class="lineNum">      91 </span>            :          * Read the SD/MMC memory OCR value by issuing CMD55 followed
+<span class="lineNum">      92 </span>            :          * by ACMD41 to read the OCR value from memory-only SD cards.
+<span class="lineNum">      93 </span>            :          * MMC cards will not respond to CMD55 or ACMD41 and this is
+<span class="lineNum">      94 </span>            :          * how we distinguish them from SD cards.
+<span class="lineNum">      95 </span>            :          */
+<span class="lineNum">      96 </span>            :  mmc_mode:
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :         if (sdmmc_mem_send_op_cond(sc, 0, &amp;card_ocr) != 0) {</span>
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :                 if (ISSET(sc-&gt;sc_flags, SMF_SD_MODE) &amp;&amp;</span>
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :                     !ISSET(sc-&gt;sc_flags, SMF_IO_MODE)) {</span>
+<span class="lineNum">     100 </span>            :                         /* Not a SD card, switch to MMC mode. */
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :                         CLR(sc-&gt;sc_flags, SMF_SD_MODE);</span>
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :                         goto mmc_mode;</span>
+<span class="lineNum">     103 </span>            :                 }
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 :                 if (!ISSET(sc-&gt;sc_flags, SMF_SD_MODE)) {</span>
+<span class="lineNum">     105 </span>            :                         DPRINTF((&quot;%s: can't read memory OCR\n&quot;,
+<span class="lineNum">     106 </span>            :                             DEVNAME(sc)));
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :                         return 1;</span>
+<span class="lineNum">     108 </span>            :                 } else {
+<span class="lineNum">     109 </span>            :                         /* Not a &quot;combo&quot; card. */
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :                         CLR(sc-&gt;sc_flags, SMF_MEM_MODE);</span>
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">     112 </span>            :                 }
+<span class="lineNum">     113 </span>            :         }
+<span class="lineNum">     114 </span>            : 
+<span class="lineNum">     115 </span>            :         /* Set the lowest voltage supported by the card and host. */
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         host_ocr = sdmmc_chip_host_ocr(sc-&gt;sct, sc-&gt;sch);</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         if (sdmmc_set_bus_power(sc, host_ocr, card_ocr) != 0) {</span>
+<span class="lineNum">     118 </span>            :                 DPRINTF((&quot;%s: can't supply voltage requested by card\n&quot;,
+<span class="lineNum">     119 </span>            :                     DEVNAME(sc)));
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">     121 </span>            :         }
+<span class="lineNum">     122 </span>            : 
+<span class="lineNum">     123 </span>            :         /* Tell the card(s) to enter the idle state (again). */
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         sdmmc_go_idle_state(sc);</span>
+<span class="lineNum">     125 </span>            : 
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         host_ocr &amp;= card_ocr; /* only allow the common voltages */</span>
+<span class="lineNum">     127 </span>            : 
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         if (sdmmc_send_if_cond(sc, card_ocr) == 0)</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :                 host_ocr |= SD_OCR_SDHC_CAP;</span>
+<span class="lineNum">     130 </span>            : 
+<span class="lineNum">     131 </span>            :         /* Send the new OCR value until all cards are ready. */
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :         if (sdmmc_mem_send_op_cond(sc, host_ocr, NULL) != 0) {</span>
+<span class="lineNum">     133 </span>            :                 DPRINTF((&quot;%s: can't send memory OCR\n&quot;, DEVNAME(sc)));
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">     135 </span>            :         }
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span>            : /*
+<span class="lineNum">     140 </span>            :  * Read the CSD and CID from all cards and assign each card a unique
+<span class="lineNum">     141 </span>            :  * relative card address (RCA).  CMD2 is ignored by SDIO-only cards.
+<a name="142"><span class="lineNum">     142 </span>            :  */</a>
+<span class="lineNum">     143 </span>            : void
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 : sdmmc_mem_scan(struct sdmmc_softc *sc)</span>
+<span class="lineNum">     145 </span>            : {
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         struct sdmmc_command cmd;</span>
+<span class="lineNum">     147 </span>            :         struct sdmmc_function *sf;
+<span class="lineNum">     148 </span>            :         u_int16_t next_rca;
+<span class="lineNum">     149 </span>            :         int error;
+<span class="lineNum">     150 </span>            :         int i;
+<span class="lineNum">     151 </span>            : 
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         rw_assert_wrlock(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span>            :         /*
+<span class="lineNum">     155 </span>            :          * CMD2 is a broadcast command understood by SD cards and MMC
+<span class="lineNum">     156 </span>            :          * cards.  All cards begin to respond to the command, but back
+<span class="lineNum">     157 </span>            :          * off if another card drives the CMD line to a different level.
+<span class="lineNum">     158 </span>            :          * Only one card will get its entire response through.  That
+<span class="lineNum">     159 </span>            :          * card remains silent once it has been assigned a RCA.
+<span class="lineNum">     160 </span>            :          */
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; 100; i++) {</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                 bzero(&amp;cmd, sizeof cmd);</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                 cmd.c_opcode = MMC_ALL_SEND_CID;</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                 cmd.c_flags = SCF_CMD_BCR | SCF_RSP_R2;</span>
+<span class="lineNum">     165 </span>            : 
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 error = sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :                 if (error == ETIMEDOUT) {</span>
+<span class="lineNum">     168 </span>            :                         /* No more cards there. */
+<span class="lineNum">     169 </span>            :                         break;
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :                 } else if (error != 0) {</span>
+<span class="lineNum">     171 </span>            :                         DPRINTF((&quot;%s: can't read CID\n&quot;, DEVNAME(sc)));
+<span class="lineNum">     172 </span>            :                         break;
+<span class="lineNum">     173 </span>            :                 }
+<span class="lineNum">     174 </span>            : 
+<span class="lineNum">     175 </span>            :                 /* In MMC mode, find the next available RCA. */
+<span class="lineNum">     176 </span>            :                 next_rca = 1;
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :                 if (!ISSET(sc-&gt;sc_flags, SMF_SD_MODE))</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                         SIMPLEQ_FOREACH(sf, &amp;sc-&gt;sf_head, sf_list)</span>
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                                 next_rca++;</span>
+<span class="lineNum">     180 </span>            : 
+<span class="lineNum">     181 </span>            :                 /* Allocate a sdmmc_function structure. */
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :                 sf = sdmmc_function_alloc(sc);</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :                 sf-&gt;rca = next_rca;</span>
+<span class="lineNum">     184 </span>            : 
+<span class="lineNum">     185 </span>            :                 /*
+<span class="lineNum">     186 </span>            :                  * Remember the CID returned in the CMD2 response for
+<span class="lineNum">     187 </span>            :                  * later decoding.
+<span class="lineNum">     188 </span>            :                  */
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                 bcopy(cmd.c_resp, sf-&gt;raw_cid, sizeof sf-&gt;raw_cid);</span>
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span>            :                 /*
+<span class="lineNum">     192 </span>            :                  * Silence the card by assigning it a unique RCA, or
+<span class="lineNum">     193 </span>            :                  * querying it for its RCA in the case of SD.
+<span class="lineNum">     194 </span>            :                  */
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                 if (sdmmc_set_relative_addr(sc, sf) != 0) {</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: can't set mem RCA\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :                         sdmmc_function_free(sf);</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     199 </span>            :                 }
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span>            : #if 0
+<span class="lineNum">     202 </span>            :                 /* Verify that the RCA has been set by selecting the card. */
+<span class="lineNum">     203 </span>            :                 if (sdmmc_select_card(sc, sf) != 0) {
+<span class="lineNum">     204 </span>            :                         printf(&quot;%s: can't select mem RCA %d\n&quot;,
+<span class="lineNum">     205 </span>            :                             DEVNAME(sc), sf-&gt;rca);
+<span class="lineNum">     206 </span>            :                         sdmmc_function_free(sf);
+<span class="lineNum">     207 </span>            :                         break;
+<span class="lineNum">     208 </span>            :                 }
+<span class="lineNum">     209 </span>            : 
+<span class="lineNum">     210 </span>            :                 /* Deselect. */
+<span class="lineNum">     211 </span>            :                 (void)sdmmc_select_card(sc, NULL);
+<span class="lineNum">     212 </span>            : #endif
+<span class="lineNum">     213 </span>            : 
+<span class="lineNum">     214 </span>            :                 /*
+<span class="lineNum">     215 </span>            :                  * If this is a memory-only card, the card responding
+<span class="lineNum">     216 </span>            :                  * first becomes an alias for SDIO function 0.
+<span class="lineNum">     217 </span>            :                  */
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_fn0 == NULL)</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_fn0 = sf;</span>
+<span class="lineNum">     220 </span>            : 
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                 SIMPLEQ_INSERT_TAIL(&amp;sc-&gt;sf_head, sf, sf_list);</span>
+<span class="lineNum">     222 </span>            :         }
+<span class="lineNum">     223 </span>            : 
+<span class="lineNum">     224 </span>            :         /*
+<span class="lineNum">     225 </span>            :          * All cards are either inactive or awaiting further commands.
+<span class="lineNum">     226 </span>            :          * Read the CSDs and decode the raw CID for each card.
+<span class="lineNum">     227 </span>            :          */
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :         SIMPLEQ_FOREACH(sf, &amp;sc-&gt;sf_head, sf_list) {</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                 bzero(&amp;cmd, sizeof cmd);</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                 cmd.c_opcode = MMC_SEND_CSD;</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                 cmd.c_arg = MMC_ARG_RCA(sf-&gt;rca);</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                 cmd.c_flags = SCF_CMD_AC | SCF_RSP_R2;</span>
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :                 if (sdmmc_mmc_command(sc, &amp;cmd) != 0) {</span>
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :                         SET(sf-&gt;flags, SFF_ERROR);</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     237 </span>            :                 }
+<span class="lineNum">     238 </span>            : 
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :                 if (sdmmc_decode_csd(sc, cmd.c_resp, sf) != 0 ||</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                     sdmmc_decode_cid(sc, sf-&gt;raw_cid, sf) != 0) {</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                         SET(sf-&gt;flags, SFF_ERROR);</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     243 </span>            :                 }
+<span class="lineNum">     244 </span>            : 
+<span class="lineNum">     245 </span>            : #ifdef SDMMC_DEBUG
+<span class="lineNum">     246 </span>            :                 printf(&quot;%s: CID: &quot;, DEVNAME(sc));
+<span class="lineNum">     247 </span>            :                 sdmmc_print_cid(&amp;sf-&gt;cid);
+<span class="lineNum">     248 </span>            : #endif
+<span class="lineNum">     249 </span>            :         }
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 : }</span>
+<a name="251"><span class="lineNum">     251 </span>            : </a>
+<span class="lineNum">     252 </span>            : int
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 : sdmmc_decode_csd(struct sdmmc_softc *sc, sdmmc_response resp,</span>
+<span class="lineNum">     254 </span>            :     struct sdmmc_function *sf)
+<span class="lineNum">     255 </span>            : {
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         struct sdmmc_csd *csd = &amp;sf-&gt;csd;</span>
+<span class="lineNum">     257 </span>            : 
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         if (ISSET(sc-&gt;sc_flags, SMF_SD_MODE)) {</span>
+<span class="lineNum">     259 </span>            :                 /*
+<span class="lineNum">     260 </span>            :                  * CSD version 1.0 corresponds to SD system
+<span class="lineNum">     261 </span>            :                  * specification version 1.0 - 1.10. (SanDisk, 3.5.3)
+<span class="lineNum">     262 </span>            :                  */
+<span class="lineNum">     263 </span>            :                 csd-&gt;csdver = SD_CSD_CSDVER(resp);
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :                 switch (csd-&gt;csdver) {</span>
+<span class="lineNum">     265 </span>            :                 case SD_CSD_CSDVER_2_0:
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :                         sf-&gt;flags |= SFF_SDHC;</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :                         csd-&gt;capacity = SD_CSD_V2_CAPACITY(resp);</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :                         csd-&gt;read_bl_len = SD_CSD_V2_BL_LEN;</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     270 </span>            :                 case SD_CSD_CSDVER_1_0:
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :                         csd-&gt;capacity = SD_CSD_CAPACITY(resp);</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                         csd-&gt;read_bl_len = SD_CSD_READ_BL_LEN(resp);</span>
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     274 </span>            :                 default:
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: unknown SD CSD structure version 0x%x\n&quot;,</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :                             DEVNAME(sc), csd-&gt;csdver);</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :                         return 1;</span>
+<span class="lineNum">     278 </span>            :                         break;
+<span class="lineNum">     279 </span>            :                 }
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                 csd-&gt;ccc = SD_CSD_CCC(resp);</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     282 </span>            :                 csd-&gt;csdver = MMC_CSD_CSDVER(resp);
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :                 if (csd-&gt;csdver == MMC_CSD_CSDVER_1_0 ||</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :                     csd-&gt;csdver == MMC_CSD_CSDVER_2_0 ||</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                     csd-&gt;csdver == MMC_CSD_CSDVER_EXT_CSD) {</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                         csd-&gt;mmcver = MMC_CSD_MMCVER(resp);</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                         csd-&gt;capacity = MMC_CSD_CAPACITY(resp);</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                         csd-&gt;read_bl_len = MMC_CSD_READ_BL_LEN(resp);</span>
+<span class="lineNum">     289 </span>            :                 } else {
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: unknown MMC CSD structure version 0x%x\n&quot;,</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :                             DEVNAME(sc), csd-&gt;csdver);</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :                         return 1;</span>
+<span class="lineNum">     293 </span>            :                 }
+<span class="lineNum">     294 </span>            :         }
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :         csd-&gt;sector_size = MIN(1 &lt;&lt; csd-&gt;read_bl_len,</span>
+<span class="lineNum">     296 </span>            :             sdmmc_chip_host_maxblklen(sc-&gt;sct, sc-&gt;sch));
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         if (csd-&gt;sector_size &lt; (1&lt;&lt;csd-&gt;read_bl_len))</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :                 csd-&gt;capacity *= (1&lt;&lt;csd-&gt;read_bl_len) /</span>
+<span class="lineNum">     299 </span>            :                     csd-&gt;sector_size;
+<span class="lineNum">     300 </span>            : 
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 : }</span>
+<a name="303"><span class="lineNum">     303 </span>            : </a>
+<span class="lineNum">     304 </span>            : int
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 : sdmmc_decode_cid(struct sdmmc_softc *sc, sdmmc_response resp,</span>
+<span class="lineNum">     306 </span>            :     struct sdmmc_function *sf)
+<span class="lineNum">     307 </span>            : {
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         struct sdmmc_cid *cid = &amp;sf-&gt;cid;</span>
+<span class="lineNum">     309 </span>            : 
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         if (ISSET(sc-&gt;sc_flags, SMF_SD_MODE)) {</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 cid-&gt;mid = SD_CID_MID(resp);</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                 cid-&gt;oid = SD_CID_OID(resp);</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :                 SD_CID_PNM_CPY(resp, cid-&gt;pnm);</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                 cid-&gt;rev = SD_CID_REV(resp);</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :                 cid-&gt;psn = SD_CID_PSN(resp);</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                 cid-&gt;mdt = SD_CID_MDT(resp);</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :                 switch(sf-&gt;csd.mmcver) {</span>
+<span class="lineNum">     319 </span>            :                 case MMC_CSD_MMCVER_1_0:
+<span class="lineNum">     320 </span>            :                 case MMC_CSD_MMCVER_1_4:
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :                         cid-&gt;mid = MMC_CID_MID_V1(resp);</span>
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :                         MMC_CID_PNM_V1_CPY(resp, cid-&gt;pnm);</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :                         cid-&gt;rev = MMC_CID_REV_V1(resp);</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :                         cid-&gt;psn = MMC_CID_PSN_V1(resp);</span>
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :                         cid-&gt;mdt = MMC_CID_MDT_V1(resp);</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     327 </span>            :                 case MMC_CSD_MMCVER_2_0:
+<span class="lineNum">     328 </span>            :                 case MMC_CSD_MMCVER_3_1:
+<span class="lineNum">     329 </span>            :                 case MMC_CSD_MMCVER_4_0:
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                         cid-&gt;mid = MMC_CID_MID_V2(resp);</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :                         cid-&gt;oid = MMC_CID_OID_V2(resp);</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                         MMC_CID_PNM_V2_CPY(resp, cid-&gt;pnm);</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :                         cid-&gt;psn = MMC_CID_PSN_V2(resp);</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     335 </span>            :                 default:
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: unknown MMC version %d\n&quot;,</span>
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :                             DEVNAME(sc), sf-&gt;csd.mmcver);</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                         return 1;</span>
+<span class="lineNum">     339 </span>            :                 }
+<span class="lineNum">     340 </span>            :         }
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     343 </span>            : 
+<span class="lineNum">     344 </span>            : #ifdef SDMMC_DEBUG
+<span class="lineNum">     345 </span>            : void
+<span class="lineNum">     346 </span>            : sdmmc_print_cid(struct sdmmc_cid *cid)
+<span class="lineNum">     347 </span>            : {
+<span class="lineNum">     348 </span>            :         printf(&quot;mid=0x%02x oid=0x%04x pnm=\&quot;%s\&quot; rev=0x%02x psn=0x%08x&quot;
+<span class="lineNum">     349 </span>            :             &quot; mdt=%03x\n&quot;, cid-&gt;mid, cid-&gt;oid, cid-&gt;pnm, cid-&gt;rev, cid-&gt;psn,
+<span class="lineNum">     350 </span>            :             cid-&gt;mdt);
+<span class="lineNum">     351 </span>            : }
+<span class="lineNum">     352 </span>            : #endif
+<a name="353"><span class="lineNum">     353 </span>            : </a>
+<span class="lineNum">     354 </span>            : int
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 : sdmmc_mem_send_scr(struct sdmmc_softc *sc, uint32_t *scr)</span>
+<span class="lineNum">     356 </span>            : {
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :         struct sdmmc_command cmd;</span>
+<span class="lineNum">     358 </span>            :         void *ptr = NULL;
+<span class="lineNum">     359 </span>            :         int datalen = 8;
+<span class="lineNum">     360 </span>            :         int error = 0;
+<span class="lineNum">     361 </span>            : 
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :         ptr = malloc(datalen, M_DEVBUF, M_NOWAIT | M_ZERO);</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :         if (ptr == NULL)</span>
+<span class="lineNum">     364 </span>            :                 goto out;
+<span class="lineNum">     365 </span>            : 
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         memset(&amp;cmd, 0, sizeof(cmd));</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :         cmd.c_data = ptr;</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         cmd.c_datalen = datalen;</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :         cmd.c_blklen = datalen;</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :         cmd.c_arg = 0;</span>
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :         cmd.c_flags = SCF_CMD_ADTC | SCF_CMD_READ | SCF_RSP_R1;</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :         cmd.c_opcode = SD_APP_SEND_SCR;</span>
+<span class="lineNum">     373 </span>            : 
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :         error = sdmmc_app_command(sc, &amp;cmd);</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :         if (error == 0)</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                 memcpy(scr, ptr, datalen);</span>
+<span class="lineNum">     377 </span>            : 
+<span class="lineNum">     378 </span>            : out:
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :         if (ptr != NULL)</span>
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :                 free(ptr, M_DEVBUF, datalen);</span>
+<span class="lineNum">     381 </span>            : 
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 : }</span>
+<a name="384"><span class="lineNum">     384 </span>            : </a>
+<span class="lineNum">     385 </span>            : int
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 : sdmmc_mem_decode_scr(struct sdmmc_softc *sc, uint32_t *raw_scr,</span>
+<span class="lineNum">     387 </span>            :     struct sdmmc_function *sf)
+<span class="lineNum">     388 </span>            : {
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         sdmmc_response resp;</span>
+<span class="lineNum">     390 </span>            :         int ver;
+<span class="lineNum">     391 </span>            : 
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         memset(resp, 0, sizeof(resp));</span>
+<span class="lineNum">     393 </span>            :         /*
+<span class="lineNum">     394 </span>            :          * Change the raw SCR to a response.
+<span class="lineNum">     395 </span>            :          */
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         resp[0] = be32toh(raw_scr[1]) &gt;&gt; 8;               // LSW</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :         resp[1] = be32toh(raw_scr[0]);                  // MSW</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :         resp[0] |= (resp[1] &amp; 0xff) &lt;&lt; 24;</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :         resp[1] &gt;&gt;= 8;</span>
+<span class="lineNum">     400 </span>            : 
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :         ver = SCR_STRUCTURE(resp);</span>
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :         sf-&gt;scr.sd_spec = SCR_SD_SPEC(resp);</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :         sf-&gt;scr.bus_width = SCR_SD_BUS_WIDTHS(resp);</span>
+<span class="lineNum">     404 </span>            : 
+<span class="lineNum">     405 </span>            :         DPRINTF((&quot;%s: %s: %08x%08x ver=%d, spec=%d, bus width=%d\n&quot;,
+<span class="lineNum">     406 </span>            :             DEVNAME(sc), __func__, resp[1], resp[0],
+<span class="lineNum">     407 </span>            :             ver, sf-&gt;scr.sd_spec, sf-&gt;scr.bus_width));
+<span class="lineNum">     408 </span>            : 
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :         if (ver != 0) {</span>
+<span class="lineNum">     410 </span>            :                 DPRINTF((&quot;%s: unknown SCR structure version: %d\n&quot;,
+<span class="lineNum">     411 </span>            :                     DEVNAME(sc), ver));
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">     413 </span>            :         }
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 : }</span>
+<a name="416"><span class="lineNum">     416 </span>            : </a>
+<span class="lineNum">     417 </span>            : int
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 : sdmmc_mem_send_cxd_data(struct sdmmc_softc *sc, int opcode, void *data,</span>
+<span class="lineNum">     419 </span>            :     size_t datalen)
+<span class="lineNum">     420 </span>            : {
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         struct sdmmc_command cmd;</span>
+<span class="lineNum">     422 </span>            :         void *ptr = NULL;
+<span class="lineNum">     423 </span>            :         int error = 0;
+<span class="lineNum">     424 </span>            : 
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         ptr = malloc(datalen, M_DEVBUF, M_NOWAIT | M_ZERO);</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :         if (ptr == NULL) {</span>
+<span class="lineNum">     427 </span>            :                 error = ENOMEM;
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     429 </span>            :         }
+<span class="lineNum">     430 </span>            : 
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :         memset(&amp;cmd, 0, sizeof(cmd));</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :         cmd.c_data = ptr;</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         cmd.c_datalen = datalen;</span>
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         cmd.c_blklen = datalen;</span>
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :         cmd.c_opcode = opcode;</span>
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :         cmd.c_arg = 0;</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         cmd.c_flags = SCF_CMD_ADTC | SCF_CMD_READ;</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :         if (opcode == MMC_SEND_EXT_CSD)</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :                 SET(cmd.c_flags, SCF_RSP_R1);</span>
+<span class="lineNum">     440 </span>            :         else
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                 SET(cmd.c_flags, SCF_RSP_R2);</span>
+<span class="lineNum">     442 </span>            : 
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :         error = sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :         if (error == 0)</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                 memcpy(data, ptr, datalen);</span>
+<span class="lineNum">     446 </span>            : 
+<span class="lineNum">     447 </span>            : out:
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :         if (ptr != NULL)</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                 free(ptr, M_DEVBUF, datalen);</span>
+<span class="lineNum">     450 </span>            : 
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 : }</span>
+<a name="453"><span class="lineNum">     453 </span>            : </a>
+<span class="lineNum">     454 </span>            : int
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 : sdmmc_mem_set_bus_width(struct sdmmc_function *sf, int width)</span>
+<span class="lineNum">     456 </span>            : {
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :         struct sdmmc_softc *sc = sf-&gt;sc;</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :         struct sdmmc_command cmd;</span>
+<span class="lineNum">     459 </span>            :         int error;
+<span class="lineNum">     460 </span>            : 
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :         memset(&amp;cmd, 0, sizeof(cmd));</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :         cmd.c_opcode = SD_APP_SET_BUS_WIDTH;</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :         cmd.c_flags = SCF_RSP_R1 | SCF_CMD_AC;</span>
+<span class="lineNum">     464 </span>            : 
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :         switch (width) {</span>
+<span class="lineNum">     466 </span>            :         case 1:
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :                 cmd.c_arg = SD_ARG_BUS_WIDTH_1;</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     469 </span>            : 
+<span class="lineNum">     470 </span>            :         case 4:
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                 cmd.c_arg = SD_ARG_BUS_WIDTH_4;</span>
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     473 </span>            : 
+<span class="lineNum">     474 </span>            :         default:
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">     476 </span>            :         }
+<span class="lineNum">     477 </span>            : 
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         error = sdmmc_app_command(sc, &amp;cmd);</span>
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :         if (error == 0)</span>
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :                 error = sdmmc_chip_bus_width(sc-&gt;sct, sc-&gt;sch, width);</span>
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 : }</span>
+<a name="483"><span class="lineNum">     483 </span>            : </a>
+<span class="lineNum">     484 </span>            : int
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 : sdmmc_mem_sd_switch(struct sdmmc_function *sf, int mode, int group,</span>
+<span class="lineNum">     486 </span>            :     int function, sdmmc_bitfield512_t *status)
+<span class="lineNum">     487 </span>            : {
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :         struct sdmmc_softc *sc = sf-&gt;sc;</span>
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :         struct sdmmc_command cmd;</span>
+<span class="lineNum">     490 </span>            :         void *ptr = NULL;
+<span class="lineNum">     491 </span>            :         int gsft, error = 0;
+<span class="lineNum">     492 </span>            :         const int statlen = 64;
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :         if (sf-&gt;scr.sd_spec &gt;= SCR_SD_SPEC_VER_1_10 &amp;&amp;</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :             !ISSET(sf-&gt;csd.ccc, SD_CSD_CCC_SWITCH))</span>
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">     497 </span>            : 
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :         if (group &lt;= 0 || group &gt; 6 ||</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :             function &lt; 0 || function &gt; 15)</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">     501 </span>            : 
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :         gsft = (group - 1) &lt;&lt; 2;</span>
+<span class="lineNum">     503 </span>            : 
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :         ptr = malloc(statlen, M_DEVBUF, M_NOWAIT | M_ZERO);</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         if (ptr == NULL)</span>
+<span class="lineNum">     506 </span>            :                 goto out;
+<span class="lineNum">     507 </span>            : 
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :         memset(&amp;cmd, 0, sizeof(cmd));</span>
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :         cmd.c_data = ptr;</span>
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :         cmd.c_datalen = statlen;</span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :         cmd.c_blklen = statlen;</span>
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :         cmd.c_opcode = SD_SEND_SWITCH_FUNC;</span>
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :         cmd.c_arg =</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :             (!!mode &lt;&lt; 31) | (function &lt;&lt; gsft) | (0x00ffffff &amp; ~(0xf &lt;&lt; gsft));</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :         cmd.c_flags = SCF_CMD_ADTC | SCF_CMD_READ | SCF_RSP_R1;</span>
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :         error = sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :         if (error == 0)</span>
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :                 memcpy(status, ptr, statlen);</span>
+<span class="lineNum">     520 </span>            : 
+<span class="lineNum">     521 </span>            : out:
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :         if (ptr != NULL)</span>
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :                 free(ptr, M_DEVBUF, statlen);</span>
+<span class="lineNum">     524 </span>            : 
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :         if (error == 0)</span>
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :                 sdmmc_be512_to_bitfield512(status);</span>
+<span class="lineNum">     527 </span>            : 
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 : }</span>
+<a name="530"><span class="lineNum">     530 </span>            : </a>
+<span class="lineNum">     531 </span>            : int
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 : sdmmc_mem_mmc_switch(struct sdmmc_function *sf, uint8_t set, uint8_t index,</span>
+<span class="lineNum">     533 </span>            :     uint8_t value)
+<span class="lineNum">     534 </span>            : {
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :         struct sdmmc_softc *sc = sf-&gt;sc;</span>
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         struct sdmmc_command cmd;</span>
+<span class="lineNum">     537 </span>            : 
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :         memset(&amp;cmd, 0, sizeof(cmd));</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :         cmd.c_opcode = MMC_SWITCH;</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :         cmd.c_arg = (MMC_SWITCH_MODE_WRITE_BYTE &lt;&lt; 24) |</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :             (index &lt;&lt; 16) | (value &lt;&lt; 8) | set;</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :         cmd.c_flags = SCF_RSP_R1B | SCF_CMD_AC;</span>
+<span class="lineNum">     543 </span>            : 
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :         return sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     546 </span>            : 
+<span class="lineNum">     547 </span>            : /*
+<span class="lineNum">     548 </span>            :  * Initialize a SD/MMC memory card.
+<a name="549"><span class="lineNum">     549 </span>            :  */</a>
+<span class="lineNum">     550 </span>            : int
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 : sdmmc_mem_init(struct sdmmc_softc *sc, struct sdmmc_function *sf)</span>
+<span class="lineNum">     552 </span>            : {
+<span class="lineNum">     553 </span>            :         int error = 0;
+<span class="lineNum">     554 </span>            : 
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 :         rw_assert_wrlock(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     556 </span>            : 
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :         if (sdmmc_select_card(sc, sf) != 0 ||</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :             sdmmc_mem_set_blocklen(sc, sf) != 0)</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :                 error = 1;</span>
+<span class="lineNum">     560 </span>            : 
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :         if (ISSET(sc-&gt;sc_flags, SMF_SD_MODE))</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_sd_init(sc, sf);</span>
+<span class="lineNum">     563 </span>            :         else
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_mmc_init(sc, sf);</span>
+<span class="lineNum">     565 </span>            : 
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     567 </span>            : }
+<span class="lineNum">     568 </span>            : 
+<a name="569"><span class="lineNum">     569 </span>            : /* make 512-bit BE quantity __bitfield()-compatible */</a>
+<span class="lineNum">     570 </span>            : void
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 : sdmmc_be512_to_bitfield512(sdmmc_bitfield512_t *buf) {</span>
+<span class="lineNum">     572 </span>            :         size_t i;
+<span class="lineNum">     573 </span>            :         uint32_t tmp0, tmp1;
+<span class="lineNum">     574 </span>            :         const size_t bitswords = nitems(buf-&gt;_bits);
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; bitswords/2; i++) {</span>
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :                 tmp0 = buf-&gt;_bits[i];</span>
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :                 tmp1 = buf-&gt;_bits[bitswords - 1 - i];</span>
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :                 buf-&gt;_bits[i] = be32toh(tmp1);</span>
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :                 buf-&gt;_bits[bitswords - 1 - i] = be32toh(tmp0);</span>
+<span class="lineNum">     580 </span>            :         }
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 : }</span>
+<a name="582"><span class="lineNum">     582 </span>            : </a>
+<span class="lineNum">     583 </span>            : int
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 : sdmmc_mem_sd_init(struct sdmmc_softc *sc, struct sdmmc_function *sf)</span>
+<span class="lineNum">     585 </span>            : {
+<span class="lineNum">     586 </span>            :         int support_func, best_func, error;
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :         sdmmc_bitfield512_t status; /* Switch Function Status */</span>
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :         uint32_t raw_scr[2];</span>
+<span class="lineNum">     589 </span>            : 
+<span class="lineNum">     590 </span>            :         /*
+<span class="lineNum">     591 </span>            :          * All SD cards are supposed to support Default Speed mode
+<span class="lineNum">     592 </span>            :          * with frequencies up to 25 MHz.  Bump up the clock frequency
+<span class="lineNum">     593 </span>            :          * now as data transfers don't seem to work on the Realtek
+<span class="lineNum">     594 </span>            :          * RTS5229 host controller if it is running at a low clock
+<span class="lineNum">     595 </span>            :          * frequency.  Reading the SCR requires a data transfer.
+<span class="lineNum">     596 </span>            :          */
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :         error = sdmmc_chip_bus_clock(sc-&gt;sct, sc-&gt;sch, SDMMC_SDCLK_25MHZ,</span>
+<span class="lineNum">     598 </span>            :             SDMMC_TIMING_LEGACY);
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: can't change bus clock\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :                 return error;</span>
+<span class="lineNum">     602 </span>            :         }
+<span class="lineNum">     603 </span>            : 
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :         error = sdmmc_mem_send_scr(sc, raw_scr);</span>
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: SD_SEND_SCR send failed\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :                 return error;</span>
+<span class="lineNum">     608 </span>            :         }
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         error = sdmmc_mem_decode_scr(sc, raw_scr, sf);</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :                 return error;</span>
+<span class="lineNum">     612 </span>            : 
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         if (ISSET(sc-&gt;sc_caps, SMC_CAPS_4BIT_MODE) &amp;&amp;</span>
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :             ISSET(sf-&gt;scr.bus_width, SCR_SD_BUS_WIDTHS_4BIT)) {</span>
+<span class="lineNum">     615 </span>            :                 DPRINTF((&quot;%s: change bus width\n&quot;, DEVNAME(sc)));
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_set_bus_width(sf, 4);</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                 if (error) {</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: can't change bus width\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :                         return error;</span>
+<span class="lineNum">     620 </span>            :                 }
+<span class="lineNum">     621 </span>            :         }
+<span class="lineNum">     622 </span>            : 
+<span class="lineNum">     623 </span>            :         best_func = 0;
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :         if (sf-&gt;scr.sd_spec &gt;= SCR_SD_SPEC_VER_1_10 &amp;&amp;</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :             ISSET(sf-&gt;csd.ccc, SD_CSD_CCC_SWITCH)) {</span>
+<span class="lineNum">     626 </span>            :                 DPRINTF((&quot;%s: switch func mode 0\n&quot;, DEVNAME(sc)));
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_sd_switch(sf, 0, 1, 0, &amp;status);</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                 if (error) {</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: switch func mode 0 failed\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :                         return error;</span>
+<span class="lineNum">     631 </span>            :                 }
+<span class="lineNum">     632 </span>            : 
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :                 support_func = SFUNC_STATUS_GROUP(&amp;status, 1);</span>
+<span class="lineNum">     634 </span>            : 
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :                 if (support_func &amp; (1 &lt;&lt; SD_ACCESS_MODE_SDR25))</span>
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :                         best_func = 1;</span>
+<span class="lineNum">     637 </span>            :         }
+<span class="lineNum">     638 </span>            : 
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :         if (best_func != 0) {</span>
+<span class="lineNum">     640 </span>            :                 DPRINTF((&quot;%s: switch func mode 1(func=%d)\n&quot;,
+<span class="lineNum">     641 </span>            :                     DEVNAME(sc), best_func));
+<span class="lineNum">     642 </span>            :                 error =
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :                     sdmmc_mem_sd_switch(sf, 1, 1, best_func, &amp;status);</span>
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :                 if (error) {</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: switch func mode 1 failed:&quot;</span>
+<span class="lineNum">     646 </span>            :                             &quot; group 1 function %d(0x%2x)\n&quot;,
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :                             DEVNAME(sc), best_func, support_func);</span>
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :                         return error;</span>
+<span class="lineNum">     649 </span>            :                 }
+<span class="lineNum">     650 </span>            : 
+<span class="lineNum">     651 </span>            :                 /* Wait 400KHz x 8 clock (2.5us * 8 + slop) */
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :                 delay(25);</span>
+<span class="lineNum">     653 </span>            : 
+<span class="lineNum">     654 </span>            :                 /* High Speed mode, Frequency up to 50MHz. */
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                 error = sdmmc_chip_bus_clock(sc-&gt;sct, sc-&gt;sch,</span>
+<span class="lineNum">     656 </span>            :                     SDMMC_SDCLK_50MHZ, SDMMC_TIMING_HIGHSPEED);
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                 if (error) {</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: can't change bus clock\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                         return error;</span>
+<span class="lineNum">     660 </span>            :                 }
+<span class="lineNum">     661 </span>            :         }
+<span class="lineNum">     662 </span>            : 
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 : }</span>
+<a name="665"><span class="lineNum">     665 </span>            : </a>
+<span class="lineNum">     666 </span>            : int
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 : sdmmc_mem_mmc_init(struct sdmmc_softc *sc, struct sdmmc_function *sf)</span>
+<span class="lineNum">     668 </span>            : {
+<span class="lineNum">     669 </span>            :         int width, value;
+<span class="lineNum">     670 </span>            :         int card_type;
+<span class="lineNum">     671 </span>            :         int error = 0;
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :         u_int8_t ext_csd[512];</span>
+<span class="lineNum">     673 </span>            :         int speed = 20000;
+<span class="lineNum">     674 </span>            :         int timing = SDMMC_TIMING_LEGACY;
+<span class="lineNum">     675 </span>            :         u_int32_t sectors = 0;
+<span class="lineNum">     676 </span>            : 
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :         error = sdmmc_chip_bus_clock(sc-&gt;sct, sc-&gt;sch, speed, timing);</span>
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: can't change bus clock\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :                 return error;</span>
+<span class="lineNum">     681 </span>            :         }
+<span class="lineNum">     682 </span>            : 
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :         if (sf-&gt;csd.mmcver &gt;= MMC_CSD_MMCVER_4_0) {</span>
+<span class="lineNum">     684 </span>            :                 /* read EXT_CSD */
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_send_cxd_data(sc,</span>
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :                     MMC_SEND_EXT_CSD, ext_csd, sizeof(ext_csd));</span>
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :                 if (error != 0) {</span>
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :                         SET(sf-&gt;flags, SFF_ERROR);</span>
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: can't read EXT_CSD\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :                         return error;</span>
+<span class="lineNum">     691 </span>            :                 }
+<span class="lineNum">     692 </span>            : 
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :                 card_type = ext_csd[EXT_CSD_CARD_TYPE];</span>
+<span class="lineNum">     694 </span>            : 
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :                 if (card_type &amp; EXT_CSD_CARD_TYPE_F_52M_1_8V &amp;&amp;</span>
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :                     ISSET(sc-&gt;sc_caps, SMC_CAPS_MMC_DDR52)) {</span>
+<span class="lineNum">     697 </span>            :                         speed = 52000;
+<span class="lineNum">     698 </span>            :                         timing = SDMMC_TIMING_MMC_DDR52;
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :                 } else if (card_type &amp; EXT_CSD_CARD_TYPE_F_52M &amp;&amp;</span>
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 :                     ISSET(sc-&gt;sc_caps, SMC_CAPS_MMC_HIGHSPEED)) {</span>
+<span class="lineNum">     701 </span>            :                         speed = 52000;
+<span class="lineNum">     702 </span>            :                         timing = SDMMC_TIMING_HIGHSPEED;
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :                 } else if (card_type &amp; EXT_CSD_CARD_TYPE_F_26M) {</span>
+<span class="lineNum">     704 </span>            :                         speed = 26000;
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: unknown CARD_TYPE 0x%x\n&quot;, DEVNAME(sc),</span>
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :                             ext_csd[EXT_CSD_CARD_TYPE]);</span>
+<span class="lineNum">     708 </span>            :                 }
+<span class="lineNum">     709 </span>            : 
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :                 if (timing != SDMMC_TIMING_LEGACY) {</span>
+<span class="lineNum">     711 </span>            :                         /* switch to high speed timing */
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :                         error = sdmmc_mem_mmc_switch(sf, EXT_CSD_CMD_SET_NORMAL,</span>
+<span class="lineNum">     713 </span>            :                             EXT_CSD_HS_TIMING, EXT_CSD_HS_TIMING_HS);
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 :                         if (error != 0) {</span>
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: can't change high speed\n&quot;,</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :                                     DEVNAME(sc));</span>
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :                                 return error;</span>
+<span class="lineNum">     718 </span>            :                         }
+<span class="lineNum">     719 </span>            : 
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :                         sdmmc_delay(10000);</span>
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     722 </span>            : 
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :                 error = sdmmc_chip_bus_clock(sc-&gt;sct, sc-&gt;sch, speed, SDMMC_TIMING_HIGHSPEED);</span>
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :                 if (error != 0) {</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: can't change bus clock\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 :                         return error;</span>
+<span class="lineNum">     727 </span>            :                 }
+<span class="lineNum">     728 </span>            : 
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :                 if (timing != SDMMC_TIMING_LEGACY) {</span>
+<span class="lineNum">     730 </span>            :                         /* read EXT_CSD again */
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :                         error = sdmmc_mem_send_cxd_data(sc,</span>
+<span class="lineNum">     732 </span>            :                             MMC_SEND_EXT_CSD, ext_csd, sizeof(ext_csd));
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :                         if (error != 0) {</span>
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: can't re-read EXT_CSD\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     735 </span><span class="lineNoCov">          0 :                                 return error;</span>
+<span class="lineNum">     736 </span>            :                         }
+<span class="lineNum">     737 </span><span class="lineNoCov">          0 :                         if (ext_csd[EXT_CSD_HS_TIMING] != EXT_CSD_HS_TIMING_HS) {</span>
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s, HS_TIMING set failed\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :                                 return EINVAL;</span>
+<span class="lineNum">     740 </span>            :                         }
+<span class="lineNum">     741 </span>            :                 }
+<span class="lineNum">     742 </span>            : 
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :                 if (ISSET(sc-&gt;sc_caps, SMC_CAPS_8BIT_MODE)) {</span>
+<span class="lineNum">     744 </span>            :                         width = 8;
+<span class="lineNum">     745 </span>            :                         value = EXT_CSD_BUS_WIDTH_8;
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :                 } else if (ISSET(sc-&gt;sc_caps, SMC_CAPS_4BIT_MODE)) {</span>
+<span class="lineNum">     747 </span>            :                         width = 4;
+<span class="lineNum">     748 </span>            :                         value = EXT_CSD_BUS_WIDTH_4;
+<span class="lineNum">     749 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     750 </span>            :                         width = 1;
+<span class="lineNum">     751 </span>            :                         value = EXT_CSD_BUS_WIDTH_1;
+<span class="lineNum">     752 </span>            :                 }
+<span class="lineNum">     753 </span>            : 
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :                 if (width != 1) {</span>
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :                         error = sdmmc_mem_mmc_switch(sf, EXT_CSD_CMD_SET_NORMAL,</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :                             EXT_CSD_BUS_WIDTH, value);</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :                         if (error == 0)</span>
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :                                 error = sdmmc_chip_bus_width(sc-&gt;sct,</span>
+<span class="lineNum">     759 </span>            :                                     sc-&gt;sch, width);
+<span class="lineNum">     760 </span>            :                         else {
+<span class="lineNum">     761 </span>            :                                 DPRINTF((&quot;%s: can't change bus width&quot;
+<span class="lineNum">     762 </span>            :                                     &quot; (%d bit)\n&quot;, DEVNAME(sc), width));
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :                                 return error;</span>
+<span class="lineNum">     764 </span>            :                         }
+<span class="lineNum">     765 </span>            : 
+<span class="lineNum">     766 </span>            :                         /* XXXX: need bus test? (using by CMD14 &amp; CMD19) */
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :                         sdmmc_delay(10000);</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     769 </span>            : 
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :                 if (timing == SDMMC_TIMING_MMC_DDR52) {</span>
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :                         switch (width) {</span>
+<span class="lineNum">     772 </span>            :                         case 4:
+<span class="lineNum">     773 </span>            :                                 value = EXT_CSD_BUS_WIDTH_4_DDR;
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     775 </span>            :                         case 8:
+<span class="lineNum">     776 </span>            :                                 value = EXT_CSD_BUS_WIDTH_8_DDR;
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     778 </span>            :                         }
+<span class="lineNum">     779 </span>            : 
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :                         error = sdmmc_mem_mmc_switch(sf, EXT_CSD_CMD_SET_NORMAL,</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :                             EXT_CSD_BUS_WIDTH, value);</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :                         if (error) {</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: can't switch to DDR\n&quot;,</span>
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :                                     DEVNAME(sc));</span>
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :                                 return error;</span>
+<span class="lineNum">     786 </span>            :                         }
+<span class="lineNum">     787 </span>            : 
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :                         sdmmc_delay(10000);</span>
+<span class="lineNum">     789 </span>            : 
+<span class="lineNum">     790 </span><span class="lineNoCov">          0 :                         error = sdmmc_chip_signal_voltage(sc-&gt;sct, sc-&gt;sch,</span>
+<span class="lineNum">     791 </span>            :                             SDMMC_SIGNAL_VOLTAGE_180);
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :                         if (error) {</span>
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: can't switch signalling voltage\n&quot;,</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :                                     DEVNAME(sc));</span>
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :                                 return error;</span>
+<span class="lineNum">     796 </span>            :                         }
+<span class="lineNum">     797 </span>            : 
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :                         error = sdmmc_chip_bus_clock(sc-&gt;sct, sc-&gt;sch, speed, timing);</span>
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :                         if (error != 0) {</span>
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: can't change bus clock\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :                                 return error;</span>
+<span class="lineNum">     802 </span>            :                         }
+<span class="lineNum">     803 </span>            : 
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :                         sdmmc_delay(10000);</span>
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     806 </span>            : 
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :                 sectors = ext_csd[EXT_CSD_SEC_COUNT + 0] &lt;&lt; 0 |</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                     ext_csd[EXT_CSD_SEC_COUNT + 1] &lt;&lt; 8  |</span>
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 :                     ext_csd[EXT_CSD_SEC_COUNT + 2] &lt;&lt; 16 |</span>
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :                     ext_csd[EXT_CSD_SEC_COUNT + 3] &lt;&lt; 24;</span>
+<span class="lineNum">     811 </span>            : 
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :                 if (sectors &gt; (2u * 1024 * 1024 * 1024) / 512) {</span>
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :                         sf-&gt;flags |= SFF_SDHC;</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :                         sf-&gt;csd.capacity = sectors;</span>
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     816 </span>            :         }
+<span class="lineNum">     817 </span>            : 
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     820 </span>            : 
+<span class="lineNum">     821 </span>            : /*
+<span class="lineNum">     822 </span>            :  * Get or set the card's memory OCR value (SD or MMC).
+<a name="823"><span class="lineNum">     823 </span>            :  */</a>
+<span class="lineNum">     824 </span>            : int
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 : sdmmc_mem_send_op_cond(struct sdmmc_softc *sc, u_int32_t ocr,</span>
+<span class="lineNum">     826 </span>            :     u_int32_t *ocrp)
+<span class="lineNum">     827 </span>            : {
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :         struct sdmmc_command cmd;</span>
+<span class="lineNum">     829 </span>            :         int error;
+<span class="lineNum">     830 </span>            :         int i;
+<span class="lineNum">     831 </span>            : 
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :         rw_assert_wrlock(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     833 </span>            : 
+<span class="lineNum">     834 </span>            :         /*
+<span class="lineNum">     835 </span>            :          * If we change the OCR value, retry the command until the OCR
+<span class="lineNum">     836 </span>            :          * we receive in response has the &quot;CARD BUSY&quot; bit set, meaning
+<span class="lineNum">     837 </span>            :          * that all cards are ready for identification.
+<span class="lineNum">     838 </span>            :          */
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; 100; i++) {</span>
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 :                 bzero(&amp;cmd, sizeof cmd);</span>
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :                 cmd.c_arg = ocr;</span>
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :                 cmd.c_flags = SCF_CMD_BCR | SCF_RSP_R3;</span>
+<span class="lineNum">     843 </span>            : 
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :                 if (ISSET(sc-&gt;sc_flags, SMF_SD_MODE)) {</span>
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                         cmd.c_opcode = SD_APP_OP_COND;</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :                         error = sdmmc_app_command(sc, &amp;cmd);</span>
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :                         cmd.c_arg &amp;= ~MMC_OCR_ACCESS_MODE_MASK;</span>
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :                         cmd.c_arg |= MMC_OCR_SECTOR_MODE;</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :                         cmd.c_opcode = MMC_SEND_OP_COND;</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                         error = sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">     852 </span>            :                 }
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :                 if (error != 0)</span>
+<span class="lineNum">     854 </span>            :                         break;
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :                 if (ISSET(MMC_R3(cmd.c_resp), MMC_OCR_MEM_READY) ||</span>
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                     ocr == 0)</span>
+<span class="lineNum">     857 </span>            :                         break;
+<span class="lineNum">     858 </span>            :                 error = ETIMEDOUT;
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                 sdmmc_delay(10000);</span>
+<span class="lineNum">     860 </span>            :         }
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :         if (error == 0 &amp;&amp; ocrp != NULL)</span>
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :                 *ocrp = MMC_R3(cmd.c_resp);</span>
+<span class="lineNum">     863 </span>            : 
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     866 </span>            : 
+<span class="lineNum">     867 </span>            : /*
+<span class="lineNum">     868 </span>            :  * Set the read block length appropriately for this card, according to
+<span class="lineNum">     869 </span>            :  * the card CSD register value.
+<a name="870"><span class="lineNum">     870 </span>            :  */</a>
+<span class="lineNum">     871 </span>            : int
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 : sdmmc_mem_set_blocklen(struct sdmmc_softc *sc, struct sdmmc_function *sf)</span>
+<span class="lineNum">     873 </span>            : {
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :         struct sdmmc_command cmd;</span>
+<span class="lineNum">     875 </span>            : 
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :         rw_assert_wrlock(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     877 </span>            : 
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd, sizeof cmd);</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :         cmd.c_opcode = MMC_SET_BLOCKLEN;</span>
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 :         cmd.c_arg = sf-&gt;csd.sector_size;</span>
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :         cmd.c_flags = SCF_CMD_AC | SCF_RSP_R1;</span>
+<span class="lineNum">     882 </span>            :         DPRINTF((&quot;%s: read_bl_len=%d sector_size=%d\n&quot;, DEVNAME(sc),
+<span class="lineNum">     883 </span>            :             1 &lt;&lt; sf-&gt;csd.read_bl_len, sf-&gt;csd.sector_size));
+<span class="lineNum">     884 </span>            : 
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :         return sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 : }</span>
+<a name="887"><span class="lineNum">     887 </span>            : </a>
+<span class="lineNum">     888 </span>            : int
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 : sdmmc_mem_read_block_subr(struct sdmmc_function *sf, bus_dmamap_t dmap,</span>
+<span class="lineNum">     890 </span>            :     int blkno, u_char *data, size_t datalen)
+<span class="lineNum">     891 </span>            : {
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :         struct sdmmc_softc *sc = sf-&gt;sc;</span>
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 :         struct sdmmc_command cmd;</span>
+<span class="lineNum">     894 </span>            :         int error;
+<span class="lineNum">     895 </span>            : 
+<span class="lineNum">     896 </span>            : 
+<span class="lineNum">     897 </span><span class="lineNoCov">          0 :         if ((error = sdmmc_select_card(sc, sf)) != 0)</span>
+<span class="lineNum">     898 </span>            :                 goto err;
+<span class="lineNum">     899 </span>            : 
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd, sizeof cmd);</span>
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :         cmd.c_data = data;</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :         cmd.c_datalen = datalen;</span>
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :         cmd.c_blklen = sf-&gt;csd.sector_size;</span>
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :         cmd.c_opcode = (datalen / cmd.c_blklen) &gt; 1 ?</span>
+<span class="lineNum">     905 </span>            :             MMC_READ_BLOCK_MULTIPLE : MMC_READ_BLOCK_SINGLE;
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :         if (sf-&gt;flags &amp; SFF_SDHC)</span>
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :                 cmd.c_arg = blkno;</span>
+<span class="lineNum">     908 </span>            :         else
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :                 cmd.c_arg = blkno &lt;&lt; 9;</span>
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :         cmd.c_flags = SCF_CMD_ADTC | SCF_CMD_READ | SCF_RSP_R1;</span>
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :         cmd.c_dmamap = dmap;</span>
+<span class="lineNum">     912 </span>            : 
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :         error = sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :         if (error != 0)</span>
+<span class="lineNum">     915 </span>            :                 goto err;
+<span class="lineNum">     916 </span>            : 
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 :         if (ISSET(sc-&gt;sc_flags, SMF_STOP_AFTER_MULTIPLE) &amp;&amp;</span>
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :             cmd.c_opcode == MMC_READ_BLOCK_MULTIPLE) {</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :                 bzero(&amp;cmd, sizeof cmd);</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :                 cmd.c_opcode = MMC_STOP_TRANSMISSION;</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :                 cmd.c_arg = MMC_ARG_RCA(sf-&gt;rca);</span>
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :                 cmd.c_flags = SCF_CMD_AC | SCF_RSP_R1B;</span>
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :                 error = sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :                 if (error != 0)</span>
+<span class="lineNum">     925 </span>            :                         goto err;
+<span class="lineNum">     926 </span>            :         }
+<span class="lineNum">     927 </span>            : 
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :                 bzero(&amp;cmd, sizeof cmd);</span>
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :                 cmd.c_opcode = MMC_SEND_STATUS;</span>
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :                 cmd.c_arg = MMC_ARG_RCA(sf-&gt;rca);</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :                 cmd.c_flags = SCF_CMD_AC | SCF_RSP_R1;</span>
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :                 error = sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :                 if (error != 0)</span>
+<span class="lineNum">     935 </span>            :                         break;
+<span class="lineNum">     936 </span>            :                 /* XXX time out */
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :         } while (!ISSET(MMC_R1(cmd.c_resp), MMC_R1_READY_FOR_DATA));</span>
+<span class="lineNum">     938 </span>            : 
+<span class="lineNum">     939 </span>            : err:
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 : }</span>
+<a name="942"><span class="lineNum">     942 </span>            : </a>
+<span class="lineNum">     943 </span>            : int
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 : sdmmc_mem_single_read_block(struct sdmmc_function *sf, int blkno, u_char *data,</span>
+<span class="lineNum">     945 </span>            :     size_t datalen)
+<span class="lineNum">     946 </span>            : {
+<span class="lineNum">     947 </span>            :         int error = 0;
+<span class="lineNum">     948 </span>            :         int i;
+<span class="lineNum">     949 </span>            : 
+<span class="lineNum">     950 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; datalen / sf-&gt;csd.sector_size; i++) {</span>
+<span class="lineNum">     951 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_read_block_subr(sf, NULL,  blkno + i,</span>
+<span class="lineNum">     952 </span><span class="lineNoCov">          0 :                     data + i * sf-&gt;csd.sector_size, sf-&gt;csd.sector_size);</span>
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 :                 if (error)</span>
+<span class="lineNum">     954 </span>            :                         break;
+<span class="lineNum">     955 </span>            :         }
+<span class="lineNum">     956 </span>            : 
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     958 </span>            : }
+<a name="959"><span class="lineNum">     959 </span>            : </a>
+<span class="lineNum">     960 </span>            : int
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 : sdmmc_mem_read_block(struct sdmmc_function *sf, int blkno, u_char *data,</span>
+<span class="lineNum">     962 </span>            :     size_t datalen)
+<span class="lineNum">     963 </span>            : {
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :         struct sdmmc_softc *sc = sf-&gt;sc;</span>
+<span class="lineNum">     965 </span>            :         int error;
+<span class="lineNum">     966 </span>            : 
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :         rw_enter_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     968 </span>            : 
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :         if (ISSET(sc-&gt;sc_caps, SMC_CAPS_SINGLE_ONLY)) {</span>
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_single_read_block(sf, blkno, data, datalen);</span>
+<span class="lineNum">     971 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     972 </span>            :         }
+<span class="lineNum">     973 </span>            : 
+<span class="lineNum">     974 </span><span class="lineNoCov">          0 :         if (!ISSET(sc-&gt;sc_caps, SMC_CAPS_DMA)) {</span>
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_read_block_subr(sf, NULL, blkno,</span>
+<span class="lineNum">     976 </span>            :                     data, datalen);
+<span class="lineNum">     977 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     978 </span>            :         }
+<span class="lineNum">     979 </span>            : 
+<span class="lineNum">     980 </span>            :         /* DMA transfer */
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 :         error = bus_dmamap_load(sc-&gt;sc_dmat, sc-&gt;sc_dmap, data, datalen,</span>
+<span class="lineNum">     982 </span>            :             NULL, BUS_DMA_NOWAIT|BUS_DMA_READ);
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">     984 </span>            :                 goto out;
+<span class="lineNum">     985 </span>            : 
+<span class="lineNum">     986 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_dmap, 0, datalen,</span>
+<span class="lineNum">     987 </span>            :             BUS_DMASYNC_PREREAD);
+<span class="lineNum">     988 </span>            : 
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 :         error = sdmmc_mem_read_block_subr(sf, sc-&gt;sc_dmap, blkno, data,</span>
+<span class="lineNum">     990 </span>            :             datalen);
+<span class="lineNum">     991 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">     992 </span>            :                 goto unload;
+<span class="lineNum">     993 </span>            : 
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_dmap, 0, datalen,</span>
+<span class="lineNum">     995 </span>            :             BUS_DMASYNC_POSTREAD);
+<span class="lineNum">     996 </span>            : unload:
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :         bus_dmamap_unload(sc-&gt;sc_dmat, sc-&gt;sc_dmap);</span>
+<span class="lineNum">     998 </span>            : 
+<span class="lineNum">     999 </span>            : out:
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :         rw_exit(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">    1002 </span>            : }
+<a name="1003"><span class="lineNum">    1003 </span>            : </a>
+<span class="lineNum">    1004 </span>            : int
+<span class="lineNum">    1005 </span><span class="lineNoCov">          0 : sdmmc_mem_write_block_subr(struct sdmmc_function *sf, bus_dmamap_t dmap,</span>
+<span class="lineNum">    1006 </span>            :     int blkno, u_char *data, size_t datalen)
+<span class="lineNum">    1007 </span>            : {
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :         struct sdmmc_softc *sc = sf-&gt;sc;</span>
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 :         struct sdmmc_command cmd;</span>
+<span class="lineNum">    1010 </span>            :         int error;
+<span class="lineNum">    1011 </span>            : 
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :         if ((error = sdmmc_select_card(sc, sf)) != 0)</span>
+<span class="lineNum">    1013 </span>            :                 goto err;
+<span class="lineNum">    1014 </span>            : 
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd, sizeof cmd);</span>
+<span class="lineNum">    1016 </span><span class="lineNoCov">          0 :         cmd.c_data = data;</span>
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :         cmd.c_datalen = datalen;</span>
+<span class="lineNum">    1018 </span><span class="lineNoCov">          0 :         cmd.c_blklen = sf-&gt;csd.sector_size;</span>
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :         cmd.c_opcode = (datalen / cmd.c_blklen) &gt; 1 ?</span>
+<span class="lineNum">    1020 </span>            :             MMC_WRITE_BLOCK_MULTIPLE : MMC_WRITE_BLOCK_SINGLE;
+<span class="lineNum">    1021 </span><span class="lineNoCov">          0 :         if (sf-&gt;flags &amp; SFF_SDHC)</span>
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :                 cmd.c_arg = blkno;</span>
+<span class="lineNum">    1023 </span>            :         else
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :                 cmd.c_arg = blkno &lt;&lt; 9;</span>
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 :         cmd.c_flags = SCF_CMD_ADTC | SCF_RSP_R1;</span>
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :         cmd.c_dmamap = dmap;</span>
+<span class="lineNum">    1027 </span>            : 
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :         error = sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :         if (error != 0)</span>
+<span class="lineNum">    1030 </span>            :                 goto err;
+<span class="lineNum">    1031 </span>            : 
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :         if (ISSET(sc-&gt;sc_flags, SMF_STOP_AFTER_MULTIPLE) &amp;&amp;</span>
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :             cmd.c_opcode == MMC_WRITE_BLOCK_MULTIPLE) {</span>
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :                 bzero(&amp;cmd, sizeof cmd);</span>
+<span class="lineNum">    1035 </span><span class="lineNoCov">          0 :                 cmd.c_opcode = MMC_STOP_TRANSMISSION;</span>
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 :                 cmd.c_flags = SCF_CMD_AC | SCF_RSP_R1B;</span>
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :                 error = sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 :                 if (error != 0)</span>
+<span class="lineNum">    1039 </span>            :                         goto err;
+<span class="lineNum">    1040 </span>            :         }
+<span class="lineNum">    1041 </span>            : 
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :                 bzero(&amp;cmd, sizeof cmd);</span>
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 :                 cmd.c_opcode = MMC_SEND_STATUS;</span>
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :                 cmd.c_arg = MMC_ARG_RCA(sf-&gt;rca);</span>
+<span class="lineNum">    1046 </span><span class="lineNoCov">          0 :                 cmd.c_flags = SCF_CMD_AC | SCF_RSP_R1;</span>
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :                 error = sdmmc_mmc_command(sc, &amp;cmd);</span>
+<span class="lineNum">    1048 </span><span class="lineNoCov">          0 :                 if (error != 0)</span>
+<span class="lineNum">    1049 </span>            :                         break;
+<span class="lineNum">    1050 </span>            :                 /* XXX time out */
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :         } while (!ISSET(MMC_R1(cmd.c_resp), MMC_R1_READY_FOR_DATA));</span>
+<span class="lineNum">    1052 </span>            : 
+<span class="lineNum">    1053 </span>            : err:
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">    1055 </span><span class="lineNoCov">          0 : }</span>
+<a name="1056"><span class="lineNum">    1056 </span>            : </a>
+<span class="lineNum">    1057 </span>            : int
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 : sdmmc_mem_single_write_block(struct sdmmc_function *sf, int blkno, u_char *data,</span>
+<span class="lineNum">    1059 </span>            :     size_t datalen)
+<span class="lineNum">    1060 </span>            : {
+<span class="lineNum">    1061 </span>            :         int error = 0;
+<span class="lineNum">    1062 </span>            :         int i;
+<span class="lineNum">    1063 </span>            : 
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; datalen / sf-&gt;csd.sector_size; i++) {</span>
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_write_block_subr(sf, NULL, blkno + i,</span>
+<span class="lineNum">    1066 </span><span class="lineNoCov">          0 :                     data + i * sf-&gt;csd.sector_size, sf-&gt;csd.sector_size);</span>
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :                 if (error)</span>
+<span class="lineNum">    1068 </span>            :                         break;
+<span class="lineNum">    1069 </span>            :         }
+<span class="lineNum">    1070 </span>            : 
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">    1072 </span>            : }
+<a name="1073"><span class="lineNum">    1073 </span>            : </a>
+<span class="lineNum">    1074 </span>            : int
+<span class="lineNum">    1075 </span><span class="lineNoCov">          0 : sdmmc_mem_write_block(struct sdmmc_function *sf, int blkno, u_char *data,</span>
+<span class="lineNum">    1076 </span>            :     size_t datalen)
+<span class="lineNum">    1077 </span>            : {
+<span class="lineNum">    1078 </span><span class="lineNoCov">          0 :         struct sdmmc_softc *sc = sf-&gt;sc;</span>
+<span class="lineNum">    1079 </span>            :         int error;
+<span class="lineNum">    1080 </span>            : 
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :         rw_enter_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">    1082 </span>            : 
+<span class="lineNum">    1083 </span><span class="lineNoCov">          0 :         if (ISSET(sc-&gt;sc_caps, SMC_CAPS_SINGLE_ONLY)) {</span>
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_single_write_block(sf, blkno, data, datalen);</span>
+<span class="lineNum">    1085 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">    1086 </span>            :         }
+<span class="lineNum">    1087 </span>            : 
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :         if (!ISSET(sc-&gt;sc_caps, SMC_CAPS_DMA)) {</span>
+<span class="lineNum">    1089 </span><span class="lineNoCov">          0 :                 error = sdmmc_mem_write_block_subr(sf, NULL, blkno,</span>
+<span class="lineNum">    1090 </span>            :                     data, datalen);
+<span class="lineNum">    1091 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">    1092 </span>            :         }
+<span class="lineNum">    1093 </span>            : 
+<span class="lineNum">    1094 </span>            :         /* DMA transfer */
+<span class="lineNum">    1095 </span><span class="lineNoCov">          0 :         error = bus_dmamap_load(sc-&gt;sc_dmat, sc-&gt;sc_dmap, data, datalen,</span>
+<span class="lineNum">    1096 </span>            :             NULL, BUS_DMA_NOWAIT|BUS_DMA_WRITE);
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">    1098 </span>            :                 goto out;
+<span class="lineNum">    1099 </span>            : 
+<span class="lineNum">    1100 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_dmap, 0, datalen,</span>
+<span class="lineNum">    1101 </span>            :             BUS_DMASYNC_PREWRITE);
+<span class="lineNum">    1102 </span>            : 
+<span class="lineNum">    1103 </span><span class="lineNoCov">          0 :         error = sdmmc_mem_write_block_subr(sf, sc-&gt;sc_dmap, blkno, data,</span>
+<span class="lineNum">    1104 </span>            :             datalen);
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">    1106 </span>            :                 goto unload;
+<span class="lineNum">    1107 </span>            : 
+<span class="lineNum">    1108 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_dmap, 0, datalen,</span>
+<span class="lineNum">    1109 </span>            :             BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">    1110 </span>            : unload:
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 :         bus_dmamap_unload(sc-&gt;sc_dmat, sc-&gt;sc_dmap);</span>
+<span class="lineNum">    1112 </span>            : 
+<span class="lineNum">    1113 </span>            : out:
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :         rw_exit(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">    1116 </span>            : }
+<span class="lineNum">    1117 </span>            : 
+<a name="1118"><span class="lineNum">    1118 </span>            : #ifdef HIBERNATE</a>
+<span class="lineNum">    1119 </span>            : int
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 : sdmmc_mem_hibernate_write(struct sdmmc_function *sf, daddr_t blkno,</span>
+<span class="lineNum">    1121 </span>            :     u_char *data, size_t datalen)
+<span class="lineNum">    1122 </span>            : {
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 :         struct sdmmc_softc *sc = sf-&gt;sc;</span>
+<span class="lineNum">    1124 </span>            :         int i, error;
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :         struct bus_dmamap dmamap;</span>
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 :         paddr_t phys_addr;</span>
+<span class="lineNum">    1127 </span>            : 
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 :         if (ISSET(sc-&gt;sc_caps, SMC_CAPS_SINGLE_ONLY)) {</span>
+<span class="lineNum">    1129 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; datalen / sf-&gt;csd.sector_size; i++) {</span>
+<span class="lineNum">    1130 </span><span class="lineNoCov">          0 :                         error = sdmmc_mem_write_block_subr(sf, NULL, blkno + i,</span>
+<span class="lineNum">    1131 </span><span class="lineNoCov">          0 :                             data + i * sf-&gt;csd.sector_size,</span>
+<span class="lineNum">    1132 </span>            :                             sf-&gt;csd.sector_size);
+<span class="lineNum">    1133 </span><span class="lineNoCov">          0 :                         if (error)</span>
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :                                 return (error);</span>
+<span class="lineNum">    1135 </span>            :                 }
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         } else if (!ISSET(sc-&gt;sc_caps, SMC_CAPS_DMA)) {</span>
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :                 return (sdmmc_mem_write_block_subr(sf, NULL, blkno, data,</span>
+<span class="lineNum">    1138 </span>            :                     datalen));
+<span class="lineNum">    1139 </span>            :         }
+<span class="lineNum">    1140 </span>            : 
+<span class="lineNum">    1141 </span>            :         /* pretend we're bus_dmamap_load */
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :         bzero(&amp;dmamap, sizeof(dmamap));</span>
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 :         pmap_extract(pmap_kernel(), (vaddr_t)data, &amp;phys_addr);</span>
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 :         dmamap.dm_mapsize = datalen;</span>
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :         dmamap.dm_nsegs = 1;</span>
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :         dmamap.dm_segs[0].ds_addr = phys_addr;</span>
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 :         dmamap.dm_segs[0].ds_len = datalen;</span>
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :         return (sdmmc_mem_write_block_subr(sf, &amp;dmamap, blkno, data, datalen));</span>
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1150 </span>            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

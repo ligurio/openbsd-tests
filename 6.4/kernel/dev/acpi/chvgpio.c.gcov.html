@@ -1,0 +1,500 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/acpi/chvgpio.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/acpi</a> - chvgpio.c<span style="font-size: 80%;"> (source / <a href="chvgpio.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">157</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: chvgpio.c,v 1.8 2017/11/29 22:51:01 kettenis Exp $    */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2016 Mark Kettenis
+<span class="lineNum">       4 </span>            :  *
+<span class="lineNum">       5 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       6 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       7 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       8 </span>            :  *
+<span class="lineNum">       9 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      10 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      11 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      12 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      13 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      14 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      15 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      16 </span>            :  */
+<span class="lineNum">      17 </span>            : 
+<span class="lineNum">      18 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      19 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      20 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      21 </span>            : 
+<span class="lineNum">      22 </span>            : #include &lt;dev/acpi/acpireg.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;dev/acpi/acpivar.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;dev/acpi/acpidev.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;dev/acpi/amltypes.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;dev/acpi/dsdt.h&gt;
+<span class="lineNum">      27 </span>            : 
+<span class="lineNum">      28 </span>            : #define CHVGPIO_INTERRUPT_STATUS        0x0300
+<span class="lineNum">      29 </span>            : #define CHVGPIO_INTERRUPT_MASK          0x0380
+<span class="lineNum">      30 </span>            : #define CHVGPIO_PAD_CFG0                0x4400
+<span class="lineNum">      31 </span>            : #define CHVGPIO_PAD_CFG1                0x4404
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : #define CHVGPIO_PAD_CFG0_GPIORXSTATE            0x00000001
+<span class="lineNum">      34 </span>            : #define CHVGPIO_PAD_CFG0_GPIOTXSTATE            0x00000002
+<span class="lineNum">      35 </span>            : #define CHVGPIO_PAD_CFG0_INTSEL_MASK            0xf0000000
+<span class="lineNum">      36 </span>            : #define CHVGPIO_PAD_CFG0_INTSEL_SHIFT           28
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : #define CHVGPIO_PAD_CFG1_INTWAKECFG_MASK        0x00000007
+<span class="lineNum">      39 </span>            : #define CHVGPIO_PAD_CFG1_INTWAKECFG_FALLING     0x00000001
+<span class="lineNum">      40 </span>            : #define CHVGPIO_PAD_CFG1_INTWAKECFG_RISING      0x00000002
+<span class="lineNum">      41 </span>            : #define CHVGPIO_PAD_CFG1_INTWAKECFG_BOTH        0x00000003
+<span class="lineNum">      42 </span>            : #define CHVGPIO_PAD_CFG1_INTWAKECFG_LEVEL       0x00000004
+<span class="lineNum">      43 </span>            : #define CHVGPIO_PAD_CFG1_INVRXTX_MASK           0x000000f0
+<span class="lineNum">      44 </span>            : #define CHVGPIO_PAD_CFG1_INVRXTX_RXDATA         0x00000040
+<span class="lineNum">      45 </span>            : 
+<span class="lineNum">      46 </span>            : /* OEM defined RegionSpace. */
+<span class="lineNum">      47 </span>            : #define CHVGPIO_REGIONSPACE_BASE        0x90
+<span class="lineNum">      48 </span>            : 
+<span class="lineNum">      49 </span>            : struct chvgpio_intrhand {
+<span class="lineNum">      50 </span>            :         int (*ih_func)(void *);
+<span class="lineNum">      51 </span>            :         void *ih_arg;
+<span class="lineNum">      52 </span>            : };
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span>            : struct chvgpio_softc {
+<span class="lineNum">      55 </span>            :         struct device sc_dev;
+<span class="lineNum">      56 </span>            :         struct acpi_softc *sc_acpi;
+<span class="lineNum">      57 </span>            :         struct aml_node *sc_node;
+<span class="lineNum">      58 </span>            : 
+<span class="lineNum">      59 </span>            :         bus_space_tag_t sc_memt;
+<span class="lineNum">      60 </span>            :         bus_space_handle_t sc_memh;
+<span class="lineNum">      61 </span>            :         bus_addr_t sc_addr;
+<span class="lineNum">      62 </span>            :         bus_size_t sc_size;
+<span class="lineNum">      63 </span>            : 
+<span class="lineNum">      64 </span>            :         int sc_irq;
+<span class="lineNum">      65 </span>            :         int sc_irq_flags;
+<span class="lineNum">      66 </span>            :         void *sc_ih;
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            :         const int *sc_pins;
+<span class="lineNum">      69 </span>            :         int sc_npins;
+<span class="lineNum">      70 </span>            :         int sc_ngroups;
+<span class="lineNum">      71 </span>            : 
+<span class="lineNum">      72 </span>            :         struct chvgpio_intrhand sc_pin_ih[16];
+<span class="lineNum">      73 </span>            : 
+<span class="lineNum">      74 </span>            :         struct acpi_gpio sc_gpio;
+<span class="lineNum">      75 </span>            : };
+<a name="76"><span class="lineNum">      76 </span>            : </a>
+<span class="lineNum">      77 </span>            : static inline int
+<span class="lineNum">      78 </span><span class="lineNoCov">          0 : chvgpio_pad_cfg0_offset(int pin)</span>
+<span class="lineNum">      79 </span>            : {
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 :         return (CHVGPIO_PAD_CFG0 + 1024 * (pin / 15) + 8 * (pin % 15));</span>
+<span class="lineNum">      81 </span>            : }
+<a name="82"><span class="lineNum">      82 </span>            : </a>
+<span class="lineNum">      83 </span>            : static inline int
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 : chvgpio_read_pad_cfg0(struct chvgpio_softc *sc, int pin)</span>
+<span class="lineNum">      85 </span>            : {
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :         return bus_space_read_4(sc-&gt;sc_memt, sc-&gt;sc_memh,</span>
+<span class="lineNum">      87 </span>            :             chvgpio_pad_cfg0_offset(pin));
+<span class="lineNum">      88 </span>            : }
+<a name="89"><span class="lineNum">      89 </span>            : </a>
+<span class="lineNum">      90 </span>            : static inline void
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 : chvgpio_write_pad_cfg0(struct chvgpio_softc *sc, int pin, uint32_t val)</span>
+<span class="lineNum">      92 </span>            : {
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :         bus_space_write_4(sc-&gt;sc_memt, sc-&gt;sc_memh,</span>
+<span class="lineNum">      94 </span>            :             chvgpio_pad_cfg0_offset(pin), val);
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 : }</span>
+<a name="96"><span class="lineNum">      96 </span>            : </a>
+<span class="lineNum">      97 </span>            : static inline int
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 : chvgpio_read_pad_cfg1(struct chvgpio_softc *sc, int pin)</span>
+<span class="lineNum">      99 </span>            : {
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 :         return bus_space_read_4(sc-&gt;sc_memt, sc-&gt;sc_memh,</span>
+<span class="lineNum">     101 </span>            :             chvgpio_pad_cfg0_offset(pin) + 4);
+<span class="lineNum">     102 </span>            : }
+<a name="103"><span class="lineNum">     103 </span>            : </a>
+<span class="lineNum">     104 </span>            : static inline void
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 : chvgpio_write_pad_cfg1(struct chvgpio_softc *sc, int pin, uint32_t val)</span>
+<span class="lineNum">     106 </span>            : {
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         bus_space_write_4(sc-&gt;sc_memt, sc-&gt;sc_memh,</span>
+<span class="lineNum">     108 </span>            :             chvgpio_pad_cfg0_offset(pin) + 4, val);
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     110 </span>            : 
+<span class="lineNum">     111 </span>            : int     chvgpio_match(struct device *, void *, void *);
+<span class="lineNum">     112 </span>            : void    chvgpio_attach(struct device *, struct device *, void *);
+<span class="lineNum">     113 </span>            : 
+<span class="lineNum">     114 </span>            : struct cfattach chvgpio_ca = {
+<span class="lineNum">     115 </span>            :         sizeof(struct chvgpio_softc), chvgpio_match, chvgpio_attach
+<span class="lineNum">     116 </span>            : };
+<span class="lineNum">     117 </span>            : 
+<span class="lineNum">     118 </span>            : struct cfdriver chvgpio_cd = {
+<span class="lineNum">     119 </span>            :         NULL, &quot;chvgpio&quot;, DV_DULL
+<span class="lineNum">     120 </span>            : };
+<span class="lineNum">     121 </span>            : 
+<span class="lineNum">     122 </span>            : const char *chvgpio_hids[] = {
+<span class="lineNum">     123 </span>            :         &quot;INT33FF&quot;,
+<span class="lineNum">     124 </span>            :         NULL
+<span class="lineNum">     125 </span>            : };
+<span class="lineNum">     126 </span>            : 
+<span class="lineNum">     127 </span>            : /*
+<span class="lineNum">     128 </span>            :  * The pads for the pins are arranged in groups of maximal 15 pins.
+<span class="lineNum">     129 </span>            :  * The arrays below give the number of pins per group, such that we
+<span class="lineNum">     130 </span>            :  * can validate the (untrusted) pin numbers from ACPI.
+<span class="lineNum">     131 </span>            :  */
+<span class="lineNum">     132 </span>            : 
+<span class="lineNum">     133 </span>            : const int chv_southwest_pins[] = {
+<span class="lineNum">     134 </span>            :         8, 8, 8, 8, 8, 8, 8, -1
+<span class="lineNum">     135 </span>            : };
+<span class="lineNum">     136 </span>            : 
+<span class="lineNum">     137 </span>            : const int chv_north_pins[] = {
+<span class="lineNum">     138 </span>            :         9, 13, 12, 12, 13, -1
+<span class="lineNum">     139 </span>            : };
+<span class="lineNum">     140 </span>            : 
+<span class="lineNum">     141 </span>            : const int chv_east_pins[] = {
+<span class="lineNum">     142 </span>            :         12, 12, -1
+<span class="lineNum">     143 </span>            : };
+<span class="lineNum">     144 </span>            : 
+<span class="lineNum">     145 </span>            : const int chv_southeast_pins[] = {
+<span class="lineNum">     146 </span>            :         8, 12, 6, 8, 10, 11, -1
+<span class="lineNum">     147 </span>            : };
+<span class="lineNum">     148 </span>            : 
+<span class="lineNum">     149 </span>            : int     chvgpio_parse_resources(int, union acpi_resource *, void *);
+<span class="lineNum">     150 </span>            : int     chvgpio_check_pin(struct chvgpio_softc *, int);
+<span class="lineNum">     151 </span>            : int     chvgpio_read_pin(void *, int);
+<span class="lineNum">     152 </span>            : void    chvgpio_write_pin(void *, int, int);
+<span class="lineNum">     153 </span>            : void    chvgpio_intr_establish(void *, int, int, int (*)(), void *);
+<span class="lineNum">     154 </span>            : int     chvgpio_intr(void *);
+<span class="lineNum">     155 </span>            : int     chvgpio_opreg_handler(void *, int, uint64_t, int, uint64_t *);
+<a name="156"><span class="lineNum">     156 </span>            : </a>
+<span class="lineNum">     157 </span>            : int
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 : chvgpio_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     159 </span>            : {
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         struct acpi_attach_args *aaa = aux;</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         struct cfdata *cf = match;</span>
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         return acpi_matchhids(aaa, chvgpio_hids, cf-&gt;cf_driver-&gt;cd_name);</span>
+<span class="lineNum">     164 </span>            : }
+<a name="165"><span class="lineNum">     165 </span>            : </a>
+<span class="lineNum">     166 </span>            : void
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 : chvgpio_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     168 </span>            : {
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :         struct acpi_attach_args *aaa = aux;</span>
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :         struct chvgpio_softc *sc = (struct chvgpio_softc *)self;</span>
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         struct aml_value res;</span>
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :         int64_t uid;</span>
+<span class="lineNum">     173 </span>            :         int i;
+<span class="lineNum">     174 </span>            : 
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :         sc-&gt;sc_acpi = (struct acpi_softc *)parent;</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :         sc-&gt;sc_node = aaa-&gt;aaa_node;</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :         printf(&quot;: %s&quot;, sc-&gt;sc_node-&gt;name);</span>
+<span class="lineNum">     178 </span>            : 
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :         if (aml_evalinteger(sc-&gt;sc_acpi, sc-&gt;sc_node, &quot;_UID&quot;, 0, NULL, &amp;uid)) {</span>
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :                 printf(&quot;, can't find uid\n&quot;);</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     182 </span>            :         }
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :         printf(&quot; uid %lld&quot;, uid);</span>
+<span class="lineNum">     185 </span>            : 
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :         switch (uid) {</span>
+<span class="lineNum">     187 </span>            :         case 1:
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_pins = chv_southwest_pins;</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     190 </span>            :         case 2:
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_pins = chv_north_pins;</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     193 </span>            :         case 3:
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_pins = chv_east_pins;</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     196 </span>            :         case 4:
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_pins = chv_southeast_pins;</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     199 </span>            :         default:
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                 printf(&quot;\n&quot;);</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     202 </span>            :         }
+<span class="lineNum">     203 </span>            : 
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :         for (i = 0; sc-&gt;sc_pins[i] &gt;= 0; i++) {</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_npins += sc-&gt;sc_pins[i];</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_ngroups++;</span>
+<span class="lineNum">     207 </span>            :         }
+<span class="lineNum">     208 </span>            : 
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         if (aml_evalname(sc-&gt;sc_acpi, sc-&gt;sc_node, &quot;_CRS&quot;, 0, NULL, &amp;res)) {</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                 printf(&quot;, can't find registers\n&quot;);</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     212 </span>            :         }
+<span class="lineNum">     213 </span>            : 
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :         aml_parse_resource(&amp;res, chvgpio_parse_resources, sc);</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         printf(&quot; addr 0x%lx/0x%lx&quot;, sc-&gt;sc_addr, sc-&gt;sc_size);</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_addr == 0 || sc-&gt;sc_size == 0) {</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :                 printf(&quot;\n&quot;);</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     219 </span>            :         }
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         aml_freevalue(&amp;res);</span>
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         printf(&quot; irq %d&quot;, sc-&gt;sc_irq);</span>
+<span class="lineNum">     223 </span>            : 
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :         sc-&gt;sc_memt = aaa-&gt;aaa_memt;</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :         if (bus_space_map(sc-&gt;sc_memt, sc-&gt;sc_addr, sc-&gt;sc_size, 0,</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :             &amp;sc-&gt;sc_memh)) {</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                 printf(&quot;, can't map registers\n&quot;);</span>
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     229 </span>            :         }
+<span class="lineNum">     230 </span>            : 
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :         sc-&gt;sc_ih = acpi_intr_establish(sc-&gt;sc_irq, sc-&gt;sc_irq_flags, IPL_BIO,</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :             chvgpio_intr, sc, sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_ih == NULL) {</span>
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :                 printf(&quot;, can't establish interrupt\n&quot;);</span>
+<span class="lineNum">     235 </span>            :                 goto unmap;
+<span class="lineNum">     236 </span>            :         }
+<span class="lineNum">     237 </span>            : 
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :         sc-&gt;sc_gpio.cookie = sc;</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :         sc-&gt;sc_gpio.read_pin = chvgpio_read_pin;</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :         sc-&gt;sc_gpio.write_pin = chvgpio_write_pin;</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :         sc-&gt;sc_gpio.intr_establish = chvgpio_intr_establish;</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         sc-&gt;sc_node-&gt;gpio = &amp;sc-&gt;sc_gpio;</span>
+<span class="lineNum">     243 </span>            : 
+<span class="lineNum">     244 </span>            :         /* Mask and ack all interrupts. */
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         bus_space_write_4(sc-&gt;sc_memt, sc-&gt;sc_memh,</span>
+<span class="lineNum">     246 </span>            :             CHVGPIO_INTERRUPT_MASK, 0);
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         bus_space_write_4(sc-&gt;sc_memt, sc-&gt;sc_memh,</span>
+<span class="lineNum">     248 </span>            :             CHVGPIO_INTERRUPT_STATUS, 0xffff);
+<span class="lineNum">     249 </span>            : 
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         printf(&quot;, %d pins\n&quot;, sc-&gt;sc_npins);</span>
+<span class="lineNum">     251 </span>            : 
+<span class="lineNum">     252 </span>            :         /* Register OEM defined address space. */
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         aml_register_regionspace(sc-&gt;sc_node, CHVGPIO_REGIONSPACE_BASE + uid,</span>
+<span class="lineNum">     254 </span>            :             sc, chvgpio_opreg_handler);
+<span class="lineNum">     255 </span>            : 
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         acpi_register_gpio(sc-&gt;sc_acpi, sc-&gt;sc_node);</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     258 </span>            : 
+<span class="lineNum">     259 </span>            : unmap:
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         bus_space_unmap(sc-&gt;sc_memt, sc-&gt;sc_memh, sc-&gt;sc_size);</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 : }</span>
+<a name="262"><span class="lineNum">     262 </span>            : </a>
+<span class="lineNum">     263 </span>            : int
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 : chvgpio_parse_resources(int crsidx, union acpi_resource *crs, void *arg)</span>
+<span class="lineNum">     265 </span>            : {
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         struct chvgpio_softc *sc = arg;</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         int type = AML_CRSTYPE(crs);</span>
+<span class="lineNum">     268 </span>            : 
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         switch (type) {</span>
+<span class="lineNum">     270 </span>            :         case LR_MEM32FIXED:
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_addr = crs-&gt;lr_m32fixed._bas;</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_size = crs-&gt;lr_m32fixed._len;</span>
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     274 </span>            :         case LR_EXTIRQ:
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_irq = crs-&gt;lr_extirq.irq[0];</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_irq_flags = crs-&gt;lr_extirq.flags;</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     278 </span>            :         default:
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                 printf(&quot; type 0x%x\n&quot;, type);</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     281 </span>            :         }
+<span class="lineNum">     282 </span>            : 
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     284 </span>            : }
+<a name="285"><span class="lineNum">     285 </span>            : </a>
+<span class="lineNum">     286 </span>            : int
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 : chvgpio_check_pin(struct chvgpio_softc *sc, int pin)</span>
+<span class="lineNum">     288 </span>            : {
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :         if (pin &lt; 0)</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         if ((pin / 15) &gt;= sc-&gt;sc_ngroups)</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :         if ((pin % 15) &gt;= sc-&gt;sc_pins[pin / 15])</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">     295 </span>            : 
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 : }</span>
+<a name="298"><span class="lineNum">     298 </span>            : </a>
+<span class="lineNum">     299 </span>            : int
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 : chvgpio_read_pin(void *cookie, int pin)</span>
+<span class="lineNum">     301 </span>            : {
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :         struct chvgpio_softc *sc = cookie;</span>
+<span class="lineNum">     303 </span>            :         uint32_t reg;
+<span class="lineNum">     304 </span>            : 
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         KASSERT(chvgpio_check_pin(sc, pin) == 0);</span>
+<span class="lineNum">     306 </span>            : 
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :         reg = chvgpio_read_pad_cfg0(sc, pin);</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         return (reg &amp; CHVGPIO_PAD_CFG0_GPIORXSTATE);</span>
+<span class="lineNum">     309 </span>            : }
+<a name="310"><span class="lineNum">     310 </span>            : </a>
+<span class="lineNum">     311 </span>            : void
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 : chvgpio_write_pin(void *cookie, int pin, int value)</span>
+<span class="lineNum">     313 </span>            : {
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :         struct chvgpio_softc *sc = cookie;</span>
+<span class="lineNum">     315 </span>            :         uint32_t reg;
+<span class="lineNum">     316 </span>            : 
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :         KASSERT(chvgpio_check_pin(sc, pin) == 0);</span>
+<span class="lineNum">     318 </span>            : 
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :         reg = chvgpio_read_pad_cfg0(sc, pin);</span>
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         if (value)</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :                 reg |= CHVGPIO_PAD_CFG0_GPIOTXSTATE;</span>
+<span class="lineNum">     322 </span>            :         else
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :                 reg &amp;= ~CHVGPIO_PAD_CFG0_GPIOTXSTATE;</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :         chvgpio_write_pad_cfg0(sc, pin, reg);</span>
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 : }</span>
+<a name="326"><span class="lineNum">     326 </span>            : </a>
+<span class="lineNum">     327 </span>            : void
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 : chvgpio_intr_establish(void *cookie, int pin, int flags,</span>
+<span class="lineNum">     329 </span>            :     int (*func)(void *), void *arg)
+<span class="lineNum">     330 </span>            : {
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         struct chvgpio_softc *sc = cookie;</span>
+<span class="lineNum">     332 </span>            :         uint32_t reg;
+<span class="lineNum">     333 </span>            :         int line;
+<span class="lineNum">     334 </span>            : 
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         KASSERT(chvgpio_check_pin(sc, pin) == 0);</span>
+<span class="lineNum">     336 </span>            : 
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :         reg = chvgpio_read_pad_cfg0(sc, pin);</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         reg &amp;= CHVGPIO_PAD_CFG0_INTSEL_MASK;</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         line = reg &gt;&gt; CHVGPIO_PAD_CFG0_INTSEL_SHIFT;</span>
+<span class="lineNum">     340 </span>            : 
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         sc-&gt;sc_pin_ih[line].ih_func = func;</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :         sc-&gt;sc_pin_ih[line].ih_arg = arg;</span>
+<span class="lineNum">     343 </span>            : 
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         reg = chvgpio_read_pad_cfg1(sc, pin);</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :         reg &amp;= ~CHVGPIO_PAD_CFG1_INTWAKECFG_MASK;</span>
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         reg &amp;= ~CHVGPIO_PAD_CFG1_INVRXTX_MASK;</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :         switch (flags &amp; (LR_GPIO_MODE | LR_GPIO_POLARITY)) {</span>
+<span class="lineNum">     348 </span>            :         case LR_GPIO_LEVEL | LR_GPIO_ACTLO:
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                 reg |= CHVGPIO_PAD_CFG1_INVRXTX_RXDATA;</span>
+<span class="lineNum">     350 </span>            :                 /* FALLTHROUGH */
+<span class="lineNum">     351 </span>            :         case LR_GPIO_LEVEL | LR_GPIO_ACTHI:
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                 reg |= CHVGPIO_PAD_CFG1_INTWAKECFG_LEVEL;</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     354 </span>            :         case LR_GPIO_EDGE | LR_GPIO_ACTLO:
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :                 reg |= CHVGPIO_PAD_CFG1_INTWAKECFG_FALLING;</span>
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     357 </span>            :         case LR_GPIO_EDGE | LR_GPIO_ACTHI:
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :                 reg |= CHVGPIO_PAD_CFG1_INTWAKECFG_RISING;</span>
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     360 </span>            :         case LR_GPIO_EDGE | LR_GPIO_ACTBOTH:
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :                 reg |= CHVGPIO_PAD_CFG1_INTWAKECFG_BOTH;</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     363 </span>            :         default:
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unsupported interrupt mode/polarity\n&quot;,</span>
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     367 </span>            :         }
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         chvgpio_write_pad_cfg1(sc, pin, reg);</span>
+<span class="lineNum">     369 </span>            : 
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :         reg = bus_space_read_4(sc-&gt;sc_memt, sc-&gt;sc_memh,</span>
+<span class="lineNum">     371 </span>            :             CHVGPIO_INTERRUPT_MASK);
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :         bus_space_write_4(sc-&gt;sc_memt, sc-&gt;sc_memh,</span>
+<span class="lineNum">     373 </span>            :             CHVGPIO_INTERRUPT_MASK, reg | (1 &lt;&lt; line));
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 : }</span>
+<a name="375"><span class="lineNum">     375 </span>            : </a>
+<span class="lineNum">     376 </span>            : int
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 : chvgpio_intr(void *arg)</span>
+<span class="lineNum">     378 </span>            : {
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :         struct chvgpio_softc *sc = arg;</span>
+<span class="lineNum">     380 </span>            :         uint32_t reg;
+<span class="lineNum">     381 </span>            :         int rc = 0;
+<span class="lineNum">     382 </span>            :         int line;
+<span class="lineNum">     383 </span>            : 
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :         reg = bus_space_read_4(sc-&gt;sc_memt, sc-&gt;sc_memh,</span>
+<span class="lineNum">     385 </span>            :             CHVGPIO_INTERRUPT_STATUS);
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :         for (line = 0; line &lt; 16; line++) {</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :                 if ((reg &amp; (1 &lt;&lt; line)) == 0)</span>
+<span class="lineNum">     388 </span>            :                         continue;
+<span class="lineNum">     389 </span>            : 
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :                 bus_space_write_4(sc-&gt;sc_memt,sc-&gt;sc_memh,</span>
+<span class="lineNum">     391 </span>            :                     CHVGPIO_INTERRUPT_STATUS, 1 &lt;&lt; line);
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_pin_ih[line].ih_func)</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_pin_ih[line].ih_func(sc-&gt;sc_pin_ih[line].ih_arg);</span>
+<span class="lineNum">     394 </span>            :                 rc = 1;
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     396 </span>            : 
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :         return rc;</span>
+<span class="lineNum">     398 </span>            : }
+<a name="399"><span class="lineNum">     399 </span>            : </a>
+<span class="lineNum">     400 </span>            : int
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 : chvgpio_opreg_handler(void *cookie, int iodir, uint64_t address, int size,</span>
+<span class="lineNum">     402 </span>            :     uint64_t *value)
+<span class="lineNum">     403 </span>            : {
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :         struct chvgpio_softc *sc = cookie;</span>
+<span class="lineNum">     405 </span>            : 
+<span class="lineNum">     406 </span>            :         /* Only allow 32-bit access. */
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         if (size != 4 || address &gt; sc-&gt;sc_size - size)</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         if (iodir == ACPI_IOREAD)</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                 *value = bus_space_read_4(sc-&gt;sc_memt, sc-&gt;sc_memh, address);</span>
+<span class="lineNum">     412 </span>            :         else
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :                 bus_space_write_4(sc-&gt;sc_memt, sc-&gt;sc_memh, address, *value);</span>
+<span class="lineNum">     414 </span>            : 
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

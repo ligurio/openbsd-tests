@@ -1,0 +1,626 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/acpi/dwiic_acpi.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/acpi</a> - dwiic_acpi.c<span style="font-size: 80%;"> (source / <a href="dwiic_acpi.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">270</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /* $OpenBSD: dwiic_acpi.c,v 1.8 2018/07/01 11:37:11 kettenis Exp $ */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Synopsys DesignWare I2C controller
+<span class="lineNum">       4 </span>            :  *
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2015, 2016 joshua stein &lt;jcs@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission to use, copy, modify, and/or distribute this software for any
+<span class="lineNum">       8 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       9 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      12 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      13 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      14 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      15 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      16 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      17 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      18 </span>            :  */
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/kthread.h&gt;
+<span class="lineNum">      24 </span>            : 
+<span class="lineNum">      25 </span>            : #include &lt;dev/acpi/acpireg.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;dev/acpi/acpivar.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;dev/acpi/acpidev.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;dev/acpi/amltypes.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;dev/acpi/dsdt.h&gt;
+<span class="lineNum">      30 </span>            : 
+<span class="lineNum">      31 </span>            : #include &lt;dev/ic/dwiicvar.h&gt;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : struct dwiic_crs {
+<span class="lineNum">      34 </span>            :         int irq_int;
+<span class="lineNum">      35 </span>            :         uint8_t irq_flags;
+<span class="lineNum">      36 </span>            :         uint32_t addr_min;
+<span class="lineNum">      37 </span>            :         uint32_t addr_bas;
+<span class="lineNum">      38 </span>            :         uint32_t addr_len;
+<span class="lineNum">      39 </span>            :         uint16_t i2c_addr;
+<span class="lineNum">      40 </span>            :         struct aml_node *devnode;
+<span class="lineNum">      41 </span>            :         struct aml_node *gpio_int_node;
+<span class="lineNum">      42 </span>            :         uint16_t gpio_int_pin;
+<span class="lineNum">      43 </span>            :         uint16_t gpio_int_flags;
+<span class="lineNum">      44 </span>            : };
+<span class="lineNum">      45 </span>            : 
+<span class="lineNum">      46 </span>            : int             dwiic_acpi_match(struct device *, void *, void *);
+<span class="lineNum">      47 </span>            : void            dwiic_acpi_attach(struct device *, struct device *, void *);
+<span class="lineNum">      48 </span>            : 
+<span class="lineNum">      49 </span>            : int             dwiic_acpi_parse_crs(int, union acpi_resource *, void *);
+<span class="lineNum">      50 </span>            : int             dwiic_acpi_found_ihidev(struct dwiic_softc *,
+<span class="lineNum">      51 </span>            :                     struct aml_node *, char *, struct dwiic_crs);
+<span class="lineNum">      52 </span>            : int             dwiic_acpi_found_iatp(struct dwiic_softc *, struct aml_node *,
+<span class="lineNum">      53 </span>            :                     char *, struct dwiic_crs);
+<span class="lineNum">      54 </span>            : void            dwiic_acpi_get_params(struct dwiic_softc *, char *, uint16_t *,
+<span class="lineNum">      55 </span>            :                     uint16_t *, uint32_t *);
+<span class="lineNum">      56 </span>            : void            dwiic_acpi_power(struct dwiic_softc *, int);
+<span class="lineNum">      57 </span>            : void            dwiic_acpi_bus_scan(struct device *,
+<span class="lineNum">      58 </span>            :                     struct i2cbus_attach_args *, void *);
+<span class="lineNum">      59 </span>            : 
+<span class="lineNum">      60 </span>            : struct cfattach dwiic_acpi_ca = {
+<span class="lineNum">      61 </span>            :         sizeof(struct dwiic_softc),
+<span class="lineNum">      62 </span>            :         dwiic_acpi_match,
+<span class="lineNum">      63 </span>            :         dwiic_acpi_attach,
+<span class="lineNum">      64 </span>            :         NULL,
+<span class="lineNum">      65 </span>            :         dwiic_activate
+<span class="lineNum">      66 </span>            : };
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            : const char *dwiic_hids[] = {
+<span class="lineNum">      69 </span>            :         &quot;INT33C2&quot;,
+<span class="lineNum">      70 </span>            :         &quot;INT33C3&quot;,
+<span class="lineNum">      71 </span>            :         &quot;INT3432&quot;,
+<span class="lineNum">      72 </span>            :         &quot;INT3433&quot;,
+<span class="lineNum">      73 </span>            :         &quot;80860F41&quot;,
+<span class="lineNum">      74 </span>            :         &quot;808622C1&quot;,
+<span class="lineNum">      75 </span>            :         NULL
+<span class="lineNum">      76 </span>            : };
+<span class="lineNum">      77 </span>            : 
+<span class="lineNum">      78 </span>            : const char *ihidev_hids[] = {
+<span class="lineNum">      79 </span>            :         &quot;PNP0C50&quot;,
+<span class="lineNum">      80 </span>            :         &quot;ACPI0C50&quot;,
+<span class="lineNum">      81 </span>            :         NULL
+<span class="lineNum">      82 </span>            : };
+<span class="lineNum">      83 </span>            : 
+<span class="lineNum">      84 </span>            : const char *iatp_hids[] = {
+<span class="lineNum">      85 </span>            :         &quot;ATML0000&quot;,
+<span class="lineNum">      86 </span>            :         &quot;ATML0001&quot;,
+<span class="lineNum">      87 </span>            :         NULL
+<span class="lineNum">      88 </span>            : };
+<a name="89"><span class="lineNum">      89 </span>            : </a>
+<span class="lineNum">      90 </span>            : int
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 : dwiic_acpi_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">      92 </span>            : {
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :         struct acpi_attach_args *aaa = aux;</span>
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :         struct cfdata *cf = match;</span>
+<span class="lineNum">      95 </span>            : 
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :         return acpi_matchhids(aaa, dwiic_hids, cf-&gt;cf_driver-&gt;cd_name);</span>
+<span class="lineNum">      97 </span>            : }
+<a name="98"><span class="lineNum">      98 </span>            : </a>
+<span class="lineNum">      99 </span>            : void
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 : dwiic_acpi_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     101 </span>            : {
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :         struct dwiic_softc *sc = (struct dwiic_softc *)self;</span>
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :         struct acpi_attach_args *aa = aux;</span>
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 :         struct aml_value res;</span>
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :         struct dwiic_crs crs;</span>
+<span class="lineNum">     106 </span>            : 
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         sc-&gt;sc_acpi = (struct acpi_softc *)parent;</span>
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :         sc-&gt;sc_devnode = aa-&gt;aaa_node;</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         memcpy(&amp;sc-&gt;sc_hid, aa-&gt;aaa_dev, sizeof(sc-&gt;sc_hid));</span>
+<span class="lineNum">     110 </span>            : 
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :         printf(&quot; %s&quot;, sc-&gt;sc_devnode-&gt;name);</span>
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         if (aml_evalname(sc-&gt;sc_acpi, sc-&gt;sc_devnode, &quot;_CRS&quot;, 0, NULL, &amp;res)) {</span>
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :                 printf(&quot;, no _CRS method\n&quot;);</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     116 </span>            :         }
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         if (res.type != AML_OBJTYPE_BUFFER || res.length &lt; 5) {</span>
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :                 printf(&quot;, invalid _CRS object (type %d len %d)\n&quot;,</span>
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :                     res.type, res.length);</span>
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :                 aml_freevalue(&amp;res);</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     122 </span>            :         }
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         memset(&amp;crs, 0, sizeof(crs));</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         crs.devnode = sc-&gt;sc_devnode;</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         aml_parse_resource(&amp;res, dwiic_acpi_parse_crs, &amp;crs);</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         aml_freevalue(&amp;res);</span>
+<span class="lineNum">     127 </span>            : 
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         if (crs.addr_bas == 0) {</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :                 printf(&quot;, can't find address\n&quot;);</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     131 </span>            :         }
+<span class="lineNum">     132 </span>            : 
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :         printf(&quot; addr 0x%x/0x%x&quot;, crs.addr_bas, crs.addr_len);</span>
+<span class="lineNum">     134 </span>            : 
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :         sc-&gt;sc_iot = aa-&gt;aaa_memt;</span>
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         if (bus_space_map(sc-&gt;sc_iot, crs.addr_bas, crs.addr_len, 0,</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :             &amp;sc-&gt;sc_ioh)) {</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :                 printf(&quot;, failed mapping at 0x%x\n&quot;, crs.addr_bas);</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     140 </span>            :         }
+<span class="lineNum">     141 </span>            : 
+<span class="lineNum">     142 </span>            :         /* power up the controller */
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         dwiic_acpi_power(sc, 1);</span>
+<span class="lineNum">     144 </span>            : 
+<span class="lineNum">     145 </span>            :         /* fetch timing parameters */
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         sc-&gt;ss_hcnt = dwiic_read(sc, DW_IC_SS_SCL_HCNT);</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         sc-&gt;ss_lcnt = dwiic_read(sc, DW_IC_SS_SCL_LCNT);</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         sc-&gt;fs_hcnt = dwiic_read(sc, DW_IC_FS_SCL_HCNT);</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         sc-&gt;fs_lcnt = dwiic_read(sc, DW_IC_FS_SCL_LCNT);</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         sc-&gt;sda_hold_time = dwiic_read(sc, DW_IC_SDA_HOLD);</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         dwiic_acpi_get_params(sc, &quot;SSCN&quot;, &amp;sc-&gt;ss_hcnt, &amp;sc-&gt;ss_lcnt, NULL);</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         dwiic_acpi_get_params(sc, &quot;FMCN&quot;, &amp;sc-&gt;fs_hcnt, &amp;sc-&gt;fs_lcnt,</span>
+<span class="lineNum">     153 </span>            :             &amp;sc-&gt;sda_hold_time);
+<span class="lineNum">     154 </span>            : 
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         if (dwiic_init(sc)) {</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :                 printf(&quot;, failed initializing\n&quot;);</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :                 bus_space_unmap(sc-&gt;sc_iot, sc-&gt;sc_ioh, crs.addr_len);</span>
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     159 </span>            :         }
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span>            :         /* leave the controller disabled */
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :         dwiic_write(sc, DW_IC_INTR_MASK, 0);</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         dwiic_enable(sc, 0);</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :         dwiic_read(sc, DW_IC_CLR_INTR);</span>
+<span class="lineNum">     165 </span>            : 
+<span class="lineNum">     166 </span>            :         /* try to register interrupt with apic, but not fatal without it */
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :         if (crs.irq_int &gt; 0) {</span>
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                 printf(&quot; irq %d&quot;, crs.irq_int);</span>
+<span class="lineNum">     169 </span>            : 
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_ih = acpi_intr_establish(crs.irq_int, crs.irq_flags,</span>
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :                     IPL_BIO, dwiic_intr, sc, sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_ih == NULL)</span>
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :                         printf(&quot;, can't establish interrupt&quot;);</span>
+<span class="lineNum">     174 </span>            :         }
+<span class="lineNum">     175 </span>            : 
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     177 </span>            : 
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :         rw_init(&amp;sc-&gt;sc_i2c_lock, &quot;iiclk&quot;);</span>
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span>            :         /* setup and attach iic bus */
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :         sc-&gt;sc_i2c_tag.ic_cookie = sc;</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         sc-&gt;sc_i2c_tag.ic_acquire_bus = dwiic_i2c_acquire_bus;</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         sc-&gt;sc_i2c_tag.ic_release_bus = dwiic_i2c_release_bus;</span>
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :         sc-&gt;sc_i2c_tag.ic_exec = dwiic_i2c_exec;</span>
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         sc-&gt;sc_i2c_tag.ic_intr_establish = dwiic_i2c_intr_establish;</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :         sc-&gt;sc_i2c_tag.ic_intr_string = dwiic_i2c_intr_string;</span>
+<span class="lineNum">     187 </span>            : 
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         bzero(&amp;sc-&gt;sc_iba, sizeof(sc-&gt;sc_iba));</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :         sc-&gt;sc_iba.iba_name = &quot;iic&quot;;</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         sc-&gt;sc_iba.iba_tag = &amp;sc-&gt;sc_i2c_tag;</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         sc-&gt;sc_iba.iba_bus_scan = dwiic_acpi_bus_scan;</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :         sc-&gt;sc_iba.iba_bus_scan_arg = sc;</span>
+<span class="lineNum">     193 </span>            : 
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :         config_found((struct device *)sc, &amp;sc-&gt;sc_iba, iicbus_print);</span>
+<span class="lineNum">     195 </span>            : 
+<span class="lineNum">     196 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         sc-&gt;sc_devnode-&gt;i2c = &amp;sc-&gt;sc_i2c_tag;</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         acpi_register_gsb(sc-&gt;sc_acpi, sc-&gt;sc_devnode);</span>
+<span class="lineNum">     199 </span>            : #endif
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 : }</span>
+<a name="203"><span class="lineNum">     203 </span>            : </a>
+<span class="lineNum">     204 </span>            : int
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 : dwiic_acpi_parse_crs(int crsidx, union acpi_resource *crs, void *arg)</span>
+<span class="lineNum">     206 </span>            : {
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :         struct dwiic_crs *sc_crs = arg;</span>
+<span class="lineNum">     208 </span>            :         struct aml_node *node;
+<span class="lineNum">     209 </span>            :         uint16_t pin;
+<span class="lineNum">     210 </span>            : 
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :         switch (AML_CRSTYPE(crs)) {</span>
+<span class="lineNum">     212 </span>            :         case SR_IRQ:
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :                 sc_crs-&gt;irq_int = ffs(letoh16(crs-&gt;sr_irq.irq_mask)) - 1;</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                 sc_crs-&gt;irq_flags = crs-&gt;sr_irq.irq_flags;</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     216 </span>            : 
+<span class="lineNum">     217 </span>            :         case LR_EXTIRQ:
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                 sc_crs-&gt;irq_int = letoh32(crs-&gt;lr_extirq.irq[0]);</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                 sc_crs-&gt;irq_flags = crs-&gt;lr_extirq.flags;</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span>            :         case LR_GPIO:
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                 node = aml_searchname(sc_crs-&gt;devnode,</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :                     (char *)&amp;crs-&gt;pad[crs-&gt;lr_gpio.res_off]);</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                 pin = *(uint16_t *)&amp;crs-&gt;pad[crs-&gt;lr_gpio.pin_off];</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                 if (crs-&gt;lr_gpio.type == LR_GPIO_INT) {</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                         sc_crs-&gt;gpio_int_node = node;</span>
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                         sc_crs-&gt;gpio_int_pin = pin;</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                         sc_crs-&gt;gpio_int_flags = crs-&gt;lr_gpio.tflags;</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     231 </span>            :                 break;
+<span class="lineNum">     232 </span>            : 
+<span class="lineNum">     233 </span>            :         case LR_MEM32:
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :                 sc_crs-&gt;addr_min = letoh32(crs-&gt;lr_m32._min);</span>
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :                 sc_crs-&gt;addr_len = letoh32(crs-&gt;lr_m32._len);</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     237 </span>            : 
+<span class="lineNum">     238 </span>            :         case LR_MEM32FIXED:
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :                 sc_crs-&gt;addr_bas = letoh32(crs-&gt;lr_m32fixed._bas);</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                 sc_crs-&gt;addr_len = letoh32(crs-&gt;lr_m32fixed._len);</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span>            :         case LR_SERBUS:
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :                 if (crs-&gt;lr_serbus.type == LR_SERBUS_I2C)</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                         sc_crs-&gt;i2c_addr = letoh16(crs-&gt;lr_i2cbus._adr);</span>
+<span class="lineNum">     246 </span>            :                 break;
+<span class="lineNum">     247 </span>            : 
+<span class="lineNum">     248 </span>            :         default:
+<span class="lineNum">     249 </span>            :                 DPRINTF((&quot;%s: unknown resource type %d\n&quot;, __func__,
+<span class="lineNum">     250 </span>            :                     AML_CRSTYPE(crs)));
+<span class="lineNum">     251 </span>            :         }
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     254 </span>            : }
+<a name="255"><span class="lineNum">     255 </span>            : </a>
+<span class="lineNum">     256 </span>            : void
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 : dwiic_acpi_get_params(struct dwiic_softc *sc, char *method, uint16_t *hcnt,</span>
+<span class="lineNum">     258 </span>            :     uint16_t *lcnt, uint32_t *sda_hold_time)
+<span class="lineNum">     259 </span>            : {
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         struct aml_value res;</span>
+<span class="lineNum">     261 </span>            : 
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :         if (!aml_searchname(sc-&gt;sc_devnode, method))</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     264 </span>            : 
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         if (aml_evalname(sc-&gt;sc_acpi, sc-&gt;sc_devnode, method, 0, NULL, &amp;res)) {</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :                 printf(&quot;: eval of %s at %s failed&quot;, method,</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :                     aml_nodename(sc-&gt;sc_devnode));</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     269 </span>            :         }
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         if (res.type != AML_OBJTYPE_PACKAGE) {</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                 printf(&quot;: %s is not a package (%d)&quot;, method, res.type);</span>
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                 aml_freevalue(&amp;res);</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     275 </span>            :         }
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         if (res.length &lt;= 2) {</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :                 printf(&quot;: %s returned package of len %d&quot;, method, res.length);</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                 aml_freevalue(&amp;res);</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     281 </span>            :         }
+<span class="lineNum">     282 </span>            : 
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         *hcnt = aml_val2int(res.v_package[0]);</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         *lcnt = aml_val2int(res.v_package[1]);</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         if (sda_hold_time)</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                 *sda_hold_time = aml_val2int(res.v_package[2]);</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         aml_freevalue(&amp;res);</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 : }</span>
+<a name="289"><span class="lineNum">     289 </span>            : </a>
+<span class="lineNum">     290 </span>            : void
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 : dwiic_acpi_bus_scan(struct device *iic, struct i2cbus_attach_args *iba,</span>
+<span class="lineNum">     292 </span>            :     void *aux)
+<span class="lineNum">     293 </span>            : {
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         struct dwiic_softc *sc = (struct dwiic_softc *)aux;</span>
+<span class="lineNum">     295 </span>            : 
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         sc-&gt;sc_iic = iic;</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         aml_find_node(sc-&gt;sc_devnode, &quot;_HID&quot;, dwiic_acpi_found_hid, sc);</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 : }</span>
+<a name="299"><span class="lineNum">     299 </span>            : </a>
+<span class="lineNum">     300 </span>            : void *
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 : dwiic_i2c_intr_establish(void *cookie, void *ih, int level,</span>
+<span class="lineNum">     302 </span>            :     int (*func)(void *), void *arg, const char *name)
+<span class="lineNum">     303 </span>            : {
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         struct dwiic_crs *crs = ih;</span>
+<span class="lineNum">     305 </span>            : 
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :         if (crs-&gt;gpio_int_node &amp;&amp; crs-&gt;gpio_int_node-&gt;gpio) {</span>
+<span class="lineNum">     307 </span>            :                 struct acpi_gpio *gpio = crs-&gt;gpio_int_node-&gt;gpio;
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :                 gpio-&gt;intr_establish(gpio-&gt;cookie, crs-&gt;gpio_int_pin,</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :                                      crs-&gt;gpio_int_flags, func, arg);</span>
+<span class="lineNum">     310 </span>            :                 return ih;
+<span class="lineNum">     311 </span>            :         }
+<span class="lineNum">     312 </span>            : 
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         return acpi_intr_establish(crs-&gt;irq_int, crs-&gt;irq_flags,</span>
+<span class="lineNum">     314 </span>            :             level, func, arg, name);
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 : }</span>
+<a name="316"><span class="lineNum">     316 </span>            : </a>
+<span class="lineNum">     317 </span>            : const char *
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 : dwiic_i2c_intr_string(void *cookie, void *ih)</span>
+<span class="lineNum">     319 </span>            : {
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         struct dwiic_crs *crs = ih;</span>
+<span class="lineNum">     321 </span>            :         static char irqstr[64];
+<span class="lineNum">     322 </span>            : 
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         if (crs-&gt;gpio_int_node &amp;&amp; crs-&gt;gpio_int_node-&gt;gpio)</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :                 snprintf(irqstr, sizeof(irqstr), &quot;gpio %d&quot;, crs-&gt;gpio_int_pin);</span>
+<span class="lineNum">     325 </span>            :         else
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :                 snprintf(irqstr, sizeof(irqstr), &quot;irq %d&quot;, crs-&gt;irq_int);</span>
+<span class="lineNum">     327 </span>            : 
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :         return irqstr;</span>
+<span class="lineNum">     329 </span>            : }
+<a name="330"><span class="lineNum">     330 </span>            : </a>
+<span class="lineNum">     331 </span>            : int
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 : dwiic_matchhids(const char *hid, const char *hids[])</span>
+<span class="lineNum">     333 </span>            : {
+<span class="lineNum">     334 </span>            :         int i;
+<span class="lineNum">     335 </span>            : 
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         for (i = 0; hids[i]; i++)</span>
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :                 if (!strcmp(hid, hids[i]))</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                         return (1);</span>
+<span class="lineNum">     339 </span>            : 
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 : }</span>
+<a name="342"><span class="lineNum">     342 </span>            : </a>
+<span class="lineNum">     343 </span>            : int
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 : dwiic_acpi_found_hid(struct aml_node *node, void *arg)</span>
+<span class="lineNum">     345 </span>            : {
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         struct dwiic_softc *sc = (struct dwiic_softc *)arg;</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :         struct dwiic_crs crs;</span>
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         struct aml_value res;</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :         int64_t sta;</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         char cdev[16], dev[16];</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         struct i2c_attach_args ia;</span>
+<span class="lineNum">     352 </span>            : 
+<span class="lineNum">     353 </span>            :         /* Skip our own _HID. */
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         if (node-&gt;parent == sc-&gt;sc_devnode)</span>
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     356 </span>            : 
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :         if (acpi_parsehid(node, arg, cdev, dev, 16) != 0)</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     359 </span>            : 
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         if (aml_evalinteger(acpi_softc, node-&gt;parent, &quot;_STA&quot;, 0, NULL, &amp;sta))</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :                 sta = STA_PRESENT | STA_ENABLED | STA_DEV_OK | 0x1000;</span>
+<span class="lineNum">     362 </span>            : 
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :         if ((sta &amp; STA_PRESENT) == 0)</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     365 </span>            : 
+<span class="lineNum">     366 </span>            :         DPRINTF((&quot;%s: found HID %s at %s\n&quot;, sc-&gt;sc_dev.dv_xname, dev,
+<span class="lineNum">     367 </span>            :             aml_nodename(node)));
+<span class="lineNum">     368 </span>            : 
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :         if (aml_evalname(acpi_softc, node-&gt;parent, &quot;_CRS&quot;, 0, NULL, &amp;res)) {</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: no _CRS method at %s\n&quot;, sc-&gt;sc_dev.dv_xname,</span>
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                     aml_nodename(node-&gt;parent));</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     373 </span>            :         }
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :         if (res.type != AML_OBJTYPE_BUFFER || res.length &lt; 5) {</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: invalid _CRS object (type %d len %d)\n&quot;,</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname, res.type, res.length);</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                 aml_freevalue(&amp;res);</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     379 </span>            :         }
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :         memset(&amp;crs, 0, sizeof(crs));</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :         crs.devnode = sc-&gt;sc_devnode;</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :         aml_parse_resource(&amp;res, dwiic_acpi_parse_crs, &amp;crs);</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :         aml_freevalue(&amp;res);</span>
+<span class="lineNum">     384 </span>            : 
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :         acpi_attach_deps(acpi_softc, node-&gt;parent);</span>
+<span class="lineNum">     386 </span>            : 
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :         if (dwiic_matchhids(cdev, ihidev_hids))</span>
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                 return dwiic_acpi_found_ihidev(sc, node, dev, crs);</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         else if (dwiic_matchhids(dev, iatp_hids))</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :                 return dwiic_acpi_found_iatp(sc, node, dev, crs);</span>
+<span class="lineNum">     391 </span>            : 
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         memset(&amp;ia, 0, sizeof(ia));</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         ia.ia_tag = sc-&gt;sc_iba.iba_tag;</span>
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :         ia.ia_name = dev;</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         ia.ia_addr = crs.i2c_addr;</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         ia.ia_cookie = node-&gt;parent;</span>
+<span class="lineNum">     397 </span>            : 
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :         if (crs.irq_int != 0 || crs.gpio_int_node != NULL)</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                 ia.ia_intr = &amp;crs;</span>
+<span class="lineNum">     400 </span>            : 
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :         config_found(sc-&gt;sc_iic, &amp;ia, dwiic_i2c_print);</span>
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :         node-&gt;parent-&gt;attached = 1;</span>
+<span class="lineNum">     403 </span>            : 
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 : }</span>
+<a name="406"><span class="lineNum">     406 </span>            : </a>
+<span class="lineNum">     407 </span>            : int
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 : dwiic_acpi_found_ihidev(struct dwiic_softc *sc, struct aml_node *node,</span>
+<span class="lineNum">     409 </span>            :     char *dev, struct dwiic_crs crs)
+<span class="lineNum">     410 </span>            : {
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         struct i2c_attach_args ia;</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :         struct aml_value cmd[4], res;</span>
+<span class="lineNum">     413 </span>            : 
+<span class="lineNum">     414 </span>            :         /* 3cdff6f7-4267-4555-ad05-b30a3d8938de */
+<span class="lineNum">     415 </span>            :         static uint8_t i2c_hid_guid[] = {
+<span class="lineNum">     416 </span>            :                 0xF7, 0xF6, 0xDF, 0x3C, 0x67, 0x42, 0x55, 0x45,
+<span class="lineNum">     417 </span>            :                 0xAD, 0x05, 0xB3, 0x0A, 0x3D, 0x89, 0x38, 0xDE,
+<span class="lineNum">     418 </span>            :         };
+<span class="lineNum">     419 </span>            : 
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         if (!aml_searchname(node-&gt;parent, &quot;_DSM&quot;)) {</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: couldn't find _DSM at %s\n&quot;, sc-&gt;sc_dev.dv_xname,</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :                     aml_nodename(node-&gt;parent));</span>
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     424 </span>            :         }
+<span class="lineNum">     425 </span>            : 
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd, sizeof(cmd));</span>
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :         cmd[0].type = AML_OBJTYPE_BUFFER;</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :         cmd[0].v_buffer = (uint8_t *)&amp;i2c_hid_guid;</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :         cmd[0].length = sizeof(i2c_hid_guid);</span>
+<span class="lineNum">     430 </span>            :         /* rev */
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :         cmd[1].type = AML_OBJTYPE_INTEGER;</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :         cmd[1].v_integer = 1;</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         cmd[1].length = 1;</span>
+<span class="lineNum">     434 </span>            :         /* func */
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :         cmd[2].type = AML_OBJTYPE_INTEGER;</span>
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :         cmd[2].v_integer = 1; /* HID */</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         cmd[2].length = 1;</span>
+<span class="lineNum">     438 </span>            :         /* not used */
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         cmd[3].type = AML_OBJTYPE_PACKAGE;</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :         cmd[3].length = 0;</span>
+<span class="lineNum">     441 </span>            : 
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         if (aml_evalname(acpi_softc, node-&gt;parent, &quot;_DSM&quot;, 4, cmd, &amp;res)) {</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: eval of _DSM at %s failed\n&quot;,</span>
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname, aml_nodename(node-&gt;parent));</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     446 </span>            :         }
+<span class="lineNum">     447 </span>            : 
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :         if (res.type != AML_OBJTYPE_INTEGER) {</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: bad _DSM result at %s: %d\n&quot;,</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname, aml_nodename(node-&gt;parent), res.type);</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                 aml_freevalue(&amp;res);</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     453 </span>            :         }
+<span class="lineNum">     454 </span>            : 
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :         memset(&amp;ia, 0, sizeof(ia));</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :         ia.ia_tag = sc-&gt;sc_iba.iba_tag;</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :         ia.ia_size = 1;</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :         ia.ia_name = &quot;ihidev&quot;;</span>
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :         ia.ia_size = aml_val2int(&amp;res); /* hid descriptor address */</span>
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :         ia.ia_addr = crs.i2c_addr;</span>
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :         ia.ia_cookie = dev;</span>
+<span class="lineNum">     462 </span>            : 
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :         aml_freevalue(&amp;res);</span>
+<span class="lineNum">     464 </span>            : 
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :         if (!sc-&gt;sc_poll_ihidev &amp;&amp;</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :             !(crs.irq_int == 0 &amp;&amp; crs.gpio_int_node == NULL))</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :                 ia.ia_intr = &amp;crs;</span>
+<span class="lineNum">     468 </span>            : 
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :         if (config_found(sc-&gt;sc_iic, &amp;ia, dwiic_i2c_print)) {</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :                 node-&gt;parent-&gt;attached = 1;</span>
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     472 </span>            :         }
+<span class="lineNum">     473 </span>            : 
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :         return 1;</span>
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 : }</span>
+<a name="476"><span class="lineNum">     476 </span>            : </a>
+<span class="lineNum">     477 </span>            : int
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 : dwiic_acpi_found_iatp(struct dwiic_softc *sc, struct aml_node *node, char *dev,</span>
+<span class="lineNum">     479 </span>            :     struct dwiic_crs crs)
+<span class="lineNum">     480 </span>            : {
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :         struct i2c_attach_args ia;</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :         struct aml_value res;</span>
+<span class="lineNum">     483 </span>            : 
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         if (aml_evalname(acpi_softc, node-&gt;parent, &quot;GPIO&quot;, 0, NULL, &amp;res))</span>
+<span class="lineNum">     485 </span>            :                 /* no gpio, assume this is the bootloader interface */
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     487 </span>            : 
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :         memset(&amp;ia, 0, sizeof(ia));</span>
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :         ia.ia_tag = sc-&gt;sc_iba.iba_tag;</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :         ia.ia_size = 1;</span>
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :         ia.ia_name = &quot;iatp&quot;;</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :         ia.ia_addr = crs.i2c_addr;</span>
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         ia.ia_cookie = dev;</span>
+<span class="lineNum">     494 </span>            : 
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :         if (crs.irq_int &lt;= 0 &amp;&amp; crs.gpio_int_node == NULL) {</span>
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: couldn't find irq for %s\n&quot;, sc-&gt;sc_dev.dv_xname,</span>
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :                    aml_nodename(node-&gt;parent));</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     499 </span>            :         }
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :         ia.ia_intr = &amp;crs;</span>
+<span class="lineNum">     501 </span>            : 
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :         if (config_found(sc-&gt;sc_iic, &amp;ia, dwiic_i2c_print)) {</span>
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :                 node-&gt;parent-&gt;attached = 1;</span>
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     505 </span>            :         }
+<span class="lineNum">     506 </span>            : 
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :         return 1;</span>
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 : }</span>
+<a name="509"><span class="lineNum">     509 </span>            : </a>
+<span class="lineNum">     510 </span>            : void
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 : dwiic_acpi_power(struct dwiic_softc *sc, int power)</span>
+<span class="lineNum">     512 </span>            : {
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :         char ps[] = &quot;_PS0&quot;;</span>
+<span class="lineNum">     514 </span>            : 
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :         if (!power)</span>
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :                 ps[3] = '3';</span>
+<span class="lineNum">     517 </span>            : 
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :         if (aml_searchname(sc-&gt;sc_devnode, ps)) {</span>
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :                 if (aml_evalname(sc-&gt;sc_acpi, sc-&gt;sc_devnode, ps, 0, NULL,</span>
+<span class="lineNum">     520 </span>            :                     NULL)) {
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: failed powering %s with %s\n&quot;,</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_dev.dv_xname, power ? &quot;on&quot; : &quot;off&quot;,</span>
+<span class="lineNum">     523 </span>            :                             ps);
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     525 </span>            :                 }
+<span class="lineNum">     526 </span>            : 
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                 DELAY(10000); /* 10 milliseconds */</span>
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     529 </span>            :                 DPRINTF((&quot;%s: no %s method\n&quot;, sc-&gt;sc_dev.dv_xname, ps));
+<span class="lineNum">     530 </span>            : 
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :         if (strcmp(sc-&gt;sc_hid, &quot;INT3432&quot;) == 0 ||</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :             strcmp(sc-&gt;sc_hid, &quot;INT3433&quot;) == 0) {</span>
+<span class="lineNum">     533 </span>            :                 /*
+<span class="lineNum">     534 </span>            :                  * XXX: broadwell i2c devices may need this for initial power
+<span class="lineNum">     535 </span>            :                  * up and/or after s3 resume.
+<span class="lineNum">     536 </span>            :                  *
+<span class="lineNum">     537 </span>            :                  * linux does this write via LPSS -&gt; clk_register_gate -&gt;
+<span class="lineNum">     538 </span>            :                  * clk_gate_enable -&gt; clk_gate_endisable -&gt; clk_writel
+<span class="lineNum">     539 </span>            :                  */
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                 dwiic_write(sc, 0x800, 1);</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

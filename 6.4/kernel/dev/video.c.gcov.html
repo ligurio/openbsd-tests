@@ -1,0 +1,576 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/video.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">dev</a> - video.c<span style="font-size: 80%;"> (source / <a href="video.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">225</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: video.c,v 1.41 2017/10/11 08:08:50 mpi Exp $  */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2008 Robert Nagy &lt;robert@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2008 Marcus Glocker &lt;mglocker@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       8 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       9 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      12 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      13 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      14 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      15 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      16 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      17 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      18 </span>            :  */
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/errno.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/fcntl.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/poll.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/vnode.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/conf.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/videoio.h&gt;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : #include &lt;dev/video_if.h&gt;
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : #include &lt;uvm/uvm_extern.h&gt;
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span>            : #ifdef VIDEO_DEBUG
+<span class="lineNum">      38 </span>            : #define DPRINTF(x)      do { printf x; } while (0)
+<span class="lineNum">      39 </span>            : #else
+<span class="lineNum">      40 </span>            : #define DPRINTF(x)
+<span class="lineNum">      41 </span>            : #endif
+<span class="lineNum">      42 </span>            : 
+<span class="lineNum">      43 </span>            : struct video_softc {
+<span class="lineNum">      44 </span>            :         struct device            dev;
+<span class="lineNum">      45 </span>            :         void                    *hw_hdl;        /* hardware driver handle */
+<span class="lineNum">      46 </span>            :         struct device           *sc_dev;        /* hardware device struct */
+<span class="lineNum">      47 </span>            :         struct video_hw_if      *hw_if;         /* hardware interface */
+<span class="lineNum">      48 </span>            :         char                     sc_dying;      /* device detached */
+<span class="lineNum">      49 </span>            : #define VIDEO_OPEN      0x01
+<span class="lineNum">      50 </span>            :         char                     sc_open;
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            :         int                      sc_fsize;
+<span class="lineNum">      53 </span>            :         uint8_t                 *sc_fbuffer;
+<span class="lineNum">      54 </span>            :         size_t                   sc_fbufferlen;
+<span class="lineNum">      55 </span>            :         int                      sc_vidmode;    /* access mode */
+<span class="lineNum">      56 </span>            : #define         VIDMODE_NONE    0
+<span class="lineNum">      57 </span>            : #define         VIDMODE_MMAP    1
+<span class="lineNum">      58 </span>            : #define         VIDMODE_READ    2
+<span class="lineNum">      59 </span>            :         int                      sc_frames_ready;
+<span class="lineNum">      60 </span>            : 
+<span class="lineNum">      61 </span>            :         struct selinfo           sc_rsel;       /* read selector */
+<span class="lineNum">      62 </span>            : };
+<span class="lineNum">      63 </span>            : 
+<span class="lineNum">      64 </span>            : int     videoprobe(struct device *, void *, void *);
+<span class="lineNum">      65 </span>            : void    videoattach(struct device *, struct device *, void *);
+<span class="lineNum">      66 </span>            : int     videodetach(struct device *, int);
+<span class="lineNum">      67 </span>            : int     videoactivate(struct device *, int);
+<span class="lineNum">      68 </span>            : int     videoprint(void *, const char *);
+<span class="lineNum">      69 </span>            : 
+<span class="lineNum">      70 </span>            : void    video_intr(void *);
+<span class="lineNum">      71 </span>            : 
+<span class="lineNum">      72 </span>            : struct cfattach video_ca = {
+<span class="lineNum">      73 </span>            :         sizeof(struct video_softc), videoprobe, videoattach,
+<span class="lineNum">      74 </span>            :         videodetach, videoactivate
+<span class="lineNum">      75 </span>            : };
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            : struct cfdriver video_cd = {
+<span class="lineNum">      78 </span>            :         NULL, &quot;video&quot;, DV_DULL
+<span class="lineNum">      79 </span>            : };
+<a name="80"><span class="lineNum">      80 </span>            : </a>
+<span class="lineNum">      81 </span>            : int
+<span class="lineNum">      82 </span><span class="lineNoCov">          0 : videoprobe(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">      83 </span>            : {
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">      85 </span>            : }
+<a name="86"><span class="lineNum">      86 </span>            : </a>
+<span class="lineNum">      87 </span>            : void
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 : videoattach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">      89 </span>            : {
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :         struct video_softc *sc = (void *)self;</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :         struct video_attach_args *sa = aux;</span>
+<span class="lineNum">      92 </span>            : 
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :         sc-&gt;hw_if = sa-&gt;hwif;</span>
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         sc-&gt;hw_hdl = sa-&gt;hdl;</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :         sc-&gt;sc_dev = parent;</span>
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :         sc-&gt;sc_fbufferlen = 0;</span>
+<span class="lineNum">      98 </span>            : 
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :         if (sc-&gt;hw_if-&gt;get_bufsize)</span>
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_fbufferlen = (sc-&gt;hw_if-&gt;get_bufsize)(sc-&gt;hw_hdl);</span>
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_fbufferlen == 0) {</span>
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :                 printf(&quot;video: could not request frame buffer size\n&quot;);</span>
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     104 </span>            :         }
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 :         sc-&gt;sc_fbuffer = malloc(sc-&gt;sc_fbufferlen, M_DEVBUF, M_NOWAIT);</span>
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_fbuffer == NULL) {</span>
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :                 printf(&quot;video: could not allocate frame buffer\n&quot;);</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     110 </span>            :         }
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 : }</span>
+<a name="112"><span class="lineNum">     112 </span>            : </a>
+<span class="lineNum">     113 </span>            : int
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 : videoopen(dev_t dev, int flags, int fmt, struct proc *p)</span>
+<span class="lineNum">     115 </span>            : {
+<span class="lineNum">     116 </span>            :         int     unit;
+<span class="lineNum">     117 </span>            :         struct video_softc *sc;
+<span class="lineNum">     118 </span>            : 
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :         unit = VIDEOUNIT(dev);</span>
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         if (unit &gt;= video_cd.cd_ndevs ||</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :             (sc = video_cd.cd_devs[unit]) == NULL ||</span>
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :              sc-&gt;hw_if == NULL)</span>
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     124 </span>            : 
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_open &amp; VIDEO_OPEN)</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :                 return (EBUSY);</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :         sc-&gt;sc_open |= VIDEO_OPEN;</span>
+<span class="lineNum">     128 </span>            : 
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :         sc-&gt;sc_vidmode = VIDMODE_NONE;</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         sc-&gt;sc_frames_ready = 0;</span>
+<span class="lineNum">     131 </span>            : 
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :         if (sc-&gt;hw_if-&gt;open != NULL)</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :                 return (sc-&gt;hw_if-&gt;open(sc-&gt;hw_hdl, flags, &amp;sc-&gt;sc_fsize,</span>
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_fbuffer, video_intr, sc));</span>
+<span class="lineNum">     135 </span>            :         else
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 : }</span>
+<a name="138"><span class="lineNum">     138 </span>            : </a>
+<span class="lineNum">     139 </span>            : int
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 : videoclose(dev_t dev, int flags, int fmt, struct proc *p)</span>
+<span class="lineNum">     141 </span>            : {
+<span class="lineNum">     142 </span>            :         struct video_softc *sc;
+<span class="lineNum">     143 </span>            :         int r = 0;
+<span class="lineNum">     144 </span>            : 
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         sc = video_cd.cd_devs[VIDEOUNIT(dev)];</span>
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         if (sc-&gt;hw_if-&gt;close != NULL)</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :                 r = sc-&gt;hw_if-&gt;close(sc-&gt;hw_hdl);</span>
+<span class="lineNum">     149 </span>            : 
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         sc-&gt;sc_open &amp;= ~VIDEO_OPEN;</span>
+<span class="lineNum">     151 </span>            : 
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         return (r);</span>
+<span class="lineNum">     153 </span>            : }
+<a name="154"><span class="lineNum">     154 </span>            : </a>
+<span class="lineNum">     155 </span>            : int
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 : videoread(dev_t dev, struct uio *uio, int ioflag)</span>
+<span class="lineNum">     157 </span>            : {
+<span class="lineNum">     158 </span>            :         struct video_softc *sc;
+<span class="lineNum">     159 </span>            :         int unit, error;
+<span class="lineNum">     160 </span>            :         size_t size;
+<span class="lineNum">     161 </span>            : 
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :         unit = VIDEOUNIT(dev);</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         if (unit &gt;= video_cd.cd_ndevs ||</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :             (sc = video_cd.cd_devs[unit]) == NULL)</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     166 </span>            : 
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_dying)</span>
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                 return (EIO);</span>
+<span class="lineNum">     169 </span>            : 
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_vidmode == VIDMODE_MMAP)</span>
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :                 return (EBUSY);</span>
+<span class="lineNum">     172 </span>            : 
+<span class="lineNum">     173 </span>            :         /* start the stream if not already started */
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_vidmode == VIDMODE_NONE &amp;&amp; sc-&gt;hw_if-&gt;start_read) {</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                 error = sc-&gt;hw_if-&gt;start_read(sc-&gt;hw_hdl);</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                 if (error)</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_vidmode = VIDMODE_READ;</span>
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     180 </span>            :  
+<span class="lineNum">     181 </span>            :         DPRINTF((&quot;resid=%zu\n&quot;, uio-&gt;uio_resid));
+<span class="lineNum">     182 </span>            : 
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_frames_ready &lt; 1) {</span>
+<span class="lineNum">     184 </span>            :                 /* block userland read until a frame is ready */
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :                 error = tsleep(sc, PWAIT | PCATCH, &quot;vid_rd&quot;, 0);</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_dying)</span>
+<span class="lineNum">     187 </span>            :                         error = EIO;
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :                 if (error)</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     190 </span>            :         }
+<span class="lineNum">     191 </span>            : 
+<span class="lineNum">     192 </span>            :         /* move no more than 1 frame to userland, as per specification */
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         size = ulmin(uio-&gt;uio_resid, sc-&gt;sc_fsize);</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :         error = uiomove(sc-&gt;sc_fbuffer, size, uio);</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         sc-&gt;sc_frames_ready--;</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span>            :         DPRINTF((&quot;uiomove successfully done (%zu bytes)\n&quot;, size));
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 : }</span>
+<a name="203"><span class="lineNum">     203 </span>            : </a>
+<span class="lineNum">     204 </span>            : int
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 : videoioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct proc *p)</span>
+<span class="lineNum">     206 </span>            : {
+<span class="lineNum">     207 </span>            :         struct video_softc *sc;
+<span class="lineNum">     208 </span>            :         int unit, error;
+<span class="lineNum">     209 </span>            : 
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :         unit = VIDEOUNIT(dev);</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :         if (unit &gt;= video_cd.cd_ndevs ||</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :             (sc = video_cd.cd_devs[unit]) == NULL || sc-&gt;hw_if == NULL)</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     214 </span>            : 
+<span class="lineNum">     215 </span>            :         DPRINTF((&quot;video_ioctl(%zu, '%c', %zu)\n&quot;,
+<span class="lineNum">     216 </span>            :             IOCPARM_LEN(cmd), (int) IOCGROUP(cmd), cmd &amp; 0xff));
+<span class="lineNum">     217 </span>            : 
+<span class="lineNum">     218 </span>            :         error = EOPNOTSUPP;
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     220 </span>            :         case VIDIOC_QUERYCAP:
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;querycap)</span>
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;querycap)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                             (struct v4l2_capability *)data);</span>
+<span class="lineNum">     224 </span>            :                 break;
+<span class="lineNum">     225 </span>            :         case VIDIOC_ENUM_FMT:
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;enum_fmt)</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;enum_fmt)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                             (struct v4l2_fmtdesc *)data);</span>
+<span class="lineNum">     229 </span>            :                 break;
+<span class="lineNum">     230 </span>            :         case VIDIOC_ENUM_FRAMESIZES:
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;enum_fsizes)</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;enum_fsizes)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :                             (struct v4l2_frmsizeenum *)data);</span>
+<span class="lineNum">     234 </span>            :                 break;
+<span class="lineNum">     235 </span>            :         case VIDIOC_ENUM_FRAMEINTERVALS:
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;enum_fivals)</span>
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;enum_fivals)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :                             (struct v4l2_frmivalenum *)data);</span>
+<span class="lineNum">     239 </span>            :                 break;
+<span class="lineNum">     240 </span>            :         case VIDIOC_S_FMT:
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                 if (!(flags &amp; FWRITE))</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :                         return (EACCES);</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;s_fmt)</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;s_fmt)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                             (struct v4l2_format *)data);</span>
+<span class="lineNum">     246 </span>            :                 break;
+<span class="lineNum">     247 </span>            :         case VIDIOC_G_FMT:
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;g_fmt)</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;g_fmt)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :                             (struct v4l2_format *)data);</span>
+<span class="lineNum">     251 </span>            :                 break;
+<span class="lineNum">     252 </span>            :         case VIDIOC_S_PARM:
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;s_parm)</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;s_parm)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :                             (struct v4l2_streamparm *)data);</span>
+<span class="lineNum">     256 </span>            :                 break;
+<span class="lineNum">     257 </span>            :         case VIDIOC_G_PARM:
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;g_parm)</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;g_parm)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :                             (struct v4l2_streamparm *)data);</span>
+<span class="lineNum">     261 </span>            :                 break;
+<span class="lineNum">     262 </span>            :         case VIDIOC_ENUMINPUT:
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;enum_input)</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;enum_input)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :                             (struct v4l2_input *)data);</span>
+<span class="lineNum">     266 </span>            :                 break;
+<span class="lineNum">     267 </span>            :         case VIDIOC_S_INPUT:
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;s_input)</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;s_input)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :                             (int)*data);</span>
+<span class="lineNum">     271 </span>            :                 break;
+<span class="lineNum">     272 </span>            :         case VIDIOC_G_INPUT:
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;g_input)</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;g_input)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :                             (int *)data);</span>
+<span class="lineNum">     276 </span>            :                 break;
+<span class="lineNum">     277 </span>            :         case VIDIOC_REQBUFS:
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;reqbufs)</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;reqbufs)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                             (struct v4l2_requestbuffers *)data);</span>
+<span class="lineNum">     281 </span>            :                 break;
+<span class="lineNum">     282 </span>            :         case VIDIOC_QUERYBUF:
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;querybuf)</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;querybuf)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                             (struct v4l2_buffer *)data);</span>
+<span class="lineNum">     286 </span>            :                 break;
+<span class="lineNum">     287 </span>            :         case VIDIOC_QBUF:
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;qbuf)</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;qbuf)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                             (struct v4l2_buffer *)data);</span>
+<span class="lineNum">     291 </span>            :                 break;
+<span class="lineNum">     292 </span>            :         case VIDIOC_DQBUF:
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                 if (!sc-&gt;hw_if-&gt;dqbuf)</span>
+<span class="lineNum">     294 </span>            :                         break;
+<span class="lineNum">     295 </span>            :                 /* should have called mmap() before now */
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_vidmode != VIDMODE_MMAP) {</span>
+<span class="lineNum">     297 </span>            :                         error = EINVAL;
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     299 </span>            :                 }
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                 error = (sc-&gt;hw_if-&gt;dqbuf)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :                     (struct v4l2_buffer *)data);</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_frames_ready--;</span>
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     304 </span>            :         case VIDIOC_STREAMON:
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;streamon)</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;streamon)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :                             (int)*data);</span>
+<span class="lineNum">     308 </span>            :                 break;
+<span class="lineNum">     309 </span>            :         case VIDIOC_STREAMOFF:
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;streamoff)</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;streamoff)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                             (int)*data);</span>
+<span class="lineNum">     313 </span>            :                 break;
+<span class="lineNum">     314 </span>            :         case VIDIOC_TRY_FMT:
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;try_fmt)</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;try_fmt)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :                             (struct v4l2_format *)data);</span>
+<span class="lineNum">     318 </span>            :                 break;
+<span class="lineNum">     319 </span>            :         case VIDIOC_QUERYCTRL:
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;queryctrl)</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;queryctrl)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :                             (struct v4l2_queryctrl *)data);</span>
+<span class="lineNum">     323 </span>            :                 break;
+<span class="lineNum">     324 </span>            :         case VIDIOC_G_CTRL:
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;g_ctrl)</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;g_ctrl)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :                             (struct v4l2_control *)data);</span>
+<span class="lineNum">     328 </span>            :                 break;
+<span class="lineNum">     329 </span>            :         case VIDIOC_S_CTRL:
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                 if (sc-&gt;hw_if-&gt;s_ctrl)</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :                         error = (sc-&gt;hw_if-&gt;s_ctrl)(sc-&gt;hw_hdl,</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                             (struct v4l2_control *)data);</span>
+<span class="lineNum">     333 </span>            :                 break;
+<span class="lineNum">     334 </span>            :         default:
+<span class="lineNum">     335 </span>            :                 error = (ENOTTY);
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 : }</span>
+<a name="340"><span class="lineNum">     340 </span>            : </a>
+<span class="lineNum">     341 </span>            : int
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 : videopoll(dev_t dev, int events, struct proc *p)</span>
+<span class="lineNum">     343 </span>            : {
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         int unit = VIDEOUNIT(dev);</span>
+<span class="lineNum">     345 </span>            :         struct video_softc *sc;
+<span class="lineNum">     346 </span>            :         int error, revents = 0;
+<span class="lineNum">     347 </span>            : 
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         if (unit &gt;= video_cd.cd_ndevs ||</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :             (sc = video_cd.cd_devs[unit]) == NULL)</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                 return (POLLERR);</span>
+<span class="lineNum">     351 </span>            : 
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_dying)</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :                 return (POLLERR);</span>
+<span class="lineNum">     354 </span>            : 
+<span class="lineNum">     355 </span>            :         DPRINTF((&quot;%s: events=0x%x\n&quot;, __func__, events));
+<span class="lineNum">     356 </span>            : 
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :         if (events &amp; (POLLIN | POLLRDNORM)) {</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_frames_ready &gt; 0)</span>
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :                         revents |= events &amp; (POLLIN | POLLRDNORM);</span>
+<span class="lineNum">     360 </span>            :         }
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         if (revents == 0) {</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :                 if (events &amp; (POLLIN | POLLRDNORM)) {</span>
+<span class="lineNum">     363 </span>            :                         /*
+<span class="lineNum">     364 </span>            :                          * Start the stream in read() mode if not already
+<span class="lineNum">     365 </span>            :                          * started.  If the user wanted mmap() mode,
+<span class="lineNum">     366 </span>            :                          * he should have called mmap() before now.
+<span class="lineNum">     367 </span>            :                          */
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :                         if (sc-&gt;sc_vidmode == VIDMODE_NONE &amp;&amp;</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                             sc-&gt;hw_if-&gt;start_read) {</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                                 error = sc-&gt;hw_if-&gt;start_read(sc-&gt;hw_hdl);</span>
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                                 if (error)</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                                         return (POLLERR);</span>
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                                 sc-&gt;sc_vidmode = VIDMODE_READ;</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                         selrecord(p, &amp;sc-&gt;sc_rsel);</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     377 </span>            :         }
+<span class="lineNum">     378 </span>            : 
+<span class="lineNum">     379 </span>            :         DPRINTF((&quot;%s: revents=0x%x\n&quot;, __func__, revents));
+<span class="lineNum">     380 </span>            : 
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :         return (revents);</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 : }</span>
+<a name="383"><span class="lineNum">     383 </span>            : </a>
+<span class="lineNum">     384 </span>            : paddr_t
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 : videommap(dev_t dev, off_t off, int prot)</span>
+<span class="lineNum">     386 </span>            : {
+<span class="lineNum">     387 </span>            :         struct video_softc *sc;
+<span class="lineNum">     388 </span>            :         int unit;
+<span class="lineNum">     389 </span>            :         caddr_t p;
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         paddr_t pa;</span>
+<span class="lineNum">     391 </span>            : 
+<span class="lineNum">     392 </span>            :         DPRINTF((&quot;%s: off=%lld, prot=%d\n&quot;, __func__, off, prot));
+<span class="lineNum">     393 </span>            : 
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :         unit = VIDEOUNIT(dev);</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         if (unit &gt;= video_cd.cd_ndevs ||</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :             (sc = video_cd.cd_devs[unit]) == NULL)</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     398 </span>            : 
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_dying)</span>
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     401 </span>            : 
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :         if (sc-&gt;hw_if-&gt;mappage == NULL)</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     404 </span>            : 
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         p = sc-&gt;hw_if-&gt;mappage(sc-&gt;hw_hdl, off, prot);</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :         if (p == NULL)</span>
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :         if (pmap_extract(pmap_kernel(), (vaddr_t)p, &amp;pa) == FALSE)</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                 panic(&quot;videommap: invalid page&quot;);</span>
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         sc-&gt;sc_vidmode = VIDMODE_MMAP;</span>
+<span class="lineNum">     411 </span>            : 
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :         return (pa);</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 : }</span>
+<a name="414"><span class="lineNum">     414 </span>            : </a>
+<span class="lineNum">     415 </span>            : int
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 : video_submatch(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     417 </span>            : {
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :         struct cfdata *cf = match;</span>
+<span class="lineNum">     419 </span>            : 
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         return (cf-&gt;cf_driver == &amp;video_cd);</span>
+<span class="lineNum">     421 </span>            : }
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span>            : /*
+<span class="lineNum">     424 </span>            :  * Called from hardware driver. This is where the MI video driver gets
+<span class="lineNum">     425 </span>            :  * probed/attached to the hardware driver
+<a name="426"><span class="lineNum">     426 </span>            :  */</a>
+<span class="lineNum">     427 </span>            : struct device *
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 : video_attach_mi(struct video_hw_if *rhwp, void *hdlp, struct device *dev)</span>
+<span class="lineNum">     429 </span>            : {
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :         struct video_attach_args arg;</span>
+<span class="lineNum">     431 </span>            : 
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :         arg.hwif = rhwp;</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         arg.hdl = hdlp;</span>
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         return (config_found_sm(dev, &amp;arg, videoprint, video_submatch));</span>
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 : }</span>
+<a name="436"><span class="lineNum">     436 </span>            : </a>
+<span class="lineNum">     437 </span>            : void
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 : video_intr(void *addr)</span>
+<span class="lineNum">     439 </span>            : {
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :         struct video_softc *sc = (struct video_softc *)addr;</span>
+<span class="lineNum">     441 </span>            : 
+<span class="lineNum">     442 </span>            :         DPRINTF((&quot;video_intr sc=%p\n&quot;, sc));
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_vidmode != VIDMODE_NONE)</span>
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_frames_ready++;</span>
+<span class="lineNum">     445 </span>            :         else
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: interrupt but no streams!\n&quot;, __func__);</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_vidmode == VIDMODE_READ)</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                 wakeup(sc);</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :         selwakeup(&amp;sc-&gt;sc_rsel);</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 : }</span>
+<a name="451"><span class="lineNum">     451 </span>            : </a>
+<span class="lineNum">     452 </span>            : int
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 : videoprint(void *aux, const char *pnp)</span>
+<span class="lineNum">     454 </span>            : {
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :         if (pnp != NULL)</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :                 printf(&quot;video at %s&quot;, pnp);</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :         return (UNCONF);</span>
+<span class="lineNum">     458 </span>            : }
+<a name="459"><span class="lineNum">     459 </span>            : </a>
+<span class="lineNum">     460 </span>            : int
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 : videodetach(struct device *self, int flags)</span>
+<span class="lineNum">     462 </span>            : {
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :         struct video_softc *sc = (struct video_softc *)self;</span>
+<span class="lineNum">     464 </span>            :         int maj, mn;
+<span class="lineNum">     465 </span>            : 
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_fbuffer != NULL)</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :                 free(sc-&gt;sc_fbuffer, M_DEVBUF, sc-&gt;sc_fbufferlen);</span>
+<span class="lineNum">     468 </span>            : 
+<span class="lineNum">     469 </span>            :         /* locate the major number */
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :         for (maj = 0; maj &lt; nchrdev; maj++)</span>
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                 if (cdevsw[maj].d_open == videoopen)</span>
+<span class="lineNum">     472 </span>            :                         break;
+<span class="lineNum">     473 </span>            : 
+<span class="lineNum">     474 </span>            :         /* Nuke the vnodes for any open instances (calls close). */
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :         mn = self-&gt;dv_unit;</span>
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :         vdevgone(maj, mn, mn, VCHR);</span>
+<span class="lineNum">     477 </span>            : 
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     479 </span>            : }
+<a name="480"><span class="lineNum">     480 </span>            : </a>
+<span class="lineNum">     481 </span>            : int
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 : videoactivate(struct device *self, int act)</span>
+<span class="lineNum">     483 </span>            : {
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         struct video_softc *sc = (struct video_softc *)self;</span>
+<span class="lineNum">     485 </span>            : 
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :         switch (act) {</span>
+<span class="lineNum">     487 </span>            :         case DVACT_DEACTIVATE:
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_dying = 1;</span>
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     490 </span>            :         }
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     492 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,1638 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pv/xen.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/pv</a> - xen.c<span style="font-size: 80%;"> (source / <a href="xen.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">708</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">49</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: xen.c,v 1.93 2018/01/21 18:54:46 mikeb Exp $  */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2015, 2016, 2017 Mike Belopuhov
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : /* Xen requires locked atomic operations */
+<span class="lineNum">      22 </span>            : #ifndef MULTIPROCESSOR
+<span class="lineNum">      23 </span>            : #define _XENMPATOMICS
+<span class="lineNum">      24 </span>            : #define MULTIPROCESSOR
+<span class="lineNum">      25 </span>            : #endif
+<span class="lineNum">      26 </span>            : #include &lt;sys/atomic.h&gt;
+<span class="lineNum">      27 </span>            : #ifdef _XENMPATOMICS
+<span class="lineNum">      28 </span>            : #undef MULTIPROCESSOR
+<span class="lineNum">      29 </span>            : #undef _XENMPATOMICS
+<span class="lineNum">      30 </span>            : #endif
+<span class="lineNum">      31 </span>            : 
+<span class="lineNum">      32 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;sys/proc.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;sys/signal.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;sys/signalvar.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;sys/refcnt.h&gt;
+<span class="lineNum">      37 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;sys/stdint.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      41 </span>            : #include &lt;sys/task.h&gt;
+<span class="lineNum">      42 </span>            : #include &lt;sys/syslog.h&gt;
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : #include &lt;machine/bus.h&gt;
+<span class="lineNum">      45 </span>            : #include &lt;machine/cpu.h&gt;
+<span class="lineNum">      46 </span>            : #include &lt;machine/cpufunc.h&gt;
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : #include &lt;uvm/uvm_extern.h&gt;
+<span class="lineNum">      49 </span>            : 
+<span class="lineNum">      50 </span>            : #include &lt;machine/i82489var.h&gt;
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : #include &lt;dev/rndvar.h&gt;
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span>            : #include &lt;dev/pv/pvvar.h&gt;
+<span class="lineNum">      55 </span>            : #include &lt;dev/pv/pvreg.h&gt;
+<span class="lineNum">      56 </span>            : #include &lt;dev/pv/xenreg.h&gt;
+<span class="lineNum">      57 </span>            : #include &lt;dev/pv/xenvar.h&gt;
+<span class="lineNum">      58 </span>            : 
+<span class="lineNum">      59 </span>            : /* #define XEN_DEBUG */
+<span class="lineNum">      60 </span>            : 
+<span class="lineNum">      61 </span>            : #ifdef XEN_DEBUG
+<span class="lineNum">      62 </span>            : #define DPRINTF(x...)           printf(x)
+<span class="lineNum">      63 </span>            : #else
+<span class="lineNum">      64 </span>            : #define DPRINTF(x...)
+<span class="lineNum">      65 </span>            : #endif
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span>            : struct xen_softc *xen_sc;
+<span class="lineNum">      68 </span>            : 
+<span class="lineNum">      69 </span>            : int     xen_init_hypercall(struct xen_softc *);
+<span class="lineNum">      70 </span>            : int     xen_getfeatures(struct xen_softc *);
+<span class="lineNum">      71 </span>            : int     xen_init_info_page(struct xen_softc *);
+<span class="lineNum">      72 </span>            : int     xen_init_cbvec(struct xen_softc *);
+<span class="lineNum">      73 </span>            : int     xen_init_interrupts(struct xen_softc *);
+<span class="lineNum">      74 </span>            : void    xen_intr_dispatch(void *);
+<span class="lineNum">      75 </span>            : int     xen_init_grant_tables(struct xen_softc *);
+<span class="lineNum">      76 </span>            : struct xen_gntent *
+<span class="lineNum">      77 </span>            :         xen_grant_table_grow(struct xen_softc *);
+<span class="lineNum">      78 </span>            : int     xen_grant_table_alloc(struct xen_softc *, grant_ref_t *);
+<span class="lineNum">      79 </span>            : void    xen_grant_table_free(struct xen_softc *, grant_ref_t);
+<span class="lineNum">      80 </span>            : void    xen_grant_table_enter(struct xen_softc *, grant_ref_t, paddr_t,
+<span class="lineNum">      81 </span>            :             int, int);
+<span class="lineNum">      82 </span>            : void    xen_grant_table_remove(struct xen_softc *, grant_ref_t);
+<span class="lineNum">      83 </span>            : void    xen_disable_emulated_devices(struct xen_softc *);
+<span class="lineNum">      84 </span>            : 
+<span class="lineNum">      85 </span>            : int     xen_match(struct device *, void *, void *);
+<span class="lineNum">      86 </span>            : void    xen_attach(struct device *, struct device *, void *);
+<span class="lineNum">      87 </span>            : void    xen_deferred(struct device *);
+<span class="lineNum">      88 </span>            : void    xen_control(void *);
+<span class="lineNum">      89 </span>            : void    xen_hotplug(void *);
+<span class="lineNum">      90 </span>            : void    xen_resume(struct device *);
+<span class="lineNum">      91 </span>            : int     xen_activate(struct device *, int);
+<span class="lineNum">      92 </span>            : int     xen_attach_device(struct xen_softc *, struct xen_devlist *,
+<span class="lineNum">      93 </span>            :             const char *, const char *);
+<span class="lineNum">      94 </span>            : int     xen_probe_devices(struct xen_softc *);
+<span class="lineNum">      95 </span>            : 
+<span class="lineNum">      96 </span>            : int     xen_bus_dmamap_create(bus_dma_tag_t, bus_size_t, int, bus_size_t,
+<span class="lineNum">      97 </span>            :             bus_size_t, int, bus_dmamap_t *);
+<span class="lineNum">      98 </span>            : void    xen_bus_dmamap_destroy(bus_dma_tag_t, bus_dmamap_t);
+<span class="lineNum">      99 </span>            : int     xen_bus_dmamap_load(bus_dma_tag_t, bus_dmamap_t, void *, bus_size_t,
+<span class="lineNum">     100 </span>            :             struct proc *, int);
+<span class="lineNum">     101 </span>            : int     xen_bus_dmamap_load_mbuf(bus_dma_tag_t, bus_dmamap_t, struct mbuf *,
+<span class="lineNum">     102 </span>            :             int);
+<span class="lineNum">     103 </span>            : void    xen_bus_dmamap_unload(bus_dma_tag_t, bus_dmamap_t);
+<span class="lineNum">     104 </span>            : void    xen_bus_dmamap_sync(bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
+<span class="lineNum">     105 </span>            :             bus_size_t, int);
+<span class="lineNum">     106 </span>            : 
+<span class="lineNum">     107 </span>            : int     xs_attach(struct xen_softc *);
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span>            : struct cfdriver xen_cd = {
+<span class="lineNum">     110 </span>            :         NULL, &quot;xen&quot;, DV_DULL
+<span class="lineNum">     111 </span>            : };
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span>            : const struct cfattach xen_ca = {
+<span class="lineNum">     114 </span>            :         sizeof(struct xen_softc), xen_match, xen_attach, NULL, xen_activate
+<span class="lineNum">     115 </span>            : };
+<span class="lineNum">     116 </span>            : 
+<span class="lineNum">     117 </span>            : struct bus_dma_tag xen_bus_dma_tag = {
+<span class="lineNum">     118 </span>            :         NULL,
+<span class="lineNum">     119 </span>            :         xen_bus_dmamap_create,
+<span class="lineNum">     120 </span>            :         xen_bus_dmamap_destroy,
+<span class="lineNum">     121 </span>            :         xen_bus_dmamap_load,
+<span class="lineNum">     122 </span>            :         xen_bus_dmamap_load_mbuf,
+<span class="lineNum">     123 </span>            :         NULL,
+<span class="lineNum">     124 </span>            :         NULL,
+<span class="lineNum">     125 </span>            :         xen_bus_dmamap_unload,
+<span class="lineNum">     126 </span>            :         xen_bus_dmamap_sync,
+<span class="lineNum">     127 </span>            :         _bus_dmamem_alloc,
+<span class="lineNum">     128 </span>            :         NULL,
+<span class="lineNum">     129 </span>            :         _bus_dmamem_free,
+<span class="lineNum">     130 </span>            :         _bus_dmamem_map,
+<span class="lineNum">     131 </span>            :         _bus_dmamem_unmap,
+<span class="lineNum">     132 </span>            :         NULL,
+<span class="lineNum">     133 </span>            : };
+<a name="134"><span class="lineNum">     134 </span>            : </a>
+<span class="lineNum">     135 </span>            : int
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 : xen_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     137 </span>            : {
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :         struct pv_attach_args *pva = aux;</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         struct pvbus_hv *hv = &amp;pva-&gt;pva_hv[PVBUS_XEN];</span>
+<span class="lineNum">     140 </span>            : 
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         if (hv-&gt;hv_base == 0)</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 : }</span>
+<a name="146"><span class="lineNum">     146 </span>            : </a>
+<span class="lineNum">     147 </span>            : void
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 : xen_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     149 </span>            : {
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         struct pv_attach_args *pva = (struct pv_attach_args *)aux;</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         struct pvbus_hv *hv = &amp;pva-&gt;pva_hv[PVBUS_XEN];</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = (struct xen_softc *)self;</span>
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         sc-&gt;sc_base = hv-&gt;hv_base;</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         sc-&gt;sc_dmat = pva-&gt;pva_dmat;</span>
+<span class="lineNum">     156 </span>            : 
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         if (xen_init_hypercall(sc))</span>
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     159 </span>            : 
+<span class="lineNum">     160 </span>            :         /* Wire it up to the global */
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         xen_sc = sc;</span>
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         if (xen_getfeatures(sc))</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     165 </span>            : 
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :         if (xen_init_info_page(sc))</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     168 </span>            : 
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :         xen_init_cbvec(sc);</span>
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         if (xen_init_interrupts(sc))</span>
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     173 </span>            : 
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         if (xen_init_grant_tables(sc))</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     176 </span>            : 
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :         if (xs_attach(sc))</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         xen_probe_devices(sc);</span>
+<span class="lineNum">     181 </span>            : 
+<span class="lineNum">     182 </span>            :         /* pvbus(4) key/value interface */
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         hv-&gt;hv_kvop = xs_kvop;</span>
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :         hv-&gt;hv_arg = sc;</span>
+<span class="lineNum">     185 </span>            : 
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :         xen_disable_emulated_devices(sc);</span>
+<span class="lineNum">     187 </span>            : 
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         config_mountroot(self, xen_deferred);</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 : }</span>
+<a name="190"><span class="lineNum">     190 </span>            : </a>
+<span class="lineNum">     191 </span>            : void
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 : xen_deferred(struct device *self)</span>
+<span class="lineNum">     193 </span>            : {
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = (struct xen_softc *)self;</span>
+<span class="lineNum">     195 </span>            : 
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         if (!(sc-&gt;sc_flags &amp; XSF_CBVEC)) {</span>
+<span class="lineNum">     197 </span>            :                 DPRINTF(&quot;%s: callback vector hasn't been established\n&quot;,
+<span class="lineNum">     198 </span>            :                     sc-&gt;sc_dev.dv_xname);
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     200 </span>            :         }
+<span class="lineNum">     201 </span>            : 
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :         xen_intr_enable();</span>
+<span class="lineNum">     203 </span>            : 
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :         if (xs_watch(sc, &quot;control&quot;, &quot;shutdown&quot;, &amp;sc-&gt;sc_ctltsk,</span>
+<span class="lineNum">     205 </span>            :             xen_control, sc))
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to setup shutdown control watch\n&quot;,</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 : }</span>
+<a name="209"><span class="lineNum">     209 </span>            : </a>
+<span class="lineNum">     210 </span>            : void
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 : xen_control(void *arg)</span>
+<span class="lineNum">     212 </span>            : {
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = arg;</span>
+<span class="lineNum">     214 </span>            :         struct xs_transaction xst;
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         char action[128];</span>
+<span class="lineNum">     216 </span>            :         int error;
+<span class="lineNum">     217 </span>            : 
+<span class="lineNum">     218 </span>            :         memset(&amp;xst, 0, sizeof(xst));
+<span class="lineNum">     219 </span>            :         xst.xst_id = 0;
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         xst.xst_cookie = sc-&gt;sc_xs;</span>
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         error = xs_getprop(sc, &quot;control&quot;, &quot;shutdown&quot;, action, sizeof(action));</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :                 if (error != ENOENT)</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: failed to process control event\n&quot;,</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     228 </span>            :         }
+<span class="lineNum">     229 </span>            : 
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         if (strlen(action) == 0)</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     232 </span>            : 
+<span class="lineNum">     233 </span>            :         /* Acknowledge the event */
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :         xs_setprop(sc, &quot;control&quot;, &quot;shutdown&quot;, &quot;&quot;, 0);</span>
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         if (strcmp(action, &quot;halt&quot;) == 0 || strcmp(action, &quot;poweroff&quot;) == 0) {</span>
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :                 pvbus_shutdown(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :         } else if (strcmp(action, &quot;reboot&quot;) == 0) {</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :                 pvbus_reboot(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :         } else if (strcmp(action, &quot;crash&quot;) == 0) {</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                 panic(&quot;xen told us to do this&quot;);</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         } else if (strcmp(action, &quot;suspend&quot;) == 0) {</span>
+<span class="lineNum">     243 </span>            :                 /* Not implemented yet */
+<span class="lineNum">     244 </span>            :         } else {
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unknown shutdown event \&quot;%s\&quot;\n&quot;,</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname, action);</span>
+<span class="lineNum">     247 </span>            :         }
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 : }</span>
+<a name="249"><span class="lineNum">     249 </span>            : </a>
+<span class="lineNum">     250 </span>            : void
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 : xen_resume(struct device *self)</span>
+<span class="lineNum">     252 </span>            : {
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 : }</span>
+<a name="254"><span class="lineNum">     254 </span>            : </a>
+<span class="lineNum">     255 </span>            : int
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 : xen_activate(struct device *self, int act)</span>
+<span class="lineNum">     257 </span>            : {
+<span class="lineNum">     258 </span>            :         int rv = 0;
+<span class="lineNum">     259 </span>            : 
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         switch (act) {</span>
+<span class="lineNum">     261 </span>            :         case DVACT_RESUME:
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :                 xen_resume(self);</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     264 </span>            :         }
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     266 </span>            : }
+<a name="267"><span class="lineNum">     267 </span>            : </a>
+<span class="lineNum">     268 </span>            : int
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 : xen_init_hypercall(struct xen_softc *sc)</span>
+<span class="lineNum">     270 </span>            : {
+<span class="lineNum">     271 </span>            :         extern void *xen_hypercall_page;
+<span class="lineNum">     272 </span>            :         uint32_t regs[4];
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         paddr_t pa;</span>
+<span class="lineNum">     274 </span>            : 
+<span class="lineNum">     275 </span>            :         /* Get hypercall page configuration MSR */
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :         CPUID(sc-&gt;sc_base + CPUID_OFFSET_XEN_HYPERCALL,</span>
+<span class="lineNum">     277 </span>            :             regs[0], regs[1], regs[2], regs[3]);
+<span class="lineNum">     278 </span>            : 
+<span class="lineNum">     279 </span>            :         /* We don't support more than one hypercall page */
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         if (regs[0] != 1) {</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                 printf(&quot;: requested %u hypercall pages\n&quot;, regs[0]);</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     283 </span>            :         }
+<span class="lineNum">     284 </span>            : 
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         sc-&gt;sc_hc = &amp;xen_hypercall_page;</span>
+<span class="lineNum">     286 </span>            : 
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         if (!pmap_extract(pmap_kernel(), (vaddr_t)sc-&gt;sc_hc, &amp;pa)) {</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                 printf(&quot;: hypercall page PA extraction failed\n&quot;);</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     290 </span>            :         }
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         wrmsr(regs[1], pa);</span>
+<span class="lineNum">     292 </span>            : 
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 : }</span>
+<a name="295"><span class="lineNum">     295 </span>            : </a>
+<span class="lineNum">     296 </span>            : int
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 : xen_hypercall(struct xen_softc *sc, int op, int argc, ...)</span>
+<span class="lineNum">     298 </span>            : {
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :         va_list ap;</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         ulong argv[5];</span>
+<span class="lineNum">     301 </span>            :         int i;
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         if (argc &lt; 0 || argc &gt; 5)</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         va_start(ap, argc);</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; argc; i++)</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :                 argv[i] = (ulong)va_arg(ap, ulong);</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         va_end(ap);</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         return (xen_hypercallv(sc, op, argc, argv));</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 : }</span>
+<a name="311"><span class="lineNum">     311 </span>            : </a>
+<span class="lineNum">     312 </span>            : int
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 : xen_hypercallv(struct xen_softc *sc, int op, int argc, ulong *argv)</span>
+<span class="lineNum">     314 </span>            : {
+<span class="lineNum">     315 </span>            :         ulong hcall;
+<span class="lineNum">     316 </span>            :         int rv = 0;
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :         hcall = (ulong)sc-&gt;sc_hc + op * 32;</span>
+<span class="lineNum">     319 </span>            : 
+<span class="lineNum">     320 </span>            : #if defined(XEN_DEBUG) &amp;&amp; disabled
+<span class="lineNum">     321 </span>            :         {
+<span class="lineNum">     322 </span>            :                 int i;
+<span class="lineNum">     323 </span>            : 
+<span class="lineNum">     324 </span>            :                 printf(&quot;hypercall %d&quot;, op);
+<span class="lineNum">     325 </span>            :                 if (argc &gt; 0) {
+<span class="lineNum">     326 </span>            :                         printf(&quot;, args {&quot;);
+<span class="lineNum">     327 </span>            :                         for (i = 0; i &lt; argc; i++)
+<span class="lineNum">     328 </span>            :                                 printf(&quot; %#lx&quot;, argv[i]);
+<span class="lineNum">     329 </span>            :                         printf(&quot; }\n&quot;);
+<span class="lineNum">     330 </span>            :                 } else
+<span class="lineNum">     331 </span>            :                         printf(&quot;\n&quot;);
+<span class="lineNum">     332 </span>            :         }
+<span class="lineNum">     333 </span>            : #endif
+<span class="lineNum">     334 </span>            : 
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         switch (argc) {</span>
+<span class="lineNum">     336 </span>            :         case 0: {
+<span class="lineNum">     337 </span>            :                 HYPERCALL_RES1;
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                 __asm__ volatile (                      \</span>
+<span class="lineNum">     339 </span>            :                           HYPERCALL_LABEL               \
+<span class="lineNum">     340 </span>            :                         : HYPERCALL_OUT1                \
+<span class="lineNum">     341 </span>            :                         : HYPERCALL_PTR(hcall)          \
+<span class="lineNum">     342 </span>            :                         : HYPERCALL_CLOBBER             \
+<span class="lineNum">     343 </span>            :                 );
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :                 HYPERCALL_RET(rv);</span>
+<span class="lineNum">     345 </span>            :                 break;
+<span class="lineNum">     346 </span>            :         }
+<span class="lineNum">     347 </span>            :         case 1: {
+<span class="lineNum">     348 </span>            :                 HYPERCALL_RES1; HYPERCALL_RES2;
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                 HYPERCALL_ARG1(argv[0]);</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                 __asm__ volatile (                      \</span>
+<span class="lineNum">     351 </span>            :                           HYPERCALL_LABEL               \
+<span class="lineNum">     352 </span>            :                         : HYPERCALL_OUT1 HYPERCALL_OUT2 \
+<span class="lineNum">     353 </span>            :                         : HYPERCALL_IN1                 \
+<span class="lineNum">     354 </span>            :                         , HYPERCALL_PTR(hcall)          \
+<span class="lineNum">     355 </span>            :                         : HYPERCALL_CLOBBER             \
+<span class="lineNum">     356 </span>            :                 );
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :                 HYPERCALL_RET(rv);</span>
+<span class="lineNum">     358 </span>            :                 break;
+<span class="lineNum">     359 </span>            :         }
+<span class="lineNum">     360 </span>            :         case 2: {
+<span class="lineNum">     361 </span>            :                 HYPERCALL_RES1; HYPERCALL_RES2; HYPERCALL_RES3;
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :                 HYPERCALL_ARG1(argv[0]); HYPERCALL_ARG2(argv[1]);</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :                 __asm__ volatile (                      \</span>
+<span class="lineNum">     364 </span>            :                           HYPERCALL_LABEL               \
+<span class="lineNum">     365 </span>            :                         : HYPERCALL_OUT1 HYPERCALL_OUT2 \
+<span class="lineNum">     366 </span>            :                           HYPERCALL_OUT3                \
+<span class="lineNum">     367 </span>            :                         : HYPERCALL_IN1 HYPERCALL_IN2   \
+<span class="lineNum">     368 </span>            :                         , HYPERCALL_PTR(hcall)          \
+<span class="lineNum">     369 </span>            :                         : HYPERCALL_CLOBBER             \
+<span class="lineNum">     370 </span>            :                 );
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                 HYPERCALL_RET(rv);</span>
+<span class="lineNum">     372 </span>            :                 break;
+<span class="lineNum">     373 </span>            :         }
+<span class="lineNum">     374 </span>            :         case 3: {
+<span class="lineNum">     375 </span>            :                 HYPERCALL_RES1; HYPERCALL_RES2; HYPERCALL_RES3;
+<span class="lineNum">     376 </span>            :                 HYPERCALL_RES4;
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                 HYPERCALL_ARG1(argv[0]); HYPERCALL_ARG2(argv[1]);</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                 HYPERCALL_ARG3(argv[2]);</span>
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :                 __asm__ volatile (                      \</span>
+<span class="lineNum">     380 </span>            :                           HYPERCALL_LABEL               \
+<span class="lineNum">     381 </span>            :                         : HYPERCALL_OUT1 HYPERCALL_OUT2 \
+<span class="lineNum">     382 </span>            :                           HYPERCALL_OUT3 HYPERCALL_OUT4 \
+<span class="lineNum">     383 </span>            :                         : HYPERCALL_IN1 HYPERCALL_IN2   \
+<span class="lineNum">     384 </span>            :                           HYPERCALL_IN3                 \
+<span class="lineNum">     385 </span>            :                         , HYPERCALL_PTR(hcall)          \
+<span class="lineNum">     386 </span>            :                         : HYPERCALL_CLOBBER             \
+<span class="lineNum">     387 </span>            :                 );
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                 HYPERCALL_RET(rv);</span>
+<span class="lineNum">     389 </span>            :                 break;
+<span class="lineNum">     390 </span>            :         }
+<span class="lineNum">     391 </span>            :         case 4: {
+<span class="lineNum">     392 </span>            :                 HYPERCALL_RES1; HYPERCALL_RES2; HYPERCALL_RES3;
+<span class="lineNum">     393 </span>            :                 HYPERCALL_RES4; HYPERCALL_RES5;
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :                 HYPERCALL_ARG1(argv[0]); HYPERCALL_ARG2(argv[1]);</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                 HYPERCALL_ARG3(argv[2]); HYPERCALL_ARG4(argv[3]);</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :                 __asm__ volatile (                      \</span>
+<span class="lineNum">     397 </span>            :                           HYPERCALL_LABEL               \
+<span class="lineNum">     398 </span>            :                         : HYPERCALL_OUT1 HYPERCALL_OUT2 \
+<span class="lineNum">     399 </span>            :                           HYPERCALL_OUT3 HYPERCALL_OUT4 \
+<span class="lineNum">     400 </span>            :                           HYPERCALL_OUT5                \
+<span class="lineNum">     401 </span>            :                         : HYPERCALL_IN1 HYPERCALL_IN2   \
+<span class="lineNum">     402 </span>            :                           HYPERCALL_IN3 HYPERCALL_IN4   \
+<span class="lineNum">     403 </span>            :                         , HYPERCALL_PTR(hcall)          \
+<span class="lineNum">     404 </span>            :                         : HYPERCALL_CLOBBER             \
+<span class="lineNum">     405 </span>            :                 );
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :                 HYPERCALL_RET(rv);</span>
+<span class="lineNum">     407 </span>            :                 break;
+<span class="lineNum">     408 </span>            :         }
+<span class="lineNum">     409 </span>            :         case 5: {
+<span class="lineNum">     410 </span>            :                 HYPERCALL_RES1; HYPERCALL_RES2; HYPERCALL_RES3;
+<span class="lineNum">     411 </span>            :                 HYPERCALL_RES4; HYPERCALL_RES5; HYPERCALL_RES6;
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :                 HYPERCALL_ARG1(argv[0]); HYPERCALL_ARG2(argv[1]);</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :                 HYPERCALL_ARG3(argv[2]); HYPERCALL_ARG4(argv[3]);</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :                 HYPERCALL_ARG5(argv[4]);</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :                 __asm__ volatile (                      \</span>
+<span class="lineNum">     416 </span>            :                           HYPERCALL_LABEL               \
+<span class="lineNum">     417 </span>            :                         : HYPERCALL_OUT1 HYPERCALL_OUT2 \
+<span class="lineNum">     418 </span>            :                           HYPERCALL_OUT3 HYPERCALL_OUT4 \
+<span class="lineNum">     419 </span>            :                           HYPERCALL_OUT5 HYPERCALL_OUT6 \
+<span class="lineNum">     420 </span>            :                         : HYPERCALL_IN1 HYPERCALL_IN2   \
+<span class="lineNum">     421 </span>            :                           HYPERCALL_IN3 HYPERCALL_IN4   \
+<span class="lineNum">     422 </span>            :                           HYPERCALL_IN5                 \
+<span class="lineNum">     423 </span>            :                         , HYPERCALL_PTR(hcall)          \
+<span class="lineNum">     424 </span>            :                         : HYPERCALL_CLOBBER             \
+<span class="lineNum">     425 </span>            :                 );
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :                 HYPERCALL_RET(rv);</span>
+<span class="lineNum">     427 </span>            :                 break;
+<span class="lineNum">     428 </span>            :         }
+<span class="lineNum">     429 </span>            :         default:
+<span class="lineNum">     430 </span>            :                 DPRINTF(&quot;%s: wrong number of arguments: %d\n&quot;, __func__, argc);
+<span class="lineNum">     431 </span>            :                 rv = -1;
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     433 </span>            :         }
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     435 </span>            : }
+<a name="436"><span class="lineNum">     436 </span>            : </a>
+<span class="lineNum">     437 </span>            : int
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 : xen_getfeatures(struct xen_softc *sc)</span>
+<span class="lineNum">     439 </span>            : {
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :         struct xen_feature_info xfi;</span>
+<span class="lineNum">     441 </span>            : 
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         memset(&amp;xfi, 0, sizeof(xfi));</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :         if (xen_hypercall(sc, XC_VERSION, 2, XENVER_get_features, &amp;xfi) &lt; 0) {</span>
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :                 printf(&quot;: failed to fetch features\n&quot;);</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     446 </span>            :         }
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :         sc-&gt;sc_features = xfi.submap;</span>
+<span class="lineNum">     448 </span>            : #ifdef XEN_DEBUG
+<span class="lineNum">     449 </span>            :         printf(&quot;: features %b&quot;, sc-&gt;sc_features,
+<span class="lineNum">     450 </span>            :             &quot;\20\014DOM0\013PIRQ\012PVCLOCK\011CBVEC\010GNTFLAGS\007HMA&quot;
+<span class="lineNum">     451 </span>            :             &quot;\006PTUPD\005PAE4G\004SUPERVISOR\003AUTOPMAP\002WDT\001WPT&quot;);
+<span class="lineNum">     452 </span>            : #else
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :         printf(&quot;: features %#x&quot;, sc-&gt;sc_features);</span>
+<span class="lineNum">     454 </span>            : #endif
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     457 </span>            : 
+<span class="lineNum">     458 </span>            : #ifdef XEN_DEBUG
+<span class="lineNum">     459 </span>            : void
+<span class="lineNum">     460 </span>            : xen_print_info_page(void)
+<span class="lineNum">     461 </span>            : {
+<span class="lineNum">     462 </span>            :         struct xen_softc *sc = xen_sc;
+<span class="lineNum">     463 </span>            :         struct shared_info *s = sc-&gt;sc_ipg;
+<span class="lineNum">     464 </span>            :         struct vcpu_info *v;
+<span class="lineNum">     465 </span>            :         int i;
+<span class="lineNum">     466 </span>            : 
+<span class="lineNum">     467 </span>            :         virtio_membar_sync();
+<span class="lineNum">     468 </span>            :         for (i = 0; i &lt; XEN_LEGACY_MAX_VCPUS; i++) {
+<span class="lineNum">     469 </span>            :                 v = &amp;s-&gt;vcpu_info[i];
+<span class="lineNum">     470 </span>            :                 if (!v-&gt;evtchn_upcall_pending &amp;&amp; !v-&gt;evtchn_upcall_mask &amp;&amp;
+<span class="lineNum">     471 </span>            :                     !v-&gt;evtchn_pending_sel &amp;&amp; !v-&gt;time.version &amp;&amp;
+<span class="lineNum">     472 </span>            :                     !v-&gt;time.tsc_timestamp &amp;&amp; !v-&gt;time.system_time &amp;&amp;
+<span class="lineNum">     473 </span>            :                     !v-&gt;time.tsc_to_system_mul &amp;&amp; !v-&gt;time.tsc_shift)
+<span class="lineNum">     474 </span>            :                         continue;
+<span class="lineNum">     475 </span>            :                 printf(&quot;vcpu%d:\n&quot;
+<span class="lineNum">     476 </span>            :                     &quot;   upcall_pending=%02x upcall_mask=%02x pending_sel=%#lx\n&quot;
+<span class="lineNum">     477 </span>            :                     &quot;   time version=%u tsc=%llu system=%llu\n&quot;
+<span class="lineNum">     478 </span>            :                     &quot;   time mul=%u shift=%d\n&quot;,
+<span class="lineNum">     479 </span>            :                     i, v-&gt;evtchn_upcall_pending, v-&gt;evtchn_upcall_mask,
+<span class="lineNum">     480 </span>            :                     v-&gt;evtchn_pending_sel, v-&gt;time.version,
+<span class="lineNum">     481 </span>            :                     v-&gt;time.tsc_timestamp, v-&gt;time.system_time,
+<span class="lineNum">     482 </span>            :                     v-&gt;time.tsc_to_system_mul, v-&gt;time.tsc_shift);
+<span class="lineNum">     483 </span>            :         }
+<span class="lineNum">     484 </span>            :         printf(&quot;pending events: &quot;);
+<span class="lineNum">     485 </span>            :         for (i = 0; i &lt; nitems(s-&gt;evtchn_pending); i++) {
+<span class="lineNum">     486 </span>            :                 if (s-&gt;evtchn_pending[i] == 0)
+<span class="lineNum">     487 </span>            :                         continue;
+<span class="lineNum">     488 </span>            :                 printf(&quot; %d:%#lx&quot;, i, s-&gt;evtchn_pending[i]);
+<span class="lineNum">     489 </span>            :         }
+<span class="lineNum">     490 </span>            :         printf(&quot;\nmasked events: &quot;);
+<span class="lineNum">     491 </span>            :         for (i = 0; i &lt; nitems(s-&gt;evtchn_mask); i++) {
+<span class="lineNum">     492 </span>            :                 if (s-&gt;evtchn_mask[i] == 0xffffffffffffffffULL)
+<span class="lineNum">     493 </span>            :                         continue;
+<span class="lineNum">     494 </span>            :                 printf(&quot; %d:%#lx&quot;, i, s-&gt;evtchn_mask[i]);
+<span class="lineNum">     495 </span>            :         }
+<span class="lineNum">     496 </span>            :         printf(&quot;\nwc ver=%u sec=%u nsec=%u\n&quot;, s-&gt;wc_version, s-&gt;wc_sec,
+<span class="lineNum">     497 </span>            :             s-&gt;wc_nsec);
+<span class="lineNum">     498 </span>            :         printf(&quot;arch maxpfn=%lu framelist=%lu nmi=%lu\n&quot;, s-&gt;arch.max_pfn,
+<span class="lineNum">     499 </span>            :             s-&gt;arch.pfn_to_mfn_frame_list, s-&gt;arch.nmi_reason);
+<span class="lineNum">     500 </span>            : }
+<span class="lineNum">     501 </span>            : #endif  /* XEN_DEBUG */
+<a name="502"><span class="lineNum">     502 </span>            : </a>
+<span class="lineNum">     503 </span>            : int
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 : xen_init_info_page(struct xen_softc *sc)</span>
+<span class="lineNum">     505 </span>            : {
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :         struct xen_add_to_physmap xatp;</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :         paddr_t pa;</span>
+<span class="lineNum">     508 </span>            : 
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :         sc-&gt;sc_ipg = malloc(PAGE_SIZE, M_DEVBUF, M_NOWAIT | M_ZERO);</span>
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_ipg == NULL) {</span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :                 printf(&quot;: failed to allocate shared info page\n&quot;);</span>
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     513 </span>            :         }
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :         if (!pmap_extract(pmap_kernel(), (vaddr_t)sc-&gt;sc_ipg, &amp;pa)) {</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :                 printf(&quot;: shared info page PA extraction failed\n&quot;);</span>
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :                 free(sc-&gt;sc_ipg, M_DEVBUF, PAGE_SIZE);</span>
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     518 </span>            :         }
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :         xatp.domid = DOMID_SELF;</span>
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         xatp.idx = 0;</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :         xatp.space = XENMAPSPACE_shared_info;</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :         xatp.gpfn = atop(pa);</span>
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :         if (xen_hypercall(sc, XC_MEMORY, 2, XENMEM_add_to_physmap, &amp;xatp)) {</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :                 printf(&quot;: failed to register shared info page\n&quot;);</span>
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                 free(sc-&gt;sc_ipg, M_DEVBUF, PAGE_SIZE);</span>
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     527 </span>            :         }
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 : }</span>
+<a name="530"><span class="lineNum">     530 </span>            : </a>
+<span class="lineNum">     531 </span>            : int
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 : xen_init_cbvec(struct xen_softc *sc)</span>
+<span class="lineNum">     533 </span>            : {
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :         struct xen_hvm_param xhp;</span>
+<span class="lineNum">     535 </span>            : 
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         if ((sc-&gt;sc_features &amp; XENFEAT_CBVEC) == 0)</span>
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                 return (ENOENT);</span>
+<span class="lineNum">     538 </span>            : 
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :         xhp.domid = DOMID_SELF;</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :         xhp.index = HVM_PARAM_CALLBACK_IRQ;</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :         xhp.value = HVM_CALLBACK_VECTOR(LAPIC_XEN_VECTOR);</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :         if (xen_hypercall(sc, XC_HVM, 2, HVMOP_set_param, &amp;xhp)) {</span>
+<span class="lineNum">     543 </span>            :                 /* Will retry with the xspd(4) PCI interrupt */
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :                 return (ENOENT);</span>
+<span class="lineNum">     545 </span>            :         }
+<span class="lineNum">     546 </span>            :         DPRINTF(&quot;, idtvec %d&quot;, LAPIC_XEN_VECTOR);
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         sc-&gt;sc_flags |= XSF_CBVEC;</span>
+<span class="lineNum">     549 </span>            : 
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 : }</span>
+<a name="552"><span class="lineNum">     552 </span>            : </a>
+<span class="lineNum">     553 </span>            : int
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 : xen_init_interrupts(struct xen_softc *sc)</span>
+<span class="lineNum">     555 </span>            : {
+<span class="lineNum">     556 </span>            :         int i;
+<span class="lineNum">     557 </span>            : 
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :         sc-&gt;sc_irq = LAPIC_XEN_VECTOR;</span>
+<span class="lineNum">     559 </span>            : 
+<span class="lineNum">     560 </span>            :         /*
+<span class="lineNum">     561 </span>            :          * Clear all pending events and mask all interrupts
+<span class="lineNum">     562 </span>            :          */
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; nitems(sc-&gt;sc_ipg-&gt;evtchn_pending); i++) {</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_ipg-&gt;evtchn_pending[i] = 0;</span>
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_ipg-&gt;evtchn_mask[i] = ~0UL;</span>
+<span class="lineNum">     566 </span>            :         }
+<span class="lineNum">     567 </span>            : 
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :         SLIST_INIT(&amp;sc-&gt;sc_intrs);</span>
+<span class="lineNum">     569 </span>            : 
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :         mtx_init(&amp;sc-&gt;sc_islck, IPL_NET);</span>
+<span class="lineNum">     571 </span>            : 
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     573 </span>            : }
+<a name="574"><span class="lineNum">     574 </span>            : </a>
+<span class="lineNum">     575 </span>            : static int
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 : xen_evtchn_hypercall(struct xen_softc *sc, int cmd, void *arg, size_t len)</span>
+<span class="lineNum">     577 </span>            : {
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :         struct evtchn_op compat;</span>
+<span class="lineNum">     579 </span>            :         int error;
+<span class="lineNum">     580 </span>            : 
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :         error = xen_hypercall(sc, XC_EVTCHN, 2, cmd, arg);</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :         if (error == -ENOXENSYS) {</span>
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :                 memset(&amp;compat, 0, sizeof(compat));</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                 compat.cmd = cmd;</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :                 memcpy(&amp;compat.u, arg, len);</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 error = xen_hypercall(sc, XC_OEVTCHN, 1, &amp;compat);</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 : }</span>
+<a name="590"><span class="lineNum">     590 </span>            : </a>
+<span class="lineNum">     591 </span>            : static inline void
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 : xen_intsrc_add(struct xen_softc *sc, struct xen_intsrc *xi)</span>
+<span class="lineNum">     593 </span>            : {
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :         refcnt_init(&amp;xi-&gt;xi_refcnt);</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_islck);</span>
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :         SLIST_INSERT_HEAD(&amp;sc-&gt;sc_intrs, xi, xi_entry);</span>
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_islck);</span>
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 : }</span>
+<a name="599"><span class="lineNum">     599 </span>            : </a>
+<span class="lineNum">     600 </span>            : static inline struct xen_intsrc *
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 : xen_intsrc_acquire(struct xen_softc *sc, evtchn_port_t port)</span>
+<span class="lineNum">     602 </span>            : {
+<span class="lineNum">     603 </span>            :         struct xen_intsrc *xi = NULL;
+<span class="lineNum">     604 </span>            : 
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_islck);</span>
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(xi, &amp;sc-&gt;sc_intrs, xi_entry) {</span>
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :                 if (xi-&gt;xi_port == port) {</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                         refcnt_take(&amp;xi-&gt;xi_refcnt);</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     610 </span>            :                 }
+<span class="lineNum">     611 </span>            :         }
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_islck);</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         return (xi);</span>
+<span class="lineNum">     614 </span>            : }
+<a name="615"><span class="lineNum">     615 </span>            : </a>
+<span class="lineNum">     616 </span>            : static inline void
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 : xen_intsrc_release(struct xen_softc *sc, struct xen_intsrc *xi)</span>
+<span class="lineNum">     618 </span>            : {
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :         refcnt_rele_wake(&amp;xi-&gt;xi_refcnt);</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 : }</span>
+<a name="621"><span class="lineNum">     621 </span>            : </a>
+<span class="lineNum">     622 </span>            : static inline struct xen_intsrc *
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 : xen_intsrc_remove(struct xen_softc *sc, evtchn_port_t port)</span>
+<span class="lineNum">     624 </span>            : {
+<span class="lineNum">     625 </span>            :         struct xen_intsrc *xi;
+<span class="lineNum">     626 </span>            : 
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_islck);</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(xi, &amp;sc-&gt;sc_intrs, xi_entry) {</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                 if (xi-&gt;xi_port == port) {</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :                         SLIST_REMOVE(&amp;sc-&gt;sc_intrs, xi, xen_intsrc, xi_entry);</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     632 </span>            :                 }
+<span class="lineNum">     633 </span>            :         }
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_islck);</span>
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :         if (xi != NULL)</span>
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :                 refcnt_finalize(&amp;xi-&gt;xi_refcnt, &quot;xenisrm&quot;);</span>
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :         return (xi);</span>
+<span class="lineNum">     638 </span>            : }
+<a name="639"><span class="lineNum">     639 </span>            : </a>
+<span class="lineNum">     640 </span>            : static inline void
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 : xen_intr_mask_acquired(struct xen_softc *sc, struct xen_intsrc *xi)</span>
+<span class="lineNum">     642 </span>            : {
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :         xi-&gt;xi_masked = 1;</span>
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :         set_bit(xi-&gt;xi_port, &amp;sc-&gt;sc_ipg-&gt;evtchn_mask[0]);</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 : }</span>
+<a name="646"><span class="lineNum">     646 </span>            : </a>
+<span class="lineNum">     647 </span>            : static inline int
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 : xen_intr_unmask_release(struct xen_softc *sc, struct xen_intsrc *xi)</span>
+<span class="lineNum">     649 </span>            : {
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :         struct evtchn_unmask eu;</span>
+<span class="lineNum">     651 </span>            : 
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :         xi-&gt;xi_masked = 0;</span>
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :         if (!test_bit(xi-&gt;xi_port, &amp;sc-&gt;sc_ipg-&gt;evtchn_mask[0]))</span>
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :         eu.port = xi-&gt;xi_port;</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :         xen_intsrc_release(sc, xi);</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :         return (xen_evtchn_hypercall(sc, EVTCHNOP_unmask, &amp;eu, sizeof(eu)));</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 : }</span>
+<a name="659"><span class="lineNum">     659 </span>            : </a>
+<span class="lineNum">     660 </span>            : void
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 : xen_intr_ack(void)</span>
+<span class="lineNum">     662 </span>            : {
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :         struct shared_info *s = sc-&gt;sc_ipg;</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :         struct cpu_info *ci = curcpu();</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :         struct vcpu_info *v = &amp;s-&gt;vcpu_info[CPU_INFO_UNIT(ci)];</span>
+<span class="lineNum">     667 </span>            : 
+<span class="lineNum">     668 </span><span class="lineNoCov">          0 :         v-&gt;evtchn_upcall_pending = 0;</span>
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :         virtio_membar_sync();</span>
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 : }</span>
+<a name="671"><span class="lineNum">     671 </span>            : </a>
+<span class="lineNum">     672 </span>            : void
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 : xen_intr(void)</span>
+<span class="lineNum">     674 </span>            : {
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     676 </span>            :         struct xen_intsrc *xi;
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :         struct shared_info *s = sc-&gt;sc_ipg;</span>
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :         struct cpu_info *ci = curcpu();</span>
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :         struct vcpu_info *v = &amp;s-&gt;vcpu_info[CPU_INFO_UNIT(ci)];</span>
+<span class="lineNum">     680 </span>            :         ulong pending, selector;
+<span class="lineNum">     681 </span>            :         int port, bit, row;
+<span class="lineNum">     682 </span>            : 
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :         v-&gt;evtchn_upcall_pending = 0;</span>
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :         selector = atomic_swap_ulong(&amp;v-&gt;evtchn_pending_sel, 0);</span>
+<span class="lineNum">     685 </span>            : 
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :         for (row = 0; selector &gt; 0; selector &gt;&gt;= 1, row++) {</span>
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :                 if ((selector &amp; 1) == 0)</span>
+<span class="lineNum">     688 </span>            :                         continue;
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :                 if ((sc-&gt;sc_ipg-&gt;evtchn_pending[row] &amp;</span>
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :                     ~(sc-&gt;sc_ipg-&gt;evtchn_mask[row])) == 0)</span>
+<span class="lineNum">     691 </span>            :                         continue;
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :                 pending = atomic_swap_ulong(&amp;sc-&gt;sc_ipg-&gt;evtchn_pending[row],</span>
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :                     0) &amp; ~(sc-&gt;sc_ipg-&gt;evtchn_mask[row]);</span>
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :                 for (bit = 0; pending &gt; 0; pending &gt;&gt;= 1, bit++) {</span>
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :                         if ((pending &amp; 1) == 0)</span>
+<span class="lineNum">     696 </span>            :                                 continue;
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :                         port = (row * LONG_BIT) + bit;</span>
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :                         if ((xi = xen_intsrc_acquire(sc, port)) == NULL) {</span>
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: unhandled interrupt on port %d\n&quot;,</span>
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 :                                     sc-&gt;sc_dev.dv_xname, port);</span>
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :                                 continue;</span>
+<span class="lineNum">     702 </span>            :                         }
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :                         xi-&gt;xi_evcnt.ec_count++;</span>
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :                         xen_intr_mask_acquired(sc, xi);</span>
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :                         task_add(xi-&gt;xi_taskq, &amp;xi-&gt;xi_task);</span>
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     707 </span>            :         }
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 : }</span>
+<a name="709"><span class="lineNum">     709 </span>            : </a>
+<span class="lineNum">     710 </span>            : void
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 : xen_intr_schedule(xen_intr_handle_t xih)</span>
+<span class="lineNum">     712 </span>            : {
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     714 </span>            :         struct xen_intsrc *xi;
+<span class="lineNum">     715 </span>            : 
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :         if ((xi = xen_intsrc_acquire(sc, (evtchn_port_t)xih)) != NULL) {</span>
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :                 if (!task_add(xi-&gt;xi_taskq, &amp;xi-&gt;xi_task))</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :                         xen_intsrc_release(sc, xi);</span>
+<span class="lineNum">     719 </span>            :         }
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     721 </span>            : 
+<span class="lineNum">     722 </span>            : /*
+<span class="lineNum">     723 </span>            :  * This code achieves two goals: 1) makes sure that *after* masking
+<span class="lineNum">     724 </span>            :  * the interrupt source we're not getting more task_adds: intr_barrier
+<span class="lineNum">     725 </span>            :  * will take care of that, and 2) makes sure that the interrupt task
+<span class="lineNum">     726 </span>            :  * has finished executing the current task and won't be called again:
+<span class="lineNum">     727 </span>            :  * it sets up a barrier task to await completion of the current task
+<span class="lineNum">     728 </span>            :  * and relies on the interrupt masking to prevent submission of new
+<span class="lineNum">     729 </span>            :  * tasks in the future.
+<a name="730"><span class="lineNum">     730 </span>            :  */</a>
+<span class="lineNum">     731 </span>            : void
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 : xen_intr_barrier(xen_intr_handle_t xih)</span>
+<span class="lineNum">     733 </span>            : {
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     735 </span>            :         struct xen_intsrc *xi;
+<span class="lineNum">     736 </span>            : 
+<span class="lineNum">     737 </span>            :         /*
+<span class="lineNum">     738 </span>            :          * XXX This will need to be revised once intr_barrier starts
+<span class="lineNum">     739 </span>            :          * using its argument.
+<span class="lineNum">     740 </span>            :          */
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 :         intr_barrier(NULL);</span>
+<span class="lineNum">     742 </span>            : 
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :         if ((xi = xen_intsrc_acquire(sc, (evtchn_port_t)xih)) != NULL) {</span>
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :                 taskq_barrier(xi-&gt;xi_taskq);</span>
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :                 xen_intsrc_release(sc, xi);</span>
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 : }</span>
+<a name="748"><span class="lineNum">     748 </span>            : </a>
+<span class="lineNum">     749 </span>            : void
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 : xen_intr_signal(xen_intr_handle_t xih)</span>
+<span class="lineNum">     751 </span>            : {
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     753 </span>            :         struct xen_intsrc *xi;
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :         struct evtchn_send es;</span>
+<span class="lineNum">     755 </span>            : 
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         if ((xi = xen_intsrc_acquire(sc, (evtchn_port_t)xih)) != NULL) {</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :                 es.port = xi-&gt;xi_port;</span>
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :                 xen_intsrc_release(sc, xi);</span>
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :                 xen_evtchn_hypercall(sc, EVTCHNOP_send, &amp;es, sizeof(es));</span>
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 : }</span>
+<a name="762"><span class="lineNum">     762 </span>            : </a>
+<span class="lineNum">     763 </span>            : int
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 : xen_intr_establish(evtchn_port_t port, xen_intr_handle_t *xih, int domain,</span>
+<span class="lineNum">     765 </span>            :     void (*handler)(void *), void *arg, char *name)
+<span class="lineNum">     766 </span>            : {
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     768 </span>            :         struct xen_intsrc *xi;
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :         struct evtchn_alloc_unbound eau;</span>
+<span class="lineNum">     770 </span>            : #ifdef notyet
+<span class="lineNum">     771 </span>            :         struct evtchn_bind_vcpu ebv;
+<span class="lineNum">     772 </span>            : #endif
+<span class="lineNum">     773 </span>            : #if defined(XEN_DEBUG) &amp;&amp; disabled
+<span class="lineNum">     774 </span>            :         struct evtchn_status es;
+<span class="lineNum">     775 </span>            : #endif
+<span class="lineNum">     776 </span>            : 
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :         if (port &amp;&amp; (xi = xen_intsrc_acquire(sc, port)) != NULL) {</span>
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :                 xen_intsrc_release(sc, xi);</span>
+<span class="lineNum">     779 </span>            :                 DPRINTF(&quot;%s: interrupt handler has already been established &quot;
+<span class="lineNum">     780 </span>            :                     &quot;for port %u\n&quot;, sc-&gt;sc_dev.dv_xname, port);
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     782 </span>            :         }
+<span class="lineNum">     783 </span>            : 
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :         xi = malloc(sizeof(*xi), M_DEVBUF, M_NOWAIT | M_ZERO);</span>
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         if (xi == NULL)</span>
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     787 </span>            : 
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :         xi-&gt;xi_port = (evtchn_port_t)*xih;</span>
+<span class="lineNum">     789 </span>            : 
+<span class="lineNum">     790 </span><span class="lineNoCov">          0 :         xi-&gt;xi_handler = handler;</span>
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :         xi-&gt;xi_ctx = arg;</span>
+<span class="lineNum">     792 </span>            : 
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :         xi-&gt;xi_taskq = taskq_create(name, 1, IPL_NET, TASKQ_MPSAFE);</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :         if (!xi-&gt;xi_taskq) {</span>
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to create interrupt task for %s\n&quot;,</span>
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname, name);</span>
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :                 free(xi, M_DEVBUF, sizeof(*xi));</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     799 </span>            :         }
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :         task_set(&amp;xi-&gt;xi_task, xen_intr_dispatch, xi);</span>
+<span class="lineNum">     801 </span>            : 
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :         if (port == 0) {</span>
+<span class="lineNum">     803 </span>            :                 /* We're being asked to allocate a new event port */
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :                 memset(&amp;eau, 0, sizeof(eau));</span>
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :                 eau.dom = DOMID_SELF;</span>
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :                 eau.remote_dom = domain;</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :                 if (xen_evtchn_hypercall(sc, EVTCHNOP_alloc_unbound, &amp;eau,</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                     sizeof(eau)) != 0) {</span>
+<span class="lineNum">     809 </span>            :                         DPRINTF(&quot;%s: failed to allocate new event port\n&quot;,
+<span class="lineNum">     810 </span>            :                             sc-&gt;sc_dev.dv_xname);
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :                         free(xi, M_DEVBUF, sizeof(*xi));</span>
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :                         return (-1);</span>
+<span class="lineNum">     813 </span>            :                 }
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :                 *xih = xi-&gt;xi_port = eau.port;</span>
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 :                 *xih = xi-&gt;xi_port = port;</span>
+<span class="lineNum">     817 </span>            :                 /*
+<span class="lineNum">     818 </span>            :                  * The Event Channel API didn't open this port, so it is not
+<span class="lineNum">     819 </span>            :                  * responsible for closing it automatically on unbind.
+<span class="lineNum">     820 </span>            :                  */
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :                 xi-&gt;xi_noclose = 1;</span>
+<span class="lineNum">     822 </span>            :         }
+<span class="lineNum">     823 </span>            : 
+<span class="lineNum">     824 </span>            : #ifdef notyet
+<span class="lineNum">     825 </span>            :         /* Bind interrupt to VCPU#0 */
+<span class="lineNum">     826 </span>            :         memset(&amp;ebv, 0, sizeof(ebv));
+<span class="lineNum">     827 </span>            :         ebv.port = xi-&gt;xi_port;
+<span class="lineNum">     828 </span>            :         ebv.vcpu = 0;
+<span class="lineNum">     829 </span>            :         if (xen_evtchn_hypercall(sc, EVTCHNOP_bind_vcpu, &amp;ebv, sizeof(ebv))) {
+<span class="lineNum">     830 </span>            :                 printf(&quot;%s: failed to bind interrupt on port %u to vcpu%d\n&quot;,
+<span class="lineNum">     831 </span>            :                     sc-&gt;sc_dev.dv_xname, ebv.port, ebv.vcpu);
+<span class="lineNum">     832 </span>            :         }
+<span class="lineNum">     833 </span>            : #endif
+<span class="lineNum">     834 </span>            : 
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         evcount_attach(&amp;xi-&gt;xi_evcnt, name, &amp;sc-&gt;sc_irq);</span>
+<span class="lineNum">     836 </span>            : 
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :         xen_intsrc_add(sc, xi);</span>
+<span class="lineNum">     838 </span>            : 
+<span class="lineNum">     839 </span>            :         /* Mask the event port */
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 :         set_bit(xi-&gt;xi_port, &amp;sc-&gt;sc_ipg-&gt;evtchn_mask[0]);</span>
+<span class="lineNum">     841 </span>            : 
+<span class="lineNum">     842 </span>            : #if defined(XEN_DEBUG) &amp;&amp; disabled
+<span class="lineNum">     843 </span>            :         memset(&amp;es, 0, sizeof(es));
+<span class="lineNum">     844 </span>            :         es.dom = DOMID_SELF;
+<span class="lineNum">     845 </span>            :         es.port = xi-&gt;xi_port;
+<span class="lineNum">     846 </span>            :         if (xen_evtchn_hypercall(sc, EVTCHNOP_status, &amp;es, sizeof(es))) {
+<span class="lineNum">     847 </span>            :                 printf(&quot;%s: failed to obtain status for port %d\n&quot;,
+<span class="lineNum">     848 </span>            :                     sc-&gt;sc_dev.dv_xname, es.port);
+<span class="lineNum">     849 </span>            :         }
+<span class="lineNum">     850 </span>            :         printf(&quot;%s: port %u bound to vcpu%u&quot;, sc-&gt;sc_dev.dv_xname,
+<span class="lineNum">     851 </span>            :             es.port, es.vcpu);
+<span class="lineNum">     852 </span>            :         if (es.status == EVTCHNSTAT_interdomain)
+<span class="lineNum">     853 </span>            :                 printf(&quot;: domain %d port %u\n&quot;, es.u.interdomain.dom,
+<span class="lineNum">     854 </span>            :                     es.u.interdomain.port);
+<span class="lineNum">     855 </span>            :         else if (es.status == EVTCHNSTAT_unbound)
+<span class="lineNum">     856 </span>            :                 printf(&quot;: domain %d\n&quot;, es.u.unbound.dom);
+<span class="lineNum">     857 </span>            :         else if (es.status == EVTCHNSTAT_pirq)
+<span class="lineNum">     858 </span>            :                 printf(&quot;: pirq %u\n&quot;, es.u.pirq);
+<span class="lineNum">     859 </span>            :         else if (es.status == EVTCHNSTAT_virq)
+<span class="lineNum">     860 </span>            :                 printf(&quot;: virq %u\n&quot;, es.u.virq);
+<span class="lineNum">     861 </span>            :         else
+<span class="lineNum">     862 </span>            :                 printf(&quot;\n&quot;);
+<span class="lineNum">     863 </span>            : #endif
+<span class="lineNum">     864 </span>            : 
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 : }</span>
+<a name="867"><span class="lineNum">     867 </span>            : </a>
+<span class="lineNum">     868 </span>            : int
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 : xen_intr_disestablish(xen_intr_handle_t xih)</span>
+<span class="lineNum">     870 </span>            : {
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     872 </span>            :         evtchn_port_t port = (evtchn_port_t)xih;
+<span class="lineNum">     873 </span><span class="lineNoCov">          0 :         struct evtchn_close ec;</span>
+<span class="lineNum">     874 </span>            :         struct xen_intsrc *xi;
+<span class="lineNum">     875 </span>            : 
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :         if ((xi = xen_intsrc_remove(sc, port)) == NULL)</span>
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     878 </span>            : 
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :         evcount_detach(&amp;xi-&gt;xi_evcnt);</span>
+<span class="lineNum">     880 </span>            : 
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :         taskq_destroy(xi-&gt;xi_taskq);</span>
+<span class="lineNum">     882 </span>            : 
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :         set_bit(xi-&gt;xi_port, &amp;sc-&gt;sc_ipg-&gt;evtchn_mask[0]);</span>
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :         clear_bit(xi-&gt;xi_port, &amp;sc-&gt;sc_ipg-&gt;evtchn_pending[0]);</span>
+<span class="lineNum">     885 </span>            : 
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :         if (!xi-&gt;xi_noclose) {</span>
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :                 ec.port = xi-&gt;xi_port;</span>
+<span class="lineNum">     888 </span><span class="lineNoCov">          0 :                 if (xen_evtchn_hypercall(sc, EVTCHNOP_close, &amp;ec, sizeof(ec))) {</span>
+<span class="lineNum">     889 </span>            :                         DPRINTF(&quot;%s: failed to close event port %u\n&quot;,
+<span class="lineNum">     890 </span>            :                             sc-&gt;sc_dev.dv_xname, xi-&gt;xi_port);
+<span class="lineNum">     891 </span>            :                 }
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     893 </span>            : 
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :         free(xi, M_DEVBUF, sizeof(*xi));</span>
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 : }</span>
+<a name="897"><span class="lineNum">     897 </span>            : </a>
+<span class="lineNum">     898 </span>            : void
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 : xen_intr_dispatch(void *arg)</span>
+<span class="lineNum">     900 </span>            : {
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :         struct xen_intsrc *xi = arg;</span>
+<span class="lineNum">     903 </span>            : 
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :         if (xi-&gt;xi_handler)</span>
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :                 xi-&gt;xi_handler(xi-&gt;xi_ctx);</span>
+<span class="lineNum">     906 </span>            : 
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :         xen_intr_unmask_release(sc, xi);</span>
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 : }</span>
+<a name="909"><span class="lineNum">     909 </span>            : </a>
+<span class="lineNum">     910 </span>            : void
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 : xen_intr_enable(void)</span>
+<span class="lineNum">     912 </span>            : {
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     914 </span>            :         struct xen_intsrc *xi;
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :         struct evtchn_unmask eu;</span>
+<span class="lineNum">     916 </span>            : 
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_islck);</span>
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(xi, &amp;sc-&gt;sc_intrs, xi_entry) {</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :                 if (!xi-&gt;xi_masked) {</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :                         eu.port = xi-&gt;xi_port;</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :                         if (xen_evtchn_hypercall(sc, EVTCHNOP_unmask, &amp;eu,</span>
+<span class="lineNum">     922 </span>            :                             sizeof(eu)))
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: unmasking port %u failed\n&quot;,</span>
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :                                     sc-&gt;sc_dev.dv_xname, xi-&gt;xi_port);</span>
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :                         virtio_membar_sync();</span>
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :                         if (test_bit(xi-&gt;xi_port, &amp;sc-&gt;sc_ipg-&gt;evtchn_mask[0]))</span>
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: port %u is still masked\n&quot;,</span>
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :                                     sc-&gt;sc_dev.dv_xname, xi-&gt;xi_port);</span>
+<span class="lineNum">     929 </span>            :                 }
+<span class="lineNum">     930 </span>            :         }
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_islck);</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 : }</span>
+<a name="933"><span class="lineNum">     933 </span>            : </a>
+<span class="lineNum">     934 </span>            : void
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 : xen_intr_mask(xen_intr_handle_t xih)</span>
+<span class="lineNum">     936 </span>            : {
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     938 </span>            :         evtchn_port_t port = (evtchn_port_t)xih;
+<span class="lineNum">     939 </span>            :         struct xen_intsrc *xi;
+<span class="lineNum">     940 </span>            : 
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :         if ((xi = xen_intsrc_acquire(sc, port)) != NULL) {</span>
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :                 xen_intr_mask_acquired(sc, xi);</span>
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :                 xen_intsrc_release(sc, xi);</span>
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 : }</span>
+<a name="946"><span class="lineNum">     946 </span>            : </a>
+<span class="lineNum">     947 </span>            : int
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 : xen_intr_unmask(xen_intr_handle_t xih)</span>
+<span class="lineNum">     949 </span>            : {
+<span class="lineNum">     950 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xen_sc;</span>
+<span class="lineNum">     951 </span>            :         evtchn_port_t port = (evtchn_port_t)xih;
+<span class="lineNum">     952 </span>            :         struct xen_intsrc *xi;
+<span class="lineNum">     953 </span>            : 
+<span class="lineNum">     954 </span><span class="lineNoCov">          0 :         if ((xi = xen_intsrc_acquire(sc, port)) != NULL)</span>
+<span class="lineNum">     955 </span><span class="lineNoCov">          0 :                 return (xen_intr_unmask_release(sc, xi));</span>
+<span class="lineNum">     956 </span>            : 
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 : }</span>
+<a name="959"><span class="lineNum">     959 </span>            : </a>
+<span class="lineNum">     960 </span>            : int
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 : xen_init_grant_tables(struct xen_softc *sc)</span>
+<span class="lineNum">     962 </span>            : {
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         struct gnttab_query_size gqs;</span>
+<span class="lineNum">     964 </span>            : 
+<span class="lineNum">     965 </span><span class="lineNoCov">          0 :         gqs.dom = DOMID_SELF;</span>
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :         if (xen_hypercall(sc, XC_GNTTAB, 3, GNTTABOP_query_size, &amp;gqs, 1)) {</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :                 printf(&quot;: failed the query for grant table pages\n&quot;);</span>
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     969 </span>            :         }
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :         if (gqs.nr_frames == 0 || gqs.nr_frames &gt; gqs.max_nr_frames) {</span>
+<span class="lineNum">     971 </span><span class="lineNoCov">          0 :                 printf(&quot;: invalid number of grant table pages: %u/%u\n&quot;,</span>
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :                     gqs.nr_frames, gqs.max_nr_frames);</span>
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     974 </span>            :         }
+<span class="lineNum">     975 </span>            : 
+<span class="lineNum">     976 </span><span class="lineNoCov">          0 :         sc-&gt;sc_gntmax = gqs.max_nr_frames;</span>
+<span class="lineNum">     977 </span>            : 
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 :         sc-&gt;sc_gnt = mallocarray(sc-&gt;sc_gntmax + 1, sizeof(struct xen_gntent),</span>
+<span class="lineNum">     979 </span>            :             M_DEVBUF, M_ZERO | M_NOWAIT);
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_gnt == NULL) {</span>
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 :                 printf(&quot;: failed to allocate grant table lookup table\n&quot;);</span>
+<span class="lineNum">     982 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     983 </span>            :         }
+<span class="lineNum">     984 </span>            : 
+<span class="lineNum">     985 </span><span class="lineNoCov">          0 :         mtx_init(&amp;sc-&gt;sc_gntlck, IPL_NET);</span>
+<span class="lineNum">     986 </span>            : 
+<span class="lineNum">     987 </span><span class="lineNoCov">          0 :         if (xen_grant_table_grow(sc) == NULL) {</span>
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :                 free(sc-&gt;sc_gnt, M_DEVBUF, sc-&gt;sc_gntmax *</span>
+<span class="lineNum">     989 </span>            :                     sizeof(struct xen_gntent));
+<span class="lineNum">     990 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     991 </span>            :         }
+<span class="lineNum">     992 </span>            : 
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :         printf(&quot;, %d grant table frames&quot;, sc-&gt;sc_gntmax);</span>
+<span class="lineNum">     994 </span>            : 
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :         xen_bus_dma_tag._cookie = sc;</span>
+<span class="lineNum">     996 </span>            : 
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 : }</span>
+<a name="999"><span class="lineNum">     999 </span>            : </a>
+<span class="lineNum">    1000 </span>            : struct xen_gntent *
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 : xen_grant_table_grow(struct xen_softc *sc)</span>
+<span class="lineNum">    1002 </span>            : {
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :         struct xen_add_to_physmap xatp;</span>
+<span class="lineNum">    1004 </span>            :         struct xen_gntent *ge;
+<span class="lineNum">    1005 </span>            :         void *va;
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :         paddr_t pa;</span>
+<span class="lineNum">    1007 </span>            : 
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_gntcnt == sc-&gt;sc_gntmax) {</span>
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: grant table frame allotment limit reached\n&quot;,</span>
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">    1011 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1012 </span>            :         }
+<span class="lineNum">    1013 </span>            : 
+<span class="lineNum">    1014 </span><span class="lineNoCov">          0 :         va = km_alloc(PAGE_SIZE, &amp;kv_any, &amp;kp_zero, &amp;kd_nowait);</span>
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :         if (va == NULL)</span>
+<span class="lineNum">    1016 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :         if (!pmap_extract(pmap_kernel(), (vaddr_t)va, &amp;pa)) {</span>
+<span class="lineNum">    1018 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: grant table page PA extraction failed\n&quot;,</span>
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">    1020 </span><span class="lineNoCov">          0 :                 km_free(va, PAGE_SIZE, &amp;kv_any, &amp;kp_zero);</span>
+<span class="lineNum">    1021 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1022 </span>            :         }
+<span class="lineNum">    1023 </span>            : 
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_gntlck);</span>
+<span class="lineNum">    1025 </span>            : 
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :         ge = &amp;sc-&gt;sc_gnt[sc-&gt;sc_gntcnt];</span>
+<span class="lineNum">    1027 </span><span class="lineNoCov">          0 :         ge-&gt;ge_table = va;</span>
+<span class="lineNum">    1028 </span>            : 
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :         xatp.domid = DOMID_SELF;</span>
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :         xatp.idx = sc-&gt;sc_gntcnt;</span>
+<span class="lineNum">    1031 </span><span class="lineNoCov">          0 :         xatp.space = XENMAPSPACE_grant_table;</span>
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :         xatp.gpfn = atop(pa);</span>
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :         if (xen_hypercall(sc, XC_MEMORY, 2, XENMEM_add_to_physmap, &amp;xatp)) {</span>
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to add a grant table page\n&quot;,</span>
+<span class="lineNum">    1035 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 :                 km_free(ge-&gt;ge_table, PAGE_SIZE, &amp;kv_any, &amp;kp_zero);</span>
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;sc-&gt;sc_gntlck);</span>
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1039 </span>            :         }
+<span class="lineNum">    1040 </span><span class="lineNoCov">          0 :         ge-&gt;ge_start = sc-&gt;sc_gntcnt * GNTTAB_NEPG;</span>
+<span class="lineNum">    1041 </span>            :         /* First page has 8 reserved entries */
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :         ge-&gt;ge_reserved = ge-&gt;ge_start == 0 ? GNTTAB_NR_RESERVED_ENTRIES : 0;</span>
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :         ge-&gt;ge_free = GNTTAB_NEPG - ge-&gt;ge_reserved;</span>
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 :         ge-&gt;ge_next = ge-&gt;ge_reserved;</span>
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :         mtx_init(&amp;ge-&gt;ge_lock, IPL_NET);</span>
+<span class="lineNum">    1046 </span>            : 
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :         sc-&gt;sc_gntcnt++;</span>
+<span class="lineNum">    1048 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_gntlck);</span>
+<span class="lineNum">    1049 </span>            : 
+<span class="lineNum">    1050 </span><span class="lineNoCov">          0 :         return (ge);</span>
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 : }</span>
+<a name="1052"><span class="lineNum">    1052 </span>            : </a>
+<span class="lineNum">    1053 </span>            : int
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 : xen_grant_table_alloc(struct xen_softc *sc, grant_ref_t *ref)</span>
+<span class="lineNum">    1055 </span>            : {
+<span class="lineNum">    1056 </span>            :         struct xen_gntent *ge;
+<span class="lineNum">    1057 </span>            :         int i;
+<span class="lineNum">    1058 </span>            : 
+<span class="lineNum">    1059 </span>            :         /* Start with a previously allocated table page */
+<span class="lineNum">    1060 </span><span class="lineNoCov">          0 :         ge = &amp;sc-&gt;sc_gnt[sc-&gt;sc_gntcnt - 1];</span>
+<span class="lineNum">    1061 </span><span class="lineNoCov">          0 :         if (ge-&gt;ge_free &gt; 0) {</span>
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 :                 mtx_enter(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1063 </span><span class="lineNoCov">          0 :                 if (ge-&gt;ge_free &gt; 0)</span>
+<span class="lineNum">    1064 </span>            :                         goto search;
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1066 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1067 </span>            : 
+<span class="lineNum">    1068 </span>            :         /* Try other existing table pages */
+<span class="lineNum">    1069 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sc-&gt;sc_gntcnt; i++) {</span>
+<span class="lineNum">    1070 </span><span class="lineNoCov">          0 :                 ge = &amp;sc-&gt;sc_gnt[i];</span>
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :                 if (ge-&gt;ge_free == 0)</span>
+<span class="lineNum">    1072 </span>            :                         continue;
+<span class="lineNum">    1073 </span><span class="lineNoCov">          0 :                 mtx_enter(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :                 if (ge-&gt;ge_free &gt; 0)</span>
+<span class="lineNum">    1075 </span>            :                         goto search;
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1078 </span>            : 
+<span class="lineNum">    1079 </span>            :  alloc:
+<span class="lineNum">    1080 </span>            :         /* Allocate a new table page */
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :         if ((ge = xen_grant_table_grow(sc)) == NULL)</span>
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">    1083 </span>            : 
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1085 </span><span class="lineNoCov">          0 :         if (ge-&gt;ge_free == 0) {</span>
+<span class="lineNum">    1086 </span>            :                 /* We were not fast enough... */
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :                 goto alloc;</span>
+<span class="lineNum">    1089 </span>            :         }
+<span class="lineNum">    1090 </span>            : 
+<span class="lineNum">    1091 </span>            :  search:
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :         for (i = ge-&gt;ge_next;</span>
+<span class="lineNum">    1093 </span>            :              /* Math works here because GNTTAB_NEPG is a power of 2 */
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :              i != ((ge-&gt;ge_next + GNTTAB_NEPG - 1) &amp; (GNTTAB_NEPG - 1));</span>
+<span class="lineNum">    1095 </span><span class="lineNoCov">          0 :              i++) {</span>
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 :                 if (i == GNTTAB_NEPG)</span>
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :                         i = 0;</span>
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 :                 if (ge-&gt;ge_reserved &amp;&amp; i &lt; ge-&gt;ge_reserved)</span>
+<span class="lineNum">    1099 </span>            :                         continue;
+<span class="lineNum">    1100 </span><span class="lineNoCov">          0 :                 if (ge-&gt;ge_table[i].frame != 0)</span>
+<span class="lineNum">    1101 </span>            :                         continue;
+<span class="lineNum">    1102 </span><span class="lineNoCov">          0 :                 *ref = ge-&gt;ge_start + i;</span>
+<span class="lineNum">    1103 </span><span class="lineNoCov">          0 :                 ge-&gt;ge_table[i].flags = GTF_invalid;</span>
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 :                 ge-&gt;ge_table[i].frame = 0xffffffff; /* Mark as taken */</span>
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :                 if ((ge-&gt;ge_next = i + 1) == GNTTAB_NEPG)</span>
+<span class="lineNum">    1106 </span><span class="lineNoCov">          0 :                         ge-&gt;ge_next = ge-&gt;ge_reserved;</span>
+<span class="lineNum">    1107 </span><span class="lineNoCov">          0 :                 ge-&gt;ge_free--;</span>
+<span class="lineNum">    1108 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1110 </span>            :         }
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1112 </span>            : 
+<span class="lineNum">    1113 </span><span class="lineNoCov">          0 :         panic(&quot;page full, sc %p gnt %p (%d) ge %p&quot;, sc, sc-&gt;sc_gnt,</span>
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :             sc-&gt;sc_gntcnt, ge);</span>
+<span class="lineNum">    1115 </span>            :         return (-1);
+<span class="lineNum">    1116 </span><span class="lineNoCov">          0 : }</span>
+<a name="1117"><span class="lineNum">    1117 </span>            : </a>
+<span class="lineNum">    1118 </span>            : void
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 : xen_grant_table_free(struct xen_softc *sc, grant_ref_t ref)</span>
+<span class="lineNum">    1120 </span>            : {
+<span class="lineNum">    1121 </span>            :         struct xen_gntent *ge;
+<span class="lineNum">    1122 </span>            : 
+<span class="lineNum">    1123 </span>            : #ifdef XEN_DEBUG
+<span class="lineNum">    1124 </span>            :         if (ref &gt; sc-&gt;sc_gntcnt * GNTTAB_NEPG)
+<span class="lineNum">    1125 </span>            :                 panic(&quot;unmanaged ref %u sc %p gnt %p (%d)&quot;, ref, sc,
+<span class="lineNum">    1126 </span>            :                     sc-&gt;sc_gnt, sc-&gt;sc_gntcnt);
+<span class="lineNum">    1127 </span>            : #endif
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 :         ge = &amp;sc-&gt;sc_gnt[ref / GNTTAB_NEPG];</span>
+<span class="lineNum">    1129 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1130 </span>            : #ifdef XEN_DEBUG
+<span class="lineNum">    1131 </span>            :         if (ref &lt; ge-&gt;ge_start || ref &gt; ge-&gt;ge_start + GNTTAB_NEPG) {
+<span class="lineNum">    1132 </span>            :                 mtx_leave(&amp;ge-&gt;ge_lock);
+<span class="lineNum">    1133 </span>            :                 panic(&quot;out of bounds ref %u ge %p start %u sc %p gnt %p&quot;,
+<span class="lineNum">    1134 </span>            :                     ref, ge, ge-&gt;ge_start, sc, sc-&gt;sc_gnt);
+<span class="lineNum">    1135 </span>            :         }
+<span class="lineNum">    1136 </span>            : #endif
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :         ref -= ge-&gt;ge_start;</span>
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :         if (ge-&gt;ge_table[ref].flags != GTF_invalid) {</span>
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :                 panic(&quot;reference %u is still in use, flags %#x frame %#x&quot;,</span>
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :                     ref + ge-&gt;ge_start, ge-&gt;ge_table[ref].flags,</span>
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :                     ge-&gt;ge_table[ref].frame);</span>
+<span class="lineNum">    1143 </span>            :         }
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 :         ge-&gt;ge_table[ref].frame = 0;</span>
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :         ge-&gt;ge_next = ref;</span>
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :         ge-&gt;ge_free++;</span>
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;ge-&gt;ge_lock);</span>
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 : }</span>
+<a name="1149"><span class="lineNum">    1149 </span>            : </a>
+<span class="lineNum">    1150 </span>            : void
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 : xen_grant_table_enter(struct xen_softc *sc, grant_ref_t ref, paddr_t pa,</span>
+<span class="lineNum">    1152 </span>            :     int domain, int flags)
+<span class="lineNum">    1153 </span>            : {
+<span class="lineNum">    1154 </span>            :         struct xen_gntent *ge;
+<span class="lineNum">    1155 </span>            : 
+<span class="lineNum">    1156 </span>            : #ifdef XEN_DEBUG
+<span class="lineNum">    1157 </span>            :         if (ref &gt; sc-&gt;sc_gntcnt * GNTTAB_NEPG)
+<span class="lineNum">    1158 </span>            :                 panic(&quot;unmanaged ref %u sc %p gnt %p (%d)&quot;, ref, sc,
+<span class="lineNum">    1159 </span>            :                     sc-&gt;sc_gnt, sc-&gt;sc_gntcnt);
+<span class="lineNum">    1160 </span>            : #endif
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :         ge = &amp;sc-&gt;sc_gnt[ref / GNTTAB_NEPG];</span>
+<span class="lineNum">    1162 </span>            : #ifdef XEN_DEBUG
+<span class="lineNum">    1163 </span>            :         if (ref &lt; ge-&gt;ge_start || ref &gt; ge-&gt;ge_start + GNTTAB_NEPG) {
+<span class="lineNum">    1164 </span>            :                 panic(&quot;out of bounds ref %u ge %p start %u sc %p gnt %p&quot;,
+<span class="lineNum">    1165 </span>            :                     ref, ge, ge-&gt;ge_start, sc, sc-&gt;sc_gnt);
+<span class="lineNum">    1166 </span>            :         }
+<span class="lineNum">    1167 </span>            : #endif
+<span class="lineNum">    1168 </span><span class="lineNoCov">          0 :         ref -= ge-&gt;ge_start;</span>
+<span class="lineNum">    1169 </span><span class="lineNoCov">          0 :         if (ge-&gt;ge_table[ref].flags != GTF_invalid) {</span>
+<span class="lineNum">    1170 </span><span class="lineNoCov">          0 :                 panic(&quot;reference %u is still in use, flags %#x frame %#x&quot;,</span>
+<span class="lineNum">    1171 </span>            :                     ref + ge-&gt;ge_start, ge-&gt;ge_table[ref].flags,
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :                     ge-&gt;ge_table[ref].frame);</span>
+<span class="lineNum">    1173 </span>            :         }
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :         ge-&gt;ge_table[ref].frame = atop(pa);</span>
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :         ge-&gt;ge_table[ref].domid = domain;</span>
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 :         virtio_membar_sync();</span>
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :         ge-&gt;ge_table[ref].flags = GTF_permit_access | flags;</span>
+<span class="lineNum">    1178 </span><span class="lineNoCov">          0 :         virtio_membar_sync();</span>
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 : }</span>
+<a name="1180"><span class="lineNum">    1180 </span>            : </a>
+<span class="lineNum">    1181 </span>            : void
+<span class="lineNum">    1182 </span><span class="lineNoCov">          0 : xen_grant_table_remove(struct xen_softc *sc, grant_ref_t ref)</span>
+<span class="lineNum">    1183 </span>            : {
+<span class="lineNum">    1184 </span>            :         struct xen_gntent *ge;
+<span class="lineNum">    1185 </span>            :         uint32_t flags, *ptr;
+<span class="lineNum">    1186 </span>            :         int loop;
+<span class="lineNum">    1187 </span>            : 
+<span class="lineNum">    1188 </span>            : #ifdef XEN_DEBUG
+<span class="lineNum">    1189 </span>            :         if (ref &gt; sc-&gt;sc_gntcnt * GNTTAB_NEPG)
+<span class="lineNum">    1190 </span>            :                 panic(&quot;unmanaged ref %u sc %p gnt %p (%d)&quot;, ref, sc,
+<span class="lineNum">    1191 </span>            :                     sc-&gt;sc_gnt, sc-&gt;sc_gntcnt);
+<span class="lineNum">    1192 </span>            : #endif
+<span class="lineNum">    1193 </span><span class="lineNoCov">          0 :         ge = &amp;sc-&gt;sc_gnt[ref / GNTTAB_NEPG];</span>
+<span class="lineNum">    1194 </span>            : #ifdef XEN_DEBUG
+<span class="lineNum">    1195 </span>            :         if (ref &lt; ge-&gt;ge_start || ref &gt; ge-&gt;ge_start + GNTTAB_NEPG) {
+<span class="lineNum">    1196 </span>            :                 panic(&quot;out of bounds ref %u ge %p start %u sc %p gnt %p&quot;,
+<span class="lineNum">    1197 </span>            :                     ref, ge, ge-&gt;ge_start, sc, sc-&gt;sc_gnt);
+<span class="lineNum">    1198 </span>            :         }
+<span class="lineNum">    1199 </span>            : #endif
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 :         ref -= ge-&gt;ge_start;</span>
+<span class="lineNum">    1201 </span>            :         /* Invalidate the grant reference */
+<span class="lineNum">    1202 </span><span class="lineNoCov">          0 :         virtio_membar_sync();</span>
+<span class="lineNum">    1203 </span><span class="lineNoCov">          0 :         ptr = (uint32_t *)&amp;ge-&gt;ge_table[ref];</span>
+<span class="lineNum">    1204 </span><span class="lineNoCov">          0 :         flags = (ge-&gt;ge_table[ref].flags &amp; ~(GTF_reading|GTF_writing)) |</span>
+<span class="lineNum">    1205 </span><span class="lineNoCov">          0 :             (ge-&gt;ge_table[ref].domid &lt;&lt; 16);</span>
+<span class="lineNum">    1206 </span>            :         loop = 0;
+<span class="lineNum">    1207 </span><span class="lineNoCov">          0 :         while (atomic_cas_uint(ptr, flags, GTF_invalid) != flags) {</span>
+<span class="lineNum">    1208 </span><span class="lineNoCov">          0 :                 if (loop++ &gt; 10) {</span>
+<span class="lineNum">    1209 </span><span class="lineNoCov">          0 :                         panic(&quot;grant table reference %u is held &quot;</span>
+<span class="lineNum">    1210 </span>            :                             &quot;by domain %d: frame %#x flags %#x&quot;,
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :                             ref + ge-&gt;ge_start, ge-&gt;ge_table[ref].domid,</span>
+<span class="lineNum">    1212 </span><span class="lineNoCov">          0 :                             ge-&gt;ge_table[ref].frame, ge-&gt;ge_table[ref].flags);</span>
+<span class="lineNum">    1213 </span>            :                 }
+<span class="lineNum">    1214 </span>            : #if (defined(__amd64__) || defined(__i386__))
+<span class="lineNum">    1215 </span><span class="lineNoCov">          0 :                 __asm volatile(&quot;pause&quot;: : : &quot;memory&quot;);</span>
+<span class="lineNum">    1216 </span>            : #endif
+<span class="lineNum">    1217 </span>            :         }
+<span class="lineNum">    1218 </span><span class="lineNoCov">          0 :         ge-&gt;ge_table[ref].frame = 0xffffffff;</span>
+<span class="lineNum">    1219 </span><span class="lineNoCov">          0 : }</span>
+<a name="1220"><span class="lineNum">    1220 </span>            : </a>
+<span class="lineNum">    1221 </span>            : int
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 : xen_bus_dmamap_create(bus_dma_tag_t t, bus_size_t size, int nsegments,</span>
+<span class="lineNum">    1223 </span>            :     bus_size_t maxsegsz, bus_size_t boundary, int flags, bus_dmamap_t *dmamp)
+<span class="lineNum">    1224 </span>            : {
+<span class="lineNum">    1225 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = t-&gt;_cookie;</span>
+<span class="lineNum">    1226 </span>            :         struct xen_gntmap *gm;
+<span class="lineNum">    1227 </span>            :         int i, error;
+<span class="lineNum">    1228 </span>            : 
+<span class="lineNum">    1229 </span><span class="lineNoCov">          0 :         if (maxsegsz &lt; PAGE_SIZE)</span>
+<span class="lineNum">    1230 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">    1231 </span>            : 
+<span class="lineNum">    1232 </span>            :         /* Allocate a dma map structure */
+<span class="lineNum">    1233 </span><span class="lineNoCov">          0 :         error = bus_dmamap_create(sc-&gt;sc_dmat, size, nsegments, maxsegsz,</span>
+<span class="lineNum">    1234 </span>            :             boundary, flags, dmamp);
+<span class="lineNum">    1235 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">    1237 </span>            :         /* Allocate an array of grant table pa&lt;-&gt;ref maps */
+<span class="lineNum">    1238 </span><span class="lineNoCov">          0 :         gm = mallocarray(nsegments, sizeof(struct xen_gntmap), M_DEVBUF,</span>
+<span class="lineNum">    1239 </span><span class="lineNoCov">          0 :             M_ZERO | ((flags &amp; BUS_DMA_NOWAIT) ? M_NOWAIT : M_WAITOK));</span>
+<span class="lineNum">    1240 </span><span class="lineNoCov">          0 :         if (gm == NULL) {</span>
+<span class="lineNum">    1241 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;sc_dmat, *dmamp);</span>
+<span class="lineNum">    1242 </span><span class="lineNoCov">          0 :                 *dmamp = NULL;</span>
+<span class="lineNum">    1243 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">    1244 </span>            :         }
+<span class="lineNum">    1245 </span>            :         /* Wire it to the dma map */
+<span class="lineNum">    1246 </span><span class="lineNoCov">          0 :         (*dmamp)-&gt;_dm_cookie = gm;</span>
+<span class="lineNum">    1247 </span>            :         /* Claim references from the grant table */
+<span class="lineNum">    1248 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; (*dmamp)-&gt;_dm_segcnt; i++) {</span>
+<span class="lineNum">    1249 </span><span class="lineNoCov">          0 :                 if (xen_grant_table_alloc(sc, &amp;gm[i].gm_ref)) {</span>
+<span class="lineNum">    1250 </span><span class="lineNoCov">          0 :                         xen_bus_dmamap_destroy(t, *dmamp);</span>
+<span class="lineNum">    1251 </span><span class="lineNoCov">          0 :                         *dmamp = NULL;</span>
+<span class="lineNum">    1252 </span><span class="lineNoCov">          0 :                         return (ENOBUFS);</span>
+<span class="lineNum">    1253 </span>            :                 }
+<span class="lineNum">    1254 </span>            :         }
+<span class="lineNum">    1255 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1256 </span><span class="lineNoCov">          0 : }</span>
+<a name="1257"><span class="lineNum">    1257 </span>            : </a>
+<span class="lineNum">    1258 </span>            : void
+<span class="lineNum">    1259 </span><span class="lineNoCov">          0 : xen_bus_dmamap_destroy(bus_dma_tag_t t, bus_dmamap_t map)</span>
+<span class="lineNum">    1260 </span>            : {
+<span class="lineNum">    1261 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = t-&gt;_cookie;</span>
+<span class="lineNum">    1262 </span>            :         struct xen_gntmap *gm;
+<span class="lineNum">    1263 </span>            :         int i;
+<span class="lineNum">    1264 </span>            : 
+<span class="lineNum">    1265 </span><span class="lineNoCov">          0 :         gm = map-&gt;_dm_cookie;</span>
+<span class="lineNum">    1266 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; map-&gt;_dm_segcnt; i++) {</span>
+<span class="lineNum">    1267 </span><span class="lineNoCov">          0 :                 if (gm[i].gm_ref == 0)</span>
+<span class="lineNum">    1268 </span>            :                         continue;
+<span class="lineNum">    1269 </span><span class="lineNoCov">          0 :                 xen_grant_table_free(sc, gm[i].gm_ref);</span>
+<span class="lineNum">    1270 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1271 </span><span class="lineNoCov">          0 :         free(gm, M_DEVBUF, map-&gt;_dm_segcnt * sizeof(struct xen_gntmap));</span>
+<span class="lineNum">    1272 </span><span class="lineNoCov">          0 :         bus_dmamap_destroy(sc-&gt;sc_dmat, map);</span>
+<span class="lineNum">    1273 </span><span class="lineNoCov">          0 : }</span>
+<a name="1274"><span class="lineNum">    1274 </span>            : </a>
+<span class="lineNum">    1275 </span>            : int
+<span class="lineNum">    1276 </span><span class="lineNoCov">          0 : xen_bus_dmamap_load(bus_dma_tag_t t, bus_dmamap_t map, void *buf,</span>
+<span class="lineNum">    1277 </span>            :     bus_size_t buflen, struct proc *p, int flags)
+<span class="lineNum">    1278 </span>            : {
+<span class="lineNum">    1279 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = t-&gt;_cookie;</span>
+<span class="lineNum">    1280 </span><span class="lineNoCov">          0 :         struct xen_gntmap *gm = map-&gt;_dm_cookie;</span>
+<span class="lineNum">    1281 </span>            :         int i, domain, error;
+<span class="lineNum">    1282 </span>            : 
+<span class="lineNum">    1283 </span><span class="lineNoCov">          0 :         domain = flags &gt;&gt; 16;</span>
+<span class="lineNum">    1284 </span><span class="lineNoCov">          0 :         flags &amp;= 0xffff;</span>
+<span class="lineNum">    1285 </span><span class="lineNoCov">          0 :         error = bus_dmamap_load(sc-&gt;sc_dmat, map, buf, buflen, p, flags);</span>
+<span class="lineNum">    1286 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">    1287 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">    1288 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; map-&gt;dm_nsegs; i++) {</span>
+<span class="lineNum">    1289 </span><span class="lineNoCov">          0 :                 xen_grant_table_enter(sc, gm[i].gm_ref, map-&gt;dm_segs[i].ds_addr,</span>
+<span class="lineNum">    1290 </span><span class="lineNoCov">          0 :                     domain, flags &amp; BUS_DMA_WRITE ? GTF_readonly : 0);</span>
+<span class="lineNum">    1291 </span><span class="lineNoCov">          0 :                 gm[i].gm_paddr = map-&gt;dm_segs[i].ds_addr;</span>
+<span class="lineNum">    1292 </span><span class="lineNoCov">          0 :                 map-&gt;dm_segs[i].ds_addr = gm[i].gm_ref;</span>
+<span class="lineNum">    1293 </span>            :         }
+<span class="lineNum">    1294 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1295 </span><span class="lineNoCov">          0 : }</span>
+<a name="1296"><span class="lineNum">    1296 </span>            : </a>
+<span class="lineNum">    1297 </span>            : int
+<span class="lineNum">    1298 </span><span class="lineNoCov">          0 : xen_bus_dmamap_load_mbuf(bus_dma_tag_t t, bus_dmamap_t map, struct mbuf *m0,</span>
+<span class="lineNum">    1299 </span>            :     int flags)
+<span class="lineNum">    1300 </span>            : {
+<span class="lineNum">    1301 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = t-&gt;_cookie;</span>
+<span class="lineNum">    1302 </span><span class="lineNoCov">          0 :         struct xen_gntmap *gm = map-&gt;_dm_cookie;</span>
+<span class="lineNum">    1303 </span>            :         int i, domain, error;
+<span class="lineNum">    1304 </span>            : 
+<span class="lineNum">    1305 </span><span class="lineNoCov">          0 :         domain = flags &gt;&gt; 16;</span>
+<span class="lineNum">    1306 </span><span class="lineNoCov">          0 :         flags &amp;= 0xffff;</span>
+<span class="lineNum">    1307 </span><span class="lineNoCov">          0 :         error = bus_dmamap_load_mbuf(sc-&gt;sc_dmat, map, m0, flags);</span>
+<span class="lineNum">    1308 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">    1309 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">    1310 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; map-&gt;dm_nsegs; i++) {</span>
+<span class="lineNum">    1311 </span><span class="lineNoCov">          0 :                 xen_grant_table_enter(sc, gm[i].gm_ref, map-&gt;dm_segs[i].ds_addr,</span>
+<span class="lineNum">    1312 </span><span class="lineNoCov">          0 :                     domain, flags &amp; BUS_DMA_WRITE ? GTF_readonly : 0);</span>
+<span class="lineNum">    1313 </span><span class="lineNoCov">          0 :                 gm[i].gm_paddr = map-&gt;dm_segs[i].ds_addr;</span>
+<span class="lineNum">    1314 </span><span class="lineNoCov">          0 :                 map-&gt;dm_segs[i].ds_addr = gm[i].gm_ref;</span>
+<span class="lineNum">    1315 </span>            :         }
+<span class="lineNum">    1316 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1317 </span><span class="lineNoCov">          0 : }</span>
+<a name="1318"><span class="lineNum">    1318 </span>            : </a>
+<span class="lineNum">    1319 </span>            : void
+<span class="lineNum">    1320 </span><span class="lineNoCov">          0 : xen_bus_dmamap_unload(bus_dma_tag_t t, bus_dmamap_t map)</span>
+<span class="lineNum">    1321 </span>            : {
+<span class="lineNum">    1322 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = t-&gt;_cookie;</span>
+<span class="lineNum">    1323 </span><span class="lineNoCov">          0 :         struct xen_gntmap *gm = map-&gt;_dm_cookie;</span>
+<span class="lineNum">    1324 </span>            :         int i;
+<span class="lineNum">    1325 </span>            : 
+<span class="lineNum">    1326 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; map-&gt;dm_nsegs; i++) {</span>
+<span class="lineNum">    1327 </span><span class="lineNoCov">          0 :                 if (gm[i].gm_paddr == 0)</span>
+<span class="lineNum">    1328 </span>            :                         continue;
+<span class="lineNum">    1329 </span><span class="lineNoCov">          0 :                 xen_grant_table_remove(sc, gm[i].gm_ref);</span>
+<span class="lineNum">    1330 </span><span class="lineNoCov">          0 :                 map-&gt;dm_segs[i].ds_addr = gm[i].gm_paddr;</span>
+<span class="lineNum">    1331 </span><span class="lineNoCov">          0 :                 gm[i].gm_paddr = 0;</span>
+<span class="lineNum">    1332 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1333 </span><span class="lineNoCov">          0 :         bus_dmamap_unload(sc-&gt;sc_dmat, map);</span>
+<span class="lineNum">    1334 </span><span class="lineNoCov">          0 : }</span>
+<a name="1335"><span class="lineNum">    1335 </span>            : </a>
+<span class="lineNum">    1336 </span>            : void
+<span class="lineNum">    1337 </span><span class="lineNoCov">          0 : xen_bus_dmamap_sync(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t addr,</span>
+<span class="lineNum">    1338 </span>            :     bus_size_t size, int op)
+<span class="lineNum">    1339 </span>            : {
+<span class="lineNum">    1340 </span><span class="lineNoCov">          0 :         if ((op == (BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE)) ||</span>
+<span class="lineNum">    1341 </span><span class="lineNoCov">          0 :             (op == (BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE)))</span>
+<span class="lineNum">    1342 </span><span class="lineNoCov">          0 :                 virtio_membar_sync();</span>
+<span class="lineNum">    1343 </span><span class="lineNoCov">          0 : }</span>
+<a name="1344"><span class="lineNum">    1344 </span>            : </a>
+<span class="lineNum">    1345 </span>            : static int
+<span class="lineNum">    1346 </span><span class="lineNoCov">          0 : xen_attach_print(void *aux, const char *name)</span>
+<span class="lineNum">    1347 </span>            : {
+<span class="lineNum">    1348 </span><span class="lineNoCov">          0 :         struct xen_attach_args *xa = aux;</span>
+<span class="lineNum">    1349 </span>            : 
+<span class="lineNum">    1350 </span><span class="lineNoCov">          0 :         if (name)</span>
+<span class="lineNum">    1351 </span><span class="lineNoCov">          0 :                 printf(&quot;\&quot;%s\&quot; at %s: %s&quot;, xa-&gt;xa_name, name, xa-&gt;xa_node);</span>
+<span class="lineNum">    1352 </span>            : 
+<span class="lineNum">    1353 </span><span class="lineNoCov">          0 :         return (UNCONF);</span>
+<span class="lineNum">    1354 </span>            : }
+<a name="1355"><span class="lineNum">    1355 </span>            : </a>
+<span class="lineNum">    1356 </span>            : int
+<span class="lineNum">    1357 </span><span class="lineNoCov">          0 : xen_attach_device(struct xen_softc *sc, struct xen_devlist *xdl,</span>
+<span class="lineNum">    1358 </span>            :     const char *name, const char *unit)
+<span class="lineNum">    1359 </span>            : {
+<span class="lineNum">    1360 </span><span class="lineNoCov">          0 :         struct xen_attach_args xa;</span>
+<span class="lineNum">    1361 </span>            :         struct xen_device *xdv;
+<span class="lineNum">    1362 </span><span class="lineNoCov">          0 :         unsigned long long res;</span>
+<span class="lineNum">    1363 </span>            : 
+<span class="lineNum">    1364 </span><span class="lineNoCov">          0 :         xa.xa_dmat = &amp;xen_bus_dma_tag;</span>
+<span class="lineNum">    1365 </span>            : 
+<span class="lineNum">    1366 </span><span class="lineNoCov">          0 :         strlcpy(xa.xa_name, name, sizeof(xa.xa_name));</span>
+<span class="lineNum">    1367 </span><span class="lineNoCov">          0 :         snprintf(xa.xa_node, sizeof(xa.xa_node), &quot;device/%s/%s&quot;, name, unit);</span>
+<span class="lineNum">    1368 </span>            : 
+<span class="lineNum">    1369 </span><span class="lineNoCov">          0 :         if (xs_getprop(sc, xa.xa_node, &quot;backend&quot;, xa.xa_backend,</span>
+<span class="lineNum">    1370 </span>            :             sizeof(xa.xa_backend))) {
+<span class="lineNum">    1371 </span>            :                 DPRINTF(&quot;%s: failed to identify \&quot;backend\&quot; for &quot;
+<span class="lineNum">    1372 </span>            :                     &quot;\&quot;%s\&quot;\n&quot;, sc-&gt;sc_dev.dv_xname, xa.xa_node);
+<span class="lineNum">    1373 </span><span class="lineNoCov">          0 :                 return (EIO);</span>
+<span class="lineNum">    1374 </span>            :         }
+<span class="lineNum">    1375 </span>            : 
+<span class="lineNum">    1376 </span><span class="lineNoCov">          0 :         if (xs_getnum(sc, xa.xa_node, &quot;backend-id&quot;, &amp;res) || res &gt; UINT16_MAX) {</span>
+<span class="lineNum">    1377 </span>            :                 DPRINTF(&quot;%s: invalid \&quot;backend-id\&quot; for \&quot;%s\&quot;\n&quot;,
+<span class="lineNum">    1378 </span>            :                     sc-&gt;sc_dev.dv_xname, xa.xa_node);
+<span class="lineNum">    1379 </span><span class="lineNoCov">          0 :                 return (EIO);</span>
+<span class="lineNum">    1380 </span>            :         }
+<span class="lineNum">    1381 </span><span class="lineNoCov">          0 :         xa.xa_domid = (uint16_t)res;</span>
+<span class="lineNum">    1382 </span>            : 
+<span class="lineNum">    1383 </span><span class="lineNoCov">          0 :         xdv = malloc(sizeof(struct xen_device), M_DEVBUF, M_ZERO | M_NOWAIT);</span>
+<span class="lineNum">    1384 </span><span class="lineNoCov">          0 :         if (xdv == NULL)</span>
+<span class="lineNum">    1385 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">    1386 </span>            : 
+<span class="lineNum">    1387 </span><span class="lineNoCov">          0 :         strlcpy(xdv-&gt;dv_unit, unit, sizeof(xdv-&gt;dv_unit));</span>
+<span class="lineNum">    1388 </span><span class="lineNoCov">          0 :         LIST_INSERT_HEAD(&amp;xdl-&gt;dl_devs, xdv, dv_entry);</span>
+<span class="lineNum">    1389 </span>            : 
+<span class="lineNum">    1390 </span><span class="lineNoCov">          0 :         xdv-&gt;dv_dev = config_found((struct device *)sc, &amp;xa, xen_attach_print);</span>
+<span class="lineNum">    1391 </span>            : 
+<span class="lineNum">    1392 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1393 </span><span class="lineNoCov">          0 : }</span>
+<a name="1394"><span class="lineNum">    1394 </span>            : </a>
+<span class="lineNum">    1395 </span>            : int
+<span class="lineNum">    1396 </span><span class="lineNoCov">          0 : xen_probe_devices(struct xen_softc *sc)</span>
+<span class="lineNum">    1397 </span>            : {
+<span class="lineNum">    1398 </span>            :         struct xen_devlist *xdl;
+<span class="lineNum">    1399 </span><span class="lineNoCov">          0 :         struct xs_transaction xst;</span>
+<span class="lineNum">    1400 </span><span class="lineNoCov">          0 :         struct iovec *iovp1 = NULL, *iovp2 = NULL;</span>
+<span class="lineNum">    1401 </span><span class="lineNoCov">          0 :         int i, j, error, iov1_cnt = 0, iov2_cnt = 0;</span>
+<span class="lineNum">    1402 </span><span class="lineNoCov">          0 :         char path[256];</span>
+<span class="lineNum">    1403 </span>            : 
+<span class="lineNum">    1404 </span><span class="lineNoCov">          0 :         memset(&amp;xst, 0, sizeof(xst));</span>
+<span class="lineNum">    1405 </span><span class="lineNoCov">          0 :         xst.xst_id = 0;</span>
+<span class="lineNum">    1406 </span><span class="lineNoCov">          0 :         xst.xst_cookie = sc-&gt;sc_xs;</span>
+<span class="lineNum">    1407 </span>            : 
+<span class="lineNum">    1408 </span><span class="lineNoCov">          0 :         if ((error = xs_cmd(&amp;xst, XS_LIST, &quot;device&quot;, &amp;iovp1, &amp;iov1_cnt)) != 0)</span>
+<span class="lineNum">    1409 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">    1410 </span>            : 
+<span class="lineNum">    1411 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; iov1_cnt; i++) {</span>
+<span class="lineNum">    1412 </span><span class="lineNoCov">          0 :                 if (strcmp(&quot;suspend&quot;, (char *)iovp1[i].iov_base) == 0)</span>
+<span class="lineNum">    1413 </span>            :                         continue;
+<span class="lineNum">    1414 </span><span class="lineNoCov">          0 :                 snprintf(path, sizeof(path), &quot;device/%s&quot;,</span>
+<span class="lineNum">    1415 </span><span class="lineNoCov">          0 :                     (char *)iovp1[i].iov_base);</span>
+<span class="lineNum">    1416 </span><span class="lineNoCov">          0 :                 if ((error = xs_cmd(&amp;xst, XS_LIST, path, &amp;iovp2,</span>
+<span class="lineNum">    1417 </span><span class="lineNoCov">          0 :                     &amp;iov2_cnt)) != 0)</span>
+<span class="lineNum">    1418 </span>            :                         goto out;
+<span class="lineNum">    1419 </span><span class="lineNoCov">          0 :                 if ((xdl = malloc(sizeof(struct xen_devlist), M_DEVBUF,</span>
+<span class="lineNum">    1420 </span><span class="lineNoCov">          0 :                     M_ZERO | M_NOWAIT)) == NULL) {</span>
+<span class="lineNum">    1421 </span>            :                         error = ENOMEM;
+<span class="lineNum">    1422 </span><span class="lineNoCov">          0 :                         goto out;</span>
+<span class="lineNum">    1423 </span>            :                 }
+<span class="lineNum">    1424 </span><span class="lineNoCov">          0 :                 xdl-&gt;dl_xen = sc;</span>
+<span class="lineNum">    1425 </span><span class="lineNoCov">          0 :                 strlcpy(xdl-&gt;dl_node, (const char *)iovp1[i].iov_base,</span>
+<span class="lineNum">    1426 </span>            :                     XEN_MAX_NODE_LEN);
+<span class="lineNum">    1427 </span><span class="lineNoCov">          0 :                 for (j = 0; j &lt; iov2_cnt; j++) {</span>
+<span class="lineNum">    1428 </span><span class="lineNoCov">          0 :                         error = xen_attach_device(sc, xdl,</span>
+<span class="lineNum">    1429 </span><span class="lineNoCov">          0 :                             (const char *)iovp1[i].iov_base,</span>
+<span class="lineNum">    1430 </span><span class="lineNoCov">          0 :                             (const char *)iovp2[j].iov_base);</span>
+<span class="lineNum">    1431 </span><span class="lineNoCov">          0 :                         if (error) {</span>
+<span class="lineNum">    1432 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: failed to attach \&quot;%s/%s\&quot;\n&quot;,</span>
+<span class="lineNum">    1433 </span><span class="lineNoCov">          0 :                                     sc-&gt;sc_dev.dv_xname, path,</span>
+<span class="lineNum">    1434 </span><span class="lineNoCov">          0 :                                     (const char *)iovp2[j].iov_base);</span>
+<span class="lineNum">    1435 </span><span class="lineNoCov">          0 :                                 goto out;</span>
+<span class="lineNum">    1436 </span>            :                         }
+<span class="lineNum">    1437 </span>            :                 }
+<span class="lineNum">    1438 </span>            :                 /* Setup a watch for every device subtree */
+<span class="lineNum">    1439 </span><span class="lineNoCov">          0 :                 if (xs_watch(sc, &quot;device&quot;, (char *)iovp1[i].iov_base,</span>
+<span class="lineNum">    1440 </span><span class="lineNoCov">          0 :                     &amp;xdl-&gt;dl_task, xen_hotplug, xdl))</span>
+<span class="lineNum">    1441 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: failed to setup hotplug watch for \&quot;%s\&quot;\n&quot;,</span>
+<span class="lineNum">    1442 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_dev.dv_xname, (char *)iovp1[i].iov_base);</span>
+<span class="lineNum">    1443 </span><span class="lineNoCov">          0 :                 SLIST_INSERT_HEAD(&amp;sc-&gt;sc_devlists, xdl, dl_entry);</span>
+<span class="lineNum">    1444 </span><span class="lineNoCov">          0 :                 xs_resfree(&amp;xst, iovp2, iov2_cnt);</span>
+<span class="lineNum">    1445 </span><span class="lineNoCov">          0 :                 iovp2 = NULL;</span>
+<span class="lineNum">    1446 </span><span class="lineNoCov">          0 :                 iov2_cnt = 0;</span>
+<span class="lineNum">    1447 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1448 </span>            : 
+<span class="lineNum">    1449 </span>            :  out:
+<span class="lineNum">    1450 </span><span class="lineNoCov">          0 :         if (iovp2)</span>
+<span class="lineNum">    1451 </span><span class="lineNoCov">          0 :                 xs_resfree(&amp;xst, iovp2, iov2_cnt);</span>
+<span class="lineNum">    1452 </span><span class="lineNoCov">          0 :         xs_resfree(&amp;xst, iovp1, iov1_cnt);</span>
+<span class="lineNum">    1453 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">    1454 </span><span class="lineNoCov">          0 : }</span>
+<a name="1455"><span class="lineNum">    1455 </span>            : </a>
+<span class="lineNum">    1456 </span>            : void
+<span class="lineNum">    1457 </span><span class="lineNoCov">          0 : xen_hotplug(void *arg)</span>
+<span class="lineNum">    1458 </span>            : {
+<span class="lineNum">    1459 </span><span class="lineNoCov">          0 :         struct xen_devlist *xdl = arg;</span>
+<span class="lineNum">    1460 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xdl-&gt;dl_xen;</span>
+<span class="lineNum">    1461 </span>            :         struct xen_device *xdv, *xvdn;
+<span class="lineNum">    1462 </span><span class="lineNoCov">          0 :         struct xs_transaction xst;</span>
+<span class="lineNum">    1463 </span><span class="lineNoCov">          0 :         struct iovec *iovp = NULL;</span>
+<span class="lineNum">    1464 </span><span class="lineNoCov">          0 :         int error, i, keep, iov_cnt = 0;</span>
+<span class="lineNum">    1465 </span><span class="lineNoCov">          0 :         char path[256];</span>
+<span class="lineNum">    1466 </span>            :         int8_t *seen;
+<span class="lineNum">    1467 </span>            : 
+<span class="lineNum">    1468 </span><span class="lineNoCov">          0 :         memset(&amp;xst, 0, sizeof(xst));</span>
+<span class="lineNum">    1469 </span><span class="lineNoCov">          0 :         xst.xst_id = 0;</span>
+<span class="lineNum">    1470 </span><span class="lineNoCov">          0 :         xst.xst_cookie = sc-&gt;sc_xs;</span>
+<span class="lineNum">    1471 </span>            : 
+<span class="lineNum">    1472 </span><span class="lineNoCov">          0 :         snprintf(path, sizeof(path), &quot;device/%s&quot;, xdl-&gt;dl_node);</span>
+<span class="lineNum">    1473 </span><span class="lineNoCov">          0 :         if ((error = xs_cmd(&amp;xst, XS_LIST, path, &amp;iovp, &amp;iov_cnt)) != 0)</span>
+<span class="lineNum">    1474 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1475 </span>            : 
+<span class="lineNum">    1476 </span><span class="lineNoCov">          0 :         seen = malloc(iov_cnt, M_TEMP, M_ZERO | M_WAITOK);</span>
+<span class="lineNum">    1477 </span>            : 
+<span class="lineNum">    1478 </span>            :         /* Detect all removed and kept devices */
+<span class="lineNum">    1479 </span><span class="lineNoCov">          0 :         LIST_FOREACH_SAFE(xdv, &amp;xdl-&gt;dl_devs, dv_entry, xvdn) {</span>
+<span class="lineNum">    1480 </span><span class="lineNoCov">          0 :                 for (i = 0, keep = 0; i &lt; iov_cnt; i++) {</span>
+<span class="lineNum">    1481 </span><span class="lineNoCov">          0 :                         if (!seen[i] &amp;&amp;</span>
+<span class="lineNum">    1482 </span><span class="lineNoCov">          0 :                             !strcmp(xdv-&gt;dv_unit, (char *)iovp[i].iov_base)) {</span>
+<span class="lineNum">    1483 </span><span class="lineNoCov">          0 :                                 seen[i]++;</span>
+<span class="lineNum">    1484 </span>            :                                 keep++;
+<span class="lineNum">    1485 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">    1486 </span>            :                         }
+<span class="lineNum">    1487 </span>            :                 }
+<span class="lineNum">    1488 </span><span class="lineNoCov">          0 :                 if (!keep) {</span>
+<span class="lineNum">    1489 </span>            :                         DPRINTF(&quot;%s: removing \&quot;%s/%s\&quot;\n&quot;, sc-&gt;sc_dev.dv_xname,
+<span class="lineNum">    1490 </span>            :                             xdl-&gt;dl_node, xdv-&gt;dv_unit);
+<span class="lineNum">    1491 </span><span class="lineNoCov">          0 :                         LIST_REMOVE(xdv, dv_entry);</span>
+<span class="lineNum">    1492 </span><span class="lineNoCov">          0 :                         config_detach(xdv-&gt;dv_dev, 0);</span>
+<span class="lineNum">    1493 </span><span class="lineNoCov">          0 :                         free(xdv, M_DEVBUF, sizeof(struct xen_device));</span>
+<span class="lineNum">    1494 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1495 </span>            :         }
+<span class="lineNum">    1496 </span>            : 
+<span class="lineNum">    1497 </span>            :         /* Attach all new devices */
+<span class="lineNum">    1498 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; iov_cnt; i++) {</span>
+<span class="lineNum">    1499 </span><span class="lineNoCov">          0 :                 if (seen[i])</span>
+<span class="lineNum">    1500 </span>            :                         continue;
+<span class="lineNum">    1501 </span>            :                 DPRINTF(&quot;%s: attaching \&quot;%s/%s\&quot;\n&quot;, sc-&gt;sc_dev.dv_xname,
+<span class="lineNum">    1502 </span>            :                             xdl-&gt;dl_node, (const char *)iovp[i].iov_base);
+<span class="lineNum">    1503 </span><span class="lineNoCov">          0 :                 error = xen_attach_device(sc, xdl, xdl-&gt;dl_node,</span>
+<span class="lineNum">    1504 </span><span class="lineNoCov">          0 :                     (const char *)iovp[i].iov_base);</span>
+<span class="lineNum">    1505 </span><span class="lineNoCov">          0 :                 if (error) {</span>
+<span class="lineNum">    1506 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: failed to attach \&quot;%s/%s\&quot;\n&quot;,</span>
+<span class="lineNum">    1507 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_dev.dv_xname, path,</span>
+<span class="lineNum">    1508 </span><span class="lineNoCov">          0 :                             (const char *)iovp[i].iov_base);</span>
+<span class="lineNum">    1509 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">    1510 </span>            :                 }
+<span class="lineNum">    1511 </span>            :         }
+<span class="lineNum">    1512 </span>            : 
+<span class="lineNum">    1513 </span><span class="lineNoCov">          0 :         free(seen, M_TEMP, iov_cnt);</span>
+<span class="lineNum">    1514 </span>            : 
+<span class="lineNum">    1515 </span><span class="lineNoCov">          0 :         xs_resfree(&amp;xst, iovp, iov_cnt);</span>
+<span class="lineNum">    1516 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1517 </span>            : 
+<span class="lineNum">    1518 </span>            : #include &lt;machine/pio.h&gt;
+<span class="lineNum">    1519 </span>            : 
+<span class="lineNum">    1520 </span>            : #define XMI_PORT                0x10
+<span class="lineNum">    1521 </span>            : #define XMI_MAGIC               0x49d2
+<span class="lineNum">    1522 </span>            : #define XMI_UNPLUG_IDE          0x01
+<span class="lineNum">    1523 </span>            : #define XMI_UNPLUG_NIC          0x02
+<span class="lineNum">    1524 </span>            : #define XMI_UNPLUG_IDESEC       0x04
+<a name="1525"><span class="lineNum">    1525 </span>            : </a>
+<span class="lineNum">    1526 </span>            : void
+<span class="lineNum">    1527 </span><span class="lineNoCov">          0 : xen_disable_emulated_devices(struct xen_softc *sc)</span>
+<span class="lineNum">    1528 </span>            : {
+<span class="lineNum">    1529 </span>            : #if defined(__i386__) || defined(__amd64__)
+<span class="lineNum">    1530 </span>            :         ushort unplug = 0;
+<span class="lineNum">    1531 </span>            : 
+<span class="lineNum">    1532 </span><span class="lineNoCov">          0 :         if (inw(XMI_PORT) != XMI_MAGIC) {</span>
+<span class="lineNum">    1533 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to disable emulated devices\n&quot;,</span>
+<span class="lineNum">    1534 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">    1535 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1536 </span>            :         }
+<span class="lineNum">    1537 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_unplug &amp; XEN_UNPLUG_IDE)</span>
+<span class="lineNum">    1538 </span><span class="lineNoCov">          0 :                 unplug |= XMI_UNPLUG_IDE;</span>
+<span class="lineNum">    1539 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_unplug &amp; XEN_UNPLUG_IDESEC)</span>
+<span class="lineNum">    1540 </span><span class="lineNoCov">          0 :                 unplug |= XMI_UNPLUG_IDESEC;</span>
+<span class="lineNum">    1541 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_unplug &amp; XEN_UNPLUG_NIC)</span>
+<span class="lineNum">    1542 </span><span class="lineNoCov">          0 :                 unplug |= XMI_UNPLUG_NIC;</span>
+<span class="lineNum">    1543 </span><span class="lineNoCov">          0 :         if (unplug)</span>
+<span class="lineNum">    1544 </span><span class="lineNoCov">          0 :                 outw(XMI_PORT, unplug);</span>
+<span class="lineNum">    1545 </span>            : #endif  /* __i386__ || __amd64__ */
+<span class="lineNum">    1546 </span><span class="lineNoCov">          0 : }</span>
+<a name="1547"><span class="lineNum">    1547 </span>            : </a>
+<span class="lineNum">    1548 </span>            : void
+<span class="lineNum">    1549 </span><span class="lineNoCov">          0 : xen_unplug_emulated(void *xsc, int what)</span>
+<span class="lineNum">    1550 </span>            : {
+<span class="lineNum">    1551 </span><span class="lineNoCov">          0 :         struct xen_softc *sc = xsc;</span>
+<span class="lineNum">    1552 </span>            : 
+<span class="lineNum">    1553 </span><span class="lineNoCov">          0 :         sc-&gt;sc_unplug |= what;</span>
+<span class="lineNum">    1554 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

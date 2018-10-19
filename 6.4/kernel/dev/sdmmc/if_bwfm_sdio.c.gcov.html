@@ -1,0 +1,1600 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/sdmmc/if_bwfm_sdio.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/sdmmc</a> - if_bwfm_sdio.c<span style="font-size: 80%;"> (source / <a href="if_bwfm_sdio.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">639</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">35</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /* $OpenBSD: if_bwfm_sdio.c,v 1.25 2018/08/09 14:23:50 patrick Exp $ */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2010-2016 Broadcom Corporation
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2016,2017 Patrick Wildt &lt;patrick@blueri.se&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and/or distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : #include &quot;bpfilter.h&quot;
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/buf.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      30 </span>            : 
+<span class="lineNum">      31 </span>            : #if defined(__HAVE_FDT)
+<span class="lineNum">      32 </span>            : #include &lt;machine/fdt.h&gt;
+<span class="lineNum">      33 </span>            : #endif
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">      36 </span>            : #include &lt;net/bpf.h&gt;
+<span class="lineNum">      37 </span>            : #endif
+<span class="lineNum">      38 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;net/if_dl.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;net/if_media.h&gt;
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      43 </span>            : #include &lt;netinet/if_ether.h&gt;
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : #include &lt;net80211/ieee80211_var.h&gt;
+<span class="lineNum">      46 </span>            : 
+<span class="lineNum">      47 </span>            : #include &lt;dev/sdmmc/sdmmcvar.h&gt;
+<span class="lineNum">      48 </span>            : 
+<span class="lineNum">      49 </span>            : #include &lt;dev/ic/bwfmvar.h&gt;
+<span class="lineNum">      50 </span>            : #include &lt;dev/ic/bwfmreg.h&gt;
+<span class="lineNum">      51 </span>            : #include &lt;dev/sdmmc/if_bwfm_sdio.h&gt;
+<span class="lineNum">      52 </span>            : 
+<span class="lineNum">      53 </span>            : #define BWFM_SDIO_CCCR_BRCM_CARDCAP                     0xf0
+<span class="lineNum">      54 </span>            : #define  BWFM_SDIO_CCCR_BRCM_CARDCAP_CMD14_SUPPORT      0x02
+<span class="lineNum">      55 </span>            : #define  BWFM_SDIO_CCCR_BRCM_CARDCAP_CMD14_EXT          0x04
+<span class="lineNum">      56 </span>            : #define  BWFM_SDIO_CCCR_BRCM_CARDCAP_CMD_NODEC          0x08
+<span class="lineNum">      57 </span>            : #define BWFM_SDIO_CCCR_BRCM_CARDCTRL                    0xf1
+<span class="lineNum">      58 </span>            : #define  BWFM_SDIO_CCCR_BRCM_CARDCTRL_WLANRESET         0x02
+<span class="lineNum">      59 </span>            : #define BWFM_SDIO_CCCR_BRCM_SEPINT                      0xf2
+<span class="lineNum">      60 </span>            : 
+<span class="lineNum">      61 </span>            : /* #define BWFM_DEBUG */
+<span class="lineNum">      62 </span>            : #ifdef BWFM_DEBUG
+<span class="lineNum">      63 </span>            : #define DPRINTF(x)      do { if (bwfm_debug &gt; 0) printf x; } while (0)
+<span class="lineNum">      64 </span>            : #define DPRINTFN(n, x)  do { if (bwfm_debug &gt;= (n)) printf x; } while (0)
+<span class="lineNum">      65 </span>            : static int bwfm_debug = 1;
+<span class="lineNum">      66 </span>            : #else
+<span class="lineNum">      67 </span>            : #define DPRINTF(x)      do { ; } while (0)
+<span class="lineNum">      68 </span>            : #define DPRINTFN(n, x)  do { ; } while (0)
+<span class="lineNum">      69 </span>            : #endif
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : #undef DEVNAME
+<span class="lineNum">      72 </span>            : #define DEVNAME(sc)     ((sc)-&gt;sc_sc.sc_dev.dv_xname)
+<span class="lineNum">      73 </span>            : 
+<span class="lineNum">      74 </span>            : enum bwfm_sdio_clkstate {
+<span class="lineNum">      75 </span>            :         CLK_NONE,
+<span class="lineNum">      76 </span>            :         CLK_SDONLY,
+<span class="lineNum">      77 </span>            :         CLK_PENDING,
+<span class="lineNum">      78 </span>            :         CLK_AVAIL,
+<span class="lineNum">      79 </span>            : };
+<span class="lineNum">      80 </span>            : 
+<span class="lineNum">      81 </span>            : struct bwfm_sdio_softc {
+<span class="lineNum">      82 </span>            :         struct bwfm_softc         sc_sc;
+<span class="lineNum">      83 </span>            :         struct sdmmc_function   **sc_sf;
+<span class="lineNum">      84 </span>            :         struct rwlock            *sc_lock;
+<span class="lineNum">      85 </span>            :         void                     *sc_ih;
+<span class="lineNum">      86 </span>            :         int                       sc_node;
+<span class="lineNum">      87 </span>            :         int                       sc_oob;
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span>            :         int                       sc_initialized;
+<span class="lineNum">      90 </span>            : 
+<span class="lineNum">      91 </span>            :         uint32_t                  sc_bar0;
+<span class="lineNum">      92 </span>            :         int                       sc_clkstate;
+<span class="lineNum">      93 </span>            :         int                       sc_alp_only;
+<span class="lineNum">      94 </span>            :         int                       sc_sr_enabled;
+<span class="lineNum">      95 </span>            :         uint32_t                  sc_console_addr;
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span>            :         char                     *sc_bounce_buf;
+<span class="lineNum">      98 </span>            :         size_t                    sc_bounce_size;
+<span class="lineNum">      99 </span>            : 
+<span class="lineNum">     100 </span>            :         char                     *sc_console_buf;
+<span class="lineNum">     101 </span>            :         size_t                    sc_console_buf_size;
+<span class="lineNum">     102 </span>            :         uint32_t                  sc_console_readidx;
+<span class="lineNum">     103 </span>            : 
+<span class="lineNum">     104 </span>            :         struct bwfm_core         *sc_cc;
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span>            :         uint8_t                   sc_tx_seq;
+<span class="lineNum">     107 </span>            :         uint8_t                   sc_tx_max_seq;
+<span class="lineNum">     108 </span>            :         struct mbuf_list          sc_tx_queue;
+<span class="lineNum">     109 </span>            :         int                       sc_tx_count;
+<span class="lineNum">     110 </span>            : 
+<span class="lineNum">     111 </span>            :         struct task               sc_task;
+<span class="lineNum">     112 </span>            : };
+<span class="lineNum">     113 </span>            : 
+<span class="lineNum">     114 </span>            : int              bwfm_sdio_match(struct device *, void *, void *);
+<span class="lineNum">     115 </span>            : void             bwfm_sdio_attach(struct device *, struct device *, void *);
+<span class="lineNum">     116 </span>            : int              bwfm_sdio_preinit(struct bwfm_softc *);
+<span class="lineNum">     117 </span>            : int              bwfm_sdio_detach(struct device *, int);
+<span class="lineNum">     118 </span>            : 
+<span class="lineNum">     119 </span>            : int              bwfm_sdio_intr(void *);
+<span class="lineNum">     120 </span>            : int              bwfm_sdio_oob_intr(void *);
+<span class="lineNum">     121 </span>            : void             bwfm_sdio_task(void *);
+<span class="lineNum">     122 </span>            : int              bwfm_sdio_load_microcode(struct bwfm_sdio_softc *,
+<span class="lineNum">     123 </span>            :                     u_char *, size_t, u_char *, size_t);
+<span class="lineNum">     124 </span>            : 
+<span class="lineNum">     125 </span>            : void             bwfm_sdio_clkctl(struct bwfm_sdio_softc *,
+<span class="lineNum">     126 </span>            :                     enum bwfm_sdio_clkstate, int);
+<span class="lineNum">     127 </span>            : void             bwfm_sdio_htclk(struct bwfm_sdio_softc *, int, int);
+<span class="lineNum">     128 </span>            : void             bwfm_sdio_readshared(struct bwfm_sdio_softc *);
+<span class="lineNum">     129 </span>            : 
+<span class="lineNum">     130 </span>            : void             bwfm_sdio_backplane(struct bwfm_sdio_softc *, uint32_t);
+<span class="lineNum">     131 </span>            : uint8_t          bwfm_sdio_read_1(struct bwfm_sdio_softc *, uint32_t);
+<span class="lineNum">     132 </span>            : uint32_t         bwfm_sdio_read_4(struct bwfm_sdio_softc *, uint32_t);
+<span class="lineNum">     133 </span>            : void             bwfm_sdio_write_1(struct bwfm_sdio_softc *, uint32_t,
+<span class="lineNum">     134 </span>            :                     uint8_t);
+<span class="lineNum">     135 </span>            : void             bwfm_sdio_write_4(struct bwfm_sdio_softc *, uint32_t,
+<span class="lineNum">     136 </span>            :                     uint32_t);
+<span class="lineNum">     137 </span>            : int              bwfm_sdio_buf_read(struct bwfm_sdio_softc *,
+<span class="lineNum">     138 </span>            :                     struct sdmmc_function *, uint32_t, char *, size_t);
+<span class="lineNum">     139 </span>            : int              bwfm_sdio_buf_write(struct bwfm_sdio_softc *,
+<span class="lineNum">     140 </span>            :                     struct sdmmc_function *, uint32_t, char *, size_t);
+<span class="lineNum">     141 </span>            : uint32_t         bwfm_sdio_ram_read_write(struct bwfm_sdio_softc *,
+<span class="lineNum">     142 </span>            :                     uint32_t, char *, size_t, int);
+<span class="lineNum">     143 </span>            : uint32_t         bwfm_sdio_frame_read_write(struct bwfm_sdio_softc *,
+<span class="lineNum">     144 </span>            :                     char *, size_t, int);
+<span class="lineNum">     145 </span>            : 
+<span class="lineNum">     146 </span>            : uint32_t         bwfm_sdio_dev_read(struct bwfm_sdio_softc *, uint32_t);
+<span class="lineNum">     147 </span>            : void             bwfm_sdio_dev_write(struct bwfm_sdio_softc *, uint32_t,
+<span class="lineNum">     148 </span>            :                     uint32_t);
+<span class="lineNum">     149 </span>            : 
+<span class="lineNum">     150 </span>            : uint32_t         bwfm_sdio_buscore_read(struct bwfm_softc *, uint32_t);
+<span class="lineNum">     151 </span>            : void             bwfm_sdio_buscore_write(struct bwfm_softc *, uint32_t,
+<span class="lineNum">     152 </span>            :                     uint32_t);
+<span class="lineNum">     153 </span>            : int              bwfm_sdio_buscore_prepare(struct bwfm_softc *);
+<span class="lineNum">     154 </span>            : void             bwfm_sdio_buscore_activate(struct bwfm_softc *, uint32_t);
+<span class="lineNum">     155 </span>            : 
+<span class="lineNum">     156 </span>            : struct mbuf *    bwfm_sdio_newbuf(void);
+<span class="lineNum">     157 </span>            : int              bwfm_sdio_tx_ok(struct bwfm_sdio_softc *);
+<span class="lineNum">     158 </span>            : void             bwfm_sdio_tx_frames(struct bwfm_sdio_softc *);
+<span class="lineNum">     159 </span>            : void             bwfm_sdio_tx_ctrlframe(struct bwfm_sdio_softc *, struct mbuf *);
+<span class="lineNum">     160 </span>            : void             bwfm_sdio_tx_dataframe(struct bwfm_sdio_softc *, struct mbuf *);
+<span class="lineNum">     161 </span>            : void             bwfm_sdio_rx_frames(struct bwfm_sdio_softc *);
+<span class="lineNum">     162 </span>            : void             bwfm_sdio_rx_glom(struct bwfm_sdio_softc *, uint16_t *, int,
+<span class="lineNum">     163 </span>            :                     uint16_t *);
+<span class="lineNum">     164 </span>            : 
+<span class="lineNum">     165 </span>            : int              bwfm_sdio_txcheck(struct bwfm_softc *);
+<span class="lineNum">     166 </span>            : int              bwfm_sdio_txdata(struct bwfm_softc *, struct mbuf *);
+<span class="lineNum">     167 </span>            : int              bwfm_sdio_txctl(struct bwfm_softc *, void *);
+<span class="lineNum">     168 </span>            : 
+<span class="lineNum">     169 </span>            : #ifdef BWFM_DEBUG
+<span class="lineNum">     170 </span>            : void             bwfm_sdio_debug_console(struct bwfm_sdio_softc *);
+<span class="lineNum">     171 </span>            : #endif
+<span class="lineNum">     172 </span>            : 
+<span class="lineNum">     173 </span>            : struct bwfm_bus_ops bwfm_sdio_bus_ops = {
+<span class="lineNum">     174 </span>            :         .bs_preinit = bwfm_sdio_preinit,
+<span class="lineNum">     175 </span>            :         .bs_stop = NULL,
+<span class="lineNum">     176 </span>            :         .bs_txcheck = bwfm_sdio_txcheck,
+<span class="lineNum">     177 </span>            :         .bs_txdata = bwfm_sdio_txdata,
+<span class="lineNum">     178 </span>            :         .bs_txctl = bwfm_sdio_txctl,
+<span class="lineNum">     179 </span>            : };
+<span class="lineNum">     180 </span>            : 
+<span class="lineNum">     181 </span>            : struct bwfm_buscore_ops bwfm_sdio_buscore_ops = {
+<span class="lineNum">     182 </span>            :         .bc_read = bwfm_sdio_buscore_read,
+<span class="lineNum">     183 </span>            :         .bc_write = bwfm_sdio_buscore_write,
+<span class="lineNum">     184 </span>            :         .bc_prepare = bwfm_sdio_buscore_prepare,
+<span class="lineNum">     185 </span>            :         .bc_reset = NULL,
+<span class="lineNum">     186 </span>            :         .bc_setup = NULL,
+<span class="lineNum">     187 </span>            :         .bc_activate = bwfm_sdio_buscore_activate,
+<span class="lineNum">     188 </span>            : };
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span>            : struct cfattach bwfm_sdio_ca = {
+<span class="lineNum">     191 </span>            :         sizeof(struct bwfm_sdio_softc),
+<span class="lineNum">     192 </span>            :         bwfm_sdio_match,
+<span class="lineNum">     193 </span>            :         bwfm_sdio_attach,
+<span class="lineNum">     194 </span>            :         bwfm_sdio_detach,
+<span class="lineNum">     195 </span>            : };
+<a name="196"><span class="lineNum">     196 </span>            : </a>
+<span class="lineNum">     197 </span>            : int
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 : bwfm_sdio_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     199 </span>            : {
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :         struct sdmmc_attach_args *saa = aux;</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :         struct sdmmc_function *sf = saa-&gt;sf;</span>
+<span class="lineNum">     202 </span>            :         struct sdmmc_cis *cis;
+<span class="lineNum">     203 </span>            : 
+<span class="lineNum">     204 </span>            :         /* Not SDIO. */
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         if (sf == NULL)</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span>            :         /* Look for Broadcom. */
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         cis = &amp;sf-&gt;sc-&gt;sc_fn0-&gt;cis;</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :         if (cis-&gt;manufacturer != 0x02d0)</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     212 </span>            : 
+<span class="lineNum">     213 </span>            :         /* Look for supported chips. */
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :         switch (cis-&gt;product) {</span>
+<span class="lineNum">     215 </span>            :         case 0x4324:
+<span class="lineNum">     216 </span>            :         case 0x4330:
+<span class="lineNum">     217 </span>            :         case 0x4334:
+<span class="lineNum">     218 </span>            :         case 0x4329:
+<span class="lineNum">     219 </span>            :         case 0x4335:
+<span class="lineNum">     220 </span>            :         case 0x4339:
+<span class="lineNum">     221 </span>            :         case 0x4345:
+<span class="lineNum">     222 </span>            :         case 0x4354:
+<span class="lineNum">     223 </span>            :         case 0x4356:
+<span class="lineNum">     224 </span>            :         case 0xa887:
+<span class="lineNum">     225 </span>            :         case 0xa94c:
+<span class="lineNum">     226 </span>            :         case 0xa94d:
+<span class="lineNum">     227 </span>            :         case 0xa962:
+<span class="lineNum">     228 </span>            :         case 0xa9a6:
+<span class="lineNum">     229 </span>            :         case 0xa9bf:
+<span class="lineNum">     230 </span>            :                 break;
+<span class="lineNum">     231 </span>            :         default:
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     233 </span>            :         }
+<span class="lineNum">     234 </span>            : 
+<span class="lineNum">     235 </span>            :         /* We need both functions, but ... */
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         if (sf-&gt;sc-&gt;sc_function_count &lt;= 1)</span>
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     238 </span>            : 
+<span class="lineNum">     239 </span>            :         /* ... only attach for one. */
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :         if (sf-&gt;number != 1)</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         return 1;</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 : }</span>
+<a name="245"><span class="lineNum">     245 </span>            : </a>
+<span class="lineNum">     246 </span>            : void
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 : bwfm_sdio_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     248 </span>            : {
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (struct bwfm_sdio_softc *)self;</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         struct sdmmc_attach_args *saa = aux;</span>
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :         struct sdmmc_function *sf = saa-&gt;sf;</span>
+<span class="lineNum">     252 </span>            :         struct bwfm_core *core;
+<span class="lineNum">     253 </span>            :         uint32_t reg;
+<span class="lineNum">     254 </span>            : 
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     256 </span>            : 
+<span class="lineNum">     257 </span>            : #if defined(__HAVE_FDT)
+<span class="lineNum">     258 </span>            :         if (sf-&gt;cookie)
+<span class="lineNum">     259 </span>            :                 sc-&gt;sc_node = *(int *)sf-&gt;cookie;
+<span class="lineNum">     260 </span>            : #endif
+<span class="lineNum">     261 </span>            : 
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :         task_set(&amp;sc-&gt;sc_task, bwfm_sdio_task, sc);</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :         ml_init(&amp;sc-&gt;sc_tx_queue);</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         sc-&gt;sc_bounce_size = 64 * 1024;</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         sc-&gt;sc_bounce_buf = dma_alloc(sc-&gt;sc_bounce_size, PR_WAITOK);</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_seq = 0xff;</span>
+<span class="lineNum">     267 </span>            : 
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         rw_assert_wrlock(&amp;sf-&gt;sc-&gt;sc_lock);</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         sc-&gt;sc_lock = &amp;sf-&gt;sc-&gt;sc_lock;</span>
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         sc-&gt;sc_sf = mallocarray(sf-&gt;sc-&gt;sc_function_count + 1,</span>
+<span class="lineNum">     272 </span>            :             sizeof(struct sdmmc_function *), M_DEVBUF, M_WAITOK);
+<span class="lineNum">     273 </span>            : 
+<span class="lineNum">     274 </span>            :         /* Copy all function pointers. */
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         SIMPLEQ_FOREACH(sf, &amp;saa-&gt;sf-&gt;sc-&gt;sf_head, sf_list) {</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_sf[sf-&gt;number] = sf;</span>
+<span class="lineNum">     277 </span>            :         }
+<span class="lineNum">     278 </span>            :         sf = saa-&gt;sf;
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         sdmmc_io_set_blocklen(sc-&gt;sc_sf[1], 64);</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         sdmmc_io_set_blocklen(sc-&gt;sc_sf[2], 512);</span>
+<span class="lineNum">     282 </span>            : 
+<span class="lineNum">     283 </span>            :         /* Enable Function 1. */
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         if (sdmmc_io_function_enable(sc-&gt;sc_sf[1]) != 0) {</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: cannot enable function 1\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     287 </span>            :         }
+<span class="lineNum">     288 </span>            : 
+<span class="lineNum">     289 </span>            :         DPRINTF((&quot;%s: F1 signature read @0x18000000=%x\n&quot;, DEVNAME(sc),
+<span class="lineNum">     290 </span>            :             bwfm_sdio_read_4(sc, 0x18000000)));
+<span class="lineNum">     291 </span>            : 
+<span class="lineNum">     292 </span>            :         /* Force PLL off */
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR,</span>
+<span class="lineNum">     294 </span>            :             BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HW_CLKREQ_OFF |
+<span class="lineNum">     295 </span>            :             BWFM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL_REQ);
+<span class="lineNum">     296 </span>            : 
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         sc-&gt;sc_sc.sc_buscore_ops = &amp;bwfm_sdio_buscore_ops;</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         if (bwfm_chip_attach(&amp;sc-&gt;sc_sc) != 0) {</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: cannot attach chip\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     301 </span>            :         }
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         sc-&gt;sc_cc = bwfm_chip_get_core(&amp;sc-&gt;sc_sc, BWFM_AGENT_CORE_CHIPCOMMON);</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_cc == NULL) {</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: cannot find chipcommon core\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     307 </span>            :         }
+<span class="lineNum">     308 </span>            : 
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         core = bwfm_chip_get_core(&amp;sc-&gt;sc_sc, BWFM_AGENT_CORE_SDIO_DEV);</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         if (core-&gt;co_rev &gt;= 12) {</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 reg = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_SLEEPCSR);</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                 if (!(reg &amp; BWFM_SDIO_FUNC1_SLEEPCSR_KSO)) {</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :                         reg |= BWFM_SDIO_FUNC1_SLEEPCSR_KSO;</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                         bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_SLEEPCSR, reg);</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     316 </span>            :         }
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span>            :         /* TODO: drive strength */
+<span class="lineNum">     319 </span>            : 
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_CCCR_BRCM_CARDCTRL,</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :             bwfm_sdio_read_1(sc, BWFM_SDIO_CCCR_BRCM_CARDCTRL) |</span>
+<span class="lineNum">     322 </span>            :             BWFM_SDIO_CCCR_BRCM_CARDCTRL_WLANRESET);
+<span class="lineNum">     323 </span>            : 
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :         core = bwfm_chip_get_pmu(&amp;sc-&gt;sc_sc);</span>
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_4(sc, core-&gt;co_base + BWFM_CHIP_REG_PMUCONTROL,</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :             bwfm_sdio_read_4(sc, core-&gt;co_base + BWFM_CHIP_REG_PMUCONTROL) |</span>
+<span class="lineNum">     327 </span>            :             (BWFM_CHIP_REG_PMUCONTROL_RES_RELOAD &lt;&lt;
+<span class="lineNum">     328 </span>            :              BWFM_CHIP_REG_PMUCONTROL_RES_SHIFT));
+<span class="lineNum">     329 </span>            : 
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         sdmmc_io_function_disable(sc-&gt;sc_sf[2]);</span>
+<span class="lineNum">     331 </span>            : 
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, 0);</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         sc-&gt;sc_clkstate = CLK_SDONLY;</span>
+<span class="lineNum">     334 </span>            : 
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         sc-&gt;sc_sc.sc_bus_ops = &amp;bwfm_sdio_bus_ops;</span>
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         sc-&gt;sc_sc.sc_proto_ops = &amp;bwfm_proto_bcdc_ops;</span>
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :         bwfm_attach(&amp;sc-&gt;sc_sc);</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         config_mountroot(self, bwfm_attachhook);</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     340 </span>            : 
+<span class="lineNum">     341 </span>            : err:
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :         free(sc-&gt;sc_sf, M_DEVBUF, 0);</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 : }</span>
+<a name="344"><span class="lineNum">     344 </span>            : </a>
+<span class="lineNum">     345 </span>            : int
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 : bwfm_sdio_preinit(struct bwfm_softc *bwfm)</span>
+<span class="lineNum">     347 </span>            : {
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (void *)bwfm;</span>
+<span class="lineNum">     349 </span>            :         const char *name = NULL;
+<span class="lineNum">     350 </span>            :         const char *nvname = NULL;
+<span class="lineNum">     351 </span>            :         uint32_t clk, reg;
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :         u_char *ucode, *nvram;</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :         size_t size, nvlen;</span>
+<span class="lineNum">     354 </span>            : 
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_initialized)</span>
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     357 </span>            : 
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :         rw_enter_write(sc-&gt;sc_lock);</span>
+<span class="lineNum">     359 </span>            : 
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         switch (bwfm-&gt;sc_chip.ch_chip)</span>
+<span class="lineNum">     361 </span>            :         {
+<span class="lineNum">     362 </span>            :         case BRCM_CC_4330_CHIP_ID:
+<span class="lineNum">     363 </span>            :                 name = &quot;brcmfmac4330-sdio.bin&quot;;
+<span class="lineNum">     364 </span>            :                 nvname = &quot;brcmfmac4330-sdio.nvram&quot;;
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     366 </span>            :         case BRCM_CC_4334_CHIP_ID:
+<span class="lineNum">     367 </span>            :                 name = &quot;brcmfmac4334-sdio.bin&quot;;
+<span class="lineNum">     368 </span>            :                 nvname = &quot;brcmfmac4334-sdio.nvram&quot;;
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     370 </span>            :         case BRCM_CC_4345_CHIP_ID:
+<span class="lineNum">     371 </span>            :                 name = &quot;brcmfmac43455-sdio.bin&quot;;
+<span class="lineNum">     372 </span>            :                 nvname = &quot;brcmfmac43455-sdio.nvram&quot;;
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     374 </span>            :         case BRCM_CC_43340_CHIP_ID:
+<span class="lineNum">     375 </span>            :                 name = &quot;brcmfmac43340-sdio.bin&quot;;
+<span class="lineNum">     376 </span>            :                 nvname = &quot;brcmfmac43340-sdio.nvram&quot;;
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     378 </span>            :         case BRCM_CC_4335_CHIP_ID:
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :                 if (bwfm-&gt;sc_chip.ch_chiprev &lt; 2) {</span>
+<span class="lineNum">     380 </span>            :                         name = &quot;brcmfmac4335-sdio.bin&quot;;
+<span class="lineNum">     381 </span>            :                         nvname = &quot;brcmfmac4335-sdio.nvram&quot;;
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     383 </span>            :                         name = &quot;brcmfmac4339-sdio.bin&quot;;
+<span class="lineNum">     384 </span>            :                         nvname = &quot;brcmfmac4339-sdio.nvram&quot;;
+<span class="lineNum">     385 </span>            :                 }
+<span class="lineNum">     386 </span>            :                 break;
+<span class="lineNum">     387 </span>            :         case BRCM_CC_4339_CHIP_ID:
+<span class="lineNum">     388 </span>            :                 name = &quot;brcmfmac4339-sdio.bin&quot;;
+<span class="lineNum">     389 </span>            :                 nvname = &quot;brcmfmac4339-sdio.nvram&quot;;
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     391 </span>            :         case BRCM_CC_43430_CHIP_ID:
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                 if (bwfm-&gt;sc_chip.ch_chiprev == 0) {</span>
+<span class="lineNum">     393 </span>            :                         name = &quot;brcmfmac43430a0-sdio.bin&quot;;
+<span class="lineNum">     394 </span>            :                         nvname = &quot;brcmfmac43430a0-sdio.nvram&quot;;
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     396 </span>            :                         name = &quot;brcmfmac43430-sdio.bin&quot;;
+<span class="lineNum">     397 </span>            :                         nvname = &quot;brcmfmac43430-sdio.nvram&quot;;
+<span class="lineNum">     398 </span>            :                 }
+<span class="lineNum">     399 </span>            :                 break;
+<span class="lineNum">     400 </span>            :         case BRCM_CC_4356_CHIP_ID:
+<span class="lineNum">     401 </span>            :                 name = &quot;brcmfmac4356-sdio.bin&quot;;
+<span class="lineNum">     402 </span>            :                 nvname = &quot;brcmfmac4356-sdio.nvram&quot;;
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     404 </span>            :         default:
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unknown firmware for chip %s\n&quot;,</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :                     DEVNAME(sc), bwfm-&gt;sc_chip.ch_name);</span>
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     408 </span>            :         }
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         if (loadfirmware(name, &amp;ucode, &amp;size) != 0) {</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed loadfirmware of file %s\n&quot;,</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :                     DEVNAME(sc), name);</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     414 </span>            :         }
+<span class="lineNum">     415 </span>            : 
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         if (loadfirmware(nvname, &amp;nvram, &amp;nvlen) != 0) {</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed loadfirmware of file %s\n&quot;,</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                     DEVNAME(sc), nvname);</span>
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :                 free(ucode, M_DEVBUF, size);</span>
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     421 </span>            :         }
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         sc-&gt;sc_alp_only = 1;</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :         if (bwfm_sdio_load_microcode(sc, ucode, size,</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :             nvram, nvlen) != 0) {</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: could not load microcode\n&quot;,</span>
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :                     DEVNAME(sc));</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                 free(ucode, M_DEVBUF, size);</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :                 free(nvram, M_DEVBUF, nvlen);</span>
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     431 </span>            :         }
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :         sc-&gt;sc_alp_only = 0;</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         free(ucode, M_DEVBUF, size);</span>
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         free(nvram, M_DEVBUF, nvlen);</span>
+<span class="lineNum">     435 </span>            : 
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :         bwfm_sdio_clkctl(sc, CLK_AVAIL, 0);</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_clkstate != CLK_AVAIL)</span>
+<span class="lineNum">     438 </span>            :                 goto err;
+<span class="lineNum">     439 </span>            : 
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :         clk = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR);</span>
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR,</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :             clk | BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HT);</span>
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :         bwfm_sdio_dev_write(sc, SDPCMD_TOSBMAILBOXDATA,</span>
+<span class="lineNum">     445 </span>            :             SDPCM_PROT_VERSION &lt;&lt; SDPCM_PROT_VERSION_SHIFT);
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :         if (sdmmc_io_function_enable(sc-&gt;sc_sf[2]) != 0) {</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: cannot enable function 2\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     449 </span>            :         }
+<span class="lineNum">     450 </span>            : 
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :         bwfm_sdio_dev_write(sc, SDPCMD_HOSTINTMASK,</span>
+<span class="lineNum">     452 </span>            :             SDPCMD_INTSTATUS_HMB_SW_MASK|SDPCMD_INTSTATUS_CHIPACTIVE);
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_WATERMARK, 8);</span>
+<span class="lineNum">     454 </span>            : 
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :         if (bwfm_chip_sr_capable(bwfm)) {</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :                 reg = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_WAKEUPCTRL);</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                 reg |= BWFM_SDIO_FUNC1_WAKEUPCTRL_HTWAIT;</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :                 bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_WAKEUPCTRL, reg);</span>
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :                 bwfm_sdio_write_1(sc, BWFM_SDIO_CCCR_CARDCAP,</span>
+<span class="lineNum">     460 </span>            :                     BWFM_SDIO_CCCR_CARDCAP_CMD14_SUPPORT |
+<span class="lineNum">     461 </span>            :                     BWFM_SDIO_CCCR_CARDCAP_CMD14_EXT);
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                 bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR,</span>
+<span class="lineNum">     463 </span>            :                     BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HT);
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_sr_enabled = 1;</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                 bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, clk);</span>
+<span class="lineNum">     467 </span>            :         }
+<span class="lineNum">     468 </span>            : 
+<span class="lineNum">     469 </span>            : #if defined(__HAVE_FDT)
+<span class="lineNum">     470 </span>            :         if (sc-&gt;sc_node) {
+<span class="lineNum">     471 </span>            :                 sc-&gt;sc_ih = fdt_intr_establish(sc-&gt;sc_node,
+<span class="lineNum">     472 </span>            :                     IPL_NET, bwfm_sdio_oob_intr, sc, DEVNAME(sc));
+<span class="lineNum">     473 </span>            :                 if (sc-&gt;sc_ih != NULL) {
+<span class="lineNum">     474 </span>            :                         bwfm_sdio_write_1(sc, BWFM_SDIO_CCCR_SEPINT,
+<span class="lineNum">     475 </span>            :                             BWFM_SDIO_CCCR_SEPINT_MASK |
+<span class="lineNum">     476 </span>            :                             BWFM_SDIO_CCCR_SEPINT_OE |
+<span class="lineNum">     477 </span>            :                             BWFM_SDIO_CCCR_SEPINT_ACT_HI);
+<span class="lineNum">     478 </span>            :                         sc-&gt;sc_oob = 1;
+<span class="lineNum">     479 </span>            :                 }
+<span class="lineNum">     480 </span>            :         }
+<span class="lineNum">     481 </span>            :         if (sc-&gt;sc_ih == NULL)
+<span class="lineNum">     482 </span>            : #endif
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :         sc-&gt;sc_ih = sdmmc_intr_establish(bwfm-&gt;sc_dev.dv_parent,</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :             bwfm_sdio_intr, sc, DEVNAME(sc));</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_ih == NULL) {</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: can't establish interrupt\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :                 bwfm_sdio_clkctl(sc, CLK_NONE, 0);</span>
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     489 </span>            :         }
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :         sdmmc_intr_enable(sc-&gt;sc_sf[1]);</span>
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :         rw_exit(sc-&gt;sc_lock);</span>
+<span class="lineNum">     492 </span>            : 
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         sc-&gt;sc_initialized = 1;</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     495 </span>            : 
+<span class="lineNum">     496 </span>            : err:
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :         rw_exit(sc-&gt;sc_lock);</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :         return 1;</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 : }</span>
+<a name="500"><span class="lineNum">     500 </span>            : </a>
+<span class="lineNum">     501 </span>            : int
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 : bwfm_sdio_load_microcode(struct bwfm_sdio_softc *sc, u_char *ucode, size_t size,</span>
+<span class="lineNum">     503 </span>            :     u_char *nvram, size_t nvlen)
+<span class="lineNum">     504 </span>            : {
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         struct bwfm_softc *bwfm = (void *)sc;</span>
+<span class="lineNum">     506 </span>            :         char *verify = NULL;
+<span class="lineNum">     507 </span>            :         int err = 0;
+<span class="lineNum">     508 </span>            : 
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :         bwfm_sdio_clkctl(sc, CLK_AVAIL, 0);</span>
+<span class="lineNum">     510 </span>            : 
+<span class="lineNum">     511 </span>            :         /* Upload firmware */
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :         err = bwfm_sdio_ram_read_write(sc, bwfm-&gt;sc_chip.ch_rambase,</span>
+<span class="lineNum">     513 </span>            :             ucode, size, 1);
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :         if (err)</span>
+<span class="lineNum">     515 </span>            :                 goto out;
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span>            :         /* Verify firmware */
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :         verify = malloc(size, M_TEMP, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :         err = bwfm_sdio_ram_read_write(sc, bwfm-&gt;sc_chip.ch_rambase,</span>
+<span class="lineNum">     520 </span>            :             verify, size, 0);
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :         if (err || memcmp(verify, ucode, size)) {</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: firmware verification failed\n&quot;,</span>
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :                     DEVNAME(sc));</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :                 free(verify, M_TEMP, size);</span>
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     526 </span>            :         }
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :         free(verify, M_TEMP, size);</span>
+<span class="lineNum">     528 </span>            : 
+<span class="lineNum">     529 </span>            :         /* Upload nvram */
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :         err = bwfm_sdio_ram_read_write(sc, bwfm-&gt;sc_chip.ch_rambase +</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :             bwfm-&gt;sc_chip.ch_ramsize - nvlen, nvram, nvlen, 1);</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :         if (err)</span>
+<span class="lineNum">     533 </span>            :                 goto out;
+<span class="lineNum">     534 </span>            : 
+<span class="lineNum">     535 </span>            :         /* Verify nvram */
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         verify = malloc(nvlen, M_TEMP, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :         err = bwfm_sdio_ram_read_write(sc, bwfm-&gt;sc_chip.ch_rambase +</span>
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :             bwfm-&gt;sc_chip.ch_ramsize - nvlen, verify, nvlen, 0);</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :         if (err || memcmp(verify, nvram, nvlen)) {</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: nvram verification failed\n&quot;,</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                     DEVNAME(sc));</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                 free(verify, M_TEMP, nvlen);</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     544 </span>            :         }
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         free(verify, M_TEMP, nvlen);</span>
+<span class="lineNum">     546 </span>            : 
+<span class="lineNum">     547 </span>            :         /* Load reset vector from firmware and kickstart core. */
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         bwfm_chip_set_active(bwfm, *(uint32_t *)ucode);</span>
+<span class="lineNum">     549 </span>            : 
+<span class="lineNum">     550 </span>            : out:
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :         bwfm_sdio_clkctl(sc, CLK_SDONLY, 0);</span>
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :         return err;</span>
+<span class="lineNum">     553 </span>            : }
+<a name="554"><span class="lineNum">     554 </span>            : </a>
+<span class="lineNum">     555 </span>            : void
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 : bwfm_sdio_clkctl(struct bwfm_sdio_softc *sc, enum bwfm_sdio_clkstate newstate,</span>
+<span class="lineNum">     557 </span>            :     int pendok)
+<span class="lineNum">     558 </span>            : {
+<span class="lineNum">     559 </span>            :         enum bwfm_sdio_clkstate oldstate;
+<span class="lineNum">     560 </span>            : 
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :         oldstate = sc-&gt;sc_clkstate;</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_clkstate == newstate)</span>
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     564 </span>            : 
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :         switch (newstate) {</span>
+<span class="lineNum">     566 </span>            :         case CLK_AVAIL:
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_clkstate == CLK_NONE)</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_clkstate = CLK_SDONLY;</span>
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :                 bwfm_sdio_htclk(sc, 1, pendok);</span>
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     571 </span>            :         case CLK_SDONLY:
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_clkstate == CLK_NONE)</span>
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_clkstate = CLK_SDONLY;</span>
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :                 else if (sc-&gt;sc_clkstate == CLK_AVAIL)</span>
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 :                         bwfm_sdio_htclk(sc, 0, 0);</span>
+<span class="lineNum">     576 </span>            :                 else
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: request for %d -&gt; %d\n&quot;,</span>
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :                             DEVNAME(sc), sc-&gt;sc_clkstate, newstate);</span>
+<span class="lineNum">     579 </span>            :                 break;
+<span class="lineNum">     580 </span>            :         case CLK_NONE:
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_clkstate == CLK_AVAIL)</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :                         bwfm_sdio_htclk(sc, 0, 0);</span>
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_clkstate = CLK_NONE;</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     585 </span>            :         default:
+<span class="lineNum">     586 </span>            :                 break;
+<span class="lineNum">     587 </span>            :         }
+<span class="lineNum">     588 </span>            : 
+<span class="lineNum">     589 </span>            :         DPRINTF((&quot;%s: %d -&gt; %d = %d\n&quot;, DEVNAME(sc), oldstate, newstate,
+<span class="lineNum">     590 </span>            :             sc-&gt;sc_clkstate));
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 : }</span>
+<a name="592"><span class="lineNum">     592 </span>            : </a>
+<span class="lineNum">     593 </span>            : void
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 : bwfm_sdio_htclk(struct bwfm_sdio_softc *sc, int on, int pendok)</span>
+<span class="lineNum">     595 </span>            : {
+<span class="lineNum">     596 </span>            :         uint32_t clkctl, devctl, req;
+<span class="lineNum">     597 </span>            :         int i;
+<span class="lineNum">     598 </span>            : 
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_sr_enabled) {</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :                 if (on)</span>
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_clkstate = CLK_AVAIL;</span>
+<span class="lineNum">     602 </span>            :                 else
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_clkstate = CLK_SDONLY;</span>
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     605 </span>            :         }
+<span class="lineNum">     606 </span>            : 
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :         if (on) {</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_alp_only)</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :                         req = BWFM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL_REQ;</span>
+<span class="lineNum">     610 </span>            :                 else
+<span class="lineNum">     611 </span>            :                         req = BWFM_SDIO_FUNC1_CHIPCLKCSR_HT_AVAIL_REQ;
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                 bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, req);</span>
+<span class="lineNum">     613 </span>            : 
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                 clkctl = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR);</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :                 if (!BWFM_SDIO_FUNC1_CHIPCLKCSR_CLKAV(clkctl, sc-&gt;sc_alp_only)</span>
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :                     &amp;&amp; pendok) {</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                         devctl = bwfm_sdio_read_1(sc, BWFM_SDIO_DEVICE_CTL);</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                         devctl |= BWFM_SDIO_DEVICE_CTL_CA_INT_ONLY;</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :                         bwfm_sdio_write_1(sc, BWFM_SDIO_DEVICE_CTL, devctl);</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_clkstate = CLK_PENDING;</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :                 } else if (sc-&gt;sc_clkstate == CLK_PENDING) {</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :                         devctl = bwfm_sdio_read_1(sc, BWFM_SDIO_DEVICE_CTL);</span>
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :                         devctl &amp;= ~BWFM_SDIO_DEVICE_CTL_CA_INT_ONLY;</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :                         bwfm_sdio_write_1(sc, BWFM_SDIO_DEVICE_CTL, devctl);</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; 5000; i++) {</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                         if (BWFM_SDIO_FUNC1_CHIPCLKCSR_CLKAV(clkctl,</span>
+<span class="lineNum">     630 </span>            :                             sc-&gt;sc_alp_only))
+<span class="lineNum">     631 </span>            :                                 break;
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :                         clkctl = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR);</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :                         delay(1000);</span>
+<span class="lineNum">     634 </span>            :                 }
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :                 if (!BWFM_SDIO_FUNC1_CHIPCLKCSR_CLKAV(clkctl, sc-&gt;sc_alp_only)) {</span>
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: HT avail timeout\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     638 </span>            :                 }
+<span class="lineNum">     639 </span>            : 
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_clkstate = CLK_AVAIL;</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_clkstate == CLK_PENDING) {</span>
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :                         devctl = bwfm_sdio_read_1(sc, BWFM_SDIO_DEVICE_CTL);</span>
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :                         devctl &amp;= ~BWFM_SDIO_DEVICE_CTL_CA_INT_ONLY;</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :                         bwfm_sdio_write_1(sc, BWFM_SDIO_DEVICE_CTL, devctl);</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_clkstate = CLK_SDONLY;</span>
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :                 bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, 0);</span>
+<span class="lineNum">     649 </span>            :         }
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 : }</span>
+<a name="651"><span class="lineNum">     651 </span>            : </a>
+<span class="lineNum">     652 </span>            : void
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 : bwfm_sdio_readshared(struct bwfm_sdio_softc *sc)</span>
+<span class="lineNum">     654 </span>            : {
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :         struct bwfm_softc *bwfm = (void *)sc;</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_sdpcm sdpcm;</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :         uint32_t addr, shaddr;</span>
+<span class="lineNum">     658 </span>            :         int err;
+<span class="lineNum">     659 </span>            : 
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         shaddr = bwfm-&gt;sc_chip.ch_rambase + bwfm-&gt;sc_chip.ch_ramsize - 4;</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :         if (!bwfm-&gt;sc_chip.ch_rambase &amp;&amp; bwfm_chip_sr_capable(bwfm))</span>
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :                 shaddr -= bwfm-&gt;sc_chip.ch_srsize;</span>
+<span class="lineNum">     663 </span>            : 
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :         err = bwfm_sdio_ram_read_write(sc, shaddr, (char *)&amp;addr,</span>
+<span class="lineNum">     665 </span>            :             sizeof(addr), 0);
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :         if (err)</span>
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     668 </span>            : 
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :         addr = letoh32(addr);</span>
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :         if (addr == 0 || ((~addr &gt;&gt; 16) &amp; 0xffff) == (addr &amp; 0xffff))</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     672 </span>            : 
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :         err = bwfm_sdio_ram_read_write(sc, addr, (char *)&amp;sdpcm,</span>
+<span class="lineNum">     674 </span>            :             sizeof(sdpcm), 0);
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         if (err)</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     677 </span>            : 
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :         sc-&gt;sc_console_addr = letoh32(sdpcm.console_addr);</span>
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 : }</span>
+<a name="680"><span class="lineNum">     680 </span>            : </a>
+<span class="lineNum">     681 </span>            : int
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 : bwfm_sdio_intr(void *v)</span>
+<span class="lineNum">     683 </span>            : {
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :         bwfm_sdio_task(v);</span>
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :         return 1;</span>
+<span class="lineNum">     686 </span>            : }
+<span class="lineNum">     687 </span>            : 
+<span class="lineNum">     688 </span>            : #if defined(__HAVE_FDT)
+<span class="lineNum">     689 </span>            : int
+<span class="lineNum">     690 </span>            : bwfm_sdio_oob_intr(void *v)
+<span class="lineNum">     691 </span>            : {
+<span class="lineNum">     692 </span>            :         struct bwfm_sdio_softc *sc = (void *)v;
+<span class="lineNum">     693 </span>            :         if (!sc-&gt;sc_oob)
+<span class="lineNum">     694 </span>            :                 return 0;
+<span class="lineNum">     695 </span>            :         fdt_intr_disable(sc-&gt;sc_ih);
+<span class="lineNum">     696 </span>            :         task_add(systq, &amp;sc-&gt;sc_task);
+<span class="lineNum">     697 </span>            :         return 1;
+<span class="lineNum">     698 </span>            : }
+<span class="lineNum">     699 </span>            : #endif
+<a name="700"><span class="lineNum">     700 </span>            : </a>
+<span class="lineNum">     701 </span>            : void
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 : bwfm_sdio_task(void *v)</span>
+<span class="lineNum">     703 </span>            : {
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (void *)v;</span>
+<span class="lineNum">     705 </span>            :         uint32_t clkctl, devctl, intstat, hostint;
+<span class="lineNum">     706 </span>            : 
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :         rw_enter_write(sc-&gt;sc_lock);</span>
+<span class="lineNum">     708 </span>            : 
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :         if (!sc-&gt;sc_sr_enabled &amp;&amp; sc-&gt;sc_clkstate == CLK_PENDING) {</span>
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :                 clkctl = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR);</span>
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                 if (BWFM_SDIO_FUNC1_CHIPCLKCSR_HTAV(clkctl)) {</span>
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :                         devctl = bwfm_sdio_read_1(sc, BWFM_SDIO_DEVICE_CTL);</span>
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 :                         devctl &amp;= ~BWFM_SDIO_DEVICE_CTL_CA_INT_ONLY;</span>
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 :                         bwfm_sdio_write_1(sc, BWFM_SDIO_DEVICE_CTL, devctl);</span>
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_clkstate = CLK_AVAIL;</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     717 </span>            :         }
+<span class="lineNum">     718 </span>            : 
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :         intstat = bwfm_sdio_dev_read(sc, BWFM_SDPCMD_INTSTATUS);</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :         intstat &amp;= (SDPCMD_INTSTATUS_HMB_SW_MASK|SDPCMD_INTSTATUS_CHIPACTIVE);</span>
+<span class="lineNum">     721 </span>            :         /* XXX fc state */
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :         if (intstat)</span>
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :                 bwfm_sdio_dev_write(sc, BWFM_SDPCMD_INTSTATUS, intstat);</span>
+<span class="lineNum">     724 </span>            : 
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :         if (intstat &amp; SDPCMD_INTSTATUS_HMB_HOST_INT) {</span>
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 :                 hostint = bwfm_sdio_dev_read(sc, SDPCMD_TOHOSTMAILBOXDATA);</span>
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :                 bwfm_sdio_dev_write(sc, SDPCMD_TOSBMAILBOX,</span>
+<span class="lineNum">     728 </span>            :                     SDPCMD_TOSBMAILBOX_INT_ACK);
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :                 if (hostint &amp; SDPCMD_TOHOSTMAILBOXDATA_NAKHANDLED)</span>
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :                         intstat |= SDPCMD_INTSTATUS_HMB_FRAME_IND;</span>
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :                 if (hostint &amp; SDPCMD_TOHOSTMAILBOXDATA_DEVREADY ||</span>
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :                     hostint &amp; SDPCMD_TOHOSTMAILBOXDATA_FWREADY)</span>
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :                         bwfm_sdio_readshared(sc);</span>
+<span class="lineNum">     734 </span>            :         }
+<span class="lineNum">     735 </span>            : 
+<span class="lineNum">     736 </span>            :         /* FIXME: Might stall if we don't when not set. */
+<span class="lineNum">     737 </span>            :         if (1 || intstat &amp; SDPCMD_INTSTATUS_HMB_FRAME_IND) {
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :                 bwfm_sdio_rx_frames(sc);</span>
+<span class="lineNum">     739 </span>            :         }
+<span class="lineNum">     740 </span>            : 
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 :         if (!ml_empty(&amp;sc-&gt;sc_tx_queue)) {</span>
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :                 bwfm_sdio_tx_frames(sc);</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     744 </span>            : 
+<span class="lineNum">     745 </span>            : #ifdef BWFM_DEBUG
+<span class="lineNum">     746 </span>            :         bwfm_sdio_debug_console(sc);
+<span class="lineNum">     747 </span>            : #endif
+<span class="lineNum">     748 </span>            : 
+<span class="lineNum">     749 </span><span class="lineNoCov">          0 :         rw_exit(sc-&gt;sc_lock);</span>
+<span class="lineNum">     750 </span>            : 
+<span class="lineNum">     751 </span>            : #if defined(__HAVE_FDT)
+<span class="lineNum">     752 </span>            :         if (sc-&gt;sc_oob)
+<span class="lineNum">     753 </span>            :                 fdt_intr_enable(sc-&gt;sc_ih);
+<span class="lineNum">     754 </span>            : #endif
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 : }</span>
+<a name="756"><span class="lineNum">     756 </span>            : </a>
+<span class="lineNum">     757 </span>            : int
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 : bwfm_sdio_detach(struct device *self, int flags)</span>
+<span class="lineNum">     759 </span>            : {
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (struct bwfm_sdio_softc *)self;</span>
+<span class="lineNum">     761 </span>            : 
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :         bwfm_detach(&amp;sc-&gt;sc_sc, flags);</span>
+<span class="lineNum">     763 </span>            : 
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :         dma_free(sc-&gt;sc_bounce_buf, sc-&gt;sc_bounce_size);</span>
+<span class="lineNum">     765 </span><span class="lineNoCov">          0 :         free(sc-&gt;sc_sf, M_DEVBUF, 0);</span>
+<span class="lineNum">     766 </span>            : 
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     768 </span>            : }
+<a name="769"><span class="lineNum">     769 </span>            : </a>
+<span class="lineNum">     770 </span>            : void
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 : bwfm_sdio_backplane(struct bwfm_sdio_softc *sc, uint32_t bar0)</span>
+<span class="lineNum">     772 </span>            : {
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_bar0 == bar0)</span>
+<span class="lineNum">     774 </span>            :                 return;
+<span class="lineNum">     775 </span>            : 
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_SBADDRLOW,</span>
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :             (bar0 &gt;&gt;  8) &amp; 0x80);</span>
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_SBADDRMID,</span>
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :             (bar0 &gt;&gt; 16) &amp; 0xff);</span>
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_SBADDRHIGH,</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :             (bar0 &gt;&gt; 24) &amp; 0xff);</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :         sc-&gt;sc_bar0 = bar0;</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 : }</span>
+<a name="784"><span class="lineNum">     784 </span>            : </a>
+<span class="lineNum">     785 </span>            : uint8_t
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 : bwfm_sdio_read_1(struct bwfm_sdio_softc *sc, uint32_t addr)</span>
+<span class="lineNum">     787 </span>            : {
+<span class="lineNum">     788 </span>            :         struct sdmmc_function *sf;
+<span class="lineNum">     789 </span>            :         uint8_t rv;
+<span class="lineNum">     790 </span>            : 
+<span class="lineNum">     791 </span>            :         /*
+<span class="lineNum">     792 </span>            :          * figure out how to read the register based on address range
+<span class="lineNum">     793 </span>            :          * 0x00 ~ 0x7FF: function 0 CCCR and FBR
+<span class="lineNum">     794 </span>            :          * 0x10000 ~ 0x1FFFF: function 1 miscellaneous registers
+<span class="lineNum">     795 </span>            :          * The rest: function 1 silicon backplane core registers
+<span class="lineNum">     796 </span>            :          */
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :         if ((addr &amp; ~0x7ff) == 0)</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :                 sf = sc-&gt;sc_sf[0];</span>
+<span class="lineNum">     799 </span>            :         else
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :                 sf = sc-&gt;sc_sf[1];</span>
+<span class="lineNum">     801 </span>            : 
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :         rv = sdmmc_io_read_1(sf, addr);</span>
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :         return rv;</span>
+<span class="lineNum">     804 </span>            : }
+<a name="805"><span class="lineNum">     805 </span>            : </a>
+<span class="lineNum">     806 </span>            : uint32_t
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 : bwfm_sdio_read_4(struct bwfm_sdio_softc *sc, uint32_t addr)</span>
+<span class="lineNum">     808 </span>            : {
+<span class="lineNum">     809 </span>            :         struct sdmmc_function *sf;
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :         uint32_t bar0 = addr &amp; ~BWFM_SDIO_SB_OFT_ADDR_MASK;</span>
+<span class="lineNum">     811 </span>            :         uint32_t rv;
+<span class="lineNum">     812 </span>            : 
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :         bwfm_sdio_backplane(sc, bar0);</span>
+<span class="lineNum">     814 </span>            : 
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 :         addr &amp;= BWFM_SDIO_SB_OFT_ADDR_MASK;</span>
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 :         addr |= BWFM_SDIO_SB_ACCESS_2_4B_FLAG;</span>
+<span class="lineNum">     817 </span>            : 
+<span class="lineNum">     818 </span>            :         /*
+<span class="lineNum">     819 </span>            :          * figure out how to read the register based on address range
+<span class="lineNum">     820 </span>            :          * 0x00 ~ 0x7FF: function 0 CCCR and FBR
+<span class="lineNum">     821 </span>            :          * 0x10000 ~ 0x1FFFF: function 1 miscellaneous registers
+<span class="lineNum">     822 </span>            :          * The rest: function 1 silicon backplane core registers
+<span class="lineNum">     823 </span>            :          */
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :         if ((addr &amp; ~0x7ff) == 0)</span>
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :                 sf = sc-&gt;sc_sf[0];</span>
+<span class="lineNum">     826 </span>            :         else
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :                 sf = sc-&gt;sc_sf[1];</span>
+<span class="lineNum">     828 </span>            : 
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :         rv = sdmmc_io_read_4(sf, addr);</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :         return rv;</span>
+<span class="lineNum">     831 </span>            : }
+<a name="832"><span class="lineNum">     832 </span>            : </a>
+<span class="lineNum">     833 </span>            : void
+<span class="lineNum">     834 </span><span class="lineNoCov">          0 : bwfm_sdio_write_1(struct bwfm_sdio_softc *sc, uint32_t addr, uint8_t data)</span>
+<span class="lineNum">     835 </span>            : {
+<span class="lineNum">     836 </span>            :         struct sdmmc_function *sf;
+<span class="lineNum">     837 </span>            : 
+<span class="lineNum">     838 </span>            :         /*
+<span class="lineNum">     839 </span>            :          * figure out how to read the register based on address range
+<span class="lineNum">     840 </span>            :          * 0x00 ~ 0x7FF: function 0 CCCR and FBR
+<span class="lineNum">     841 </span>            :          * 0x10000 ~ 0x1FFFF: function 1 miscellaneous registers
+<span class="lineNum">     842 </span>            :          * The rest: function 1 silicon backplane core registers
+<span class="lineNum">     843 </span>            :          */
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :         if ((addr &amp; ~0x7ff) == 0)</span>
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                 sf = sc-&gt;sc_sf[0];</span>
+<span class="lineNum">     846 </span>            :         else
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :                 sf = sc-&gt;sc_sf[1];</span>
+<span class="lineNum">     848 </span>            : 
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :         sdmmc_io_write_1(sf, addr, data);</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 : }</span>
+<a name="851"><span class="lineNum">     851 </span>            : </a>
+<span class="lineNum">     852 </span>            : void
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 : bwfm_sdio_write_4(struct bwfm_sdio_softc *sc, uint32_t addr, uint32_t data)</span>
+<span class="lineNum">     854 </span>            : {
+<span class="lineNum">     855 </span>            :         struct sdmmc_function *sf;
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :         uint32_t bar0 = addr &amp; ~BWFM_SDIO_SB_OFT_ADDR_MASK;</span>
+<span class="lineNum">     857 </span>            : 
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :         bwfm_sdio_backplane(sc, bar0);</span>
+<span class="lineNum">     859 </span>            : 
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :         addr &amp;= BWFM_SDIO_SB_OFT_ADDR_MASK;</span>
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :         addr |= BWFM_SDIO_SB_ACCESS_2_4B_FLAG;</span>
+<span class="lineNum">     862 </span>            : 
+<span class="lineNum">     863 </span>            :         /*
+<span class="lineNum">     864 </span>            :          * figure out how to read the register based on address range
+<span class="lineNum">     865 </span>            :          * 0x00 ~ 0x7FF: function 0 CCCR and FBR
+<span class="lineNum">     866 </span>            :          * 0x10000 ~ 0x1FFFF: function 1 miscellaneous registers
+<span class="lineNum">     867 </span>            :          * The rest: function 1 silicon backplane core registers
+<span class="lineNum">     868 </span>            :          */
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :         if ((addr &amp; ~0x7ff) == 0)</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :                 sf = sc-&gt;sc_sf[0];</span>
+<span class="lineNum">     871 </span>            :         else
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                 sf = sc-&gt;sc_sf[1];</span>
+<span class="lineNum">     873 </span>            : 
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :         sdmmc_io_write_4(sf, addr, data);</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 : }</span>
+<a name="876"><span class="lineNum">     876 </span>            : </a>
+<span class="lineNum">     877 </span>            : int
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 : bwfm_sdio_buf_read(struct bwfm_sdio_softc *sc, struct sdmmc_function *sf,</span>
+<span class="lineNum">     879 </span>            :     uint32_t reg, char *data, size_t size)
+<span class="lineNum">     880 </span>            : {
+<span class="lineNum">     881 </span>            :         int err;
+<span class="lineNum">     882 </span>            : 
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :         KASSERT(((vaddr_t)data &amp; 0x3) == 0);</span>
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :         KASSERT((size &amp; 0x3) == 0);</span>
+<span class="lineNum">     885 </span>            : 
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :         if (sf == sc-&gt;sc_sf[1])</span>
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :                 err = sdmmc_io_read_region_1(sf, reg, data, size);</span>
+<span class="lineNum">     888 </span>            :         else
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :                 err = sdmmc_io_read_multi_1(sf, reg, data, size);</span>
+<span class="lineNum">     890 </span>            : 
+<span class="lineNum">     891 </span><span class="lineNoCov">          0 :         if (err)</span>
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: error %d\n&quot;, __func__, err);</span>
+<span class="lineNum">     893 </span>            : 
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :         return err;</span>
+<span class="lineNum">     895 </span>            : }
+<a name="896"><span class="lineNum">     896 </span>            : </a>
+<span class="lineNum">     897 </span>            : int
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 : bwfm_sdio_buf_write(struct bwfm_sdio_softc *sc, struct sdmmc_function *sf,</span>
+<span class="lineNum">     899 </span>            :     uint32_t reg, char *data, size_t size)
+<span class="lineNum">     900 </span>            : {
+<span class="lineNum">     901 </span>            :         int err;
+<span class="lineNum">     902 </span>            : 
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :         KASSERT(((vaddr_t)data &amp; 0x3) == 0);</span>
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :         KASSERT((size &amp; 0x3) == 0);</span>
+<span class="lineNum">     905 </span>            : 
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :         err = sdmmc_io_write_region_1(sf, reg, data, size);</span>
+<span class="lineNum">     907 </span>            : 
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :         if (err)</span>
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: error %d\n&quot;, __func__, err);</span>
+<span class="lineNum">     910 </span>            : 
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :         return err;</span>
+<span class="lineNum">     912 </span>            : }
+<a name="913"><span class="lineNum">     913 </span>            : </a>
+<span class="lineNum">     914 </span>            : uint32_t
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 : bwfm_sdio_ram_read_write(struct bwfm_sdio_softc *sc, uint32_t reg,</span>
+<span class="lineNum">     916 </span>            :     char *data, size_t left, int write)
+<span class="lineNum">     917 </span>            : {
+<span class="lineNum">     918 </span>            :         uint32_t sbaddr, sdaddr, off;
+<span class="lineNum">     919 </span>            :         size_t size;
+<span class="lineNum">     920 </span>            :         int err;
+<span class="lineNum">     921 </span>            : 
+<span class="lineNum">     922 </span>            :         err = off = 0;
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :         while (left &gt; 0) {</span>
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :                 sbaddr = reg + off;</span>
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :                 bwfm_sdio_backplane(sc, sbaddr);</span>
+<span class="lineNum">     926 </span>            : 
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :                 sdaddr = sbaddr &amp; BWFM_SDIO_SB_OFT_ADDR_MASK;</span>
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :                 size = min(left, (BWFM_SDIO_SB_OFT_ADDR_PAGE - sdaddr));</span>
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :                 sdaddr |= BWFM_SDIO_SB_ACCESS_2_4B_FLAG;</span>
+<span class="lineNum">     930 </span>            : 
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :                 if (write) {</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :                         memcpy(sc-&gt;sc_bounce_buf, data + off, size);</span>
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :                         if (roundup(size, 4) != size)</span>
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :                                 memset(sc-&gt;sc_bounce_buf + size, 0,</span>
+<span class="lineNum">     935 </span>            :                                     roundup(size, 4) - size);
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :                         err = bwfm_sdio_buf_write(sc, sc-&gt;sc_sf[1], sdaddr,</span>
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_bounce_buf, roundup(size, 4));</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :                         err = bwfm_sdio_buf_read(sc, sc-&gt;sc_sf[1], sdaddr,</span>
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_bounce_buf, roundup(size, 4));</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :                         memcpy(data + off, sc-&gt;sc_bounce_buf, size);</span>
+<span class="lineNum">     942 </span>            :                 }
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :                 if (err)</span>
+<span class="lineNum">     944 </span>            :                         break;
+<span class="lineNum">     945 </span>            : 
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :                 off += size;</span>
+<span class="lineNum">     947 </span><span class="lineNoCov">          0 :                 left -= size;</span>
+<span class="lineNum">     948 </span>            :         }
+<span class="lineNum">     949 </span>            : 
+<span class="lineNum">     950 </span><span class="lineNoCov">          0 :         return err;</span>
+<span class="lineNum">     951 </span>            : }
+<a name="952"><span class="lineNum">     952 </span>            : </a>
+<span class="lineNum">     953 </span>            : uint32_t
+<span class="lineNum">     954 </span><span class="lineNoCov">          0 : bwfm_sdio_frame_read_write(struct bwfm_sdio_softc *sc,</span>
+<span class="lineNum">     955 </span>            :     char *data, size_t size, int write)
+<span class="lineNum">     956 </span>            : {
+<span class="lineNum">     957 </span>            :         uint32_t addr;
+<span class="lineNum">     958 </span>            :         int err;
+<span class="lineNum">     959 </span>            : 
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :         addr = sc-&gt;sc_cc-&gt;co_base;</span>
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :         bwfm_sdio_backplane(sc, addr);</span>
+<span class="lineNum">     962 </span>            : 
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         addr &amp;= BWFM_SDIO_SB_OFT_ADDR_MASK;</span>
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :         addr |= BWFM_SDIO_SB_ACCESS_2_4B_FLAG;</span>
+<span class="lineNum">     965 </span>            : 
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :         if (write)</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :                 err = bwfm_sdio_buf_write(sc, sc-&gt;sc_sf[2], addr, data, size);</span>
+<span class="lineNum">     968 </span>            :         else
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :                 err = bwfm_sdio_buf_read(sc, sc-&gt;sc_sf[2], addr, data, size);</span>
+<span class="lineNum">     970 </span>            : 
+<span class="lineNum">     971 </span><span class="lineNoCov">          0 :         return err;</span>
+<span class="lineNum">     972 </span>            : }
+<a name="973"><span class="lineNum">     973 </span>            : </a>
+<span class="lineNum">     974 </span>            : uint32_t
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 : bwfm_sdio_dev_read(struct bwfm_sdio_softc *sc, uint32_t reg)</span>
+<span class="lineNum">     976 </span>            : {
+<span class="lineNum">     977 </span>            :         struct bwfm_core *core;
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 :         core = bwfm_chip_get_core(&amp;sc-&gt;sc_sc, BWFM_AGENT_CORE_SDIO_DEV);</span>
+<span class="lineNum">     979 </span><span class="lineNoCov">          0 :         return bwfm_sdio_read_4(sc, core-&gt;co_base + reg);</span>
+<span class="lineNum">     980 </span>            : }
+<a name="981"><span class="lineNum">     981 </span>            : </a>
+<span class="lineNum">     982 </span>            : void
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 : bwfm_sdio_dev_write(struct bwfm_sdio_softc *sc, uint32_t reg, uint32_t val)</span>
+<span class="lineNum">     984 </span>            : {
+<span class="lineNum">     985 </span>            :         struct bwfm_core *core;
+<span class="lineNum">     986 </span><span class="lineNoCov">          0 :         core = bwfm_chip_get_core(&amp;sc-&gt;sc_sc, BWFM_AGENT_CORE_SDIO_DEV);</span>
+<span class="lineNum">     987 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_4(sc, core-&gt;co_base + reg, val);</span>
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 : }</span>
+<a name="989"><span class="lineNum">     989 </span>            : </a>
+<span class="lineNum">     990 </span>            : uint32_t
+<span class="lineNum">     991 </span><span class="lineNoCov">          0 : bwfm_sdio_buscore_read(struct bwfm_softc *bwfm, uint32_t reg)</span>
+<span class="lineNum">     992 </span>            : {
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (void *)bwfm;</span>
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :         return bwfm_sdio_read_4(sc, reg);</span>
+<span class="lineNum">     995 </span>            : }
+<a name="996"><span class="lineNum">     996 </span>            : </a>
+<span class="lineNum">     997 </span>            : void
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 : bwfm_sdio_buscore_write(struct bwfm_softc *bwfm, uint32_t reg, uint32_t val)</span>
+<span class="lineNum">     999 </span>            : {
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (void *)bwfm;</span>
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_4(sc, reg, val);</span>
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 : }</span>
+<a name="1003"><span class="lineNum">    1003 </span>            : </a>
+<span class="lineNum">    1004 </span>            : int
+<span class="lineNum">    1005 </span><span class="lineNoCov">          0 : bwfm_sdio_buscore_prepare(struct bwfm_softc *bwfm)</span>
+<span class="lineNum">    1006 </span>            : {
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (void *)bwfm;</span>
+<span class="lineNum">    1008 </span>            :         uint8_t clkval, clkset, clkmask;
+<span class="lineNum">    1009 </span>            :         int i;
+<span class="lineNum">    1010 </span>            : 
+<span class="lineNum">    1011 </span>            :         clkset = BWFM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL_REQ |
+<span class="lineNum">    1012 </span>            :             BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HW_CLKREQ_OFF;
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, clkset);</span>
+<span class="lineNum">    1014 </span>            : 
+<span class="lineNum">    1015 </span>            :         clkmask = BWFM_SDIO_FUNC1_CHIPCLKCSR_ALP_AVAIL |
+<span class="lineNum">    1016 </span>            :             BWFM_SDIO_FUNC1_CHIPCLKCSR_HT_AVAIL;
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :         clkval = bwfm_sdio_read_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR);</span>
+<span class="lineNum">    1018 </span>            : 
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :         if ((clkval &amp; ~clkmask) != clkset) {</span>
+<span class="lineNum">    1020 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: wrote 0x%02x read 0x%02x\n&quot;, DEVNAME(sc),</span>
+<span class="lineNum">    1021 </span>            :                     clkset, clkval);
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">    1023 </span>            :         }
+<span class="lineNum">    1024 </span>            : 
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 :         for (i = 1000; i &gt; 0; i--) {</span>
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :                 clkval = bwfm_sdio_read_1(sc,</span>
+<span class="lineNum">    1027 </span>            :                     BWFM_SDIO_FUNC1_CHIPCLKCSR);
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :                 if (clkval &amp; clkmask)</span>
+<span class="lineNum">    1029 </span>            :                         break;
+<span class="lineNum">    1030 </span>            :         }
+<span class="lineNum">    1031 </span><span class="lineNoCov">          0 :         if (i == 0) {</span>
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: timeout on ALPAV wait, clkval 0x%02x\n&quot;,</span>
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :                     DEVNAME(sc), clkval);</span>
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">    1035 </span>            :         }
+<span class="lineNum">    1036 </span>            : 
+<span class="lineNum">    1037 </span>            :         clkset = BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_HW_CLKREQ_OFF |
+<span class="lineNum">    1038 </span>            :             BWFM_SDIO_FUNC1_CHIPCLKCSR_FORCE_ALP;
+<span class="lineNum">    1039 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_CHIPCLKCSR, clkset);</span>
+<span class="lineNum">    1040 </span><span class="lineNoCov">          0 :         delay(65);</span>
+<span class="lineNum">    1041 </span>            : 
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :         bwfm_sdio_write_1(sc, BWFM_SDIO_FUNC1_SDIOPULLUP, 0);</span>
+<span class="lineNum">    1043 </span>            : 
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 : }</span>
+<a name="1046"><span class="lineNum">    1046 </span>            : </a>
+<span class="lineNum">    1047 </span>            : void
+<span class="lineNum">    1048 </span><span class="lineNoCov">          0 : bwfm_sdio_buscore_activate(struct bwfm_softc *bwfm, uint32_t rstvec)</span>
+<span class="lineNum">    1049 </span>            : {
+<span class="lineNum">    1050 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (void *)bwfm;</span>
+<span class="lineNum">    1051 </span>            : 
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :         bwfm_sdio_dev_write(sc, BWFM_SDPCMD_INTSTATUS, 0xFFFFFFFF);</span>
+<span class="lineNum">    1053 </span>            : 
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :         if (rstvec)</span>
+<span class="lineNum">    1055 </span><span class="lineNoCov">          0 :                 bwfm_sdio_ram_read_write(sc, 0, (char *)&amp;rstvec,</span>
+<span class="lineNum">    1056 </span>            :                     sizeof(rstvec), 1);
+<span class="lineNum">    1057 </span><span class="lineNoCov">          0 : }</span>
+<a name="1058"><span class="lineNum">    1058 </span>            : </a>
+<span class="lineNum">    1059 </span>            : struct mbuf *
+<span class="lineNum">    1060 </span><span class="lineNoCov">          0 : bwfm_sdio_newbuf(void)</span>
+<span class="lineNum">    1061 </span>            : {
+<span class="lineNum">    1062 </span>            :         struct mbuf *m;
+<span class="lineNum">    1063 </span>            : 
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :         MGETHDR(m, M_DONTWAIT, MT_DATA);</span>
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 :         if (m == NULL)</span>
+<span class="lineNum">    1066 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1067 </span>            : 
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 :         MCLGET(m, M_DONTWAIT);</span>
+<span class="lineNum">    1069 </span><span class="lineNoCov">          0 :         if (!(m-&gt;m_flags &amp; M_EXT)) {</span>
+<span class="lineNum">    1070 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1072 </span>            :         }
+<span class="lineNum">    1073 </span>            : 
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :         m-&gt;m_len = m-&gt;m_pkthdr.len = MCLBYTES;</span>
+<span class="lineNum">    1075 </span>            : 
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 : }</span>
+<a name="1078"><span class="lineNum">    1078 </span>            : </a>
+<span class="lineNum">    1079 </span>            : int
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 : bwfm_sdio_tx_ok(struct bwfm_sdio_softc *sc)</span>
+<span class="lineNum">    1081 </span>            : {
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :         return (uint8_t)(sc-&gt;sc_tx_max_seq - sc-&gt;sc_tx_seq) != 0 &amp;&amp;</span>
+<span class="lineNum">    1083 </span><span class="lineNoCov">          0 :             ((uint8_t)(sc-&gt;sc_tx_max_seq - sc-&gt;sc_tx_seq) &amp; 0x80) == 0;</span>
+<span class="lineNum">    1084 </span>            : }
+<a name="1085"><span class="lineNum">    1085 </span>            : </a>
+<span class="lineNum">    1086 </span>            : void
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 : bwfm_sdio_tx_frames(struct bwfm_sdio_softc *sc)</span>
+<span class="lineNum">    1088 </span>            : {
+<span class="lineNum">    1089 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;sc_sc.sc_ic.ic_if;</span>
+<span class="lineNum">    1090 </span>            :         struct mbuf *m;
+<span class="lineNum">    1091 </span>            :         int i;
+<span class="lineNum">    1092 </span>            : 
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :         if (!bwfm_sdio_tx_ok(sc))</span>
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1095 </span>            : 
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 :         i = min((uint8_t)(sc-&gt;sc_tx_max_seq - sc-&gt;sc_tx_seq), 32);</span>
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :         while (i--) {</span>
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 :                 m = ml_dequeue(&amp;sc-&gt;sc_tx_queue);</span>
+<span class="lineNum">    1099 </span><span class="lineNoCov">          0 :                 if (m == NULL)</span>
+<span class="lineNum">    1100 </span>            :                         break;
+<span class="lineNum">    1101 </span>            : 
+<span class="lineNum">    1102 </span><span class="lineNoCov">          0 :                 if (m-&gt;m_type == MT_CONTROL)</span>
+<span class="lineNum">    1103 </span><span class="lineNoCov">          0 :                         bwfm_sdio_tx_ctrlframe(sc, m);</span>
+<span class="lineNum">    1104 </span>            :                 else
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :                         bwfm_sdio_tx_dataframe(sc, m);</span>
+<span class="lineNum">    1106 </span>            : 
+<span class="lineNum">    1107 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1108 </span>            :         }
+<span class="lineNum">    1109 </span>            : 
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tx_count &lt; 64)</span>
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 :                 ifq_restart(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 : }</span>
+<a name="1113"><span class="lineNum">    1113 </span>            : </a>
+<span class="lineNum">    1114 </span>            : void
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 : bwfm_sdio_tx_ctrlframe(struct bwfm_sdio_softc *sc, struct mbuf *m)</span>
+<span class="lineNum">    1116 </span>            : {
+<span class="lineNum">    1117 </span>            :         struct bwfm_sdio_hwhdr *hwhdr;
+<span class="lineNum">    1118 </span>            :         struct bwfm_sdio_swhdr *swhdr;
+<span class="lineNum">    1119 </span>            :         size_t len, roundto;
+<span class="lineNum">    1120 </span>            : 
+<span class="lineNum">    1121 </span><span class="lineNoCov">          0 :         len = sizeof(*hwhdr) + sizeof(*swhdr) + m-&gt;m_len;</span>
+<span class="lineNum">    1122 </span>            : 
+<span class="lineNum">    1123 </span>            :         /* Zero-pad to either block-size or 4-byte alignment. */
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :         if (len &gt; 512 &amp;&amp; (len % 512) != 0)</span>
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :                 roundto = 512;</span>
+<span class="lineNum">    1126 </span>            :         else
+<span class="lineNum">    1127 </span>            :                 roundto = 4;
+<span class="lineNum">    1128 </span>            : 
+<span class="lineNum">    1129 </span><span class="lineNoCov">          0 :         KASSERT(roundup(len, roundto) &lt;= sc-&gt;sc_bounce_size);</span>
+<span class="lineNum">    1130 </span>            : 
+<span class="lineNum">    1131 </span><span class="lineNoCov">          0 :         hwhdr = (void *)sc-&gt;sc_bounce_buf;</span>
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 :         hwhdr-&gt;frmlen = htole16(len);</span>
+<span class="lineNum">    1133 </span><span class="lineNoCov">          0 :         hwhdr-&gt;cksum = htole16(~len);</span>
+<span class="lineNum">    1134 </span>            : 
+<span class="lineNum">    1135 </span><span class="lineNoCov">          0 :         swhdr = (void *)&amp;hwhdr[1];</span>
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         swhdr-&gt;seqnr = sc-&gt;sc_tx_seq++;</span>
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :         swhdr-&gt;chanflag = BWFM_SDIO_SWHDR_CHANNEL_CONTROL;</span>
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :         swhdr-&gt;nextlen = 0;</span>
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :         swhdr-&gt;dataoff = sizeof(*hwhdr) + sizeof(*swhdr);</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :         swhdr-&gt;maxseqnr = 0;</span>
+<span class="lineNum">    1141 </span>            : 
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :         m_copydata(m, 0, m-&gt;m_len, (caddr_t)&amp;swhdr[1]);</span>
+<span class="lineNum">    1143 </span>            : 
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 :         if (roundup(len, roundto) != len)</span>
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :                 memset(sc-&gt;sc_bounce_buf + len, 0,</span>
+<span class="lineNum">    1146 </span>            :                     roundup(len, roundto) - len);
+<span class="lineNum">    1147 </span>            : 
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :         bwfm_sdio_frame_read_write(sc, sc-&gt;sc_bounce_buf,</span>
+<span class="lineNum">    1149 </span>            :             roundup(len, roundto), 1);
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 : }</span>
+<a name="1151"><span class="lineNum">    1151 </span>            : </a>
+<span class="lineNum">    1152 </span>            : void
+<span class="lineNum">    1153 </span><span class="lineNoCov">          0 : bwfm_sdio_tx_dataframe(struct bwfm_sdio_softc *sc, struct mbuf *m)</span>
+<span class="lineNum">    1154 </span>            : {
+<span class="lineNum">    1155 </span>            :         struct bwfm_sdio_hwhdr *hwhdr;
+<span class="lineNum">    1156 </span>            :         struct bwfm_sdio_swhdr *swhdr;
+<span class="lineNum">    1157 </span>            :         struct bwfm_proto_bcdc_hdr *bcdc;
+<span class="lineNum">    1158 </span>            :         size_t len, roundto;
+<span class="lineNum">    1159 </span>            : 
+<span class="lineNum">    1160 </span>            :         len = sizeof(*hwhdr) + sizeof(*swhdr) + sizeof(*bcdc)
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :             + m-&gt;m_pkthdr.len;</span>
+<span class="lineNum">    1162 </span>            : 
+<span class="lineNum">    1163 </span>            :         /* Zero-pad to either block-size or 4-byte alignment. */
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :         if (len &gt; 512 &amp;&amp; (len % 512) != 0)</span>
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 :                 roundto = 512;</span>
+<span class="lineNum">    1166 </span>            :         else
+<span class="lineNum">    1167 </span>            :                 roundto = 4;
+<span class="lineNum">    1168 </span>            : 
+<span class="lineNum">    1169 </span><span class="lineNoCov">          0 :         KASSERT(roundup(len, roundto) &lt;= sc-&gt;sc_bounce_size);</span>
+<span class="lineNum">    1170 </span>            : 
+<span class="lineNum">    1171 </span><span class="lineNoCov">          0 :         hwhdr = (void *)sc-&gt;sc_bounce_buf;</span>
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :         hwhdr-&gt;frmlen = htole16(len);</span>
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 :         hwhdr-&gt;cksum = htole16(~len);</span>
+<span class="lineNum">    1174 </span>            : 
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :         swhdr = (void *)&amp;hwhdr[1];</span>
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 :         swhdr-&gt;seqnr = sc-&gt;sc_tx_seq++;</span>
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :         swhdr-&gt;chanflag = BWFM_SDIO_SWHDR_CHANNEL_DATA;</span>
+<span class="lineNum">    1178 </span><span class="lineNoCov">          0 :         swhdr-&gt;nextlen = 0;</span>
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 :         swhdr-&gt;dataoff = sizeof(*hwhdr) + sizeof(*swhdr);</span>
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :         swhdr-&gt;maxseqnr = 0;</span>
+<span class="lineNum">    1181 </span>            : 
+<span class="lineNum">    1182 </span><span class="lineNoCov">          0 :         bcdc = (void *)&amp;swhdr[1];</span>
+<span class="lineNum">    1183 </span><span class="lineNoCov">          0 :         bcdc-&gt;data_offset = 0;</span>
+<span class="lineNum">    1184 </span><span class="lineNoCov">          0 :         bcdc-&gt;priority = ieee80211_classify(&amp;sc-&gt;sc_sc.sc_ic, m);</span>
+<span class="lineNum">    1185 </span><span class="lineNoCov">          0 :         bcdc-&gt;flags = BWFM_BCDC_FLAG_VER(BWFM_BCDC_FLAG_PROTO_VER);</span>
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :         bcdc-&gt;flags2 = 0;</span>
+<span class="lineNum">    1187 </span>            : 
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :         m_copydata(m, 0, m-&gt;m_pkthdr.len, (caddr_t)&amp;bcdc[1]);</span>
+<span class="lineNum">    1189 </span>            : 
+<span class="lineNum">    1190 </span><span class="lineNoCov">          0 :         if (roundup(len, roundto) != len)</span>
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :                 memset(sc-&gt;sc_bounce_buf + len, 0,</span>
+<span class="lineNum">    1192 </span>            :                     roundup(len, roundto) - len);
+<span class="lineNum">    1193 </span>            : 
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 :         bwfm_sdio_frame_read_write(sc, sc-&gt;sc_bounce_buf,</span>
+<span class="lineNum">    1195 </span>            :             roundup(len, roundto), 1);
+<span class="lineNum">    1196 </span>            : 
+<span class="lineNum">    1197 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_count--;</span>
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 : }</span>
+<a name="1199"><span class="lineNum">    1199 </span>            : </a>
+<span class="lineNum">    1200 </span>            : void
+<span class="lineNum">    1201 </span><span class="lineNoCov">          0 : bwfm_sdio_rx_frames(struct bwfm_sdio_softc *sc)</span>
+<span class="lineNum">    1202 </span>            : {
+<span class="lineNum">    1203 </span>            :         struct bwfm_sdio_hwhdr *hwhdr;
+<span class="lineNum">    1204 </span>            :         struct bwfm_sdio_swhdr *swhdr;
+<span class="lineNum">    1205 </span><span class="lineNoCov">          0 :         uint16_t *sublen, nextlen = 0;</span>
+<span class="lineNum">    1206 </span>            :         struct mbuf *m;
+<span class="lineNum">    1207 </span>            :         size_t flen;
+<span class="lineNum">    1208 </span>            :         char *data;
+<span class="lineNum">    1209 </span>            :         off_t off;
+<span class="lineNum">    1210 </span>            :         int nsub;
+<span class="lineNum">    1211 </span>            : 
+<span class="lineNum">    1212 </span><span class="lineNoCov">          0 :         hwhdr = (struct bwfm_sdio_hwhdr *)sc-&gt;sc_bounce_buf;</span>
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :         swhdr = (struct bwfm_sdio_swhdr *)&amp;hwhdr[1];</span>
+<span class="lineNum">    1214 </span><span class="lineNoCov">          0 :         data = (char *)&amp;swhdr[1];</span>
+<span class="lineNum">    1215 </span>            : 
+<span class="lineNum">    1216 </span><span class="lineNoCov">          0 :         for (;;) {</span>
+<span class="lineNum">    1217 </span>            :                 /* If we know the next size, just read ahead. */
+<span class="lineNum">    1218 </span><span class="lineNoCov">          0 :                 if (nextlen) {</span>
+<span class="lineNum">    1219 </span><span class="lineNoCov">          0 :                         if (bwfm_sdio_frame_read_write(sc, sc-&gt;sc_bounce_buf,</span>
+<span class="lineNum">    1220 </span><span class="lineNoCov">          0 :                             nextlen, 0))</span>
+<span class="lineNum">    1221 </span>            :                                 break;
+<span class="lineNum">    1222 </span>            :                 } else {
+<span class="lineNum">    1223 </span><span class="lineNoCov">          0 :                         if (bwfm_sdio_frame_read_write(sc, sc-&gt;sc_bounce_buf,</span>
+<span class="lineNum">    1224 </span>            :                             sizeof(*hwhdr) + sizeof(*swhdr), 0))
+<span class="lineNum">    1225 </span>            :                                 break;
+<span class="lineNum">    1226 </span>            :                 }
+<span class="lineNum">    1227 </span>            : 
+<span class="lineNum">    1228 </span><span class="lineNoCov">          0 :                 hwhdr-&gt;frmlen = letoh16(hwhdr-&gt;frmlen);</span>
+<span class="lineNum">    1229 </span><span class="lineNoCov">          0 :                 hwhdr-&gt;cksum = letoh16(hwhdr-&gt;cksum);</span>
+<span class="lineNum">    1230 </span>            : 
+<span class="lineNum">    1231 </span><span class="lineNoCov">          0 :                 if (hwhdr-&gt;frmlen == 0 &amp;&amp; hwhdr-&gt;cksum == 0)</span>
+<span class="lineNum">    1232 </span>            :                         break;
+<span class="lineNum">    1233 </span>            : 
+<span class="lineNum">    1234 </span><span class="lineNoCov">          0 :                 if ((hwhdr-&gt;frmlen ^ hwhdr-&gt;cksum) != 0xffff) {</span>
+<span class="lineNum">    1235 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: checksum error\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1237 </span>            :                 }
+<span class="lineNum">    1238 </span>            : 
+<span class="lineNum">    1239 </span><span class="lineNoCov">          0 :                 if (hwhdr-&gt;frmlen &lt; sizeof(*hwhdr) + sizeof(*swhdr)) {</span>
+<span class="lineNum">    1240 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: length error\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1241 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1242 </span>            :                 }
+<span class="lineNum">    1243 </span>            : 
+<span class="lineNum">    1244 </span><span class="lineNoCov">          0 :                 if (nextlen &amp;&amp; hwhdr-&gt;frmlen &gt; nextlen) {</span>
+<span class="lineNum">    1245 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: read ahead length error (%u &gt; %u)\n&quot;,</span>
+<span class="lineNum">    1246 </span><span class="lineNoCov">          0 :                             DEVNAME(sc), hwhdr-&gt;frmlen, nextlen);</span>
+<span class="lineNum">    1247 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1248 </span>            :                 }
+<span class="lineNum">    1249 </span>            : 
+<span class="lineNum">    1250 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_tx_max_seq = swhdr-&gt;maxseqnr;</span>
+<span class="lineNum">    1251 </span>            : 
+<span class="lineNum">    1252 </span><span class="lineNoCov">          0 :                 flen = hwhdr-&gt;frmlen - (sizeof(*hwhdr) + sizeof(*swhdr));</span>
+<span class="lineNum">    1253 </span><span class="lineNoCov">          0 :                 if (flen == 0) {</span>
+<span class="lineNum">    1254 </span><span class="lineNoCov">          0 :                         nextlen = swhdr-&gt;nextlen &lt;&lt; 4;</span>
+<span class="lineNum">    1255 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">    1256 </span>            :                 }
+<span class="lineNum">    1257 </span>            : 
+<span class="lineNum">    1258 </span><span class="lineNoCov">          0 :                 if (!nextlen) {</span>
+<span class="lineNum">    1259 </span><span class="lineNoCov">          0 :                         KASSERT(roundup(flen, 4) &lt;= sc-&gt;sc_bounce_size -</span>
+<span class="lineNum">    1260 </span>            :                             (sizeof(*hwhdr) + sizeof(*swhdr)));
+<span class="lineNum">    1261 </span><span class="lineNoCov">          0 :                         if (bwfm_sdio_frame_read_write(sc, data,</span>
+<span class="lineNum">    1262 </span>            :                             roundup(flen, 4), 0))
+<span class="lineNum">    1263 </span>            :                                 break;
+<span class="lineNum">    1264 </span>            :                 }
+<span class="lineNum">    1265 </span>            : 
+<span class="lineNum">    1266 </span><span class="lineNoCov">          0 :                 if (swhdr-&gt;dataoff &lt; (sizeof(*hwhdr) + sizeof(*swhdr)))</span>
+<span class="lineNum">    1267 </span>            :                         break;
+<span class="lineNum">    1268 </span>            : 
+<span class="lineNum">    1269 </span><span class="lineNoCov">          0 :                 off = swhdr-&gt;dataoff - (sizeof(*hwhdr) + sizeof(*swhdr));</span>
+<span class="lineNum">    1270 </span><span class="lineNoCov">          0 :                 if (off &gt; flen)</span>
+<span class="lineNum">    1271 </span>            :                         break;
+<span class="lineNum">    1272 </span>            : 
+<span class="lineNum">    1273 </span><span class="lineNoCov">          0 :                 switch (swhdr-&gt;chanflag &amp; BWFM_SDIO_SWHDR_CHANNEL_MASK) {</span>
+<span class="lineNum">    1274 </span>            :                 case BWFM_SDIO_SWHDR_CHANNEL_CONTROL:
+<span class="lineNum">    1275 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_sc.sc_proto_ops-&gt;proto_rxctl(&amp;sc-&gt;sc_sc,</span>
+<span class="lineNum">    1276 </span><span class="lineNoCov">          0 :                             data + off, flen - off);</span>
+<span class="lineNum">    1277 </span><span class="lineNoCov">          0 :                         nextlen = swhdr-&gt;nextlen &lt;&lt; 4;</span>
+<span class="lineNum">    1278 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1279 </span>            :                 case BWFM_SDIO_SWHDR_CHANNEL_EVENT:
+<span class="lineNum">    1280 </span>            :                 case BWFM_SDIO_SWHDR_CHANNEL_DATA:
+<span class="lineNum">    1281 </span><span class="lineNoCov">          0 :                         m = bwfm_sdio_newbuf();</span>
+<span class="lineNum">    1282 </span><span class="lineNoCov">          0 :                         if (m == NULL)</span>
+<span class="lineNum">    1283 </span>            :                                 break;
+<span class="lineNum">    1284 </span><span class="lineNoCov">          0 :                         if (flen - off &gt; m-&gt;m_len) {</span>
+<span class="lineNum">    1285 </span><span class="lineNoCov">          0 :                                 printf(&quot;%s: frame bigger than anticipated\n&quot;,</span>
+<span class="lineNum">    1286 </span><span class="lineNoCov">          0 :                                     DEVNAME(sc));</span>
+<span class="lineNum">    1287 </span><span class="lineNoCov">          0 :                                 m_free(m);</span>
+<span class="lineNum">    1288 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">    1289 </span>            :                         }
+<span class="lineNum">    1290 </span><span class="lineNoCov">          0 :                         m-&gt;m_len = m-&gt;m_pkthdr.len = flen - off;</span>
+<span class="lineNum">    1291 </span><span class="lineNoCov">          0 :                         memcpy(mtod(m, char *), data + off, flen - off);</span>
+<span class="lineNum">    1292 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_sc.sc_proto_ops-&gt;proto_rx(&amp;sc-&gt;sc_sc, m);</span>
+<span class="lineNum">    1293 </span><span class="lineNoCov">          0 :                         nextlen = swhdr-&gt;nextlen &lt;&lt; 4;</span>
+<span class="lineNum">    1294 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1295 </span>            :                 case BWFM_SDIO_SWHDR_CHANNEL_GLOM:
+<span class="lineNum">    1296 </span><span class="lineNoCov">          0 :                         if ((flen % sizeof(uint16_t)) != 0)</span>
+<span class="lineNum">    1297 </span>            :                                 break;
+<span class="lineNum">    1298 </span><span class="lineNoCov">          0 :                         nsub = flen / sizeof(uint16_t);</span>
+<span class="lineNum">    1299 </span><span class="lineNoCov">          0 :                         sublen = mallocarray(nsub, sizeof(uint16_t),</span>
+<span class="lineNum">    1300 </span>            :                             M_DEVBUF, M_WAITOK | M_ZERO);
+<span class="lineNum">    1301 </span><span class="lineNoCov">          0 :                         memcpy(sublen, data, nsub * sizeof(uint16_t));</span>
+<span class="lineNum">    1302 </span><span class="lineNoCov">          0 :                         bwfm_sdio_rx_glom(sc, sublen, nsub, &amp;nextlen);</span>
+<span class="lineNum">    1303 </span><span class="lineNoCov">          0 :                         free(sublen, M_DEVBUF, nsub * sizeof(uint16_t));</span>
+<span class="lineNum">    1304 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1305 </span>            :                 default:
+<span class="lineNum">    1306 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: unknown channel\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1307 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1308 </span>            :                 }
+<span class="lineNum">    1309 </span>            :         }
+<span class="lineNum">    1310 </span><span class="lineNoCov">          0 : }</span>
+<a name="1311"><span class="lineNum">    1311 </span>            : </a>
+<span class="lineNum">    1312 </span>            : void
+<span class="lineNum">    1313 </span><span class="lineNoCov">          0 : bwfm_sdio_rx_glom(struct bwfm_sdio_softc *sc, uint16_t *sublen, int nsub,</span>
+<span class="lineNum">    1314 </span>            :     uint16_t *nextlen)
+<span class="lineNum">    1315 </span>            : {
+<span class="lineNum">    1316 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_hwhdr hwhdr;</span>
+<span class="lineNum">    1317 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_swhdr swhdr;</span>
+<span class="lineNum">    1318 </span><span class="lineNoCov">          0 :         struct mbuf_list ml, drop;</span>
+<span class="lineNum">    1319 </span>            :         struct mbuf *m;
+<span class="lineNum">    1320 </span>            :         size_t flen;
+<span class="lineNum">    1321 </span>            :         off_t off;
+<span class="lineNum">    1322 </span>            :         int i;
+<span class="lineNum">    1323 </span>            : 
+<span class="lineNum">    1324 </span><span class="lineNoCov">          0 :         ml_init(&amp;ml);</span>
+<span class="lineNum">    1325 </span><span class="lineNoCov">          0 :         ml_init(&amp;drop);</span>
+<span class="lineNum">    1326 </span>            : 
+<span class="lineNum">    1327 </span><span class="lineNoCov">          0 :         if (nsub == 0)</span>
+<span class="lineNum">    1328 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1329 </span>            : 
+<span class="lineNum">    1330 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; nsub; i++) {</span>
+<span class="lineNum">    1331 </span><span class="lineNoCov">          0 :                 m = bwfm_sdio_newbuf();</span>
+<span class="lineNum">    1332 </span><span class="lineNoCov">          0 :                 if (m == NULL) {</span>
+<span class="lineNum">    1333 </span><span class="lineNoCov">          0 :                         ml_purge(&amp;ml);</span>
+<span class="lineNum">    1334 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">    1335 </span>            :                 }
+<span class="lineNum">    1336 </span><span class="lineNoCov">          0 :                 ml_enqueue(&amp;ml, m);</span>
+<span class="lineNum">    1337 </span><span class="lineNoCov">          0 :                 if (letoh16(sublen[i]) &gt; m-&gt;m_len) {</span>
+<span class="lineNum">    1338 </span><span class="lineNoCov">          0 :                         ml_purge(&amp;ml);</span>
+<span class="lineNum">    1339 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">    1340 </span>            :                 }
+<span class="lineNum">    1341 </span><span class="lineNoCov">          0 :                 if (bwfm_sdio_frame_read_write(sc, mtod(m, char *),</span>
+<span class="lineNum">    1342 </span><span class="lineNoCov">          0 :                     letoh16(sublen[i]), 0)) {</span>
+<span class="lineNum">    1343 </span><span class="lineNoCov">          0 :                         ml_purge(&amp;ml);</span>
+<span class="lineNum">    1344 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">    1345 </span>            :                 }
+<span class="lineNum">    1346 </span><span class="lineNoCov">          0 :                 m-&gt;m_len = m-&gt;m_pkthdr.len = letoh16(sublen[i]);</span>
+<span class="lineNum">    1347 </span>            :         }
+<span class="lineNum">    1348 </span>            : 
+<span class="lineNum">    1349 </span>            :         /* TODO: Verify actual superframe header */
+<span class="lineNum">    1350 </span><span class="lineNoCov">          0 :         m = MBUF_LIST_FIRST(&amp;ml);</span>
+<span class="lineNum">    1351 </span><span class="lineNoCov">          0 :         if (m-&gt;m_len &gt;= sizeof(hwhdr) + sizeof(swhdr)) {</span>
+<span class="lineNum">    1352 </span><span class="lineNoCov">          0 :                 m_copydata(m, 0, sizeof(hwhdr), (caddr_t)&amp;hwhdr);</span>
+<span class="lineNum">    1353 </span><span class="lineNoCov">          0 :                 m_copydata(m, sizeof(hwhdr), sizeof(swhdr), (caddr_t)&amp;swhdr);</span>
+<span class="lineNum">    1354 </span><span class="lineNoCov">          0 :                 *nextlen = swhdr.nextlen &lt;&lt; 4;</span>
+<span class="lineNum">    1355 </span><span class="lineNoCov">          0 :                 m_adj(m, sizeof(struct bwfm_sdio_hwhdr) +</span>
+<span class="lineNum">    1356 </span>            :                     sizeof(struct bwfm_sdio_swhdr));
+<span class="lineNum">    1357 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1358 </span>            : 
+<span class="lineNum">    1359 </span><span class="lineNoCov">          0 :         while ((m = ml_dequeue(&amp;ml)) != NULL) {</span>
+<span class="lineNum">    1360 </span><span class="lineNoCov">          0 :                 if (m-&gt;m_len &lt; sizeof(hwhdr) + sizeof(swhdr))</span>
+<span class="lineNum">    1361 </span>            :                         goto drop;
+<span class="lineNum">    1362 </span>            : 
+<span class="lineNum">    1363 </span><span class="lineNoCov">          0 :                 m_copydata(m, 0, sizeof(hwhdr), (caddr_t)&amp;hwhdr);</span>
+<span class="lineNum">    1364 </span><span class="lineNoCov">          0 :                 m_copydata(m, sizeof(hwhdr), sizeof(swhdr), (caddr_t)&amp;swhdr);</span>
+<span class="lineNum">    1365 </span>            : 
+<span class="lineNum">    1366 </span><span class="lineNoCov">          0 :                 hwhdr.frmlen = letoh16(hwhdr.frmlen);</span>
+<span class="lineNum">    1367 </span><span class="lineNoCov">          0 :                 hwhdr.cksum = letoh16(hwhdr.cksum);</span>
+<span class="lineNum">    1368 </span>            : 
+<span class="lineNum">    1369 </span><span class="lineNoCov">          0 :                 if (hwhdr.frmlen == 0 &amp;&amp; hwhdr.cksum == 0)</span>
+<span class="lineNum">    1370 </span>            :                         goto drop;
+<span class="lineNum">    1371 </span>            : 
+<span class="lineNum">    1372 </span><span class="lineNoCov">          0 :                 if ((hwhdr.frmlen ^ hwhdr.cksum) != 0xffff) {</span>
+<span class="lineNum">    1373 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: checksum error\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1374 </span><span class="lineNoCov">          0 :                         goto drop;</span>
+<span class="lineNum">    1375 </span>            :                 }
+<span class="lineNum">    1376 </span>            : 
+<span class="lineNum">    1377 </span><span class="lineNoCov">          0 :                 if (hwhdr.frmlen &lt; sizeof(hwhdr) + sizeof(swhdr)) {</span>
+<span class="lineNum">    1378 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: length error\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1379 </span><span class="lineNoCov">          0 :                         goto drop;</span>
+<span class="lineNum">    1380 </span>            :                 }
+<span class="lineNum">    1381 </span>            : 
+<span class="lineNum">    1382 </span><span class="lineNoCov">          0 :                 flen = hwhdr.frmlen - (sizeof(hwhdr) + sizeof(swhdr));</span>
+<span class="lineNum">    1383 </span><span class="lineNoCov">          0 :                 if (flen == 0)</span>
+<span class="lineNum">    1384 </span>            :                         goto drop;
+<span class="lineNum">    1385 </span><span class="lineNoCov">          0 :                 if (m-&gt;m_len &lt; flen)</span>
+<span class="lineNum">    1386 </span>            :                         goto drop;
+<span class="lineNum">    1387 </span>            : 
+<span class="lineNum">    1388 </span><span class="lineNoCov">          0 :                 if (swhdr.dataoff &lt; (sizeof(hwhdr) + sizeof(swhdr)))</span>
+<span class="lineNum">    1389 </span>            :                         goto drop;
+<span class="lineNum">    1390 </span>            : 
+<span class="lineNum">    1391 </span><span class="lineNoCov">          0 :                 off = swhdr.dataoff - (sizeof(hwhdr) + sizeof(swhdr));</span>
+<span class="lineNum">    1392 </span><span class="lineNoCov">          0 :                 if (off &gt; flen)</span>
+<span class="lineNum">    1393 </span>            :                         goto drop;
+<span class="lineNum">    1394 </span>            : 
+<span class="lineNum">    1395 </span><span class="lineNoCov">          0 :                 switch (swhdr.chanflag &amp; BWFM_SDIO_SWHDR_CHANNEL_MASK) {</span>
+<span class="lineNum">    1396 </span>            :                 case BWFM_SDIO_SWHDR_CHANNEL_CONTROL:
+<span class="lineNum">    1397 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: control channel not allowed in glom\n&quot;,</span>
+<span class="lineNum">    1398 </span><span class="lineNoCov">          0 :                             DEVNAME(sc));</span>
+<span class="lineNum">    1399 </span><span class="lineNoCov">          0 :                         goto drop;</span>
+<span class="lineNum">    1400 </span>            :                 case BWFM_SDIO_SWHDR_CHANNEL_EVENT:
+<span class="lineNum">    1401 </span>            :                 case BWFM_SDIO_SWHDR_CHANNEL_DATA:
+<span class="lineNum">    1402 </span><span class="lineNoCov">          0 :                         m_adj(m, swhdr.dataoff);</span>
+<span class="lineNum">    1403 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_sc.sc_proto_ops-&gt;proto_rx(&amp;sc-&gt;sc_sc, m);</span>
+<span class="lineNum">    1404 </span>            :                         break;
+<span class="lineNum">    1405 </span>            :                 case BWFM_SDIO_SWHDR_CHANNEL_GLOM:
+<span class="lineNum">    1406 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: glom not allowed in glom\n&quot;,</span>
+<span class="lineNum">    1407 </span><span class="lineNoCov">          0 :                             DEVNAME(sc));</span>
+<span class="lineNum">    1408 </span><span class="lineNoCov">          0 :                         goto drop;</span>
+<span class="lineNum">    1409 </span>            :                 default:
+<span class="lineNum">    1410 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: unknown channel\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1411 </span><span class="lineNoCov">          0 :                         goto drop;</span>
+<span class="lineNum">    1412 </span>            :                 }
+<span class="lineNum">    1413 </span>            : 
+<span class="lineNum">    1414 </span><span class="lineNoCov">          0 :                 continue;</span>
+<span class="lineNum">    1415 </span>            : drop:
+<span class="lineNum">    1416 </span><span class="lineNoCov">          0 :                 ml_enqueue(&amp;drop, m);</span>
+<span class="lineNum">    1417 </span>            :         }
+<span class="lineNum">    1418 </span>            : 
+<span class="lineNum">    1419 </span><span class="lineNoCov">          0 :         ml_purge(&amp;drop);</span>
+<span class="lineNum">    1420 </span><span class="lineNoCov">          0 : }</span>
+<a name="1421"><span class="lineNum">    1421 </span>            : </a>
+<span class="lineNum">    1422 </span>            : int
+<span class="lineNum">    1423 </span><span class="lineNoCov">          0 : bwfm_sdio_txcheck(struct bwfm_softc *bwfm)</span>
+<span class="lineNum">    1424 </span>            : {
+<span class="lineNum">    1425 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (void *)bwfm;</span>
+<span class="lineNum">    1426 </span>            : 
+<span class="lineNum">    1427 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tx_count &gt;= 64)</span>
+<span class="lineNum">    1428 </span><span class="lineNoCov">          0 :                 return ENOBUFS;</span>
+<span class="lineNum">    1429 </span>            : 
+<span class="lineNum">    1430 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1431 </span><span class="lineNoCov">          0 : }</span>
+<a name="1432"><span class="lineNum">    1432 </span>            : </a>
+<span class="lineNum">    1433 </span>            : int
+<span class="lineNum">    1434 </span><span class="lineNoCov">          0 : bwfm_sdio_txdata(struct bwfm_softc *bwfm, struct mbuf *m)</span>
+<span class="lineNum">    1435 </span>            : {
+<span class="lineNum">    1436 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (void *)bwfm;</span>
+<span class="lineNum">    1437 </span>            : 
+<span class="lineNum">    1438 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tx_count &gt;= 64)</span>
+<span class="lineNum">    1439 </span><span class="lineNoCov">          0 :                 return ENOBUFS;</span>
+<span class="lineNum">    1440 </span>            : 
+<span class="lineNum">    1441 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_count++;</span>
+<span class="lineNum">    1442 </span><span class="lineNoCov">          0 :         ml_enqueue(&amp;sc-&gt;sc_tx_queue, m);</span>
+<span class="lineNum">    1443 </span><span class="lineNoCov">          0 :         task_add(systq, &amp;sc-&gt;sc_task);</span>
+<span class="lineNum">    1444 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1445 </span><span class="lineNoCov">          0 : }</span>
+<a name="1446"><span class="lineNum">    1446 </span>            : </a>
+<span class="lineNum">    1447 </span>            : int
+<span class="lineNum">    1448 </span><span class="lineNoCov">          0 : bwfm_sdio_txctl(struct bwfm_softc *bwfm, void *arg)</span>
+<span class="lineNum">    1449 </span>            : {
+<span class="lineNum">    1450 </span><span class="lineNoCov">          0 :         struct bwfm_sdio_softc *sc = (void *)bwfm;</span>
+<span class="lineNum">    1451 </span><span class="lineNoCov">          0 :         struct bwfm_proto_bcdc_ctl *ctl = arg;</span>
+<span class="lineNum">    1452 </span>            :         struct mbuf *m;
+<span class="lineNum">    1453 </span>            : 
+<span class="lineNum">    1454 </span><span class="lineNoCov">          0 :         MGET(m, M_DONTWAIT, MT_CONTROL);</span>
+<span class="lineNum">    1455 </span><span class="lineNoCov">          0 :         if (m == NULL || M_TRAILINGSPACE(m) &lt; ctl-&gt;len) {</span>
+<span class="lineNum">    1456 </span><span class="lineNoCov">          0 :                 free(ctl-&gt;buf, M_TEMP, ctl-&gt;len);</span>
+<span class="lineNum">    1457 </span><span class="lineNoCov">          0 :                 free(ctl, M_TEMP, sizeof(*ctl));</span>
+<span class="lineNum">    1458 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">    1459 </span>            :         }
+<span class="lineNum">    1460 </span><span class="lineNoCov">          0 :         memcpy(mtod(m, char *), ctl-&gt;buf, ctl-&gt;len);</span>
+<span class="lineNum">    1461 </span><span class="lineNoCov">          0 :         m-&gt;m_len = ctl-&gt;len;</span>
+<span class="lineNum">    1462 </span>            : 
+<span class="lineNum">    1463 </span><span class="lineNoCov">          0 :         TAILQ_INSERT_TAIL(&amp;sc-&gt;sc_sc.sc_bcdc_rxctlq, ctl, next);</span>
+<span class="lineNum">    1464 </span><span class="lineNoCov">          0 :         ml_enqueue(&amp;sc-&gt;sc_tx_queue, m);</span>
+<span class="lineNum">    1465 </span><span class="lineNoCov">          0 :         task_add(systq, &amp;sc-&gt;sc_task);</span>
+<span class="lineNum">    1466 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1467 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1468 </span>            : 
+<span class="lineNum">    1469 </span>            : #ifdef BWFM_DEBUG
+<span class="lineNum">    1470 </span>            : void
+<span class="lineNum">    1471 </span>            : bwfm_sdio_debug_console(struct bwfm_sdio_softc *sc)
+<span class="lineNum">    1472 </span>            : {
+<span class="lineNum">    1473 </span>            :         struct bwfm_sdio_console c;
+<span class="lineNum">    1474 </span>            :         uint32_t newidx;
+<span class="lineNum">    1475 </span>            :         int err;
+<span class="lineNum">    1476 </span>            : 
+<span class="lineNum">    1477 </span>            :         if (!sc-&gt;sc_console_addr)
+<span class="lineNum">    1478 </span>            :                 return;
+<span class="lineNum">    1479 </span>            : 
+<span class="lineNum">    1480 </span>            :         err = bwfm_sdio_ram_read_write(sc, sc-&gt;sc_console_addr,
+<span class="lineNum">    1481 </span>            :             (char *)&amp;c, sizeof(c), 0);
+<span class="lineNum">    1482 </span>            :         if (err)
+<span class="lineNum">    1483 </span>            :                 return;
+<span class="lineNum">    1484 </span>            : 
+<span class="lineNum">    1485 </span>            :         c.log_buf = letoh32(c.log_buf);
+<span class="lineNum">    1486 </span>            :         c.log_bufsz = letoh32(c.log_bufsz);
+<span class="lineNum">    1487 </span>            :         c.log_idx = letoh32(c.log_idx);
+<span class="lineNum">    1488 </span>            : 
+<span class="lineNum">    1489 </span>            :         if (sc-&gt;sc_console_buf == NULL) {
+<span class="lineNum">    1490 </span>            :                 sc-&gt;sc_console_buf = malloc(c.log_bufsz, M_DEVBUF,
+<span class="lineNum">    1491 </span>            :                     M_WAITOK|M_ZERO);
+<span class="lineNum">    1492 </span>            :                 sc-&gt;sc_console_buf_size = c.log_bufsz;
+<span class="lineNum">    1493 </span>            :         }
+<span class="lineNum">    1494 </span>            : 
+<span class="lineNum">    1495 </span>            :         newidx = c.log_idx;
+<span class="lineNum">    1496 </span>            :         if (newidx &gt;= sc-&gt;sc_console_buf_size)
+<span class="lineNum">    1497 </span>            :                 return;
+<span class="lineNum">    1498 </span>            : 
+<span class="lineNum">    1499 </span>            :         err = bwfm_sdio_ram_read_write(sc, c.log_buf, sc-&gt;sc_console_buf,
+<span class="lineNum">    1500 </span>            :             sc-&gt;sc_console_buf_size, 0);
+<span class="lineNum">    1501 </span>            :         if (err)
+<span class="lineNum">    1502 </span>            :                 return;
+<span class="lineNum">    1503 </span>            : 
+<span class="lineNum">    1504 </span>            :         if (newidx != sc-&gt;sc_console_readidx)
+<span class="lineNum">    1505 </span>            :                 DPRINTFN(3, (&quot;BWFM CONSOLE: &quot;));
+<span class="lineNum">    1506 </span>            :         while (newidx != sc-&gt;sc_console_readidx) {
+<span class="lineNum">    1507 </span>            :                 uint8_t ch = sc-&gt;sc_console_buf[sc-&gt;sc_console_readidx];
+<span class="lineNum">    1508 </span>            :                 sc-&gt;sc_console_readidx++;
+<span class="lineNum">    1509 </span>            :                 if (sc-&gt;sc_console_readidx == sc-&gt;sc_console_buf_size)
+<span class="lineNum">    1510 </span>            :                         sc-&gt;sc_console_readidx = 0;
+<span class="lineNum">    1511 </span>            :                 if (ch == '\r')
+<span class="lineNum">    1512 </span>            :                         continue;
+<span class="lineNum">    1513 </span>            :                 DPRINTFN(3, (&quot;%c&quot;, ch));
+<span class="lineNum">    1514 </span>            :         }
+<span class="lineNum">    1515 </span>            : }
+<span class="lineNum">    1516 </span>            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

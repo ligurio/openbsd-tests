@@ -1,0 +1,508 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - lib/libz/crc32.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">lib/libz</a> - crc32.c<span style="font-size: 80%;"> (source / <a href="crc32.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">49</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">5</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: crc32.c,v 1.12 2011/07/07 02:57:24 deraadt Exp $      */</a>
+<span class="lineNum">       2 </span>            : /* crc32.c -- compute the CRC-32 of a data stream
+<span class="lineNum">       3 </span>            :  * Copyright (C) 1995-2005 Mark Adler
+<span class="lineNum">       4 </span>            :  * For conditions of distribution and use, see copyright notice in zlib.h
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Thanks to Rodney Brown &lt;rbrown64@csc.com.au&gt; for his contribution of faster
+<span class="lineNum">       7 </span>            :  * CRC methods: exclusive-oring 32 bits of data at a time, and pre-computing
+<span class="lineNum">       8 </span>            :  * tables for updating the shift register in one step with three exclusive-ors
+<span class="lineNum">       9 </span>            :  * instead of four steps with four exclusive-ors.  This results in about a
+<span class="lineNum">      10 </span>            :  * factor of two increase in speed on a Power PC G4 (PPC7455) using gcc -O3.
+<span class="lineNum">      11 </span>            :  */
+<span class="lineNum">      12 </span>            : 
+<span class="lineNum">      13 </span>            : /*
+<span class="lineNum">      14 </span>            :   Note on the use of DYNAMIC_CRC_TABLE: there is no mutex or semaphore
+<span class="lineNum">      15 </span>            :   protection on the static variables used to control the first-use generation
+<span class="lineNum">      16 </span>            :   of the crc tables.  Therefore, if you #define DYNAMIC_CRC_TABLE, you should
+<span class="lineNum">      17 </span>            :   first call get_crc_table() to initialize the tables before allowing more than
+<span class="lineNum">      18 </span>            :   one thread to use crc32().
+<span class="lineNum">      19 </span>            :  */
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #ifdef MAKECRCH
+<span class="lineNum">      22 </span>            : #  include &lt;stdio.h&gt;
+<span class="lineNum">      23 </span>            : #  ifndef DYNAMIC_CRC_TABLE
+<span class="lineNum">      24 </span>            : #    define DYNAMIC_CRC_TABLE
+<span class="lineNum">      25 </span>            : #  endif /* !DYNAMIC_CRC_TABLE */
+<span class="lineNum">      26 </span>            : #endif /* MAKECRCH */
+<span class="lineNum">      27 </span>            :   
+<span class="lineNum">      28 </span>            : #include &quot;zutil.h&quot;      /* for STDC and FAR definitions */
+<span class="lineNum">      29 </span>            : 
+<span class="lineNum">      30 </span>            : #define local static
+<span class="lineNum">      31 </span>            : 
+<span class="lineNum">      32 </span>            : #ifndef _KERNEL
+<span class="lineNum">      33 </span>            : /* Find a four-byte integer type for crc32_little() and crc32_big(). */
+<span class="lineNum">      34 </span>            : #ifndef NOBYFOUR
+<span class="lineNum">      35 </span>            : #  ifdef STDC           /* need ANSI C limits.h to determine sizes */
+<span class="lineNum">      36 </span>            : #    include &lt;limits.h&gt;
+<span class="lineNum">      37 </span>            : #    define BYFOUR
+<span class="lineNum">      38 </span>            : #    if (UINT_MAX == 0xffffffffUL)
+<span class="lineNum">      39 </span>            :        typedef unsigned int u4;
+<span class="lineNum">      40 </span>            : #    else
+<span class="lineNum">      41 </span>            : #      if (ULONG_MAX == 0xffffffffUL)
+<span class="lineNum">      42 </span>            :          typedef unsigned long u4;
+<span class="lineNum">      43 </span>            : #      else
+<span class="lineNum">      44 </span>            : #        if (USHRT_MAX == 0xffffffffUL)
+<span class="lineNum">      45 </span>            :            typedef unsigned short u4;
+<span class="lineNum">      46 </span>            : #        else
+<span class="lineNum">      47 </span>            : #          undef BYFOUR     /* can't find a four-byte integer type! */
+<span class="lineNum">      48 </span>            : #        endif
+<span class="lineNum">      49 </span>            : #      endif
+<span class="lineNum">      50 </span>            : #    endif
+<span class="lineNum">      51 </span>            : #  endif /* STDC */
+<span class="lineNum">      52 </span>            : #endif /* !NOBYFOUR */
+<span class="lineNum">      53 </span>            : #endif
+<span class="lineNum">      54 </span>            : 
+<span class="lineNum">      55 </span>            : /* Definitions for doing the crc four data bytes at a time. */
+<span class="lineNum">      56 </span>            : #ifdef BYFOUR
+<span class="lineNum">      57 </span>            : #  define REV(w) (((w)&gt;&gt;24)+(((w)&gt;&gt;8)&amp;0xff00)+ \
+<span class="lineNum">      58 </span>            :                 (((w)&amp;0xff00)&lt;&lt;8)+(((w)&amp;0xff)&lt;&lt;24))
+<span class="lineNum">      59 </span>            :    local unsigned long crc32_little OF((unsigned long,
+<span class="lineNum">      60 </span>            :                         const unsigned char FAR *, unsigned));
+<span class="lineNum">      61 </span>            :    local unsigned long crc32_big OF((unsigned long,
+<span class="lineNum">      62 </span>            :                         const unsigned char FAR *, unsigned));
+<span class="lineNum">      63 </span>            : #  define TBLS 8
+<span class="lineNum">      64 </span>            : #else
+<span class="lineNum">      65 </span>            : #  define TBLS 1
+<span class="lineNum">      66 </span>            : #endif /* BYFOUR */
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            : /* Local functions for crc concatenation */
+<span class="lineNum">      69 </span>            : local unsigned long gf2_matrix_times OF((unsigned long *mat,
+<span class="lineNum">      70 </span>            :                                          unsigned long vec));
+<span class="lineNum">      71 </span>            : local void gf2_matrix_square OF((unsigned long *square, unsigned long *mat));
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span>            : #ifdef DYNAMIC_CRC_TABLE
+<span class="lineNum">      74 </span>            : 
+<span class="lineNum">      75 </span>            : local volatile int crc_table_empty = 1;
+<span class="lineNum">      76 </span>            : local unsigned long FAR crc_table[TBLS][256];
+<span class="lineNum">      77 </span>            : local void make_crc_table OF((void));
+<span class="lineNum">      78 </span>            : #ifdef MAKECRCH
+<span class="lineNum">      79 </span>            :    local void write_table OF((FILE *, const unsigned long FAR *));
+<span class="lineNum">      80 </span>            : #endif /* MAKECRCH */
+<span class="lineNum">      81 </span>            : /*
+<span class="lineNum">      82 </span>            :   Generate tables for a byte-wise 32-bit CRC calculation on the polynomial:
+<span class="lineNum">      83 </span>            :   x^32+x^26+x^23+x^22+x^16+x^12+x^11+x^10+x^8+x^7+x^5+x^4+x^2+x+1.
+<span class="lineNum">      84 </span>            : 
+<span class="lineNum">      85 </span>            :   Polynomials over GF(2) are represented in binary, one bit per coefficient,
+<span class="lineNum">      86 </span>            :   with the lowest powers in the most significant bit.  Then adding polynomials
+<span class="lineNum">      87 </span>            :   is just exclusive-or, and multiplying a polynomial by x is a right shift by
+<span class="lineNum">      88 </span>            :   one.  If we call the above polynomial p, and represent a byte as the
+<span class="lineNum">      89 </span>            :   polynomial q, also with the lowest power in the most significant bit (so the
+<span class="lineNum">      90 </span>            :   byte 0xb1 is the polynomial x^7+x^3+x+1), then the CRC is (q*x^32) mod p,
+<span class="lineNum">      91 </span>            :   where a mod b means the remainder after dividing a by b.
+<span class="lineNum">      92 </span>            : 
+<span class="lineNum">      93 </span>            :   This calculation is done using the shift-register method of multiplying and
+<span class="lineNum">      94 </span>            :   taking the remainder.  The register is initialized to zero, and for each
+<span class="lineNum">      95 </span>            :   incoming bit, x^32 is added mod p to the register if the bit is a one (where
+<span class="lineNum">      96 </span>            :   x^32 mod p is p+x^32 = x^26+...+1), and the register is multiplied mod p by
+<span class="lineNum">      97 </span>            :   x (which is shifting right by one and adding x^32 mod p if the bit shifted
+<span class="lineNum">      98 </span>            :   out is a one).  We start with the highest power (least significant bit) of
+<span class="lineNum">      99 </span>            :   q and repeat for all eight bits of q.
+<span class="lineNum">     100 </span>            : 
+<span class="lineNum">     101 </span>            :   The first table is simply the CRC of all possible eight bit values.  This is
+<span class="lineNum">     102 </span>            :   all the information needed to generate CRCs on data a byte at a time for all
+<span class="lineNum">     103 </span>            :   combinations of CRC register values and incoming bytes.  The remaining tables
+<span class="lineNum">     104 </span>            :   allow for word-at-a-time CRC calculation for both big-endian and little-
+<span class="lineNum">     105 </span>            :   endian machines, where a word is four bytes.
+<span class="lineNum">     106 </span>            : */
+<span class="lineNum">     107 </span>            : local void make_crc_table()
+<span class="lineNum">     108 </span>            : {
+<span class="lineNum">     109 </span>            :     unsigned long c;
+<span class="lineNum">     110 </span>            :     int n, k;
+<span class="lineNum">     111 </span>            :     unsigned long poly;                 /* polynomial exclusive-or pattern */
+<span class="lineNum">     112 </span>            :     /* terms of polynomial defining this crc (except x^32): */
+<span class="lineNum">     113 </span>            :     static volatile int first = 1;      /* flag to limit concurrent making */
+<span class="lineNum">     114 </span>            :     static const unsigned char p[] = {0,1,2,4,5,7,8,10,11,12,16,22,23,26};
+<span class="lineNum">     115 </span>            : 
+<span class="lineNum">     116 </span>            :     /* See if another task is already doing this (not thread-safe, but better
+<span class="lineNum">     117 </span>            :        than nothing -- significantly reduces duration of vulnerability in
+<span class="lineNum">     118 </span>            :        case the advice about DYNAMIC_CRC_TABLE is ignored) */
+<span class="lineNum">     119 </span>            :     if (first) {
+<span class="lineNum">     120 </span>            :         first = 0;
+<span class="lineNum">     121 </span>            : 
+<span class="lineNum">     122 </span>            :         /* make exclusive-or pattern from polynomial (0xedb88320UL) */
+<span class="lineNum">     123 </span>            :         poly = 0UL;
+<span class="lineNum">     124 </span>            :         for (n = 0; n &lt; sizeof(p)/sizeof(unsigned char); n++)
+<span class="lineNum">     125 </span>            :             poly |= 1UL &lt;&lt; (31 - p[n]);
+<span class="lineNum">     126 </span>            : 
+<span class="lineNum">     127 </span>            :         /* generate a crc for every 8-bit value */
+<span class="lineNum">     128 </span>            :         for (n = 0; n &lt; 256; n++) {
+<span class="lineNum">     129 </span>            :             c = (unsigned long)n;
+<span class="lineNum">     130 </span>            :             for (k = 0; k &lt; 8; k++)
+<span class="lineNum">     131 </span>            :                 c = c &amp; 1 ? poly ^ (c &gt;&gt; 1) : c &gt;&gt; 1;
+<span class="lineNum">     132 </span>            :             crc_table[0][n] = c;
+<span class="lineNum">     133 </span>            :         }
+<span class="lineNum">     134 </span>            : 
+<span class="lineNum">     135 </span>            : #ifdef BYFOUR
+<span class="lineNum">     136 </span>            :         /* generate crc for each value followed by one, two, and three zeros,
+<span class="lineNum">     137 </span>            :            and then the byte reversal of those as well as the first table */
+<span class="lineNum">     138 </span>            :         for (n = 0; n &lt; 256; n++) {
+<span class="lineNum">     139 </span>            :             c = crc_table[0][n];
+<span class="lineNum">     140 </span>            :             crc_table[4][n] = REV(c);
+<span class="lineNum">     141 </span>            :             for (k = 1; k &lt; 4; k++) {
+<span class="lineNum">     142 </span>            :                 c = crc_table[0][c &amp; 0xff] ^ (c &gt;&gt; 8);
+<span class="lineNum">     143 </span>            :                 crc_table[k][n] = c;
+<span class="lineNum">     144 </span>            :                 crc_table[k + 4][n] = REV(c);
+<span class="lineNum">     145 </span>            :             }
+<span class="lineNum">     146 </span>            :         }
+<span class="lineNum">     147 </span>            : #endif /* BYFOUR */
+<span class="lineNum">     148 </span>            : 
+<span class="lineNum">     149 </span>            :         crc_table_empty = 0;
+<span class="lineNum">     150 </span>            :     }
+<span class="lineNum">     151 </span>            :     else {      /* not first */
+<span class="lineNum">     152 </span>            :         /* wait for the other guy to finish (not efficient, but rare) */
+<span class="lineNum">     153 </span>            :         while (crc_table_empty)
+<span class="lineNum">     154 </span>            :             ;
+<span class="lineNum">     155 </span>            :     }
+<span class="lineNum">     156 </span>            : 
+<span class="lineNum">     157 </span>            : #ifdef MAKECRCH
+<span class="lineNum">     158 </span>            :     /* write out CRC tables to crc32.h */
+<span class="lineNum">     159 </span>            :     {
+<span class="lineNum">     160 </span>            :         FILE *out;
+<span class="lineNum">     161 </span>            : 
+<span class="lineNum">     162 </span>            :         out = fopen(&quot;crc32.h&quot;, &quot;w&quot;);
+<span class="lineNum">     163 </span>            :         if (out == NULL) return;
+<span class="lineNum">     164 </span>            :         fprintf(out, &quot;/* crc32.h -- tables for rapid CRC calculation\n&quot;);
+<span class="lineNum">     165 </span>            :         fprintf(out, &quot; * Generated automatically by crc32.c\n */\n\n&quot;);
+<span class="lineNum">     166 </span>            :         fprintf(out, &quot;local const unsigned long FAR &quot;);
+<span class="lineNum">     167 </span>            :         fprintf(out, &quot;crc_table[TBLS][256] =\n{\n  {\n&quot;);
+<span class="lineNum">     168 </span>            :         write_table(out, crc_table[0]);
+<span class="lineNum">     169 </span>            : #  ifdef BYFOUR
+<span class="lineNum">     170 </span>            :         fprintf(out, &quot;#ifdef BYFOUR\n&quot;);
+<span class="lineNum">     171 </span>            :         for (k = 1; k &lt; 8; k++) {
+<span class="lineNum">     172 </span>            :             fprintf(out, &quot;  },\n  {\n&quot;);
+<span class="lineNum">     173 </span>            :             write_table(out, crc_table[k]);
+<span class="lineNum">     174 </span>            :         }
+<span class="lineNum">     175 </span>            :         fprintf(out, &quot;#endif\n&quot;);
+<span class="lineNum">     176 </span>            : #  endif /* BYFOUR */
+<span class="lineNum">     177 </span>            :         fprintf(out, &quot;  }\n};\n&quot;);
+<span class="lineNum">     178 </span>            :         fclose(out);
+<span class="lineNum">     179 </span>            :     }
+<span class="lineNum">     180 </span>            : #endif /* MAKECRCH */
+<span class="lineNum">     181 </span>            : }
+<span class="lineNum">     182 </span>            : 
+<span class="lineNum">     183 </span>            : #ifdef MAKECRCH
+<span class="lineNum">     184 </span>            : local void write_table(out, table)
+<span class="lineNum">     185 </span>            :     FILE *out;
+<span class="lineNum">     186 </span>            :     const unsigned long FAR *table;
+<span class="lineNum">     187 </span>            : {
+<span class="lineNum">     188 </span>            :     int n;
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span>            :     for (n = 0; n &lt; 256; n++)
+<span class="lineNum">     191 </span>            :         fprintf(out, &quot;%s0x%08lxUL%s&quot;, n % 5 ? &quot;&quot; : &quot;    &quot;, table[n],
+<span class="lineNum">     192 </span>            :                 n == 255 ? &quot;\n&quot; : (n % 5 == 4 ? &quot;,\n&quot; : &quot;, &quot;));
+<span class="lineNum">     193 </span>            : }
+<span class="lineNum">     194 </span>            : #endif /* MAKECRCH */
+<span class="lineNum">     195 </span>            : 
+<span class="lineNum">     196 </span>            : #else /* !DYNAMIC_CRC_TABLE */
+<span class="lineNum">     197 </span>            : /* ========================================================================
+<span class="lineNum">     198 </span>            :  * Tables of CRC-32s of all single-byte values, made by make_crc_table().
+<span class="lineNum">     199 </span>            :  */
+<span class="lineNum">     200 </span>            : #include &quot;crc32.h&quot;
+<span class="lineNum">     201 </span>            : #endif /* DYNAMIC_CRC_TABLE */
+<span class="lineNum">     202 </span>            : 
+<span class="lineNum">     203 </span>            : /* =========================================================================
+<a name="204"><span class="lineNum">     204 </span>            :  * This function can be used by asm versions of crc32()</a>
+<span class="lineNum">     205 </span>            :  */
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 : const unsigned long FAR * ZEXPORT get_crc_table()</span>
+<span class="lineNum">     207 </span>            : {
+<span class="lineNum">     208 </span>            : #ifdef DYNAMIC_CRC_TABLE
+<span class="lineNum">     209 </span>            :     if (crc_table_empty)
+<span class="lineNum">     210 </span>            :         make_crc_table();
+<span class="lineNum">     211 </span>            : #endif /* DYNAMIC_CRC_TABLE */
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :     return (const unsigned long FAR *)crc_table;</span>
+<span class="lineNum">     213 </span>            : }
+<span class="lineNum">     214 </span>            : 
+<span class="lineNum">     215 </span>            : /* ========================================================================= */
+<span class="lineNum">     216 </span>            : #define DO1 crc = crc_table[0][((int)crc ^ (*buf++)) &amp; 0xff] ^ (crc &gt;&gt; 8)
+<span class="lineNum">     217 </span>            : #define DO8 DO1; DO1; DO1; DO1; DO1; DO1; DO1; DO1
+<a name="218"><span class="lineNum">     218 </span>            : </a>
+<span class="lineNum">     219 </span>            : /* ========================================================================= */
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 : unsigned long ZEXPORT crc32(crc, buf, len)</span>
+<span class="lineNum">     221 </span>            :     unsigned long crc;
+<span class="lineNum">     222 </span>            :     const unsigned char FAR *buf;
+<span class="lineNum">     223 </span>            :     unsigned len;
+<span class="lineNum">     224 </span>            : {
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :     if (buf == Z_NULL) return 0UL;</span>
+<span class="lineNum">     226 </span>            : 
+<span class="lineNum">     227 </span>            : #ifdef DYNAMIC_CRC_TABLE
+<span class="lineNum">     228 </span>            :     if (crc_table_empty)
+<span class="lineNum">     229 </span>            :         make_crc_table();
+<span class="lineNum">     230 </span>            : #endif /* DYNAMIC_CRC_TABLE */
+<span class="lineNum">     231 </span>            : 
+<span class="lineNum">     232 </span>            : #ifdef BYFOUR
+<span class="lineNum">     233 </span>            :     if (sizeof(void *) == sizeof(ptrdiff_t)) {
+<span class="lineNum">     234 </span>            :         u4 endian;
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span>            :         endian = 1;
+<span class="lineNum">     237 </span>            :         if (*((unsigned char *)(&amp;endian)))
+<span class="lineNum">     238 </span>            :             return crc32_little(crc, buf, len);
+<span class="lineNum">     239 </span>            :         else
+<span class="lineNum">     240 </span>            :             return crc32_big(crc, buf, len);
+<span class="lineNum">     241 </span>            :     }
+<span class="lineNum">     242 </span>            : #endif /* BYFOUR */
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :     crc = crc ^ 0xffffffffUL;</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :     while (len &gt;= 8) {</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         DO8;</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         len -= 8;</span>
+<span class="lineNum">     247 </span>            :     }
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :     if (len) do {</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :         DO1;</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :     } while (--len);</span>
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :     return crc ^ 0xffffffffUL;</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     253 </span>            : 
+<span class="lineNum">     254 </span>            : #ifdef BYFOUR
+<span class="lineNum">     255 </span>            : 
+<span class="lineNum">     256 </span>            : /* ========================================================================= */
+<span class="lineNum">     257 </span>            : #define DOLIT4 c ^= *buf4++; \
+<span class="lineNum">     258 </span>            :         c = crc_table[3][c &amp; 0xff] ^ crc_table[2][(c &gt;&gt; 8) &amp; 0xff] ^ \
+<span class="lineNum">     259 </span>            :             crc_table[1][(c &gt;&gt; 16) &amp; 0xff] ^ crc_table[0][c &gt;&gt; 24]
+<span class="lineNum">     260 </span>            : #define DOLIT32 DOLIT4; DOLIT4; DOLIT4; DOLIT4; DOLIT4; DOLIT4; DOLIT4; DOLIT4
+<span class="lineNum">     261 </span>            : 
+<span class="lineNum">     262 </span>            : /* ========================================================================= */
+<span class="lineNum">     263 </span>            : local unsigned long crc32_little(crc, buf, len)
+<span class="lineNum">     264 </span>            :     unsigned long crc;
+<span class="lineNum">     265 </span>            :     const unsigned char FAR *buf;
+<span class="lineNum">     266 </span>            :     unsigned len;
+<span class="lineNum">     267 </span>            : {
+<span class="lineNum">     268 </span>            :     register u4 c;
+<span class="lineNum">     269 </span>            :     register const u4 FAR *buf4;
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span>            :     c = (u4)crc;
+<span class="lineNum">     272 </span>            :     c = ~c;
+<span class="lineNum">     273 </span>            :     while (len &amp;&amp; ((ptrdiff_t)buf &amp; 3)) {
+<span class="lineNum">     274 </span>            :         c = crc_table[0][(c ^ *buf++) &amp; 0xff] ^ (c &gt;&gt; 8);
+<span class="lineNum">     275 </span>            :         len--;
+<span class="lineNum">     276 </span>            :     }
+<span class="lineNum">     277 </span>            : 
+<span class="lineNum">     278 </span>            :     buf4 = (const u4 FAR *)(const void FAR *)buf;
+<span class="lineNum">     279 </span>            :     while (len &gt;= 32) {
+<span class="lineNum">     280 </span>            :         DOLIT32;
+<span class="lineNum">     281 </span>            :         len -= 32;
+<span class="lineNum">     282 </span>            :     }
+<span class="lineNum">     283 </span>            :     while (len &gt;= 4) {
+<span class="lineNum">     284 </span>            :         DOLIT4;
+<span class="lineNum">     285 </span>            :         len -= 4;
+<span class="lineNum">     286 </span>            :     }
+<span class="lineNum">     287 </span>            :     buf = (const unsigned char FAR *)buf4;
+<span class="lineNum">     288 </span>            : 
+<span class="lineNum">     289 </span>            :     if (len) do {
+<span class="lineNum">     290 </span>            :         c = crc_table[0][(c ^ *buf++) &amp; 0xff] ^ (c &gt;&gt; 8);
+<span class="lineNum">     291 </span>            :     } while (--len);
+<span class="lineNum">     292 </span>            :     c = ~c;
+<span class="lineNum">     293 </span>            :     return (unsigned long)c;
+<span class="lineNum">     294 </span>            : }
+<span class="lineNum">     295 </span>            : 
+<span class="lineNum">     296 </span>            : /* ========================================================================= */
+<span class="lineNum">     297 </span>            : #define DOBIG4 c ^= *++buf4; \
+<span class="lineNum">     298 </span>            :         c = crc_table[4][c &amp; 0xff] ^ crc_table[5][(c &gt;&gt; 8) &amp; 0xff] ^ \
+<span class="lineNum">     299 </span>            :             crc_table[6][(c &gt;&gt; 16) &amp; 0xff] ^ crc_table[7][c &gt;&gt; 24]
+<span class="lineNum">     300 </span>            : #define DOBIG32 DOBIG4; DOBIG4; DOBIG4; DOBIG4; DOBIG4; DOBIG4; DOBIG4; DOBIG4
+<span class="lineNum">     301 </span>            : 
+<span class="lineNum">     302 </span>            : /* ========================================================================= */
+<span class="lineNum">     303 </span>            : local unsigned long crc32_big(crc, buf, len)
+<span class="lineNum">     304 </span>            :     unsigned long crc;
+<span class="lineNum">     305 </span>            :     const unsigned char FAR *buf;
+<span class="lineNum">     306 </span>            :     unsigned len;
+<span class="lineNum">     307 </span>            : {
+<span class="lineNum">     308 </span>            :     register u4 c;
+<span class="lineNum">     309 </span>            :     register const u4 FAR *buf4;
+<span class="lineNum">     310 </span>            : 
+<span class="lineNum">     311 </span>            :     c = REV((u4)crc);
+<span class="lineNum">     312 </span>            :     c = ~c;
+<span class="lineNum">     313 </span>            :     while (len &amp;&amp; ((ptrdiff_t)buf &amp; 3)) {
+<span class="lineNum">     314 </span>            :         c = crc_table[4][(c &gt;&gt; 24) ^ *buf++] ^ (c &lt;&lt; 8);
+<span class="lineNum">     315 </span>            :         len--;
+<span class="lineNum">     316 </span>            :     }
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span>            :     buf4 = (const u4 FAR *)(const void FAR *)buf;
+<span class="lineNum">     319 </span>            :     buf4--;
+<span class="lineNum">     320 </span>            :     while (len &gt;= 32) {
+<span class="lineNum">     321 </span>            :         DOBIG32;
+<span class="lineNum">     322 </span>            :         len -= 32;
+<span class="lineNum">     323 </span>            :     }
+<span class="lineNum">     324 </span>            :     while (len &gt;= 4) {
+<span class="lineNum">     325 </span>            :         DOBIG4;
+<span class="lineNum">     326 </span>            :         len -= 4;
+<span class="lineNum">     327 </span>            :     }
+<span class="lineNum">     328 </span>            :     buf4++;
+<span class="lineNum">     329 </span>            :     buf = (const unsigned char FAR *)buf4;
+<span class="lineNum">     330 </span>            : 
+<span class="lineNum">     331 </span>            :     if (len) do {
+<span class="lineNum">     332 </span>            :         c = crc_table[4][(c &gt;&gt; 24) ^ *buf++] ^ (c &lt;&lt; 8);
+<span class="lineNum">     333 </span>            :     } while (--len);
+<span class="lineNum">     334 </span>            :     c = ~c;
+<span class="lineNum">     335 </span>            :     return (unsigned long)(REV(c));
+<span class="lineNum">     336 </span>            : }
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span>            : #endif /* BYFOUR */
+<span class="lineNum">     339 </span>            : 
+<span class="lineNum">     340 </span>            : #define GF2_DIM 32      /* dimension of GF(2) vectors (length of CRC) */
+<a name="341"><span class="lineNum">     341 </span>            : </a>
+<span class="lineNum">     342 </span>            : /* ========================================================================= */
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 : local unsigned long gf2_matrix_times(mat, vec)</span>
+<span class="lineNum">     344 </span>            :     unsigned long *mat;
+<span class="lineNum">     345 </span>            :     unsigned long vec;
+<span class="lineNum">     346 </span>            : {
+<span class="lineNum">     347 </span>            :     unsigned long sum;
+<span class="lineNum">     348 </span>            : 
+<span class="lineNum">     349 </span>            :     sum = 0;
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :     while (vec) {</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         if (vec &amp; 1)</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :             sum ^= *mat;</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :         vec &gt;&gt;= 1;</span>
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         mat++;</span>
+<span class="lineNum">     355 </span>            :     }
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :     return sum;</span>
+<span class="lineNum">     357 </span>            : }
+<a name="358"><span class="lineNum">     358 </span>            : </a>
+<span class="lineNum">     359 </span>            : /* ========================================================================= */
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 : local void gf2_matrix_square(square, mat)</span>
+<span class="lineNum">     361 </span>            :     unsigned long *square;
+<span class="lineNum">     362 </span>            :     unsigned long *mat;
+<span class="lineNum">     363 </span>            : {
+<span class="lineNum">     364 </span>            :     int n;
+<span class="lineNum">     365 </span>            : 
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :     for (n = 0; n &lt; GF2_DIM; n++)</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :         square[n] = gf2_matrix_times(mat, mat[n]);</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 : }</span>
+<a name="369"><span class="lineNum">     369 </span>            : </a>
+<span class="lineNum">     370 </span>            : /* ========================================================================= */
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 : uLong ZEXPORT crc32_combine(crc1, crc2, len2)</span>
+<span class="lineNum">     372 </span>            :     uLong crc1;
+<span class="lineNum">     373 </span>            :     uLong crc2;
+<span class="lineNum">     374 </span>            :     z_off_t len2;
+<span class="lineNum">     375 </span>            : {
+<span class="lineNum">     376 </span>            :     int n;
+<span class="lineNum">     377 </span>            :     unsigned long row;
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :     unsigned long even[GF2_DIM];    /* even-power-of-two zeros operator */</span>
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :     unsigned long odd[GF2_DIM];     /* odd-power-of-two zeros operator */</span>
+<span class="lineNum">     380 </span>            : 
+<span class="lineNum">     381 </span>            :     /* degenerate case */
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :     if (len2 == 0)</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :         return crc1;</span>
+<span class="lineNum">     384 </span>            : 
+<span class="lineNum">     385 </span>            :     /* put operator for one zero bit in odd */
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :     odd[0] = 0xedb88320L;           /* CRC-32 polynomial */</span>
+<span class="lineNum">     387 </span>            :     row = 1;
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :     for (n = 1; n &lt; GF2_DIM; n++) {</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         odd[n] = row;</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         row &lt;&lt;= 1;</span>
+<span class="lineNum">     391 </span>            :     }
+<span class="lineNum">     392 </span>            : 
+<span class="lineNum">     393 </span>            :     /* put operator for two zero bits in even */
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :     gf2_matrix_square(even, odd);</span>
+<span class="lineNum">     395 </span>            : 
+<span class="lineNum">     396 </span>            :     /* put operator for four zero bits in odd */
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :     gf2_matrix_square(odd, even);</span>
+<span class="lineNum">     398 </span>            : 
+<span class="lineNum">     399 </span>            :     /* apply len2 zeros to crc1 (first square will put the operator for one
+<span class="lineNum">     400 </span>            :        zero byte, eight zero bits, in even) */
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :     do {</span>
+<span class="lineNum">     402 </span>            :         /* apply zeros operator for this bit of len2 */
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :         gf2_matrix_square(even, odd);</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :         if (len2 &amp; 1)</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :             crc1 = gf2_matrix_times(even, crc1);</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :         len2 &gt;&gt;= 1;</span>
+<span class="lineNum">     407 </span>            : 
+<span class="lineNum">     408 </span>            :         /* if no more bits set, then done */
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :         if (len2 == 0)</span>
+<span class="lineNum">     410 </span>            :             break;
+<span class="lineNum">     411 </span>            : 
+<span class="lineNum">     412 </span>            :         /* another iteration of the loop with odd and even swapped */
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         gf2_matrix_square(odd, even);</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         if (len2 &amp; 1)</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :             crc1 = gf2_matrix_times(odd, crc1);</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         len2 &gt;&gt;= 1;</span>
+<span class="lineNum">     417 </span>            : 
+<span class="lineNum">     418 </span>            :         /* if no more bits set, then done */
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :     } while (len2 != 0);</span>
+<span class="lineNum">     420 </span>            : 
+<span class="lineNum">     421 </span>            :     /* return combined crc */
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :     crc1 ^= crc2;</span>
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :     return crc1;</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

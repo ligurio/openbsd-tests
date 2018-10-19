@@ -1,0 +1,1334 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/softraid_crypto.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">dev</a> - softraid_crypto.c<span style="font-size: 80%;"> (source / <a href="softraid_crypto.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">538</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /* $OpenBSD: softraid_crypto.c,v 1.137 2017/06/12 16:39:51 jsing Exp $ */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2007 Marco Peereboom &lt;marco@peereboom.us&gt;
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2008 Hans-Joerg Hoexer &lt;hshoexer@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2008 Damien Miller &lt;djm@mindrot.org&gt;
+<span class="lineNum">       6 </span>            :  * Copyright (c) 2009 Joel Sing &lt;jsing@openbsd.org&gt;
+<span class="lineNum">       7 </span>            :  *
+<span class="lineNum">       8 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       9 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">      10 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      11 </span>            :  *
+<span class="lineNum">      12 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      13 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      14 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      15 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      16 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      17 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      18 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      19 </span>            :  */
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #include &quot;bio.h&quot;
+<span class="lineNum">      22 </span>            : 
+<span class="lineNum">      23 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/buf.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/disk.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/rwlock.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;sys/fcntl.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;sys/disklabel.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;sys/vnode.h&gt;
+<span class="lineNum">      37 </span>            : #include &lt;sys/mount.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;sys/sensors.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;sys/conf.h&gt;
+<span class="lineNum">      41 </span>            : #include &lt;sys/uio.h&gt;
+<span class="lineNum">      42 </span>            : #include &lt;sys/dkio.h&gt;
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : #include &lt;crypto/cryptodev.h&gt;
+<span class="lineNum">      45 </span>            : #include &lt;crypto/rijndael.h&gt;
+<span class="lineNum">      46 </span>            : #include &lt;crypto/md5.h&gt;
+<span class="lineNum">      47 </span>            : #include &lt;crypto/sha1.h&gt;
+<span class="lineNum">      48 </span>            : #include &lt;crypto/sha2.h&gt;
+<span class="lineNum">      49 </span>            : #include &lt;crypto/hmac.h&gt;
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span>            : #include &lt;scsi/scsi_all.h&gt;
+<span class="lineNum">      52 </span>            : #include &lt;scsi/scsiconf.h&gt;
+<span class="lineNum">      53 </span>            : #include &lt;scsi/scsi_disk.h&gt;
+<span class="lineNum">      54 </span>            : 
+<span class="lineNum">      55 </span>            : #include &lt;dev/softraidvar.h&gt;
+<span class="lineNum">      56 </span>            : 
+<span class="lineNum">      57 </span>            : /*
+<span class="lineNum">      58 </span>            :  * The per-I/O data that we need to preallocate. We cannot afford to allow I/O
+<span class="lineNum">      59 </span>            :  * to start failing when memory pressure kicks in. We can store this in the WU
+<span class="lineNum">      60 </span>            :  * because we assert that only one ccb per WU will ever be active.
+<span class="lineNum">      61 </span>            :  */
+<span class="lineNum">      62 </span>            : struct sr_crypto_wu {
+<span class="lineNum">      63 </span>            :         struct sr_workunit               cr_wu;         /* Must be first. */
+<span class="lineNum">      64 </span>            :         struct uio                       cr_uio;
+<span class="lineNum">      65 </span>            :         struct iovec                     cr_iov;
+<span class="lineNum">      66 </span>            :         struct cryptop                  *cr_crp;
+<span class="lineNum">      67 </span>            :         void                            *cr_dmabuf;
+<span class="lineNum">      68 </span>            : };
+<span class="lineNum">      69 </span>            : 
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : struct sr_crypto_wu *sr_crypto_prepare(struct sr_workunit *, int);
+<span class="lineNum">      72 </span>            : int             sr_crypto_create_keys(struct sr_discipline *);
+<span class="lineNum">      73 </span>            : int             sr_crypto_get_kdf(struct bioc_createraid *,
+<span class="lineNum">      74 </span>            :                     struct sr_discipline *);
+<span class="lineNum">      75 </span>            : int             sr_crypto_decrypt(u_char *, u_char *, u_char *, size_t, int);
+<span class="lineNum">      76 </span>            : int             sr_crypto_encrypt(u_char *, u_char *, u_char *, size_t, int);
+<span class="lineNum">      77 </span>            : int             sr_crypto_decrypt_key(struct sr_discipline *);
+<span class="lineNum">      78 </span>            : int             sr_crypto_change_maskkey(struct sr_discipline *,
+<span class="lineNum">      79 </span>            :                     struct sr_crypto_kdfinfo *, struct sr_crypto_kdfinfo *);
+<span class="lineNum">      80 </span>            : int             sr_crypto_create(struct sr_discipline *,
+<span class="lineNum">      81 </span>            :                     struct bioc_createraid *, int, int64_t);
+<span class="lineNum">      82 </span>            : int             sr_crypto_assemble(struct sr_discipline *,
+<span class="lineNum">      83 </span>            :                     struct bioc_createraid *, int, void *);
+<span class="lineNum">      84 </span>            : int             sr_crypto_alloc_resources(struct sr_discipline *);
+<span class="lineNum">      85 </span>            : void            sr_crypto_free_resources(struct sr_discipline *);
+<span class="lineNum">      86 </span>            : int             sr_crypto_ioctl(struct sr_discipline *,
+<span class="lineNum">      87 </span>            :                     struct bioc_discipline *);
+<span class="lineNum">      88 </span>            : int             sr_crypto_meta_opt_handler(struct sr_discipline *,
+<span class="lineNum">      89 </span>            :                     struct sr_meta_opt_hdr *);
+<span class="lineNum">      90 </span>            : void            sr_crypto_write(struct cryptop *);
+<span class="lineNum">      91 </span>            : int             sr_crypto_rw(struct sr_workunit *);
+<span class="lineNum">      92 </span>            : int             sr_crypto_dev_rw(struct sr_workunit *, struct sr_crypto_wu *);
+<span class="lineNum">      93 </span>            : void            sr_crypto_done(struct sr_workunit *);
+<span class="lineNum">      94 </span>            : void            sr_crypto_read(struct cryptop *);
+<span class="lineNum">      95 </span>            : void            sr_crypto_calculate_check_hmac_sha1(u_int8_t *, int,
+<span class="lineNum">      96 </span>            :                    u_int8_t *, int, u_char *);
+<span class="lineNum">      97 </span>            : void            sr_crypto_hotplug(struct sr_discipline *, struct disk *, int);
+<span class="lineNum">      98 </span>            : 
+<span class="lineNum">      99 </span>            : #ifdef SR_DEBUG0
+<span class="lineNum">     100 </span>            : void             sr_crypto_dumpkeys(struct sr_discipline *);
+<span class="lineNum">     101 </span>            : #endif
+<span class="lineNum">     102 </span>            : 
+<a name="103"><span class="lineNum">     103 </span>            : /* Discipline initialisation. */</a>
+<span class="lineNum">     104 </span>            : void
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 : sr_crypto_discipline_init(struct sr_discipline *sd)</span>
+<span class="lineNum">     106 </span>            : {
+<span class="lineNum">     107 </span>            :         int i;
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span>            :         /* Fill out discipline members. */
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :         sd-&gt;sd_type = SR_MD_CRYPTO;</span>
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :         strlcpy(sd-&gt;sd_name, &quot;CRYPTO&quot;, sizeof(sd-&gt;sd_name));</span>
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :         sd-&gt;sd_capabilities = SR_CAP_SYSTEM_DISK | SR_CAP_AUTO_ASSEMBLE;</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         sd-&gt;sd_max_wu = SR_CRYPTO_NOWU;</span>
+<span class="lineNum">     114 </span>            : 
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; SR_CRYPTO_MAXKEYS; i++)</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :                 sd-&gt;mds.mdd_crypto.scr_sid[i] = (u_int64_t)-1;</span>
+<span class="lineNum">     117 </span>            : 
+<span class="lineNum">     118 </span>            :         /* Setup discipline specific function pointers. */
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :         sd-&gt;sd_alloc_resources = sr_crypto_alloc_resources;</span>
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         sd-&gt;sd_assemble = sr_crypto_assemble;</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :         sd-&gt;sd_create = sr_crypto_create;</span>
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :         sd-&gt;sd_free_resources = sr_crypto_free_resources;</span>
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         sd-&gt;sd_ioctl_handler = sr_crypto_ioctl;</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         sd-&gt;sd_meta_opt_handler = sr_crypto_meta_opt_handler;</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         sd-&gt;sd_scsi_rw = sr_crypto_rw;</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         sd-&gt;sd_scsi_done = sr_crypto_done;</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 : }</span>
+<a name="128"><span class="lineNum">     128 </span>            : </a>
+<span class="lineNum">     129 </span>            : int
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 : sr_crypto_create(struct sr_discipline *sd, struct bioc_createraid *bc,</span>
+<span class="lineNum">     131 </span>            :     int no_chunk, int64_t coerced_size)
+<span class="lineNum">     132 </span>            : {
+<span class="lineNum">     133 </span>            :         struct sr_meta_opt_item *omi;
+<span class="lineNum">     134 </span>            :         int                     rv = EINVAL;
+<span class="lineNum">     135 </span>            : 
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         if (no_chunk != 1) {</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :                 sr_error(sd-&gt;sd_sc, &quot;%s requires exactly one chunk&quot;,</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :                     sd-&gt;sd_name);</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     140 </span>            :         }
+<span class="lineNum">     141 </span>            : 
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         if (coerced_size &gt; SR_CRYPTO_MAXSIZE) {</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :                 sr_error(sd-&gt;sd_sc, &quot;%s exceeds maximum size (%lli &gt; %llu)&quot;,</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :                     sd-&gt;sd_name, coerced_size, SR_CRYPTO_MAXSIZE);</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     146 </span>            :         }
+<span class="lineNum">     147 </span>            : 
+<span class="lineNum">     148 </span>            :         /* Create crypto optional metadata. */
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         omi = malloc(sizeof(struct sr_meta_opt_item), M_DEVBUF,</span>
+<span class="lineNum">     150 </span>            :             M_WAITOK | M_ZERO);
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         omi-&gt;omi_som = malloc(sizeof(struct sr_meta_crypto), M_DEVBUF,</span>
+<span class="lineNum">     152 </span>            :             M_WAITOK | M_ZERO);
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         omi-&gt;omi_som-&gt;som_type = SR_OPT_CRYPTO;</span>
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         omi-&gt;omi_som-&gt;som_length = sizeof(struct sr_meta_crypto);</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         SLIST_INSERT_HEAD(&amp;sd-&gt;sd_meta_opt, omi, omi_link);</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         sd-&gt;mds.mdd_crypto.scr_meta = (struct sr_meta_crypto *)omi-&gt;omi_som;</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         sd-&gt;sd_meta-&gt;ssdi.ssd_opt_no++;</span>
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         sd-&gt;mds.mdd_crypto.key_disk = NULL;</span>
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         if (bc-&gt;bc_key_disk != NODEV) {</span>
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span>            :                 /* Create a key disk. */
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                 if (sr_crypto_get_kdf(bc, sd))</span>
+<span class="lineNum">     165 </span>            :                         goto done;
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 sd-&gt;mds.mdd_crypto.key_disk =</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :                     sr_crypto_create_key_disk(sd, bc-&gt;bc_key_disk);</span>
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                 if (sd-&gt;mds.mdd_crypto.key_disk == NULL)</span>
+<span class="lineNum">     169 </span>            :                         goto done;
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :                 sd-&gt;sd_capabilities |= SR_CAP_AUTO_ASSEMBLE;</span>
+<span class="lineNum">     171 </span>            : 
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :         } else if (bc-&gt;bc_opaque_flags &amp; BIOC_SOOUT) {</span>
+<span class="lineNum">     173 </span>            : 
+<span class="lineNum">     174 </span>            :                 /* No hint available yet. */
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                 bc-&gt;bc_opaque_status = BIOC_SOINOUT_FAILED;</span>
+<span class="lineNum">     176 </span>            :                 rv = EAGAIN;
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     178 </span>            : 
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :         } else if (sr_crypto_get_kdf(bc, sd))</span>
+<span class="lineNum">     180 </span>            :                 goto done;
+<span class="lineNum">     181 </span>            : 
+<span class="lineNum">     182 </span>            :         /* Passphrase volumes cannot be automatically assembled. */
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         if (!(bc-&gt;bc_flags &amp; BIOC_SCNOAUTOASSEMBLE) &amp;&amp; bc-&gt;bc_key_disk == NODEV)</span>
+<span class="lineNum">     184 </span>            :                 goto done;
+<span class="lineNum">     185 </span>            : 
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :         sd-&gt;sd_meta-&gt;ssdi.ssd_size = coerced_size;</span>
+<span class="lineNum">     187 </span>            : 
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         sr_crypto_create_keys(sd);</span>
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         sd-&gt;sd_max_ccb_per_wu = no_chunk;</span>
+<span class="lineNum">     191 </span>            : 
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :         rv = 0;</span>
+<span class="lineNum">     193 </span>            : done:
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     195 </span>            : }
+<a name="196"><span class="lineNum">     196 </span>            : </a>
+<span class="lineNum">     197 </span>            : int
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 : sr_crypto_assemble(struct sr_discipline *sd, struct bioc_createraid *bc,</span>
+<span class="lineNum">     199 </span>            :     int no_chunk, void *data)
+<span class="lineNum">     200 </span>            : {
+<span class="lineNum">     201 </span>            :         int     rv = EINVAL;
+<span class="lineNum">     202 </span>            : 
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :         sd-&gt;mds.mdd_crypto.key_disk = NULL;</span>
+<span class="lineNum">     204 </span>            : 
+<span class="lineNum">     205 </span>            :         /* Crypto optional metadata must already exist... */
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         if (sd-&gt;mds.mdd_crypto.scr_meta == NULL)</span>
+<span class="lineNum">     207 </span>            :                 goto done;
+<span class="lineNum">     208 </span>            : 
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         if (data != NULL) {</span>
+<span class="lineNum">     210 </span>            :                 /* Kernel already has mask key. */
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                 memcpy(sd-&gt;mds.mdd_crypto.scr_maskkey, data,</span>
+<span class="lineNum">     212 </span>            :                     sizeof(sd-&gt;mds.mdd_crypto.scr_maskkey));
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         } else if (bc-&gt;bc_key_disk != NODEV) {</span>
+<span class="lineNum">     214 </span>            :                 /* Read the mask key from the key disk. */
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                 sd-&gt;mds.mdd_crypto.key_disk =</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                     sr_crypto_read_key_disk(sd, bc-&gt;bc_key_disk);</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :                 if (sd-&gt;mds.mdd_crypto.key_disk == NULL)</span>
+<span class="lineNum">     218 </span>            :                         goto done;
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         } else if (bc-&gt;bc_opaque_flags &amp; BIOC_SOOUT) {</span>
+<span class="lineNum">     220 </span>            :                 /* provide userland with kdf hint */
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                 if (bc-&gt;bc_opaque == NULL)</span>
+<span class="lineNum">     222 </span>            :                         goto done;
+<span class="lineNum">     223 </span>            : 
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :                 if (sizeof(sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_kdfhint) &lt;</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                     bc-&gt;bc_opaque_size)</span>
+<span class="lineNum">     226 </span>            :                         goto done;
+<span class="lineNum">     227 </span>            : 
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                 if (copyout(sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_kdfhint,</span>
+<span class="lineNum">     229 </span>            :                     bc-&gt;bc_opaque, bc-&gt;bc_opaque_size))
+<span class="lineNum">     230 </span>            :                         goto done;
+<span class="lineNum">     231 </span>            : 
+<span class="lineNum">     232 </span>            :                 /* we're done */
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :                 bc-&gt;bc_opaque_status = BIOC_SOINOUT_OK;</span>
+<span class="lineNum">     234 </span>            :                 rv = EAGAIN;
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         } else if (bc-&gt;bc_opaque_flags &amp; BIOC_SOIN) {</span>
+<span class="lineNum">     237 </span>            :                 /* get kdf with maskkey from userland */
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :                 if (sr_crypto_get_kdf(bc, sd))</span>
+<span class="lineNum">     239 </span>            :                         goto done;
+<span class="lineNum">     240 </span>            :         } else
+<span class="lineNum">     241 </span>            :                 goto done;
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         sd-&gt;sd_max_ccb_per_wu = sd-&gt;sd_meta-&gt;ssdi.ssd_chunk_no;</span>
+<span class="lineNum">     244 </span>            : 
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         rv = 0;</span>
+<span class="lineNum">     246 </span>            : done:
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     248 </span>            : }
+<a name="249"><span class="lineNum">     249 </span>            : </a>
+<span class="lineNum">     250 </span>            : struct sr_crypto_wu *
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 : sr_crypto_prepare(struct sr_workunit *wu, int encrypt)</span>
+<span class="lineNum">     252 </span>            : {
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         struct scsi_xfer        *xs = wu-&gt;swu_xs;</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         struct sr_discipline    *sd = wu-&gt;swu_dis;</span>
+<span class="lineNum">     255 </span>            :         struct sr_crypto_wu     *crwu;
+<span class="lineNum">     256 </span>            :         struct cryptodesc       *crd;
+<span class="lineNum">     257 </span>            :         int                     flags, i, n;
+<span class="lineNum">     258 </span>            :         daddr_t                 blkno;
+<span class="lineNum">     259 </span>            :         u_int                   keyndx;
+<span class="lineNum">     260 </span>            : 
+<span class="lineNum">     261 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: sr_crypto_prepare wu %p encrypt %d\n&quot;,
+<span class="lineNum">     262 </span>            :             DEVNAME(sd-&gt;sd_sc), wu, encrypt);
+<span class="lineNum">     263 </span>            : 
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         crwu = (struct sr_crypto_wu *)wu;</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         crwu-&gt;cr_uio.uio_iovcnt = 1;</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         crwu-&gt;cr_uio.uio_iov-&gt;iov_len = xs-&gt;datalen;</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         if (xs-&gt;flags &amp; SCSI_DATA_OUT) {</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :                 crwu-&gt;cr_uio.uio_iov-&gt;iov_base = crwu-&gt;cr_dmabuf;</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :                 memcpy(crwu-&gt;cr_uio.uio_iov-&gt;iov_base, xs-&gt;data, xs-&gt;datalen);</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :                 crwu-&gt;cr_uio.uio_iov-&gt;iov_base = xs-&gt;data;</span>
+<span class="lineNum">     272 </span>            : 
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         blkno = wu-&gt;swu_blk_start;</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :         n = xs-&gt;datalen &gt;&gt; DEV_BSHIFT;</span>
+<span class="lineNum">     275 </span>            : 
+<span class="lineNum">     276 </span>            :         /*
+<span class="lineNum">     277 </span>            :          * We preallocated enough crypto descs for up to MAXPHYS of I/O.
+<span class="lineNum">     278 </span>            :          * Since there may be less than that we need to tweak the amount
+<span class="lineNum">     279 </span>            :          * of crypto desc structures to be just long enough for our needs.
+<span class="lineNum">     280 </span>            :          */
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         KASSERT(crwu-&gt;cr_crp-&gt;crp_ndescalloc &gt;= n);</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :         crwu-&gt;cr_crp-&gt;crp_ndesc = n;</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         flags = (encrypt ? CRD_F_ENCRYPT : 0) |</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :             CRD_F_IV_PRESENT | CRD_F_IV_EXPLICIT;</span>
+<span class="lineNum">     285 </span>            : 
+<span class="lineNum">     286 </span>            :         /*
+<span class="lineNum">     287 </span>            :          * Select crypto session based on block number.
+<span class="lineNum">     288 </span>            :          *
+<span class="lineNum">     289 </span>            :          * XXX - this does not handle the case where the read/write spans
+<span class="lineNum">     290 </span>            :          * across a different key blocks (e.g. 0.5TB boundary). Currently
+<span class="lineNum">     291 </span>            :          * this is already broken by the use of scr_key[0] below.
+<span class="lineNum">     292 </span>            :          */
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :         keyndx = blkno &gt;&gt; SR_CRYPTO_KEY_BLKSHIFT;</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         crwu-&gt;cr_crp-&gt;crp_sid = sd-&gt;mds.mdd_crypto.scr_sid[keyndx];</span>
+<span class="lineNum">     295 </span>            : 
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         crwu-&gt;cr_crp-&gt;crp_opaque = crwu;</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         crwu-&gt;cr_crp-&gt;crp_ilen = xs-&gt;datalen;</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         crwu-&gt;cr_crp-&gt;crp_alloctype = M_DEVBUF;</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :         crwu-&gt;cr_crp-&gt;crp_flags = CRYPTO_F_IOV | CRYPTO_F_NOQUEUE;</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         crwu-&gt;cr_crp-&gt;crp_buf = &amp;crwu-&gt;cr_uio;</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; crwu-&gt;cr_crp-&gt;crp_ndesc; i++, blkno++) {</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                 crd = &amp;crwu-&gt;cr_crp-&gt;crp_desc[i];</span>
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :                 crd-&gt;crd_skip = i &lt;&lt; DEV_BSHIFT;</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :                 crd-&gt;crd_len = DEV_BSIZE;</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                 crd-&gt;crd_inject = 0;</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :                 crd-&gt;crd_flags = flags;</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :                 crd-&gt;crd_alg = sd-&gt;mds.mdd_crypto.scr_alg;</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :                 crd-&gt;crd_klen = sd-&gt;mds.mdd_crypto.scr_klen;</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :                 crd-&gt;crd_key = sd-&gt;mds.mdd_crypto.scr_key[0];</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :                 memcpy(crd-&gt;crd_iv, &amp;blkno, sizeof(blkno));</span>
+<span class="lineNum">     311 </span>            :         }
+<span class="lineNum">     312 </span>            : 
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         return (crwu);</span>
+<span class="lineNum">     314 </span>            : }
+<a name="315"><span class="lineNum">     315 </span>            : </a>
+<span class="lineNum">     316 </span>            : int
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 : sr_crypto_get_kdf(struct bioc_createraid *bc, struct sr_discipline *sd)</span>
+<span class="lineNum">     318 </span>            : {
+<span class="lineNum">     319 </span>            :         int                     rv = EINVAL;
+<span class="lineNum">     320 </span>            :         struct sr_crypto_kdfinfo *kdfinfo;
+<span class="lineNum">     321 </span>            : 
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         if (!(bc-&gt;bc_opaque_flags &amp; BIOC_SOIN))</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :                 return (rv);</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :         if (bc-&gt;bc_opaque == NULL)</span>
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :                 return (rv);</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :         if (bc-&gt;bc_opaque_size != sizeof(*kdfinfo))</span>
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :                 return (rv);</span>
+<span class="lineNum">     328 </span>            : 
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :         kdfinfo = malloc(bc-&gt;bc_opaque_size, M_DEVBUF, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         if (copyin(bc-&gt;bc_opaque, kdfinfo, bc-&gt;bc_opaque_size))</span>
+<span class="lineNum">     331 </span>            :                 goto out;
+<span class="lineNum">     332 </span>            : 
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         if (kdfinfo-&gt;len != bc-&gt;bc_opaque_size)</span>
+<span class="lineNum">     334 </span>            :                 goto out;
+<span class="lineNum">     335 </span>            : 
+<span class="lineNum">     336 </span>            :         /* copy KDF hint to disk meta data */
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :         if (kdfinfo-&gt;flags &amp; SR_CRYPTOKDF_HINT) {</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                 if (sizeof(sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_kdfhint) &lt;</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :                     kdfinfo-&gt;genkdf.len)</span>
+<span class="lineNum">     340 </span>            :                         goto out;
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :                 memcpy(sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_kdfhint,</span>
+<span class="lineNum">     342 </span>            :                     &amp;kdfinfo-&gt;genkdf, kdfinfo-&gt;genkdf.len);
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     344 </span>            : 
+<span class="lineNum">     345 </span>            :         /* copy mask key to run-time meta data */
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         if ((kdfinfo-&gt;flags &amp; SR_CRYPTOKDF_KEY)) {</span>
+<span class="lineNum">     347 </span>            :                 if (sizeof(sd-&gt;mds.mdd_crypto.scr_maskkey) &lt;
+<span class="lineNum">     348 </span>            :                     sizeof(kdfinfo-&gt;maskkey))
+<span class="lineNum">     349 </span>            :                         goto out;
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                 memcpy(sd-&gt;mds.mdd_crypto.scr_maskkey, &amp;kdfinfo-&gt;maskkey,</span>
+<span class="lineNum">     351 </span>            :                     sizeof(kdfinfo-&gt;maskkey));
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     353 </span>            : 
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         bc-&gt;bc_opaque_status = BIOC_SOINOUT_OK;</span>
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :         rv = 0;</span>
+<span class="lineNum">     356 </span>            : out:
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :         explicit_bzero(kdfinfo, bc-&gt;bc_opaque_size);</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :         free(kdfinfo, M_DEVBUF, bc-&gt;bc_opaque_size);</span>
+<span class="lineNum">     359 </span>            : 
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 : }</span>
+<a name="362"><span class="lineNum">     362 </span>            : </a>
+<span class="lineNum">     363 </span>            : int
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 : sr_crypto_encrypt(u_char *p, u_char *c, u_char *key, size_t size, int alg)</span>
+<span class="lineNum">     365 </span>            : {
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         rijndael_ctx            ctx;</span>
+<span class="lineNum">     367 </span>            :         int                     i, rv = 1;
+<span class="lineNum">     368 </span>            : 
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :         switch (alg) {</span>
+<span class="lineNum">     370 </span>            :         case SR_CRYPTOM_AES_ECB_256:
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                 if (rijndael_set_key_enc_only(&amp;ctx, key, 256) != 0)</span>
+<span class="lineNum">     372 </span>            :                         goto out;
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; size; i += RIJNDAEL128_BLOCK_LEN)</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                         rijndael_encrypt(&amp;ctx, &amp;p[i], &amp;c[i]);</span>
+<span class="lineNum">     375 </span>            :                 rv = 0;
+<span class="lineNum">     376 </span>            :                 break;
+<span class="lineNum">     377 </span>            :         default:
+<span class="lineNum">     378 </span>            :                 DNPRINTF(SR_D_DIS, &quot;%s: unsupported encryption algorithm %d\n&quot;,
+<span class="lineNum">     379 </span>            :                     &quot;softraid&quot;, alg);
+<span class="lineNum">     380 </span>            :                 rv = -1;
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     383 </span>            : 
+<span class="lineNum">     384 </span>            : out:
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;ctx, sizeof(ctx));</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 : }</span>
+<a name="388"><span class="lineNum">     388 </span>            : </a>
+<span class="lineNum">     389 </span>            : int
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 : sr_crypto_decrypt(u_char *c, u_char *p, u_char *key, size_t size, int alg)</span>
+<span class="lineNum">     391 </span>            : {
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         rijndael_ctx            ctx;</span>
+<span class="lineNum">     393 </span>            :         int                     i, rv = 1;
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         switch (alg) {</span>
+<span class="lineNum">     396 </span>            :         case SR_CRYPTOM_AES_ECB_256:
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 if (rijndael_set_key(&amp;ctx, key, 256) != 0)</span>
+<span class="lineNum">     398 </span>            :                         goto out;
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; size; i += RIJNDAEL128_BLOCK_LEN)</span>
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :                         rijndael_decrypt(&amp;ctx, &amp;c[i], &amp;p[i]);</span>
+<span class="lineNum">     401 </span>            :                 rv = 0;
+<span class="lineNum">     402 </span>            :                 break;
+<span class="lineNum">     403 </span>            :         default:
+<span class="lineNum">     404 </span>            :                 DNPRINTF(SR_D_DIS, &quot;%s: unsupported encryption algorithm %d\n&quot;,
+<span class="lineNum">     405 </span>            :                     &quot;softraid&quot;, alg);
+<span class="lineNum">     406 </span>            :                 rv = -1;
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span>            : out:
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;ctx, sizeof(ctx));</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 : }</span>
+<a name="414"><span class="lineNum">     414 </span>            : </a>
+<span class="lineNum">     415 </span>            : void
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 : sr_crypto_calculate_check_hmac_sha1(u_int8_t *maskkey, int maskkey_size,</span>
+<span class="lineNum">     417 </span>            :     u_int8_t *key, int key_size, u_char *check_digest)
+<span class="lineNum">     418 </span>            : {
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :         u_char                  check_key[SHA1_DIGEST_LENGTH];</span>
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         HMAC_SHA1_CTX           hmacctx;</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         SHA1_CTX                shactx;</span>
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         bzero(check_key, sizeof(check_key));</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :         bzero(&amp;hmacctx, sizeof(hmacctx));</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         bzero(&amp;shactx, sizeof(shactx));</span>
+<span class="lineNum">     426 </span>            : 
+<span class="lineNum">     427 </span>            :         /* k = SHA1(mask_key) */
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :         SHA1Init(&amp;shactx);</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :         SHA1Update(&amp;shactx, maskkey, maskkey_size);</span>
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :         SHA1Final(check_key, &amp;shactx);</span>
+<span class="lineNum">     431 </span>            : 
+<span class="lineNum">     432 </span>            :         /* mac = HMAC_SHA1_k(unencrypted key) */
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         HMAC_SHA1_Init(&amp;hmacctx, check_key, sizeof(check_key));</span>
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         HMAC_SHA1_Update(&amp;hmacctx, key, key_size);</span>
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :         HMAC_SHA1_Final(check_digest, &amp;hmacctx);</span>
+<span class="lineNum">     436 </span>            : 
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         explicit_bzero(check_key, sizeof(check_key));</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;hmacctx, sizeof(hmacctx));</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;shactx, sizeof(shactx));</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 : }</span>
+<a name="441"><span class="lineNum">     441 </span>            : </a>
+<span class="lineNum">     442 </span>            : int
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 : sr_crypto_decrypt_key(struct sr_discipline *sd)</span>
+<span class="lineNum">     444 </span>            : {
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :         u_char                  check_digest[SHA1_DIGEST_LENGTH];</span>
+<span class="lineNum">     446 </span>            :         int                     rv = 1;
+<span class="lineNum">     447 </span>            : 
+<span class="lineNum">     448 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: sr_crypto_decrypt_key\n&quot;, DEVNAME(sd-&gt;sd_sc));
+<span class="lineNum">     449 </span>            : 
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :         if (sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_check_alg != SR_CRYPTOC_HMAC_SHA1)</span>
+<span class="lineNum">     451 </span>            :                 goto out;
+<span class="lineNum">     452 </span>            : 
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :         if (sr_crypto_decrypt((u_char *)sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_key,</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :             (u_char *)sd-&gt;mds.mdd_crypto.scr_key,</span>
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :             sd-&gt;mds.mdd_crypto.scr_maskkey, sizeof(sd-&gt;mds.mdd_crypto.scr_key),</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :             sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_mask_alg) == -1)</span>
+<span class="lineNum">     457 </span>            :                 goto out;
+<span class="lineNum">     458 </span>            : 
+<span class="lineNum">     459 </span>            : #ifdef SR_DEBUG0
+<span class="lineNum">     460 </span>            :         sr_crypto_dumpkeys(sd);
+<span class="lineNum">     461 </span>            : #endif
+<span class="lineNum">     462 </span>            : 
+<span class="lineNum">     463 </span>            :         /* Check that the key decrypted properly. */
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :         sr_crypto_calculate_check_hmac_sha1(sd-&gt;mds.mdd_crypto.scr_maskkey,</span>
+<span class="lineNum">     465 </span>            :             sizeof(sd-&gt;mds.mdd_crypto.scr_maskkey),
+<span class="lineNum">     466 </span>            :             (u_int8_t *)sd-&gt;mds.mdd_crypto.scr_key,
+<span class="lineNum">     467 </span>            :             sizeof(sd-&gt;mds.mdd_crypto.scr_key),
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :             check_digest);</span>
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :         if (memcmp(sd-&gt;mds.mdd_crypto.scr_meta-&gt;chk_hmac_sha1.sch_mac,</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :             check_digest, sizeof(check_digest)) != 0) {</span>
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                 explicit_bzero(sd-&gt;mds.mdd_crypto.scr_key,</span>
+<span class="lineNum">     472 </span>            :                     sizeof(sd-&gt;mds.mdd_crypto.scr_key));
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     474 </span>            :         }
+<span class="lineNum">     475 </span>            : 
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :         rv = 0; /* Success */</span>
+<span class="lineNum">     477 </span>            : out:
+<span class="lineNum">     478 </span>            :         /* we don't need the mask key anymore */
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;sd-&gt;mds.mdd_crypto.scr_maskkey,</span>
+<span class="lineNum">     480 </span>            :             sizeof(sd-&gt;mds.mdd_crypto.scr_maskkey));
+<span class="lineNum">     481 </span>            : 
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :         explicit_bzero(check_digest, sizeof(check_digest));</span>
+<span class="lineNum">     483 </span>            : 
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         return rv;</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 : }</span>
+<a name="486"><span class="lineNum">     486 </span>            : </a>
+<span class="lineNum">     487 </span>            : int
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 : sr_crypto_create_keys(struct sr_discipline *sd)</span>
+<span class="lineNum">     489 </span>            : {
+<span class="lineNum">     490 </span>            : 
+<span class="lineNum">     491 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: sr_crypto_create_keys\n&quot;,
+<span class="lineNum">     492 </span>            :             DEVNAME(sd-&gt;sd_sc));
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span>            :         if (AES_MAXKEYBYTES &lt; sizeof(sd-&gt;mds.mdd_crypto.scr_maskkey))
+<span class="lineNum">     495 </span>            :                 return (1);
+<span class="lineNum">     496 </span>            : 
+<span class="lineNum">     497 </span>            :         /* XXX allow user to specify */
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :         sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_alg = SR_CRYPTOA_AES_XTS_256;</span>
+<span class="lineNum">     499 </span>            : 
+<span class="lineNum">     500 </span>            :         /* generate crypto keys */
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         arc4random_buf(sd-&gt;mds.mdd_crypto.scr_key,</span>
+<span class="lineNum">     502 </span>            :             sizeof(sd-&gt;mds.mdd_crypto.scr_key));
+<span class="lineNum">     503 </span>            : 
+<span class="lineNum">     504 </span>            :         /* Mask the disk keys. */
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_mask_alg = SR_CRYPTOM_AES_ECB_256;</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :         sr_crypto_encrypt((u_char *)sd-&gt;mds.mdd_crypto.scr_key,</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :             (u_char *)sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_key,</span>
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :             sd-&gt;mds.mdd_crypto.scr_maskkey, sizeof(sd-&gt;mds.mdd_crypto.scr_key),</span>
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :             sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_mask_alg);</span>
+<span class="lineNum">     510 </span>            : 
+<span class="lineNum">     511 </span>            :         /* Prepare key decryption check code. */
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :         sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_check_alg = SR_CRYPTOC_HMAC_SHA1;</span>
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :         sr_crypto_calculate_check_hmac_sha1(sd-&gt;mds.mdd_crypto.scr_maskkey,</span>
+<span class="lineNum">     514 </span>            :             sizeof(sd-&gt;mds.mdd_crypto.scr_maskkey),
+<span class="lineNum">     515 </span>            :             (u_int8_t *)sd-&gt;mds.mdd_crypto.scr_key,
+<span class="lineNum">     516 </span>            :             sizeof(sd-&gt;mds.mdd_crypto.scr_key),
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :             sd-&gt;mds.mdd_crypto.scr_meta-&gt;chk_hmac_sha1.sch_mac);</span>
+<span class="lineNum">     518 </span>            : 
+<span class="lineNum">     519 </span>            :         /* Erase the plaintext disk keys */
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         explicit_bzero(sd-&gt;mds.mdd_crypto.scr_key,</span>
+<span class="lineNum">     521 </span>            :             sizeof(sd-&gt;mds.mdd_crypto.scr_key));
+<span class="lineNum">     522 </span>            : 
+<span class="lineNum">     523 </span>            : #ifdef SR_DEBUG0
+<span class="lineNum">     524 </span>            :         sr_crypto_dumpkeys(sd);
+<span class="lineNum">     525 </span>            : #endif
+<span class="lineNum">     526 </span>            : 
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :         sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_flags = SR_CRYPTOF_KEY |</span>
+<span class="lineNum">     528 </span>            :             SR_CRYPTOF_KDFHINT;
+<span class="lineNum">     529 </span>            : 
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     531 </span>            : }
+<a name="532"><span class="lineNum">     532 </span>            : </a>
+<span class="lineNum">     533 </span>            : int
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 : sr_crypto_change_maskkey(struct sr_discipline *sd,</span>
+<span class="lineNum">     535 </span>            :   struct sr_crypto_kdfinfo *kdfinfo1, struct sr_crypto_kdfinfo *kdfinfo2)
+<span class="lineNum">     536 </span>            : {
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :         u_char                  check_digest[SHA1_DIGEST_LENGTH];</span>
+<span class="lineNum">     538 </span>            :         u_char                  *c, *p = NULL;
+<span class="lineNum">     539 </span>            :         size_t                  ksz;
+<span class="lineNum">     540 </span>            :         int                     rv = 1;
+<span class="lineNum">     541 </span>            : 
+<span class="lineNum">     542 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: sr_crypto_change_maskkey\n&quot;,
+<span class="lineNum">     543 </span>            :             DEVNAME(sd-&gt;sd_sc));
+<span class="lineNum">     544 </span>            : 
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         if (sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_check_alg != SR_CRYPTOC_HMAC_SHA1)</span>
+<span class="lineNum">     546 </span>            :                 goto out;
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         c = (u_char *)sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_key;</span>
+<span class="lineNum">     549 </span>            :         ksz = sizeof(sd-&gt;mds.mdd_crypto.scr_key);
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :         p = malloc(ksz, M_DEVBUF, M_WAITOK | M_CANFAIL | M_ZERO);</span>
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :         if (p == NULL)</span>
+<span class="lineNum">     552 </span>            :                 goto out;
+<span class="lineNum">     553 </span>            : 
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :         if (sr_crypto_decrypt(c, p, kdfinfo1-&gt;maskkey, ksz,</span>
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 :             sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_mask_alg) == -1)</span>
+<span class="lineNum">     556 </span>            :                 goto out;
+<span class="lineNum">     557 </span>            : 
+<span class="lineNum">     558 </span>            : #ifdef SR_DEBUG0
+<span class="lineNum">     559 </span>            :         sr_crypto_dumpkeys(sd);
+<span class="lineNum">     560 </span>            : #endif
+<span class="lineNum">     561 </span>            : 
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :         sr_crypto_calculate_check_hmac_sha1(kdfinfo1-&gt;maskkey,</span>
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :             sizeof(kdfinfo1-&gt;maskkey), p, ksz, check_digest);</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :         if (memcmp(sd-&gt;mds.mdd_crypto.scr_meta-&gt;chk_hmac_sha1.sch_mac,</span>
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :             check_digest, sizeof(check_digest)) != 0) {</span>
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :                 sr_error(sd-&gt;sd_sc, &quot;incorrect key or passphrase&quot;);</span>
+<span class="lineNum">     567 </span>            :                 rv = EPERM;
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     569 </span>            :         }
+<span class="lineNum">     570 </span>            : 
+<span class="lineNum">     571 </span>            :         /* Copy new KDF hint to metadata, if supplied. */
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :         if (kdfinfo2-&gt;flags &amp; SR_CRYPTOKDF_HINT) {</span>
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :                 if (kdfinfo2-&gt;genkdf.len &gt;</span>
+<span class="lineNum">     574 </span>            :                     sizeof(sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_kdfhint))
+<span class="lineNum">     575 </span>            :                         goto out;
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :                 explicit_bzero(sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_kdfhint,</span>
+<span class="lineNum">     577 </span>            :                     sizeof(sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_kdfhint));
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :                 memcpy(sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_kdfhint,</span>
+<span class="lineNum">     579 </span>            :                     &amp;kdfinfo2-&gt;genkdf, kdfinfo2-&gt;genkdf.len);
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     581 </span>            : 
+<span class="lineNum">     582 </span>            :         /* Mask the disk keys. */
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :         c = (u_char *)sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_key;</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :         if (sr_crypto_encrypt(p, c, kdfinfo2-&gt;maskkey, ksz,</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :             sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_mask_alg) == -1)</span>
+<span class="lineNum">     586 </span>            :                 goto out;
+<span class="lineNum">     587 </span>            : 
+<span class="lineNum">     588 </span>            :         /* Prepare key decryption check code. */
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :         sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_check_alg = SR_CRYPTOC_HMAC_SHA1;</span>
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :         sr_crypto_calculate_check_hmac_sha1(kdfinfo2-&gt;maskkey,</span>
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :             sizeof(kdfinfo2-&gt;maskkey), (u_int8_t *)sd-&gt;mds.mdd_crypto.scr_key,</span>
+<span class="lineNum">     592 </span>            :             sizeof(sd-&gt;mds.mdd_crypto.scr_key), check_digest);
+<span class="lineNum">     593 </span>            : 
+<span class="lineNum">     594 </span>            :         /* Copy new encrypted key and HMAC to metadata. */
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :         memcpy(sd-&gt;mds.mdd_crypto.scr_meta-&gt;chk_hmac_sha1.sch_mac, check_digest,</span>
+<span class="lineNum">     596 </span>            :             sizeof(sd-&gt;mds.mdd_crypto.scr_meta-&gt;chk_hmac_sha1.sch_mac));
+<span class="lineNum">     597 </span>            : 
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :         rv = 0; /* Success */</span>
+<span class="lineNum">     599 </span>            : 
+<span class="lineNum">     600 </span>            : out:
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :         if (p) {</span>
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :                 explicit_bzero(p, ksz);</span>
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :                 free(p, M_DEVBUF, ksz);</span>
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     605 </span>            : 
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :         explicit_bzero(check_digest, sizeof(check_digest));</span>
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;kdfinfo1-&gt;maskkey, sizeof(kdfinfo1-&gt;maskkey));</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;kdfinfo2-&gt;maskkey, sizeof(kdfinfo2-&gt;maskkey));</span>
+<span class="lineNum">     609 </span>            : 
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 : }</span>
+<a name="612"><span class="lineNum">     612 </span>            : </a>
+<span class="lineNum">     613 </span>            : struct sr_chunk *
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 : sr_crypto_create_key_disk(struct sr_discipline *sd, dev_t dev)</span>
+<span class="lineNum">     615 </span>            : {
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :         struct sr_softc         *sc = sd-&gt;sd_sc;</span>
+<span class="lineNum">     617 </span>            :         struct sr_discipline    *fakesd = NULL;
+<span class="lineNum">     618 </span>            :         struct sr_metadata      *sm = NULL;
+<span class="lineNum">     619 </span>            :         struct sr_meta_chunk    *km;
+<span class="lineNum">     620 </span>            :         struct sr_meta_opt_item *omi = NULL;
+<span class="lineNum">     621 </span>            :         struct sr_meta_keydisk  *skm;
+<span class="lineNum">     622 </span>            :         struct sr_chunk         *key_disk = NULL;
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :         struct disklabel        label;</span>
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :         struct vnode            *vn;</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :         char                    devname[32];</span>
+<span class="lineNum">     626 </span>            :         int                     c, part, open = 0;
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span>            :         /*
+<span class="lineNum">     629 </span>            :          * Create a metadata structure on the key disk and store
+<span class="lineNum">     630 </span>            :          * keying material in the optional metadata.
+<span class="lineNum">     631 </span>            :          */
+<span class="lineNum">     632 </span>            : 
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :         sr_meta_getdevname(sc, dev, devname, sizeof(devname));</span>
+<span class="lineNum">     634 </span>            : 
+<span class="lineNum">     635 </span>            :         /* Make sure chunk is not already in use. */
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :         c = sr_chunk_in_use(sc, dev);</span>
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :         if (c != BIOC_SDINVALID &amp;&amp; c != BIOC_SDOFFLINE) {</span>
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :                 sr_error(sc, &quot;%s is already in use&quot;, devname);</span>
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     640 </span>            :         }
+<span class="lineNum">     641 </span>            : 
+<span class="lineNum">     642 </span>            :         /* Open device. */
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :         if (bdevvp(dev, &amp;vn)) {</span>
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :                 sr_error(sc, &quot;cannot open key disk %s&quot;, devname);</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     646 </span>            :         }
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         if (VOP_OPEN(vn, FREAD | FWRITE, NOCRED, curproc)) {</span>
+<span class="lineNum">     648 </span>            :                 DNPRINTF(SR_D_META,&quot;%s: sr_crypto_create_key_disk cannot &quot;
+<span class="lineNum">     649 </span>            :                     &quot;open %s\n&quot;, DEVNAME(sc), devname);
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :                 vput(vn);</span>
+<span class="lineNum">     651 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     652 </span>            :         }
+<span class="lineNum">     653 </span>            :         open = 1; /* close dev on error */
+<span class="lineNum">     654 </span>            : 
+<span class="lineNum">     655 </span>            :         /* Get partition details. */
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :         part = DISKPART(dev);</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :         if (VOP_IOCTL(vn, DIOCGDINFO, (caddr_t)&amp;label,</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :             FREAD, NOCRED, curproc)) {</span>
+<span class="lineNum">     659 </span>            :                 DNPRINTF(SR_D_META, &quot;%s: sr_crypto_create_key_disk ioctl &quot;
+<span class="lineNum">     660 </span>            :                     &quot;failed\n&quot;, DEVNAME(sc));
+<span class="lineNum">     661 </span>            :                 goto done;
+<span class="lineNum">     662 </span>            :         }
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :         if (label.d_partitions[part].p_fstype != FS_RAID) {</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                 sr_error(sc, &quot;%s partition not of type RAID (%d)&quot;,</span>
+<span class="lineNum">     665 </span>            :                     devname, label.d_partitions[part].p_fstype);
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     667 </span>            :         }
+<span class="lineNum">     668 </span>            : 
+<span class="lineNum">     669 </span>            :         /*
+<span class="lineNum">     670 </span>            :          * Create and populate chunk metadata.
+<span class="lineNum">     671 </span>            :          */
+<span class="lineNum">     672 </span>            : 
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :         key_disk = malloc(sizeof(struct sr_chunk), M_DEVBUF, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :         km = &amp;key_disk-&gt;src_meta;</span>
+<span class="lineNum">     675 </span>            : 
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :         key_disk-&gt;src_dev_mm = dev;</span>
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :         key_disk-&gt;src_vn = vn;</span>
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :         strlcpy(key_disk-&gt;src_devname, devname, sizeof(km-&gt;scmi.scm_devname));</span>
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :         key_disk-&gt;src_size = 0;</span>
+<span class="lineNum">     680 </span>            : 
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         km-&gt;scmi.scm_volid = sd-&gt;sd_meta-&gt;ssdi.ssd_level;</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :         km-&gt;scmi.scm_chunk_id = 0;</span>
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :         km-&gt;scmi.scm_size = 0;</span>
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :         km-&gt;scmi.scm_coerced_size = 0;</span>
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :         strlcpy(km-&gt;scmi.scm_devname, devname, sizeof(km-&gt;scmi.scm_devname));</span>
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :         memcpy(&amp;km-&gt;scmi.scm_uuid, &amp;sd-&gt;sd_meta-&gt;ssdi.ssd_uuid,</span>
+<span class="lineNum">     687 </span>            :             sizeof(struct sr_uuid));
+<span class="lineNum">     688 </span>            : 
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :         sr_checksum(sc, km, &amp;km-&gt;scm_checksum,</span>
+<span class="lineNum">     690 </span>            :             sizeof(struct sr_meta_chunk_invariant));
+<span class="lineNum">     691 </span>            : 
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :         km-&gt;scm_status = BIOC_SDONLINE;</span>
+<span class="lineNum">     693 </span>            : 
+<span class="lineNum">     694 </span>            :         /*
+<span class="lineNum">     695 </span>            :          * Create and populate our own discipline and metadata.
+<span class="lineNum">     696 </span>            :          */
+<span class="lineNum">     697 </span>            : 
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :         sm = malloc(sizeof(struct sr_metadata), M_DEVBUF, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :         sm-&gt;ssdi.ssd_magic = SR_MAGIC;</span>
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 :         sm-&gt;ssdi.ssd_version = SR_META_VERSION;</span>
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :         sm-&gt;ssd_ondisk = 0;</span>
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :         sm-&gt;ssdi.ssd_vol_flags = 0;</span>
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :         memcpy(&amp;sm-&gt;ssdi.ssd_uuid, &amp;sd-&gt;sd_meta-&gt;ssdi.ssd_uuid,</span>
+<span class="lineNum">     704 </span>            :             sizeof(struct sr_uuid));
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :         sm-&gt;ssdi.ssd_chunk_no = 1;</span>
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :         sm-&gt;ssdi.ssd_volid = SR_KEYDISK_VOLID;</span>
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :         sm-&gt;ssdi.ssd_level = SR_KEYDISK_LEVEL;</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :         sm-&gt;ssdi.ssd_size = 0;</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :         strlcpy(sm-&gt;ssdi.ssd_vendor, &quot;OPENBSD&quot;, sizeof(sm-&gt;ssdi.ssd_vendor));</span>
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :         snprintf(sm-&gt;ssdi.ssd_product, sizeof(sm-&gt;ssdi.ssd_product),</span>
+<span class="lineNum">     711 </span>            :             &quot;SR %s&quot;, &quot;KEYDISK&quot;);
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :         snprintf(sm-&gt;ssdi.ssd_revision, sizeof(sm-&gt;ssdi.ssd_revision),</span>
+<span class="lineNum">     713 </span>            :             &quot;%03d&quot;, SR_META_VERSION);
+<span class="lineNum">     714 </span>            : 
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :         fakesd = malloc(sizeof(struct sr_discipline), M_DEVBUF,</span>
+<span class="lineNum">     716 </span>            :             M_WAITOK | M_ZERO);
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :         fakesd-&gt;sd_sc = sd-&gt;sd_sc;</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :         fakesd-&gt;sd_meta = sm;</span>
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :         fakesd-&gt;sd_meta_type = SR_META_F_NATIVE;</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :         fakesd-&gt;sd_vol_status = BIOC_SVONLINE;</span>
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :         strlcpy(fakesd-&gt;sd_name, &quot;KEYDISK&quot;, sizeof(fakesd-&gt;sd_name));</span>
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :         SLIST_INIT(&amp;fakesd-&gt;sd_meta_opt);</span>
+<span class="lineNum">     723 </span>            : 
+<span class="lineNum">     724 </span>            :         /* Add chunk to volume. */
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :         fakesd-&gt;sd_vol.sv_chunks = malloc(sizeof(struct sr_chunk *), M_DEVBUF,</span>
+<span class="lineNum">     726 </span>            :             M_WAITOK | M_ZERO);
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :         fakesd-&gt;sd_vol.sv_chunks[0] = key_disk;</span>
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :         SLIST_INIT(&amp;fakesd-&gt;sd_vol.sv_chunk_list);</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :         SLIST_INSERT_HEAD(&amp;fakesd-&gt;sd_vol.sv_chunk_list, key_disk, src_link);</span>
+<span class="lineNum">     730 </span>            : 
+<span class="lineNum">     731 </span>            :         /* Generate mask key. */
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :         arc4random_buf(sd-&gt;mds.mdd_crypto.scr_maskkey,</span>
+<span class="lineNum">     733 </span>            :             sizeof(sd-&gt;mds.mdd_crypto.scr_maskkey));
+<span class="lineNum">     734 </span>            : 
+<span class="lineNum">     735 </span>            :         /* Copy mask key to optional metadata area. */
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :         omi = malloc(sizeof(struct sr_meta_opt_item), M_DEVBUF,</span>
+<span class="lineNum">     737 </span>            :             M_WAITOK | M_ZERO);
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :         omi-&gt;omi_som = malloc(sizeof(struct sr_meta_keydisk), M_DEVBUF,</span>
+<span class="lineNum">     739 </span>            :             M_WAITOK | M_ZERO);
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :         omi-&gt;omi_som-&gt;som_type = SR_OPT_KEYDISK;</span>
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 :         omi-&gt;omi_som-&gt;som_length = sizeof(struct sr_meta_keydisk);</span>
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :         skm = (struct sr_meta_keydisk *)omi-&gt;omi_som;</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :         memcpy(&amp;skm-&gt;skm_maskkey, sd-&gt;mds.mdd_crypto.scr_maskkey,</span>
+<span class="lineNum">     744 </span>            :             sizeof(skm-&gt;skm_maskkey));
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :         SLIST_INSERT_HEAD(&amp;fakesd-&gt;sd_meta_opt, omi, omi_link);</span>
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :         fakesd-&gt;sd_meta-&gt;ssdi.ssd_opt_no++;</span>
+<span class="lineNum">     747 </span>            : 
+<span class="lineNum">     748 </span>            :         /* Save metadata. */
+<span class="lineNum">     749 </span><span class="lineNoCov">          0 :         if (sr_meta_save(fakesd, SR_META_DIRTY)) {</span>
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :                 sr_error(sc, &quot;could not save metadata to %s&quot;, devname);</span>
+<span class="lineNum">     751 </span>            :                 goto fail;
+<span class="lineNum">     752 </span>            :         }
+<span class="lineNum">     753 </span>            : 
+<span class="lineNum">     754 </span>            :         goto done;
+<span class="lineNum">     755 </span>            : 
+<span class="lineNum">     756 </span>            : fail:
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :         free(key_disk, M_DEVBUF, sizeof(struct sr_chunk));</span>
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :         key_disk = NULL;</span>
+<span class="lineNum">     759 </span>            : 
+<span class="lineNum">     760 </span>            : done:
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :         free(omi, M_DEVBUF, sizeof(struct sr_meta_opt_item));</span>
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :         if (fakesd &amp;&amp; fakesd-&gt;sd_vol.sv_chunks)</span>
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :                 free(fakesd-&gt;sd_vol.sv_chunks, M_DEVBUF,</span>
+<span class="lineNum">     764 </span>            :                     sizeof(struct sr_chunk *));
+<span class="lineNum">     765 </span><span class="lineNoCov">          0 :         free(fakesd, M_DEVBUF, sizeof(struct sr_discipline));</span>
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :         free(sm, M_DEVBUF, sizeof(struct sr_metadata));</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :         if (open) {</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :                 VOP_CLOSE(vn, FREAD | FWRITE, NOCRED, curproc);</span>
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :                 vput(vn);</span>
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     771 </span>            : 
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :         return key_disk;</span>
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 : }</span>
+<a name="774"><span class="lineNum">     774 </span>            : </a>
+<span class="lineNum">     775 </span>            : struct sr_chunk *
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 : sr_crypto_read_key_disk(struct sr_discipline *sd, dev_t dev)</span>
+<span class="lineNum">     777 </span>            : {
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :         struct sr_softc         *sc = sd-&gt;sd_sc;</span>
+<span class="lineNum">     779 </span>            :         struct sr_metadata      *sm = NULL;
+<span class="lineNum">     780 </span>            :         struct sr_meta_opt_item *omi, *omi_next;
+<span class="lineNum">     781 </span>            :         struct sr_meta_opt_hdr  *omh;
+<span class="lineNum">     782 </span>            :         struct sr_meta_keydisk  *skm;
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :         struct sr_meta_opt_head som;</span>
+<span class="lineNum">     784 </span>            :         struct sr_chunk         *key_disk = NULL;
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         struct disklabel        label;</span>
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :         struct vnode            *vn = NULL;</span>
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :         char                    devname[32];</span>
+<span class="lineNum">     788 </span>            :         int                     c, part, open = 0;
+<span class="lineNum">     789 </span>            : 
+<span class="lineNum">     790 </span>            :         /*
+<span class="lineNum">     791 </span>            :          * Load a key disk and load keying material into memory.
+<span class="lineNum">     792 </span>            :          */
+<span class="lineNum">     793 </span>            : 
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :         SLIST_INIT(&amp;som);</span>
+<span class="lineNum">     795 </span>            : 
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 :         sr_meta_getdevname(sc, dev, devname, sizeof(devname));</span>
+<span class="lineNum">     797 </span>            : 
+<span class="lineNum">     798 </span>            :         /* Make sure chunk is not already in use. */
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :         c = sr_chunk_in_use(sc, dev);</span>
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :         if (c != BIOC_SDINVALID &amp;&amp; c != BIOC_SDOFFLINE) {</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :                 sr_error(sc, &quot;%s is already in use&quot;, devname);</span>
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     803 </span>            :         }
+<span class="lineNum">     804 </span>            : 
+<span class="lineNum">     805 </span>            :         /* Open device. */
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         if (bdevvp(dev, &amp;vn)) {</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :                 sr_error(sc, &quot;cannot open key disk %s&quot;, devname);</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     809 </span>            :         }
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :         if (VOP_OPEN(vn, FREAD, NOCRED, curproc)) {</span>
+<span class="lineNum">     811 </span>            :                 DNPRINTF(SR_D_META,&quot;%s: sr_crypto_read_key_disk cannot &quot;
+<span class="lineNum">     812 </span>            :                     &quot;open %s\n&quot;, DEVNAME(sc), devname);
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :                 vput(vn);</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     815 </span>            :         }
+<span class="lineNum">     816 </span>            :         open = 1; /* close dev on error */
+<span class="lineNum">     817 </span>            : 
+<span class="lineNum">     818 </span>            :         /* Get partition details. */
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 :         part = DISKPART(dev);</span>
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :         if (VOP_IOCTL(vn, DIOCGDINFO, (caddr_t)&amp;label, FREAD,</span>
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :             NOCRED, curproc)) {</span>
+<span class="lineNum">     822 </span>            :                 DNPRINTF(SR_D_META, &quot;%s: sr_crypto_read_key_disk ioctl &quot;
+<span class="lineNum">     823 </span>            :                     &quot;failed\n&quot;, DEVNAME(sc));
+<span class="lineNum">     824 </span>            :                 goto done;
+<span class="lineNum">     825 </span>            :         }
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         if (label.d_partitions[part].p_fstype != FS_RAID) {</span>
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :                 sr_error(sc, &quot;%s partition not of type RAID (%d)&quot;,</span>
+<span class="lineNum">     828 </span>            :                     devname, label.d_partitions[part].p_fstype);
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     830 </span>            :         }
+<span class="lineNum">     831 </span>            : 
+<span class="lineNum">     832 </span>            :         /*
+<span class="lineNum">     833 </span>            :          * Read and validate key disk metadata.
+<span class="lineNum">     834 </span>            :          */
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         sm = malloc(SR_META_SIZE * DEV_BSIZE, M_DEVBUF, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :         if (sr_meta_native_read(sd, dev, sm, NULL)) {</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :                 sr_error(sc, &quot;native bootprobe could not read native metadata&quot;);</span>
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     839 </span>            :         }
+<span class="lineNum">     840 </span>            : 
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :         if (sr_meta_validate(sd, dev, sm, NULL)) {</span>
+<span class="lineNum">     842 </span>            :                 DNPRINTF(SR_D_META, &quot;%s: invalid metadata\n&quot;,
+<span class="lineNum">     843 </span>            :                     DEVNAME(sc));
+<span class="lineNum">     844 </span>            :                 goto done;
+<span class="lineNum">     845 </span>            :         }
+<span class="lineNum">     846 </span>            : 
+<span class="lineNum">     847 </span>            :         /* Make sure this is a key disk. */
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :         if (sm-&gt;ssdi.ssd_level != SR_KEYDISK_LEVEL) {</span>
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :                 sr_error(sc, &quot;%s is not a key disk&quot;, devname);</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     851 </span>            :         }
+<span class="lineNum">     852 </span>            : 
+<span class="lineNum">     853 </span>            :         /* Construct key disk chunk. */
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :         key_disk = malloc(sizeof(struct sr_chunk), M_DEVBUF, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :         key_disk-&gt;src_dev_mm = dev;</span>
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :         key_disk-&gt;src_vn = vn;</span>
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :         key_disk-&gt;src_size = 0;</span>
+<span class="lineNum">     858 </span>            : 
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :         memcpy(&amp;key_disk-&gt;src_meta, (struct sr_meta_chunk *)(sm + 1),</span>
+<span class="lineNum">     860 </span>            :             sizeof(key_disk-&gt;src_meta));
+<span class="lineNum">     861 </span>            : 
+<span class="lineNum">     862 </span>            :         /* Read mask key from optional metadata. */
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :         sr_meta_opt_load(sc, sm, &amp;som);</span>
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(omi, &amp;som, omi_link) {</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :                 omh = omi-&gt;omi_som;</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :                 if (omh-&gt;som_type == SR_OPT_KEYDISK) {</span>
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :                         skm = (struct sr_meta_keydisk *)omh;</span>
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 :                         memcpy(sd-&gt;mds.mdd_crypto.scr_maskkey, &amp;skm-&gt;skm_maskkey,</span>
+<span class="lineNum">     869 </span>            :                             sizeof(sd-&gt;mds.mdd_crypto.scr_maskkey));
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :                 } else if (omh-&gt;som_type == SR_OPT_CRYPTO) {</span>
+<span class="lineNum">     871 </span>            :                         /* Original keydisk format with key in crypto area. */
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                         memcpy(sd-&gt;mds.mdd_crypto.scr_maskkey,</span>
+<span class="lineNum">     873 </span>            :                             omh + sizeof(struct sr_meta_opt_hdr),
+<span class="lineNum">     874 </span>            :                             sizeof(sd-&gt;mds.mdd_crypto.scr_maskkey));
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     876 </span>            :         }
+<span class="lineNum">     877 </span>            : 
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :         open = 0;</span>
+<span class="lineNum">     879 </span>            : 
+<span class="lineNum">     880 </span>            : done:
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :         for (omi = SLIST_FIRST(&amp;som); omi != NULL; omi = omi_next) {</span>
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :                 omi_next = SLIST_NEXT(omi, omi_link);</span>
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :                 free(omi-&gt;omi_som, M_DEVBUF, 0);</span>
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :                 free(omi, M_DEVBUF, 0);</span>
+<span class="lineNum">     885 </span>            :         }
+<span class="lineNum">     886 </span>            : 
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :         free(sm, M_DEVBUF, SR_META_SIZE * DEV_BSIZE);</span>
+<span class="lineNum">     888 </span>            : 
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :         if (vn &amp;&amp; open) {</span>
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 :                 VOP_CLOSE(vn, FREAD, NOCRED, curproc);</span>
+<span class="lineNum">     891 </span><span class="lineNoCov">          0 :                 vput(vn);</span>
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     893 </span>            : 
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :         return key_disk;</span>
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 : }</span>
+<a name="896"><span class="lineNum">     896 </span>            : </a>
+<span class="lineNum">     897 </span>            : static void
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 : sr_crypto_free_sessions(struct sr_discipline *sd)</span>
+<span class="lineNum">     899 </span>            : {
+<span class="lineNum">     900 </span>            :         u_int                   i;
+<span class="lineNum">     901 </span>            : 
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; SR_CRYPTO_MAXKEYS; i++) {</span>
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :                 if (sd-&gt;mds.mdd_crypto.scr_sid[i] != (u_int64_t)-1) {</span>
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :                         crypto_freesession(sd-&gt;mds.mdd_crypto.scr_sid[i]);</span>
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :                         sd-&gt;mds.mdd_crypto.scr_sid[i] = (u_int64_t)-1;</span>
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     907 </span>            :         }
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 : }</span>
+<a name="909"><span class="lineNum">     909 </span>            : </a>
+<span class="lineNum">     910 </span>            : int
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 : sr_crypto_alloc_resources(struct sr_discipline *sd)</span>
+<span class="lineNum">     912 </span>            : {
+<span class="lineNum">     913 </span>            :         struct sr_workunit      *wu;
+<span class="lineNum">     914 </span>            :         struct sr_crypto_wu     *crwu;
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :         struct cryptoini        cri;</span>
+<span class="lineNum">     916 </span>            :         u_int                   num_keys, i;
+<span class="lineNum">     917 </span>            : 
+<span class="lineNum">     918 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: sr_crypto_alloc_resources\n&quot;,
+<span class="lineNum">     919 </span>            :             DEVNAME(sd-&gt;sd_sc));
+<span class="lineNum">     920 </span>            : 
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :         sd-&gt;mds.mdd_crypto.scr_alg = CRYPTO_AES_XTS;</span>
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :         switch (sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_alg) {</span>
+<span class="lineNum">     923 </span>            :         case SR_CRYPTOA_AES_XTS_128:
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :                 sd-&gt;mds.mdd_crypto.scr_klen = 256;</span>
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     926 </span>            :         case SR_CRYPTOA_AES_XTS_256:
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :                 sd-&gt;mds.mdd_crypto.scr_klen = 512;</span>
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     929 </span>            :         default:
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :                 sr_error(sd-&gt;sd_sc, &quot;unknown crypto algorithm&quot;);</span>
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     932 </span>            :         }
+<span class="lineNum">     933 </span>            : 
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; SR_CRYPTO_MAXKEYS; i++)</span>
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :                 sd-&gt;mds.mdd_crypto.scr_sid[i] = (u_int64_t)-1;</span>
+<span class="lineNum">     936 </span>            : 
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :         if (sr_wu_alloc(sd, sizeof(struct sr_crypto_wu))) {</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :                 sr_error(sd-&gt;sd_sc, &quot;unable to allocate work units&quot;);</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     940 </span>            :         }
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :         if (sr_ccb_alloc(sd)) {</span>
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :                 sr_error(sd-&gt;sd_sc, &quot;unable to allocate CCBs&quot;);</span>
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     944 </span>            :         }
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 :         if (sr_crypto_decrypt_key(sd)) {</span>
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :                 sr_error(sd-&gt;sd_sc, &quot;incorrect key or passphrase&quot;);</span>
+<span class="lineNum">     947 </span><span class="lineNoCov">          0 :                 return (EPERM);</span>
+<span class="lineNum">     948 </span>            :         }
+<span class="lineNum">     949 </span>            : 
+<span class="lineNum">     950 </span>            :         /*
+<span class="lineNum">     951 </span>            :          * For each work unit allocate the uio, iovec and crypto structures.
+<span class="lineNum">     952 </span>            :          * These have to be allocated now because during runtime we cannot
+<span class="lineNum">     953 </span>            :          * fail an allocation without failing the I/O (which can cause real
+<span class="lineNum">     954 </span>            :          * problems).
+<span class="lineNum">     955 </span>            :          */
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(wu, &amp;sd-&gt;sd_wu, swu_next) {</span>
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :                 crwu = (struct sr_crypto_wu *)wu;</span>
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :                 crwu-&gt;cr_uio.uio_iov = &amp;crwu-&gt;cr_iov;</span>
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :                 crwu-&gt;cr_dmabuf = dma_alloc(MAXPHYS, PR_WAITOK);</span>
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :                 crwu-&gt;cr_crp = crypto_getreq(MAXPHYS &gt;&gt; DEV_BSHIFT);</span>
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :                 if (crwu-&gt;cr_crp == NULL)</span>
+<span class="lineNum">     962 </span><span class="lineNoCov">          0 :                         return (ENOMEM);</span>
+<span class="lineNum">     963 </span>            :         }
+<span class="lineNum">     964 </span>            : 
+<span class="lineNum">     965 </span><span class="lineNoCov">          0 :         memset(&amp;cri, 0, sizeof(cri));</span>
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :         cri.cri_alg = sd-&gt;mds.mdd_crypto.scr_alg;</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :         cri.cri_klen = sd-&gt;mds.mdd_crypto.scr_klen;</span>
+<span class="lineNum">     968 </span>            : 
+<span class="lineNum">     969 </span>            :         /* Allocate a session for every 2^SR_CRYPTO_KEY_BLKSHIFT blocks. */
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :         num_keys = ((sd-&gt;sd_meta-&gt;ssdi.ssd_size - 1) &gt;&gt;</span>
+<span class="lineNum">     971 </span><span class="lineNoCov">          0 :             SR_CRYPTO_KEY_BLKSHIFT) + 1;</span>
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :         if (num_keys &gt; SR_CRYPTO_MAXKEYS)</span>
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :                 return (EFBIG);</span>
+<span class="lineNum">     974 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; num_keys; i++) {</span>
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 :                 cri.cri_key = sd-&gt;mds.mdd_crypto.scr_key[i];</span>
+<span class="lineNum">     976 </span><span class="lineNoCov">          0 :                 if (crypto_newsession(&amp;sd-&gt;mds.mdd_crypto.scr_sid[i],</span>
+<span class="lineNum">     977 </span><span class="lineNoCov">          0 :                     &amp;cri, 0) != 0) {</span>
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 :                         sr_crypto_free_sessions(sd);</span>
+<span class="lineNum">     979 </span><span class="lineNoCov">          0 :                         return (EINVAL);</span>
+<span class="lineNum">     980 </span>            :                 }
+<span class="lineNum">     981 </span>            :         }
+<span class="lineNum">     982 </span>            : 
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 :         sr_hotplug_register(sd, sr_crypto_hotplug);</span>
+<span class="lineNum">     984 </span>            : 
+<span class="lineNum">     985 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     986 </span><span class="lineNoCov">          0 : }</span>
+<a name="987"><span class="lineNum">     987 </span>            : </a>
+<span class="lineNum">     988 </span>            : void
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 : sr_crypto_free_resources(struct sr_discipline *sd)</span>
+<span class="lineNum">     990 </span>            : {
+<span class="lineNum">     991 </span>            :         struct sr_workunit      *wu;
+<span class="lineNum">     992 </span>            :         struct sr_crypto_wu     *crwu;
+<span class="lineNum">     993 </span>            : 
+<span class="lineNum">     994 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: sr_crypto_free_resources\n&quot;,
+<span class="lineNum">     995 </span>            :             DEVNAME(sd-&gt;sd_sc));
+<span class="lineNum">     996 </span>            : 
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :         if (sd-&gt;mds.mdd_crypto.key_disk != NULL) {</span>
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 :                 explicit_bzero(sd-&gt;mds.mdd_crypto.key_disk,</span>
+<span class="lineNum">     999 </span>            :                     sizeof(*sd-&gt;mds.mdd_crypto.key_disk));
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :                 free(sd-&gt;mds.mdd_crypto.key_disk, M_DEVBUF,</span>
+<span class="lineNum">    1001 </span>            :                     sizeof(*sd-&gt;mds.mdd_crypto.key_disk));
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1003 </span>            : 
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :         sr_hotplug_unregister(sd, sr_crypto_hotplug);</span>
+<span class="lineNum">    1005 </span>            : 
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :         sr_crypto_free_sessions(sd);</span>
+<span class="lineNum">    1007 </span>            : 
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(wu, &amp;sd-&gt;sd_wu, swu_next) {</span>
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 :                 crwu = (struct sr_crypto_wu *)wu;</span>
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :                 if (crwu-&gt;cr_dmabuf)</span>
+<span class="lineNum">    1011 </span><span class="lineNoCov">          0 :                         dma_free(crwu-&gt;cr_dmabuf, MAXPHYS);</span>
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :                 if (crwu-&gt;cr_crp)</span>
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                         crypto_freereq(crwu-&gt;cr_crp);</span>
+<span class="lineNum">    1014 </span>            :         }
+<span class="lineNum">    1015 </span>            : 
+<span class="lineNum">    1016 </span><span class="lineNoCov">          0 :         sr_wu_free(sd);</span>
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :         sr_ccb_free(sd);</span>
+<span class="lineNum">    1018 </span><span class="lineNoCov">          0 : }</span>
+<a name="1019"><span class="lineNum">    1019 </span>            : </a>
+<span class="lineNum">    1020 </span>            : int
+<span class="lineNum">    1021 </span><span class="lineNoCov">          0 : sr_crypto_ioctl(struct sr_discipline *sd, struct bioc_discipline *bd)</span>
+<span class="lineNum">    1022 </span>            : {
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 :         struct sr_crypto_kdfpair kdfpair;</span>
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :         struct sr_crypto_kdfinfo kdfinfo1, kdfinfo2;</span>
+<span class="lineNum">    1025 </span>            :         int                     size, rv = 1;
+<span class="lineNum">    1026 </span>            : 
+<span class="lineNum">    1027 </span>            :         DNPRINTF(SR_D_IOCTL, &quot;%s: sr_crypto_ioctl %u\n&quot;,
+<span class="lineNum">    1028 </span>            :             DEVNAME(sd-&gt;sd_sc), bd-&gt;bd_cmd);
+<span class="lineNum">    1029 </span>            : 
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :         switch (bd-&gt;bd_cmd) {</span>
+<span class="lineNum">    1031 </span>            :         case SR_IOCTL_GET_KDFHINT:
+<span class="lineNum">    1032 </span>            : 
+<span class="lineNum">    1033 </span>            :                 /* Get KDF hint for userland. */
+<span class="lineNum">    1034 </span>            :                 size = sizeof(sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_kdfhint);
+<span class="lineNum">    1035 </span><span class="lineNoCov">          0 :                 if (bd-&gt;bd_data == NULL || bd-&gt;bd_size &gt; size)</span>
+<span class="lineNum">    1036 </span>            :                         goto bad;
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :                 if (copyout(sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_kdfhint,</span>
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 :                     bd-&gt;bd_data, bd-&gt;bd_size))</span>
+<span class="lineNum">    1039 </span>            :                         goto bad;
+<span class="lineNum">    1040 </span>            : 
+<span class="lineNum">    1041 </span>            :                 rv = 0;
+<span class="lineNum">    1042 </span>            : 
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1044 </span>            : 
+<span class="lineNum">    1045 </span>            :         case SR_IOCTL_CHANGE_PASSPHRASE:
+<span class="lineNum">    1046 </span>            : 
+<span class="lineNum">    1047 </span>            :                 /* Attempt to change passphrase. */
+<span class="lineNum">    1048 </span>            : 
+<span class="lineNum">    1049 </span>            :                 size = sizeof(kdfpair);
+<span class="lineNum">    1050 </span><span class="lineNoCov">          0 :                 if (bd-&gt;bd_data == NULL || bd-&gt;bd_size &gt; size)</span>
+<span class="lineNum">    1051 </span>            :                         goto bad;
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :                 if (copyin(bd-&gt;bd_data, &amp;kdfpair, size))</span>
+<span class="lineNum">    1053 </span>            :                         goto bad;
+<span class="lineNum">    1054 </span>            : 
+<span class="lineNum">    1055 </span>            :                 size = sizeof(kdfinfo1);
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :                 if (kdfpair.kdfinfo1 == NULL || kdfpair.kdfsize1 &gt; size)</span>
+<span class="lineNum">    1057 </span>            :                         goto bad;
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :                 if (copyin(kdfpair.kdfinfo1, &amp;kdfinfo1, size))</span>
+<span class="lineNum">    1059 </span>            :                         goto bad;
+<span class="lineNum">    1060 </span>            : 
+<span class="lineNum">    1061 </span>            :                 size = sizeof(kdfinfo2);
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 :                 if (kdfpair.kdfinfo2 == NULL || kdfpair.kdfsize2 &gt; size)</span>
+<span class="lineNum">    1063 </span>            :                         goto bad;
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :                 if (copyin(kdfpair.kdfinfo2, &amp;kdfinfo2, size))</span>
+<span class="lineNum">    1065 </span>            :                         goto bad;
+<span class="lineNum">    1066 </span>            : 
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :                 if (sr_crypto_change_maskkey(sd, &amp;kdfinfo1, &amp;kdfinfo2))</span>
+<span class="lineNum">    1068 </span>            :                         goto bad;
+<span class="lineNum">    1069 </span>            : 
+<span class="lineNum">    1070 </span>            :                 /* Save metadata to disk. */
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :                 rv = sr_meta_save(sd, SR_META_DIRTY);</span>
+<span class="lineNum">    1072 </span>            : 
+<span class="lineNum">    1073 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1074 </span>            :         }
+<span class="lineNum">    1075 </span>            : 
+<span class="lineNum">    1076 </span>            : bad:
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;kdfpair, sizeof(kdfpair));</span>
+<span class="lineNum">    1078 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;kdfinfo1, sizeof(kdfinfo1));</span>
+<span class="lineNum">    1079 </span><span class="lineNoCov">          0 :         explicit_bzero(&amp;kdfinfo2, sizeof(kdfinfo2));</span>
+<span class="lineNum">    1080 </span>            : 
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 : }</span>
+<a name="1083"><span class="lineNum">    1083 </span>            : </a>
+<span class="lineNum">    1084 </span>            : int
+<span class="lineNum">    1085 </span><span class="lineNoCov">          0 : sr_crypto_meta_opt_handler(struct sr_discipline *sd, struct sr_meta_opt_hdr *om)</span>
+<span class="lineNum">    1086 </span>            : {
+<span class="lineNum">    1087 </span>            :         int rv = EINVAL;
+<span class="lineNum">    1088 </span>            : 
+<span class="lineNum">    1089 </span><span class="lineNoCov">          0 :         if (om-&gt;som_type == SR_OPT_CRYPTO) {</span>
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :                 sd-&gt;mds.mdd_crypto.scr_meta = (struct sr_meta_crypto *)om;</span>
+<span class="lineNum">    1091 </span>            :                 rv = 0;
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1093 </span>            : 
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">    1095 </span>            : }
+<a name="1096"><span class="lineNum">    1096 </span>            : </a>
+<span class="lineNum">    1097 </span>            : int
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 : sr_crypto_rw(struct sr_workunit *wu)</span>
+<span class="lineNum">    1099 </span>            : {
+<span class="lineNum">    1100 </span>            :         struct sr_crypto_wu     *crwu;
+<span class="lineNum">    1101 </span><span class="lineNoCov">          0 :         daddr_t                 blkno;</span>
+<span class="lineNum">    1102 </span>            :         int                     rv = 0;
+<span class="lineNum">    1103 </span>            : 
+<span class="lineNum">    1104 </span>            :         DNPRINTF(SR_D_DIS, &quot;%s: sr_crypto_rw wu %p\n&quot;,
+<span class="lineNum">    1105 </span>            :             DEVNAME(wu-&gt;swu_dis-&gt;sd_sc), wu);
+<span class="lineNum">    1106 </span>            : 
+<span class="lineNum">    1107 </span><span class="lineNoCov">          0 :         if (sr_validate_io(wu, &amp;blkno, &quot;sr_crypto_rw&quot;))</span>
+<span class="lineNum">    1108 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1109 </span>            : 
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :         if (wu-&gt;swu_xs-&gt;flags &amp; SCSI_DATA_OUT) {</span>
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 :                 crwu = sr_crypto_prepare(wu, 1);</span>
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 :                 crwu-&gt;cr_crp-&gt;crp_callback = sr_crypto_write;</span>
+<span class="lineNum">    1113 </span><span class="lineNoCov">          0 :                 rv = crypto_dispatch(crwu-&gt;cr_crp);</span>
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :                 if (rv == 0)</span>
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 :                         rv = crwu-&gt;cr_crp-&gt;crp_etype;</span>
+<span class="lineNum">    1116 </span>            :         } else
+<span class="lineNum">    1117 </span><span class="lineNoCov">          0 :                 rv = sr_crypto_dev_rw(wu, NULL);</span>
+<span class="lineNum">    1118 </span>            : 
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 : }</span>
+<a name="1121"><span class="lineNum">    1121 </span>            : </a>
+<span class="lineNum">    1122 </span>            : void
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 : sr_crypto_write(struct cryptop *crp)</span>
+<span class="lineNum">    1124 </span>            : {
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :         struct sr_crypto_wu     *crwu = crp-&gt;crp_opaque;</span>
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 :         struct sr_workunit      *wu = &amp;crwu-&gt;cr_wu;</span>
+<span class="lineNum">    1127 </span>            :         int                     s;
+<span class="lineNum">    1128 </span>            : 
+<span class="lineNum">    1129 </span>            :         DNPRINTF(SR_D_INTR, &quot;%s: sr_crypto_write: wu %p xs: %p\n&quot;,
+<span class="lineNum">    1130 </span>            :             DEVNAME(wu-&gt;swu_dis-&gt;sd_sc), wu, wu-&gt;swu_xs);
+<span class="lineNum">    1131 </span>            : 
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 :         if (crp-&gt;crp_etype) {</span>
+<span class="lineNum">    1133 </span>            :                 /* fail io */
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :                 wu-&gt;swu_xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">    1135 </span><span class="lineNoCov">          0 :                 s = splbio();</span>
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :                 sr_scsi_done(wu-&gt;swu_dis, wu-&gt;swu_xs);</span>
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1139 </span>            : 
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :         sr_crypto_dev_rw(wu, crwu);</span>
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 : }</span>
+<a name="1142"><span class="lineNum">    1142 </span>            : </a>
+<span class="lineNum">    1143 </span>            : int
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 : sr_crypto_dev_rw(struct sr_workunit *wu, struct sr_crypto_wu *crwu)</span>
+<span class="lineNum">    1145 </span>            : {
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :         struct sr_discipline    *sd = wu-&gt;swu_dis;</span>
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 :         struct scsi_xfer        *xs = wu-&gt;swu_xs;</span>
+<span class="lineNum">    1148 </span>            :         struct sr_ccb           *ccb;
+<span class="lineNum">    1149 </span>            :         struct uio              *uio;
+<span class="lineNum">    1150 </span>            :         daddr_t                 blkno;
+<span class="lineNum">    1151 </span>            : 
+<span class="lineNum">    1152 </span><span class="lineNoCov">          0 :         blkno = wu-&gt;swu_blk_start;</span>
+<span class="lineNum">    1153 </span>            : 
+<span class="lineNum">    1154 </span><span class="lineNoCov">          0 :         ccb = sr_ccb_rw(sd, 0, blkno, xs-&gt;datalen, xs-&gt;data, xs-&gt;flags, 0);</span>
+<span class="lineNum">    1155 </span><span class="lineNoCov">          0 :         if (!ccb) {</span>
+<span class="lineNum">    1156 </span>            :                 /* should never happen but handle more gracefully */
+<span class="lineNum">    1157 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: %s: too many ccbs queued\n&quot;,</span>
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 :                     DEVNAME(sd-&gt;sd_sc), sd-&gt;sd_meta-&gt;ssd_devname);</span>
+<span class="lineNum">    1159 </span>            :                 goto bad;
+<span class="lineNum">    1160 </span>            :         }
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :         if (!ISSET(xs-&gt;flags, SCSI_DATA_IN)) {</span>
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 :                 uio = crwu-&gt;cr_crp-&gt;crp_buf;</span>
+<span class="lineNum">    1163 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_buf.b_data = uio-&gt;uio_iov-&gt;iov_base;</span>
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_opaque = crwu;</span>
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1166 </span><span class="lineNoCov">          0 :         sr_wu_enqueue_ccb(wu, ccb);</span>
+<span class="lineNum">    1167 </span><span class="lineNoCov">          0 :         sr_schedule_wu(wu);</span>
+<span class="lineNum">    1168 </span>            : 
+<span class="lineNum">    1169 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1170 </span>            : 
+<span class="lineNum">    1171 </span>            : bad:
+<span class="lineNum">    1172 </span>            :         /* wu is unwound by sr_wu_put */
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 :         if (crwu)</span>
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :                 crwu-&gt;cr_crp-&gt;crp_etype = EINVAL;</span>
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 : }</span>
+<a name="1177"><span class="lineNum">    1177 </span>            : </a>
+<span class="lineNum">    1178 </span>            : void
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 : sr_crypto_done(struct sr_workunit *wu)</span>
+<span class="lineNum">    1180 </span>            : {
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 :         struct scsi_xfer        *xs = wu-&gt;swu_xs;</span>
+<span class="lineNum">    1182 </span>            :         struct sr_crypto_wu     *crwu;
+<span class="lineNum">    1183 </span>            :         int                     s;
+<span class="lineNum">    1184 </span>            : 
+<span class="lineNum">    1185 </span>            :         /* If this was a successful read, initiate decryption of the data. */
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :         if (ISSET(xs-&gt;flags, SCSI_DATA_IN) &amp;&amp; xs-&gt;error == XS_NOERROR) {</span>
+<span class="lineNum">    1187 </span><span class="lineNoCov">          0 :                 crwu = sr_crypto_prepare(wu, 0);</span>
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :                 crwu-&gt;cr_crp-&gt;crp_callback = sr_crypto_read;</span>
+<span class="lineNum">    1189 </span>            :                 DNPRINTF(SR_D_INTR, &quot;%s: sr_crypto_done: crypto_dispatch %p\n&quot;,
+<span class="lineNum">    1190 </span>            :                     DEVNAME(wu-&gt;swu_dis-&gt;sd_sc), crwu-&gt;cr_crp);
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :                 crypto_dispatch(crwu-&gt;cr_crp);</span>
+<span class="lineNum">    1192 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1193 </span>            :         }
+<span class="lineNum">    1194 </span>            : 
+<span class="lineNum">    1195 </span><span class="lineNoCov">          0 :         s = splbio();</span>
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :         sr_scsi_done(wu-&gt;swu_dis, wu-&gt;swu_xs);</span>
+<span class="lineNum">    1197 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 : }</span>
+<a name="1199"><span class="lineNum">    1199 </span>            : </a>
+<span class="lineNum">    1200 </span>            : void
+<span class="lineNum">    1201 </span><span class="lineNoCov">          0 : sr_crypto_read(struct cryptop *crp)</span>
+<span class="lineNum">    1202 </span>            : {
+<span class="lineNum">    1203 </span><span class="lineNoCov">          0 :         struct sr_crypto_wu     *crwu = crp-&gt;crp_opaque;</span>
+<span class="lineNum">    1204 </span><span class="lineNoCov">          0 :         struct sr_workunit      *wu = &amp;crwu-&gt;cr_wu;</span>
+<span class="lineNum">    1205 </span>            :         int                     s;
+<span class="lineNum">    1206 </span>            : 
+<span class="lineNum">    1207 </span>            :         DNPRINTF(SR_D_INTR, &quot;%s: sr_crypto_read: wu %p xs: %p\n&quot;,
+<span class="lineNum">    1208 </span>            :             DEVNAME(wu-&gt;swu_dis-&gt;sd_sc), wu, wu-&gt;swu_xs);
+<span class="lineNum">    1209 </span>            : 
+<span class="lineNum">    1210 </span><span class="lineNoCov">          0 :         if (crp-&gt;crp_etype)</span>
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :                 wu-&gt;swu_xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">    1212 </span>            : 
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :         s = splbio();</span>
+<span class="lineNum">    1214 </span><span class="lineNoCov">          0 :         sr_scsi_done(wu-&gt;swu_dis, wu-&gt;swu_xs);</span>
+<span class="lineNum">    1215 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1216 </span><span class="lineNoCov">          0 : }</span>
+<a name="1217"><span class="lineNum">    1217 </span>            : </a>
+<span class="lineNum">    1218 </span>            : void
+<span class="lineNum">    1219 </span><span class="lineNoCov">          0 : sr_crypto_hotplug(struct sr_discipline *sd, struct disk *diskp, int action)</span>
+<span class="lineNum">    1220 </span>            : {
+<span class="lineNum">    1221 </span>            :         DNPRINTF(SR_D_MISC, &quot;%s: sr_crypto_hotplug: %s %d\n&quot;,
+<span class="lineNum">    1222 </span>            :             DEVNAME(sd-&gt;sd_sc), diskp-&gt;dk_name, action);
+<span class="lineNum">    1223 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1224 </span>            : 
+<span class="lineNum">    1225 </span>            : #ifdef SR_DEBUG0
+<span class="lineNum">    1226 </span>            : void
+<span class="lineNum">    1227 </span>            : sr_crypto_dumpkeys(struct sr_discipline *sd)
+<span class="lineNum">    1228 </span>            : {
+<span class="lineNum">    1229 </span>            :         int                     i, j;
+<span class="lineNum">    1230 </span>            : 
+<span class="lineNum">    1231 </span>            :         printf(&quot;sr_crypto_dumpkeys:\n&quot;);
+<span class="lineNum">    1232 </span>            :         for (i = 0; i &lt; SR_CRYPTO_MAXKEYS; i++) {
+<span class="lineNum">    1233 </span>            :                 printf(&quot;\tscm_key[%d]: 0x&quot;, i);
+<span class="lineNum">    1234 </span>            :                 for (j = 0; j &lt; SR_CRYPTO_KEYBYTES; j++) {
+<span class="lineNum">    1235 </span>            :                         printf(&quot;%02x&quot;,
+<span class="lineNum">    1236 </span>            :                             sd-&gt;mds.mdd_crypto.scr_meta-&gt;scm_key[i][j]);
+<span class="lineNum">    1237 </span>            :                 }
+<span class="lineNum">    1238 </span>            :                 printf(&quot;\n&quot;);
+<span class="lineNum">    1239 </span>            :         }
+<span class="lineNum">    1240 </span>            :         printf(&quot;sr_crypto_dumpkeys: runtime data keys:\n&quot;);
+<span class="lineNum">    1241 </span>            :         for (i = 0; i &lt; SR_CRYPTO_MAXKEYS; i++) {
+<span class="lineNum">    1242 </span>            :                 printf(&quot;\tscr_key[%d]: 0x&quot;, i);
+<span class="lineNum">    1243 </span>            :                 for (j = 0; j &lt; SR_CRYPTO_KEYBYTES; j++) {
+<span class="lineNum">    1244 </span>            :                         printf(&quot;%02x&quot;,
+<span class="lineNum">    1245 </span>            :                             sd-&gt;mds.mdd_crypto.scr_key[i][j]);
+<span class="lineNum">    1246 </span>            :                 }
+<span class="lineNum">    1247 </span>            :                 printf(&quot;\n&quot;);
+<span class="lineNum">    1248 </span>            :         }
+<span class="lineNum">    1249 </span>            : }
+<span class="lineNum">    1250 </span>            : #endif  /* SR_DEBUG */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

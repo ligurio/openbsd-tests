@@ -1,0 +1,1706 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/i915/intel_overlay.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">dev/pci/drm/i915</a> - intel_overlay.c<span style="font-size: 80%;"> (source / <a href="intel_overlay.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">707</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">38</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * Copyright © 2009
+<span class="lineNum">       3 </span>            :  *
+<span class="lineNum">       4 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       5 </span>            :  * copy of this software and associated documentation files (the &quot;Software&quot;),
+<span class="lineNum">       6 </span>            :  * to deal in the Software without restriction, including without limitation
+<span class="lineNum">       7 </span>            :  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+<span class="lineNum">       8 </span>            :  * and/or sell copies of the Software, and to permit persons to whom the
+<span class="lineNum">       9 </span>            :  * Software is furnished to do so, subject to the following conditions:
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * The above copyright notice and this permission notice (including the next
+<span class="lineNum">      12 </span>            :  * paragraph) shall be included in all copies or substantial portions of the
+<span class="lineNum">      13 </span>            :  * Software.
+<span class="lineNum">      14 </span>            :  *
+<span class="lineNum">      15 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      16 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      17 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+<span class="lineNum">      18 </span>            :  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+<span class="lineNum">      19 </span>            :  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+<span class="lineNum">      20 </span>            :  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+<span class="lineNum">      21 </span>            :  * SOFTWARE.
+<span class="lineNum">      22 </span>            :  *
+<span class="lineNum">      23 </span>            :  * Authors:
+<span class="lineNum">      24 </span>            :  *    Daniel Vetter &lt;daniel@ffwll.ch&gt;
+<span class="lineNum">      25 </span>            :  *
+<span class="lineNum">      26 </span>            :  * Derived from Xorg ddx, xf86-video-intel, src/i830_video.c
+<span class="lineNum">      27 </span>            :  */
+<span class="lineNum">      28 </span>            : #include &lt;dev/pci/drm/drmP.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;dev/pci/drm/i915_drm.h&gt;
+<span class="lineNum">      30 </span>            : #include &quot;i915_drv.h&quot;
+<span class="lineNum">      31 </span>            : #include &quot;i915_reg.h&quot;
+<span class="lineNum">      32 </span>            : #include &quot;intel_drv.h&quot;
+<span class="lineNum">      33 </span>            : 
+<span class="lineNum">      34 </span>            : /* Limits for overlay size. According to intel doc, the real limits are:
+<span class="lineNum">      35 </span>            :  * Y width: 4095, UV width (planar): 2047, Y height: 2047,
+<span class="lineNum">      36 </span>            :  * UV width (planar): * 1023. But the xorg thinks 2048 for height and width. Use
+<span class="lineNum">      37 </span>            :  * the mininum of both.  */
+<span class="lineNum">      38 </span>            : #define IMAGE_MAX_WIDTH         2048
+<span class="lineNum">      39 </span>            : #define IMAGE_MAX_HEIGHT        2046 /* 2 * 1023 */
+<span class="lineNum">      40 </span>            : /* on 830 and 845 these large limits result in the card hanging */
+<span class="lineNum">      41 </span>            : #define IMAGE_MAX_WIDTH_LEGACY  1024
+<span class="lineNum">      42 </span>            : #define IMAGE_MAX_HEIGHT_LEGACY 1088
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : /* overlay register definitions */
+<span class="lineNum">      45 </span>            : /* OCMD register */
+<span class="lineNum">      46 </span>            : #define OCMD_TILED_SURFACE      (0x1&lt;&lt;19)
+<span class="lineNum">      47 </span>            : #define OCMD_MIRROR_MASK        (0x3&lt;&lt;17)
+<span class="lineNum">      48 </span>            : #define OCMD_MIRROR_MODE        (0x3&lt;&lt;17)
+<span class="lineNum">      49 </span>            : #define OCMD_MIRROR_HORIZONTAL  (0x1&lt;&lt;17)
+<span class="lineNum">      50 </span>            : #define OCMD_MIRROR_VERTICAL    (0x2&lt;&lt;17)
+<span class="lineNum">      51 </span>            : #define OCMD_MIRROR_BOTH        (0x3&lt;&lt;17)
+<span class="lineNum">      52 </span>            : #define OCMD_BYTEORDER_MASK     (0x3&lt;&lt;14) /* zero for YUYV or FOURCC YUY2 */
+<span class="lineNum">      53 </span>            : #define OCMD_UV_SWAP            (0x1&lt;&lt;14) /* YVYU */
+<span class="lineNum">      54 </span>            : #define OCMD_Y_SWAP             (0x2&lt;&lt;14) /* UYVY or FOURCC UYVY */
+<span class="lineNum">      55 </span>            : #define OCMD_Y_AND_UV_SWAP      (0x3&lt;&lt;14) /* VYUY */
+<span class="lineNum">      56 </span>            : #define OCMD_SOURCE_FORMAT_MASK (0xf&lt;&lt;10)
+<span class="lineNum">      57 </span>            : #define OCMD_RGB_888            (0x1&lt;&lt;10) /* not in i965 Intel docs */
+<span class="lineNum">      58 </span>            : #define OCMD_RGB_555            (0x2&lt;&lt;10) /* not in i965 Intel docs */
+<span class="lineNum">      59 </span>            : #define OCMD_RGB_565            (0x3&lt;&lt;10) /* not in i965 Intel docs */
+<span class="lineNum">      60 </span>            : #define OCMD_YUV_422_PACKED     (0x8&lt;&lt;10)
+<span class="lineNum">      61 </span>            : #define OCMD_YUV_411_PACKED     (0x9&lt;&lt;10) /* not in i965 Intel docs */
+<span class="lineNum">      62 </span>            : #define OCMD_YUV_420_PLANAR     (0xc&lt;&lt;10)
+<span class="lineNum">      63 </span>            : #define OCMD_YUV_422_PLANAR     (0xd&lt;&lt;10)
+<span class="lineNum">      64 </span>            : #define OCMD_YUV_410_PLANAR     (0xe&lt;&lt;10) /* also 411 */
+<span class="lineNum">      65 </span>            : #define OCMD_TVSYNCFLIP_PARITY  (0x1&lt;&lt;9)
+<span class="lineNum">      66 </span>            : #define OCMD_TVSYNCFLIP_ENABLE  (0x1&lt;&lt;7)
+<span class="lineNum">      67 </span>            : #define OCMD_BUF_TYPE_MASK      (0x1&lt;&lt;5)
+<span class="lineNum">      68 </span>            : #define OCMD_BUF_TYPE_FRAME     (0x0&lt;&lt;5)
+<span class="lineNum">      69 </span>            : #define OCMD_BUF_TYPE_FIELD     (0x1&lt;&lt;5)
+<span class="lineNum">      70 </span>            : #define OCMD_TEST_MODE          (0x1&lt;&lt;4)
+<span class="lineNum">      71 </span>            : #define OCMD_BUFFER_SELECT      (0x3&lt;&lt;2)
+<span class="lineNum">      72 </span>            : #define OCMD_BUFFER0            (0x0&lt;&lt;2)
+<span class="lineNum">      73 </span>            : #define OCMD_BUFFER1            (0x1&lt;&lt;2)
+<span class="lineNum">      74 </span>            : #define OCMD_FIELD_SELECT       (0x1&lt;&lt;2)
+<span class="lineNum">      75 </span>            : #define OCMD_FIELD0             (0x0&lt;&lt;1)
+<span class="lineNum">      76 </span>            : #define OCMD_FIELD1             (0x1&lt;&lt;1)
+<span class="lineNum">      77 </span>            : #define OCMD_ENABLE             (0x1&lt;&lt;0)
+<span class="lineNum">      78 </span>            : 
+<span class="lineNum">      79 </span>            : /* OCONFIG register */
+<span class="lineNum">      80 </span>            : #define OCONF_PIPE_MASK         (0x1&lt;&lt;18)
+<span class="lineNum">      81 </span>            : #define OCONF_PIPE_A            (0x0&lt;&lt;18)
+<span class="lineNum">      82 </span>            : #define OCONF_PIPE_B            (0x1&lt;&lt;18)
+<span class="lineNum">      83 </span>            : #define OCONF_GAMMA2_ENABLE     (0x1&lt;&lt;16)
+<span class="lineNum">      84 </span>            : #define OCONF_CSC_MODE_BT601    (0x0&lt;&lt;5)
+<span class="lineNum">      85 </span>            : #define OCONF_CSC_MODE_BT709    (0x1&lt;&lt;5)
+<span class="lineNum">      86 </span>            : #define OCONF_CSC_BYPASS        (0x1&lt;&lt;4)
+<span class="lineNum">      87 </span>            : #define OCONF_CC_OUT_8BIT       (0x1&lt;&lt;3)
+<span class="lineNum">      88 </span>            : #define OCONF_TEST_MODE         (0x1&lt;&lt;2)
+<span class="lineNum">      89 </span>            : #define OCONF_THREE_LINE_BUFFER (0x1&lt;&lt;0)
+<span class="lineNum">      90 </span>            : #define OCONF_TWO_LINE_BUFFER   (0x0&lt;&lt;0)
+<span class="lineNum">      91 </span>            : 
+<span class="lineNum">      92 </span>            : /* DCLRKM (dst-key) register */
+<span class="lineNum">      93 </span>            : #define DST_KEY_ENABLE          (0x1&lt;&lt;31)
+<span class="lineNum">      94 </span>            : #define CLK_RGB24_MASK          0x0
+<span class="lineNum">      95 </span>            : #define CLK_RGB16_MASK          0x070307
+<span class="lineNum">      96 </span>            : #define CLK_RGB15_MASK          0x070707
+<span class="lineNum">      97 </span>            : #define CLK_RGB8I_MASK          0xffffff
+<span class="lineNum">      98 </span>            : 
+<span class="lineNum">      99 </span>            : #define RGB16_TO_COLORKEY(c) \
+<span class="lineNum">     100 </span>            :         (((c &amp; 0xF800) &lt;&lt; 8) | ((c &amp; 0x07E0) &lt;&lt; 5) | ((c &amp; 0x001F) &lt;&lt; 3))
+<span class="lineNum">     101 </span>            : #define RGB15_TO_COLORKEY(c) \
+<span class="lineNum">     102 </span>            :         (((c &amp; 0x7c00) &lt;&lt; 9) | ((c &amp; 0x03E0) &lt;&lt; 6) | ((c &amp; 0x001F) &lt;&lt; 3))
+<span class="lineNum">     103 </span>            : 
+<span class="lineNum">     104 </span>            : /* overlay flip addr flag */
+<span class="lineNum">     105 </span>            : #define OFC_UPDATE              0x1
+<span class="lineNum">     106 </span>            : 
+<span class="lineNum">     107 </span>            : /* polyphase filter coefficients */
+<span class="lineNum">     108 </span>            : #define N_HORIZ_Y_TAPS          5
+<span class="lineNum">     109 </span>            : #define N_VERT_Y_TAPS           3
+<span class="lineNum">     110 </span>            : #define N_HORIZ_UV_TAPS         3
+<span class="lineNum">     111 </span>            : #define N_VERT_UV_TAPS          3
+<span class="lineNum">     112 </span>            : #define N_PHASES                17
+<span class="lineNum">     113 </span>            : #define MAX_TAPS                5
+<span class="lineNum">     114 </span>            : 
+<span class="lineNum">     115 </span>            : /* memory bufferd overlay registers */
+<span class="lineNum">     116 </span>            : struct overlay_registers {
+<span class="lineNum">     117 </span>            :         u32 OBUF_0Y;
+<span class="lineNum">     118 </span>            :         u32 OBUF_1Y;
+<span class="lineNum">     119 </span>            :         u32 OBUF_0U;
+<span class="lineNum">     120 </span>            :         u32 OBUF_0V;
+<span class="lineNum">     121 </span>            :         u32 OBUF_1U;
+<span class="lineNum">     122 </span>            :         u32 OBUF_1V;
+<span class="lineNum">     123 </span>            :         u32 OSTRIDE;
+<span class="lineNum">     124 </span>            :         u32 YRGB_VPH;
+<span class="lineNum">     125 </span>            :         u32 UV_VPH;
+<span class="lineNum">     126 </span>            :         u32 HORZ_PH;
+<span class="lineNum">     127 </span>            :         u32 INIT_PHS;
+<span class="lineNum">     128 </span>            :         u32 DWINPOS;
+<span class="lineNum">     129 </span>            :         u32 DWINSZ;
+<span class="lineNum">     130 </span>            :         u32 SWIDTH;
+<span class="lineNum">     131 </span>            :         u32 SWIDTHSW;
+<span class="lineNum">     132 </span>            :         u32 SHEIGHT;
+<span class="lineNum">     133 </span>            :         u32 YRGBSCALE;
+<span class="lineNum">     134 </span>            :         u32 UVSCALE;
+<span class="lineNum">     135 </span>            :         u32 OCLRC0;
+<span class="lineNum">     136 </span>            :         u32 OCLRC1;
+<span class="lineNum">     137 </span>            :         u32 DCLRKV;
+<span class="lineNum">     138 </span>            :         u32 DCLRKM;
+<span class="lineNum">     139 </span>            :         u32 SCLRKVH;
+<span class="lineNum">     140 </span>            :         u32 SCLRKVL;
+<span class="lineNum">     141 </span>            :         u32 SCLRKEN;
+<span class="lineNum">     142 </span>            :         u32 OCONFIG;
+<span class="lineNum">     143 </span>            :         u32 OCMD;
+<span class="lineNum">     144 </span>            :         u32 RESERVED1; /* 0x6C */
+<span class="lineNum">     145 </span>            :         u32 OSTART_0Y;
+<span class="lineNum">     146 </span>            :         u32 OSTART_1Y;
+<span class="lineNum">     147 </span>            :         u32 OSTART_0U;
+<span class="lineNum">     148 </span>            :         u32 OSTART_0V;
+<span class="lineNum">     149 </span>            :         u32 OSTART_1U;
+<span class="lineNum">     150 </span>            :         u32 OSTART_1V;
+<span class="lineNum">     151 </span>            :         u32 OTILEOFF_0Y;
+<span class="lineNum">     152 </span>            :         u32 OTILEOFF_1Y;
+<span class="lineNum">     153 </span>            :         u32 OTILEOFF_0U;
+<span class="lineNum">     154 </span>            :         u32 OTILEOFF_0V;
+<span class="lineNum">     155 </span>            :         u32 OTILEOFF_1U;
+<span class="lineNum">     156 </span>            :         u32 OTILEOFF_1V;
+<span class="lineNum">     157 </span>            :         u32 FASTHSCALE; /* 0xA0 */
+<span class="lineNum">     158 </span>            :         u32 UVSCALEV; /* 0xA4 */
+<span class="lineNum">     159 </span>            :         u32 RESERVEDC[(0x200 - 0xA8) / 4]; /* 0xA8 - 0x1FC */
+<span class="lineNum">     160 </span>            :         u16 Y_VCOEFS[N_VERT_Y_TAPS * N_PHASES]; /* 0x200 */
+<span class="lineNum">     161 </span>            :         u16 RESERVEDD[0x100 / 2 - N_VERT_Y_TAPS * N_PHASES];
+<span class="lineNum">     162 </span>            :         u16 Y_HCOEFS[N_HORIZ_Y_TAPS * N_PHASES]; /* 0x300 */
+<span class="lineNum">     163 </span>            :         u16 RESERVEDE[0x200 / 2 - N_HORIZ_Y_TAPS * N_PHASES];
+<span class="lineNum">     164 </span>            :         u16 UV_VCOEFS[N_VERT_UV_TAPS * N_PHASES]; /* 0x500 */
+<span class="lineNum">     165 </span>            :         u16 RESERVEDF[0x100 / 2 - N_VERT_UV_TAPS * N_PHASES];
+<span class="lineNum">     166 </span>            :         u16 UV_HCOEFS[N_HORIZ_UV_TAPS * N_PHASES]; /* 0x600 */
+<span class="lineNum">     167 </span>            :         u16 RESERVEDG[0x100 / 2 - N_HORIZ_UV_TAPS * N_PHASES];
+<span class="lineNum">     168 </span>            : };
+<span class="lineNum">     169 </span>            : 
+<span class="lineNum">     170 </span>            : struct intel_overlay {
+<span class="lineNum">     171 </span>            :         struct drm_device *dev;
+<span class="lineNum">     172 </span>            :         struct intel_crtc *crtc;
+<span class="lineNum">     173 </span>            :         struct drm_i915_gem_object *vid_bo;
+<span class="lineNum">     174 </span>            :         struct drm_i915_gem_object *old_vid_bo;
+<span class="lineNum">     175 </span>            :         bool active;
+<span class="lineNum">     176 </span>            :         bool pfit_active;
+<span class="lineNum">     177 </span>            :         u32 pfit_vscale_ratio; /* shifted-point number, (1&lt;&lt;12) == 1.0 */
+<span class="lineNum">     178 </span>            :         u32 color_key:24;
+<span class="lineNum">     179 </span>            :         u32 color_key_enabled:1;
+<span class="lineNum">     180 </span>            :         u32 brightness, contrast, saturation;
+<span class="lineNum">     181 </span>            :         u32 old_xscale, old_yscale;
+<span class="lineNum">     182 </span>            :         /* register access */
+<span class="lineNum">     183 </span>            :         u32 flip_addr;
+<span class="lineNum">     184 </span>            :         struct drm_i915_gem_object *reg_bo;
+<span class="lineNum">     185 </span>            :         bus_space_handle_t reg_bsh;
+<span class="lineNum">     186 </span>            :         int reg_refcount;
+<span class="lineNum">     187 </span>            :         /* flip handling */
+<span class="lineNum">     188 </span>            :         struct drm_i915_gem_request *last_flip_req;
+<span class="lineNum">     189 </span>            :         void (*flip_tail)(struct intel_overlay *);
+<span class="lineNum">     190 </span>            : };
+<a name="191"><span class="lineNum">     191 </span>            : </a>
+<span class="lineNum">     192 </span>            : static struct overlay_registers __iomem *
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 : intel_overlay_map_regs(struct intel_overlay *overlay)</span>
+<span class="lineNum">     194 </span>            : {
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = overlay-&gt;dev-&gt;dev_private;</span>
+<span class="lineNum">     196 </span>            :         struct overlay_registers __iomem *regs;
+<span class="lineNum">     197 </span>            : 
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         if (OVERLAY_NEEDS_PHYSICAL(overlay-&gt;dev))</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                 regs = (struct overlay_registers __iomem *)overlay-&gt;reg_bo-&gt;phys_handle-&gt;vaddr;</span>
+<span class="lineNum">     200 </span>            :         else {
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                 if (overlay-&gt;reg_refcount++ == 0 &amp;&amp;</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                     agp_map_subregion(dev_priv-&gt;agph,</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :                                       i915_gem_obj_ggtt_offset(overlay-&gt;reg_bo),</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                                       PAGE_SIZE, &amp;overlay-&gt;reg_bsh))</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                         return NULL;</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                 regs = bus_space_vaddr(overlay-&gt;dev-&gt;bst, overlay-&gt;reg_bsh);</span>
+<span class="lineNum">     207 </span>            :         }
+<span class="lineNum">     208 </span>            : 
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         return regs;</span>
+<a name="210"><span class="lineNum">     210 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     211 </span>            : 
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 : static void intel_overlay_unmap_regs(struct intel_overlay *overlay,</span>
+<span class="lineNum">     213 </span>            :                                      struct overlay_registers __iomem *regs)
+<span class="lineNum">     214 </span>            : {
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = overlay-&gt;dev-&gt;dev_private;</span>
+<span class="lineNum">     216 </span>            : 
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         if (!OVERLAY_NEEDS_PHYSICAL(overlay-&gt;dev))</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                 if (--overlay-&gt;reg_refcount == 0)</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                         agp_unmap_subregion(dev_priv-&gt;agph, overlay-&gt;reg_bsh,</span>
+<span class="lineNum">     220 </span>            :                                             PAGE_SIZE);
+<a name="221"><span class="lineNum">     221 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     222 </span>            : 
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 : static int intel_overlay_do_wait_request(struct intel_overlay *overlay,</span>
+<span class="lineNum">     224 </span>            :                                          struct drm_i915_gem_request *req,
+<span class="lineNum">     225 </span>            :                                          void (*tail)(struct intel_overlay *))
+<span class="lineNum">     226 </span>            : {
+<span class="lineNum">     227 </span>            :         int ret;
+<span class="lineNum">     228 </span>            : 
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         WARN_ON(overlay-&gt;last_flip_req);</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         i915_gem_request_assign(&amp;overlay-&gt;last_flip_req, req);</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :         i915_add_request(req);</span>
+<span class="lineNum">     232 </span>            : 
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :         overlay-&gt;flip_tail = tail;</span>
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :         ret = i915_wait_request(overlay-&gt;last_flip_req);</span>
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     237 </span>            : 
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :         i915_gem_request_assign(&amp;overlay-&gt;last_flip_req, NULL);</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 : }</span>
+<a name="241"><span class="lineNum">     241 </span>            : </a>
+<span class="lineNum">     242 </span>            : /* overlay needs to be disable in OCMD reg */
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 : static int intel_overlay_on(struct intel_overlay *overlay)</span>
+<span class="lineNum">     244 </span>            : {
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         struct drm_device *dev = overlay-&gt;dev;</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         struct intel_engine_cs *ring = &amp;dev_priv-&gt;ring[RCS];</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_request *req;</span>
+<span class="lineNum">     249 </span>            :         int ret;
+<span class="lineNum">     250 </span>            : 
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :         WARN_ON(overlay-&gt;active);</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         WARN_ON(IS_I830(dev) &amp;&amp; !(dev_priv-&gt;quirks &amp; QUIRK_PIPEA_FORCE));</span>
+<span class="lineNum">     253 </span>            : 
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         ret = i915_gem_request_alloc(ring, ring-&gt;default_context, &amp;req);</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     257 </span>            : 
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         ret = intel_ring_begin(req, 4);</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         if (ret) {</span>
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :                 i915_gem_request_cancel(req);</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     262 </span>            :         }
+<span class="lineNum">     263 </span>            : 
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         overlay-&gt;active = true;</span>
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         intel_ring_emit(ring, MI_OVERLAY_FLIP | MI_OVERLAY_ON);</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         intel_ring_emit(ring, overlay-&gt;flip_addr | OFC_UPDATE);</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         intel_ring_emit(ring, MI_WAIT_FOR_EVENT | MI_WAIT_FOR_OVERLAY_FLIP);</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         intel_ring_emit(ring, MI_NOOP);</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :         intel_ring_advance(ring);</span>
+<span class="lineNum">     271 </span>            : 
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :         return intel_overlay_do_wait_request(overlay, req, NULL);</span>
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 : }</span>
+<a name="274"><span class="lineNum">     274 </span>            : </a>
+<span class="lineNum">     275 </span>            : /* overlay needs to be enabled in OCMD reg */
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 : static int intel_overlay_continue(struct intel_overlay *overlay,</span>
+<span class="lineNum">     277 </span>            :                                   bool load_polyphase_filter)
+<span class="lineNum">     278 </span>            : {
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :         struct drm_device *dev = overlay-&gt;dev;</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         struct intel_engine_cs *ring = &amp;dev_priv-&gt;ring[RCS];</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_request *req;</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         u32 flip_addr = overlay-&gt;flip_addr;</span>
+<span class="lineNum">     284 </span>            :         u32 tmp;
+<span class="lineNum">     285 </span>            :         int ret;
+<span class="lineNum">     286 </span>            : 
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         WARN_ON(!overlay-&gt;active);</span>
+<span class="lineNum">     288 </span>            : 
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :         if (load_polyphase_filter)</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                 flip_addr |= OFC_UPDATE;</span>
+<span class="lineNum">     291 </span>            : 
+<span class="lineNum">     292 </span>            :         /* check for underruns */
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :         tmp = I915_READ(DOVSTA);</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         if (tmp &amp; (1 &lt;&lt; 17))</span>
+<span class="lineNum">     295 </span>            :                 DRM_DEBUG(&quot;overlay underrun, DOVSTA: %x\n&quot;, tmp);
+<span class="lineNum">     296 </span>            : 
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         ret = i915_gem_request_alloc(ring, ring-&gt;default_context, &amp;req);</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     300 </span>            : 
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         ret = intel_ring_begin(req, 2);</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :         if (ret) {</span>
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :                 i915_gem_request_cancel(req);</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     305 </span>            :         }
+<span class="lineNum">     306 </span>            : 
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :         intel_ring_emit(ring, MI_OVERLAY_FLIP | MI_OVERLAY_CONTINUE);</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         intel_ring_emit(ring, flip_addr);</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         intel_ring_advance(ring);</span>
+<span class="lineNum">     310 </span>            : 
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :         WARN_ON(overlay-&gt;last_flip_req);</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :         i915_gem_request_assign(&amp;overlay-&gt;last_flip_req, req);</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         i915_add_request(req);</span>
+<span class="lineNum">     314 </span>            : 
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :         return 0;</span>
+<a name="316"><span class="lineNum">     316 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 : static void intel_overlay_release_old_vid_tail(struct intel_overlay *overlay)</span>
+<span class="lineNum">     319 </span>            : {
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_object *obj = overlay-&gt;old_vid_bo;</span>
+<span class="lineNum">     321 </span>            : 
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         i915_gem_object_ggtt_unpin(obj);</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         drm_gem_object_unreference(&amp;obj-&gt;base);</span>
+<span class="lineNum">     324 </span>            : 
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         overlay-&gt;old_vid_bo = NULL;</span>
+<a name="326"><span class="lineNum">     326 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     327 </span>            : 
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 : static void intel_overlay_off_tail(struct intel_overlay *overlay)</span>
+<span class="lineNum">     329 </span>            : {
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_object *obj = overlay-&gt;vid_bo;</span>
+<span class="lineNum">     331 </span>            : 
+<span class="lineNum">     332 </span>            :         /* never have the overlay hw on without showing a frame */
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         if (WARN_ON(!obj))</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     335 </span>            : 
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         i915_gem_object_ggtt_unpin(obj);</span>
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :         drm_gem_object_unreference(&amp;obj-&gt;base);</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         overlay-&gt;vid_bo = NULL;</span>
+<span class="lineNum">     339 </span>            : 
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :         overlay-&gt;crtc-&gt;overlay = NULL;</span>
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         overlay-&gt;crtc = NULL;</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :         overlay-&gt;active = false;</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 : }</span>
+<a name="344"><span class="lineNum">     344 </span>            : </a>
+<span class="lineNum">     345 </span>            : /* overlay needs to be disabled in OCMD reg */
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 : static int intel_overlay_off(struct intel_overlay *overlay)</span>
+<span class="lineNum">     347 </span>            : {
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         struct drm_device *dev = overlay-&gt;dev;</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         struct intel_engine_cs *ring = &amp;dev_priv-&gt;ring[RCS];</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_request *req;</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :         u32 flip_addr = overlay-&gt;flip_addr;</span>
+<span class="lineNum">     353 </span>            :         int ret;
+<span class="lineNum">     354 </span>            : 
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :         WARN_ON(!overlay-&gt;active);</span>
+<span class="lineNum">     356 </span>            : 
+<span class="lineNum">     357 </span>            :         /* According to intel docs the overlay hw may hang (when switching
+<span class="lineNum">     358 </span>            :          * off) without loading the filter coeffs. It is however unclear whether
+<span class="lineNum">     359 </span>            :          * this applies to the disabling of the overlay or to the switching off
+<span class="lineNum">     360 </span>            :          * of the hw. Do it in both cases */
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         flip_addr |= OFC_UPDATE;</span>
+<span class="lineNum">     362 </span>            : 
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :         ret = i915_gem_request_alloc(ring, ring-&gt;default_context, &amp;req);</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     366 </span>            : 
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :         ret = intel_ring_begin(req, 6);</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         if (ret) {</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                 i915_gem_request_cancel(req);</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     371 </span>            :         }
+<span class="lineNum">     372 </span>            : 
+<span class="lineNum">     373 </span>            :         /* wait for overlay to go idle */
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :         intel_ring_emit(ring, MI_OVERLAY_FLIP | MI_OVERLAY_CONTINUE);</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :         intel_ring_emit(ring, flip_addr);</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :         intel_ring_emit(ring, MI_WAIT_FOR_EVENT | MI_WAIT_FOR_OVERLAY_FLIP);</span>
+<span class="lineNum">     377 </span>            :         /* turn overlay off */
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :         if (IS_I830(dev)) {</span>
+<span class="lineNum">     379 </span>            :                 /* Workaround: Don't disable the overlay fully, since otherwise
+<span class="lineNum">     380 </span>            :                  * it dies on the next OVERLAY_ON cmd. */
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, MI_NOOP);</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, MI_NOOP);</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, MI_NOOP);</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, MI_OVERLAY_FLIP | MI_OVERLAY_OFF);</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, flip_addr);</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, MI_WAIT_FOR_EVENT | MI_WAIT_FOR_OVERLAY_FLIP);</span>
+<span class="lineNum">     388 </span>            :         }
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         intel_ring_advance(ring);</span>
+<span class="lineNum">     390 </span>            : 
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :         return intel_overlay_do_wait_request(overlay, req, intel_overlay_off_tail);</span>
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     393 </span>            : 
+<a name="394"><span class="lineNum">     394 </span>            : /* recover from an interruption due to a signal</a>
+<span class="lineNum">     395 </span>            :  * We have to be careful not to repeat work forever an make forward progess. */
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 : static int intel_overlay_recover_from_interrupt(struct intel_overlay *overlay)</span>
+<span class="lineNum">     397 </span>            : {
+<span class="lineNum">     398 </span>            :         int ret;
+<span class="lineNum">     399 </span>            : 
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :         if (overlay-&gt;last_flip_req == NULL)</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     402 </span>            : 
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :         ret = i915_wait_request(overlay-&gt;last_flip_req);</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     406 </span>            : 
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         if (overlay-&gt;flip_tail)</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 overlay-&gt;flip_tail(overlay);</span>
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         i915_gem_request_assign(&amp;overlay-&gt;last_flip_req, NULL);</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     413 </span>            : 
+<span class="lineNum">     414 </span>            : /* Wait for pending overlay flip and release old frame.
+<span class="lineNum">     415 </span>            :  * Needs to be called before the overlay register are changed
+<a name="416"><span class="lineNum">     416 </span>            :  * via intel_overlay_(un)map_regs</a>
+<span class="lineNum">     417 </span>            :  */
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 : static int intel_overlay_release_old_vid(struct intel_overlay *overlay)</span>
+<span class="lineNum">     419 </span>            : {
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         struct drm_device *dev = overlay-&gt;dev;</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :         struct intel_engine_cs *ring = &amp;dev_priv-&gt;ring[RCS];</span>
+<span class="lineNum">     423 </span>            :         int ret;
+<span class="lineNum">     424 </span>            : 
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         WARN_ON(!mutex_is_locked(&amp;dev-&gt;struct_mutex));</span>
+<span class="lineNum">     426 </span>            : 
+<span class="lineNum">     427 </span>            :         /* Only wait if there is actually an old frame to release to
+<span class="lineNum">     428 </span>            :          * guarantee forward progress.
+<span class="lineNum">     429 </span>            :          */
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :         if (!overlay-&gt;old_vid_bo)</span>
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     432 </span>            : 
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         if (I915_READ(ISR) &amp; I915_OVERLAY_PLANE_FLIP_PENDING_INTERRUPT) {</span>
+<span class="lineNum">     434 </span>            :                 /* synchronous slowpath */
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :                 struct drm_i915_gem_request *req;</span>
+<span class="lineNum">     436 </span>            : 
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :                 ret = i915_gem_request_alloc(ring, ring-&gt;default_context, &amp;req);</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">     440 </span>            : 
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                 ret = intel_ring_begin(req, 2);</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :                 if (ret) {</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :                         i915_gem_request_cancel(req);</span>
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">     445 </span>            :                 }
+<span class="lineNum">     446 </span>            : 
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, MI_WAIT_FOR_EVENT | MI_WAIT_FOR_OVERLAY_FLIP);</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, MI_NOOP);</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                 intel_ring_advance(ring);</span>
+<span class="lineNum">     450 </span>            : 
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                 ret = intel_overlay_do_wait_request(overlay, req,</span>
+<span class="lineNum">     452 </span>            :                                                     intel_overlay_release_old_vid_tail);
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     456 </span>            : 
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :         intel_overlay_release_old_vid_tail(overlay);</span>
+<span class="lineNum">     458 </span>            : 
+<span class="lineNum">     459 </span>            : 
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :         i915_gem_track_fb(overlay-&gt;old_vid_bo, NULL,</span>
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                           INTEL_FRONTBUFFER_OVERLAY(overlay-&gt;crtc-&gt;pipe));</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :         return 0;</span>
+<a name="463"><span class="lineNum">     463 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     464 </span>            : 
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 : void intel_overlay_reset(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     466 </span>            : {
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :         struct intel_overlay *overlay = dev_priv-&gt;overlay;</span>
+<span class="lineNum">     468 </span>            : 
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :         if (!overlay)</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     471 </span>            : 
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :         intel_overlay_release_old_vid(overlay);</span>
+<span class="lineNum">     473 </span>            : 
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :         overlay-&gt;last_flip_req = NULL;</span>
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :         overlay-&gt;old_xscale = 0;</span>
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :         overlay-&gt;old_yscale = 0;</span>
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :         overlay-&gt;crtc = NULL;</span>
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         overlay-&gt;active = false;</span>
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     480 </span>            : 
+<span class="lineNum">     481 </span>            : struct put_image_params {
+<span class="lineNum">     482 </span>            :         int format;
+<span class="lineNum">     483 </span>            :         short dst_x;
+<span class="lineNum">     484 </span>            :         short dst_y;
+<span class="lineNum">     485 </span>            :         short dst_w;
+<span class="lineNum">     486 </span>            :         short dst_h;
+<span class="lineNum">     487 </span>            :         short src_w;
+<span class="lineNum">     488 </span>            :         short src_scan_h;
+<span class="lineNum">     489 </span>            :         short src_scan_w;
+<span class="lineNum">     490 </span>            :         short src_h;
+<span class="lineNum">     491 </span>            :         short stride_Y;
+<span class="lineNum">     492 </span>            :         short stride_UV;
+<span class="lineNum">     493 </span>            :         int offset_Y;
+<span class="lineNum">     494 </span>            :         int offset_U;
+<span class="lineNum">     495 </span>            :         int offset_V;
+<a name="496"><span class="lineNum">     496 </span>            : };</a>
+<span class="lineNum">     497 </span>            : 
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 : static int packed_depth_bytes(u32 format)</span>
+<span class="lineNum">     499 </span>            : {
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :         switch (format &amp; I915_OVERLAY_DEPTH_MASK) {</span>
+<span class="lineNum">     501 </span>            :         case I915_OVERLAY_YUV422:
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                 return 4;</span>
+<span class="lineNum">     503 </span>            :         case I915_OVERLAY_YUV411:
+<span class="lineNum">     504 </span>            :                 /* return 6; not implemented */
+<span class="lineNum">     505 </span>            :         default:
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     507 </span>            :         }
+<a name="508"><span class="lineNum">     508 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     509 </span>            : 
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 : static int packed_width_bytes(u32 format, short width)</span>
+<span class="lineNum">     511 </span>            : {
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :         switch (format &amp; I915_OVERLAY_DEPTH_MASK) {</span>
+<span class="lineNum">     513 </span>            :         case I915_OVERLAY_YUV422:
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                 return width &lt;&lt; 1;</span>
+<span class="lineNum">     515 </span>            :         default:
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     517 </span>            :         }
+<a name="518"><span class="lineNum">     518 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     519 </span>            : 
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 : static int uv_hsubsampling(u32 format)</span>
+<span class="lineNum">     521 </span>            : {
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :         switch (format &amp; I915_OVERLAY_DEPTH_MASK) {</span>
+<span class="lineNum">     523 </span>            :         case I915_OVERLAY_YUV422:
+<span class="lineNum">     524 </span>            :         case I915_OVERLAY_YUV420:
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                 return 2;</span>
+<span class="lineNum">     526 </span>            :         case I915_OVERLAY_YUV411:
+<span class="lineNum">     527 </span>            :         case I915_OVERLAY_YUV410:
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :                 return 4;</span>
+<span class="lineNum">     529 </span>            :         default:
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     531 </span>            :         }
+<a name="532"><span class="lineNum">     532 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     533 </span>            : 
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 : static int uv_vsubsampling(u32 format)</span>
+<span class="lineNum">     535 </span>            : {
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         switch (format &amp; I915_OVERLAY_DEPTH_MASK) {</span>
+<span class="lineNum">     537 </span>            :         case I915_OVERLAY_YUV420:
+<span class="lineNum">     538 </span>            :         case I915_OVERLAY_YUV410:
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :                 return 2;</span>
+<span class="lineNum">     540 </span>            :         case I915_OVERLAY_YUV422:
+<span class="lineNum">     541 </span>            :         case I915_OVERLAY_YUV411:
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">     543 </span>            :         default:
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     545 </span>            :         }
+<a name="546"><span class="lineNum">     546 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 : static u32 calc_swidthsw(struct drm_device *dev, u32 offset, u32 width)</span>
+<span class="lineNum">     549 </span>            : {
+<span class="lineNum">     550 </span>            :         u32 mask, shift, ret;
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :         if (IS_GEN2(dev)) {</span>
+<span class="lineNum">     552 </span>            :                 mask = 0x1f;
+<span class="lineNum">     553 </span>            :                 shift = 5;
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     555 </span>            :                 mask = 0x3f;
+<span class="lineNum">     556 </span>            :                 shift = 6;
+<span class="lineNum">     557 </span>            :         }
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :         ret = ((offset + width + mask) &gt;&gt; shift) - (offset &gt;&gt; shift);</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :         if (!IS_GEN2(dev))</span>
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :                 ret &lt;&lt;= 1;</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :         ret -= 1;</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :         return ret &lt;&lt; 2;</span>
+<span class="lineNum">     563 </span>            : }
+<span class="lineNum">     564 </span>            : 
+<span class="lineNum">     565 </span>            : static const u16 y_static_hcoeffs[N_HORIZ_Y_TAPS * N_PHASES] = {
+<span class="lineNum">     566 </span>            :         0x3000, 0xb4a0, 0x1930, 0x1920, 0xb4a0,
+<span class="lineNum">     567 </span>            :         0x3000, 0xb500, 0x19d0, 0x1880, 0xb440,
+<span class="lineNum">     568 </span>            :         0x3000, 0xb540, 0x1a88, 0x2f80, 0xb3e0,
+<span class="lineNum">     569 </span>            :         0x3000, 0xb580, 0x1b30, 0x2e20, 0xb380,
+<span class="lineNum">     570 </span>            :         0x3000, 0xb5c0, 0x1bd8, 0x2cc0, 0xb320,
+<span class="lineNum">     571 </span>            :         0x3020, 0xb5e0, 0x1c60, 0x2b80, 0xb2c0,
+<span class="lineNum">     572 </span>            :         0x3020, 0xb5e0, 0x1cf8, 0x2a20, 0xb260,
+<span class="lineNum">     573 </span>            :         0x3020, 0xb5e0, 0x1d80, 0x28e0, 0xb200,
+<span class="lineNum">     574 </span>            :         0x3020, 0xb5c0, 0x1e08, 0x3f40, 0xb1c0,
+<span class="lineNum">     575 </span>            :         0x3020, 0xb580, 0x1e78, 0x3ce0, 0xb160,
+<span class="lineNum">     576 </span>            :         0x3040, 0xb520, 0x1ed8, 0x3aa0, 0xb120,
+<span class="lineNum">     577 </span>            :         0x3040, 0xb4a0, 0x1f30, 0x3880, 0xb0e0,
+<span class="lineNum">     578 </span>            :         0x3040, 0xb400, 0x1f78, 0x3680, 0xb0a0,
+<span class="lineNum">     579 </span>            :         0x3020, 0xb340, 0x1fb8, 0x34a0, 0xb060,
+<span class="lineNum">     580 </span>            :         0x3020, 0xb240, 0x1fe0, 0x32e0, 0xb040,
+<span class="lineNum">     581 </span>            :         0x3020, 0xb140, 0x1ff8, 0x3160, 0xb020,
+<span class="lineNum">     582 </span>            :         0xb000, 0x3000, 0x0800, 0x3000, 0xb000
+<span class="lineNum">     583 </span>            : };
+<span class="lineNum">     584 </span>            : 
+<span class="lineNum">     585 </span>            : static const u16 uv_static_hcoeffs[N_HORIZ_UV_TAPS * N_PHASES] = {
+<span class="lineNum">     586 </span>            :         0x3000, 0x1800, 0x1800, 0xb000, 0x18d0, 0x2e60,
+<span class="lineNum">     587 </span>            :         0xb000, 0x1990, 0x2ce0, 0xb020, 0x1a68, 0x2b40,
+<span class="lineNum">     588 </span>            :         0xb040, 0x1b20, 0x29e0, 0xb060, 0x1bd8, 0x2880,
+<span class="lineNum">     589 </span>            :         0xb080, 0x1c88, 0x3e60, 0xb0a0, 0x1d28, 0x3c00,
+<span class="lineNum">     590 </span>            :         0xb0c0, 0x1db8, 0x39e0, 0xb0e0, 0x1e40, 0x37e0,
+<span class="lineNum">     591 </span>            :         0xb100, 0x1eb8, 0x3620, 0xb100, 0x1f18, 0x34a0,
+<span class="lineNum">     592 </span>            :         0xb100, 0x1f68, 0x3360, 0xb0e0, 0x1fa8, 0x3240,
+<span class="lineNum">     593 </span>            :         0xb0c0, 0x1fe0, 0x3140, 0xb060, 0x1ff0, 0x30a0,
+<span class="lineNum">     594 </span>            :         0x3000, 0x0800, 0x3000
+<a name="595"><span class="lineNum">     595 </span>            : };</a>
+<span class="lineNum">     596 </span>            : 
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 : static void update_polyphase_filter(struct overlay_registers __iomem *regs)</span>
+<span class="lineNum">     598 </span>            : {
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :         memcpy_toio(regs-&gt;Y_HCOEFS, y_static_hcoeffs, sizeof(y_static_hcoeffs));</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :         memcpy_toio(regs-&gt;UV_HCOEFS, uv_static_hcoeffs,</span>
+<span class="lineNum">     601 </span>            :                     sizeof(uv_static_hcoeffs));
+<a name="602"><span class="lineNum">     602 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     603 </span>            : 
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 : static bool update_scaling_factors(struct intel_overlay *overlay,</span>
+<span class="lineNum">     605 </span>            :                                    struct overlay_registers __iomem *regs,
+<span class="lineNum">     606 </span>            :                                    struct put_image_params *params)
+<span class="lineNum">     607 </span>            : {
+<span class="lineNum">     608 </span>            :         /* fixed point with a 12 bit shift */
+<span class="lineNum">     609 </span>            :         u32 xscale, yscale, xscale_UV, yscale_UV;
+<span class="lineNum">     610 </span>            : #define FP_SHIFT 12
+<span class="lineNum">     611 </span>            : #define FRACT_MASK 0xfff
+<span class="lineNum">     612 </span>            :         bool scale_changed = false;
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         int uv_hscale = uv_hsubsampling(params-&gt;format);</span>
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :         int uv_vscale = uv_vsubsampling(params-&gt;format);</span>
+<span class="lineNum">     615 </span>            : 
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :         if (params-&gt;dst_w &gt; 1)</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                 xscale = ((params-&gt;src_scan_w - 1) &lt;&lt; FP_SHIFT)</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                         /(params-&gt;dst_w);</span>
+<span class="lineNum">     619 </span>            :         else
+<span class="lineNum">     620 </span>            :                 xscale = 1 &lt;&lt; FP_SHIFT;
+<span class="lineNum">     621 </span>            : 
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :         if (params-&gt;dst_h &gt; 1)</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :                 yscale = ((params-&gt;src_scan_h - 1) &lt;&lt; FP_SHIFT)</span>
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :                         /(params-&gt;dst_h);</span>
+<span class="lineNum">     625 </span>            :         else
+<span class="lineNum">     626 </span>            :                 yscale = 1 &lt;&lt; FP_SHIFT;
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span>            :         /*if (params-&gt;format &amp; I915_OVERLAY_YUV_PLANAR) {*/
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :         xscale_UV = xscale/uv_hscale;</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :         yscale_UV = yscale/uv_vscale;</span>
+<span class="lineNum">     631 </span>            :         /* make the Y scale to UV scale ratio an exact multiply */
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :         xscale = xscale_UV * uv_hscale;</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :         yscale = yscale_UV * uv_vscale;</span>
+<span class="lineNum">     634 </span>            :         /*} else {
+<span class="lineNum">     635 </span>            :           xscale_UV = 0;
+<span class="lineNum">     636 </span>            :           yscale_UV = 0;
+<span class="lineNum">     637 </span>            :           }*/
+<span class="lineNum">     638 </span>            : 
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :         if (xscale != overlay-&gt;old_xscale || yscale != overlay-&gt;old_yscale)</span>
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :                 scale_changed = true;</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :         overlay-&gt;old_xscale = xscale;</span>
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         overlay-&gt;old_yscale = yscale;</span>
+<span class="lineNum">     643 </span>            : 
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :         iowrite32(((yscale &amp; FRACT_MASK) &lt;&lt; 20) |</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :                   ((xscale &gt;&gt; FP_SHIFT)  &lt;&lt; 16) |</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :                   ((xscale &amp; FRACT_MASK) &lt;&lt; 3),</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :                  &amp;regs-&gt;YRGBSCALE);</span>
+<span class="lineNum">     648 </span>            : 
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :         iowrite32(((yscale_UV &amp; FRACT_MASK) &lt;&lt; 20) |</span>
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :                   ((xscale_UV &gt;&gt; FP_SHIFT)  &lt;&lt; 16) |</span>
+<span class="lineNum">     651 </span><span class="lineNoCov">          0 :                   ((xscale_UV &amp; FRACT_MASK) &lt;&lt; 3),</span>
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :                  &amp;regs-&gt;UVSCALE);</span>
+<span class="lineNum">     653 </span>            : 
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :         iowrite32((((yscale    &gt;&gt; FP_SHIFT) &lt;&lt; 16) |</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                    ((yscale_UV &gt;&gt; FP_SHIFT) &lt;&lt; 0)),</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :                  &amp;regs-&gt;UVSCALEV);</span>
+<span class="lineNum">     657 </span>            : 
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :         if (scale_changed)</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                 update_polyphase_filter(regs);</span>
+<span class="lineNum">     660 </span>            : 
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :         return scale_changed;</span>
+<a name="662"><span class="lineNum">     662 </span>            : }</a>
+<span class="lineNum">     663 </span>            : 
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 : static void update_colorkey(struct intel_overlay *overlay,</span>
+<span class="lineNum">     665 </span>            :                             struct overlay_registers __iomem *regs)
+<span class="lineNum">     666 </span>            : {
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :         u32 key = overlay-&gt;color_key;</span>
+<span class="lineNum">     668 </span>            :         u32 flags;
+<span class="lineNum">     669 </span>            : 
+<span class="lineNum">     670 </span>            :         flags = 0;
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :         if (overlay-&gt;color_key_enabled)</span>
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :                 flags |= DST_KEY_ENABLE;</span>
+<span class="lineNum">     673 </span>            : 
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :         switch (overlay-&gt;crtc-&gt;base.primary-&gt;fb-&gt;bits_per_pixel) {</span>
+<span class="lineNum">     675 </span>            :         case 8:
+<span class="lineNum">     676 </span>            :                 key = 0;
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :                 flags |= CLK_RGB8I_MASK;</span>
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     679 </span>            : 
+<span class="lineNum">     680 </span>            :         case 16:
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :                 if (overlay-&gt;crtc-&gt;base.primary-&gt;fb-&gt;depth == 15) {</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :                         key = RGB15_TO_COLORKEY(key);</span>
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :                         flags |= CLK_RGB15_MASK;</span>
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :                         key = RGB16_TO_COLORKEY(key);</span>
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :                         flags |= CLK_RGB16_MASK;</span>
+<span class="lineNum">     687 </span>            :                 }
+<span class="lineNum">     688 </span>            :                 break;
+<span class="lineNum">     689 </span>            : 
+<span class="lineNum">     690 </span>            :         case 24:
+<span class="lineNum">     691 </span>            :         case 32:
+<span class="lineNum">     692 </span>            :                 flags |= CLK_RGB24_MASK;
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     694 </span>            :         }
+<span class="lineNum">     695 </span>            : 
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :         iowrite32(key, &amp;regs-&gt;DCLRKV);</span>
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :         iowrite32(flags, &amp;regs-&gt;DCLRKM);</span>
+<a name="698"><span class="lineNum">     698 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     699 </span>            : 
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 : static u32 overlay_cmd_reg(struct put_image_params *params)</span>
+<span class="lineNum">     701 </span>            : {
+<span class="lineNum">     702 </span>            :         u32 cmd = OCMD_ENABLE | OCMD_BUF_TYPE_FRAME | OCMD_BUFFER0;
+<span class="lineNum">     703 </span>            : 
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :         if (params-&gt;format &amp; I915_OVERLAY_YUV_PLANAR) {</span>
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :                 switch (params-&gt;format &amp; I915_OVERLAY_DEPTH_MASK) {</span>
+<span class="lineNum">     706 </span>            :                 case I915_OVERLAY_YUV422:
+<span class="lineNum">     707 </span>            :                         cmd |= OCMD_YUV_422_PLANAR;
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     709 </span>            :                 case I915_OVERLAY_YUV420:
+<span class="lineNum">     710 </span>            :                         cmd |= OCMD_YUV_420_PLANAR;
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     712 </span>            :                 case I915_OVERLAY_YUV411:
+<span class="lineNum">     713 </span>            :                 case I915_OVERLAY_YUV410:
+<span class="lineNum">     714 </span>            :                         cmd |= OCMD_YUV_410_PLANAR;
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     716 </span>            :                 }
+<span class="lineNum">     717 </span>            :         } else { /* YUV packed */
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :                 switch (params-&gt;format &amp; I915_OVERLAY_DEPTH_MASK) {</span>
+<span class="lineNum">     719 </span>            :                 case I915_OVERLAY_YUV422:
+<span class="lineNum">     720 </span>            :                         cmd |= OCMD_YUV_422_PACKED;
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     722 </span>            :                 case I915_OVERLAY_YUV411:
+<span class="lineNum">     723 </span>            :                         cmd |= OCMD_YUV_411_PACKED;
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     725 </span>            :                 }
+<span class="lineNum">     726 </span>            : 
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :                 switch (params-&gt;format &amp; I915_OVERLAY_SWAP_MASK) {</span>
+<span class="lineNum">     728 </span>            :                 case I915_OVERLAY_NO_SWAP:
+<span class="lineNum">     729 </span>            :                         break;
+<span class="lineNum">     730 </span>            :                 case I915_OVERLAY_UV_SWAP:
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :                         cmd |= OCMD_UV_SWAP;</span>
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     733 </span>            :                 case I915_OVERLAY_Y_SWAP:
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :                         cmd |= OCMD_Y_SWAP;</span>
+<span class="lineNum">     735 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     736 </span>            :                 case I915_OVERLAY_Y_AND_UV_SWAP:
+<span class="lineNum">     737 </span><span class="lineNoCov">          0 :                         cmd |= OCMD_Y_AND_UV_SWAP;</span>
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     739 </span>            :                 }
+<span class="lineNum">     740 </span>            :         }
+<span class="lineNum">     741 </span>            : 
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :         return cmd;</span>
+<a name="743"><span class="lineNum">     743 </span>            : }</a>
+<span class="lineNum">     744 </span>            : 
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 : static int intel_overlay_do_put_image(struct intel_overlay *overlay,</span>
+<span class="lineNum">     746 </span>            :                                       struct drm_i915_gem_object *new_bo,
+<span class="lineNum">     747 </span>            :                                       struct put_image_params *params)
+<span class="lineNum">     748 </span>            : {
+<span class="lineNum">     749 </span>            :         int ret, tmp_width;
+<span class="lineNum">     750 </span>            :         struct overlay_registers __iomem *regs;
+<span class="lineNum">     751 </span>            :         bool scale_changed = false;
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :         struct drm_device *dev = overlay-&gt;dev;</span>
+<span class="lineNum">     753 </span>            :         u32 swidth, swidthsw, sheight, ostride;
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :         enum pipe pipe = overlay-&gt;crtc-&gt;pipe;</span>
+<span class="lineNum">     755 </span>            : 
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         WARN_ON(!mutex_is_locked(&amp;dev-&gt;struct_mutex));</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :         WARN_ON(!drm_modeset_is_locked(&amp;dev-&gt;mode_config.connection_mutex));</span>
+<span class="lineNum">     758 </span>            : 
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :         ret = intel_overlay_release_old_vid(overlay);</span>
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         if (ret != 0)</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     762 </span>            : 
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :         ret = i915_gem_object_pin_to_display_plane(new_bo, 0, NULL, NULL,</span>
+<span class="lineNum">     764 </span>            :                                                    &amp;i915_ggtt_view_normal);
+<span class="lineNum">     765 </span><span class="lineNoCov">          0 :         if (ret != 0)</span>
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     767 </span>            : 
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :         ret = i915_gem_object_put_fence(new_bo);</span>
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     770 </span>            :                 goto out_unpin;
+<span class="lineNum">     771 </span>            : 
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :         if (!overlay-&gt;active) {</span>
+<span class="lineNum">     773 </span>            :                 u32 oconfig;
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :                 regs = intel_overlay_map_regs(overlay);</span>
+<span class="lineNum">     775 </span><span class="lineNoCov">          0 :                 if (!regs) {</span>
+<span class="lineNum">     776 </span>            :                         ret = -ENOMEM;
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :                         goto out_unpin;</span>
+<span class="lineNum">     778 </span>            :                 }
+<span class="lineNum">     779 </span>            :                 oconfig = OCONF_CC_OUT_8BIT;
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :                 if (IS_GEN4(overlay-&gt;dev))</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :                         oconfig |= OCONF_CSC_MODE_BT709;</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :                 oconfig |= pipe == 0 ?</span>
+<span class="lineNum">     783 </span>            :                         OCONF_PIPE_A : OCONF_PIPE_B;
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :                 iowrite32(oconfig, &amp;regs-&gt;OCONFIG);</span>
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :                 intel_overlay_unmap_regs(overlay, regs);</span>
+<span class="lineNum">     786 </span>            : 
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :                 ret = intel_overlay_on(overlay);</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :                 if (ret != 0)</span>
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 :                         goto out_unpin;</span>
+<span class="lineNum">     790 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     791 </span>            : 
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :         regs = intel_overlay_map_regs(overlay);</span>
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :         if (!regs) {</span>
+<span class="lineNum">     794 </span>            :                 ret = -ENOMEM;
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :                 goto out_unpin;</span>
+<span class="lineNum">     796 </span>            :         }
+<span class="lineNum">     797 </span>            : 
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :         iowrite32((params-&gt;dst_y &lt;&lt; 16) | params-&gt;dst_x, &amp;regs-&gt;DWINPOS);</span>
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :         iowrite32((params-&gt;dst_h &lt;&lt; 16) | params-&gt;dst_w, &amp;regs-&gt;DWINSZ);</span>
+<span class="lineNum">     800 </span>            : 
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :         if (params-&gt;format &amp; I915_OVERLAY_YUV_PACKED)</span>
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :                 tmp_width = packed_width_bytes(params-&gt;format, params-&gt;src_w);</span>
+<span class="lineNum">     803 </span>            :         else
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :                 tmp_width = params-&gt;src_w;</span>
+<span class="lineNum">     805 </span>            : 
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         swidth = params-&gt;src_w;</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :         swidthsw = calc_swidthsw(overlay-&gt;dev, params-&gt;offset_Y, tmp_width);</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :         sheight = params-&gt;src_h;</span>
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 :         iowrite32(i915_gem_obj_ggtt_offset(new_bo) + params-&gt;offset_Y, &amp;regs-&gt;OBUF_0Y);</span>
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :         ostride = params-&gt;stride_Y;</span>
+<span class="lineNum">     811 </span>            : 
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :         if (params-&gt;format &amp; I915_OVERLAY_YUV_PLANAR) {</span>
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :                 int uv_hscale = uv_hsubsampling(params-&gt;format);</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :                 int uv_vscale = uv_vsubsampling(params-&gt;format);</span>
+<span class="lineNum">     815 </span>            :                 u32 tmp_U, tmp_V;
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 :                 swidth |= (params-&gt;src_w/uv_hscale) &lt;&lt; 16;</span>
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 :                 tmp_U = calc_swidthsw(overlay-&gt;dev, params-&gt;offset_U,</span>
+<span class="lineNum">     818 </span>            :                                       params-&gt;src_w/uv_hscale);
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 :                 tmp_V = calc_swidthsw(overlay-&gt;dev, params-&gt;offset_V,</span>
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :                                       params-&gt;src_w/uv_hscale);</span>
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :                 swidthsw |= max_t(u32, tmp_U, tmp_V) &lt;&lt; 16;</span>
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :                 sheight |= (params-&gt;src_h/uv_vscale) &lt;&lt; 16;</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :                 iowrite32(i915_gem_obj_ggtt_offset(new_bo) + params-&gt;offset_U, &amp;regs-&gt;OBUF_0U);</span>
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :                 iowrite32(i915_gem_obj_ggtt_offset(new_bo) + params-&gt;offset_V, &amp;regs-&gt;OBUF_0V);</span>
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :                 ostride |= params-&gt;stride_UV &lt;&lt; 16;</span>
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     827 </span>            : 
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :         iowrite32(swidth, &amp;regs-&gt;SWIDTH);</span>
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :         iowrite32(swidthsw, &amp;regs-&gt;SWIDTHSW);</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :         iowrite32(sheight, &amp;regs-&gt;SHEIGHT);</span>
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :         iowrite32(ostride, &amp;regs-&gt;OSTRIDE);</span>
+<span class="lineNum">     832 </span>            : 
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 :         scale_changed = update_scaling_factors(overlay, regs, params);</span>
+<span class="lineNum">     834 </span>            : 
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         update_colorkey(overlay, regs);</span>
+<span class="lineNum">     836 </span>            : 
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :         iowrite32(overlay_cmd_reg(params), &amp;regs-&gt;OCMD);</span>
+<span class="lineNum">     838 </span>            : 
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :         intel_overlay_unmap_regs(overlay, regs);</span>
+<span class="lineNum">     840 </span>            : 
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :         ret = intel_overlay_continue(overlay, scale_changed);</span>
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     843 </span>            :                 goto out_unpin;
+<span class="lineNum">     844 </span>            : 
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :         i915_gem_track_fb(overlay-&gt;vid_bo, new_bo,</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :                           INTEL_FRONTBUFFER_OVERLAY(pipe));</span>
+<span class="lineNum">     847 </span>            : 
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :         overlay-&gt;old_vid_bo = overlay-&gt;vid_bo;</span>
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :         overlay-&gt;vid_bo = new_bo;</span>
+<span class="lineNum">     850 </span>            : 
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :         intel_frontbuffer_flip(dev,</span>
+<span class="lineNum">     852 </span>            :                                INTEL_FRONTBUFFER_OVERLAY(pipe));
+<span class="lineNum">     853 </span>            : 
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     855 </span>            : 
+<span class="lineNum">     856 </span>            : out_unpin:
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :         i915_gem_object_ggtt_unpin(new_bo);</span>
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :         return ret;</span>
+<a name="859"><span class="lineNum">     859 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     860 </span>            : 
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 : int intel_overlay_switch_off(struct intel_overlay *overlay)</span>
+<span class="lineNum">     862 </span>            : {
+<span class="lineNum">     863 </span>            :         struct overlay_registers __iomem *regs;
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :         struct drm_device *dev = overlay-&gt;dev;</span>
+<span class="lineNum">     865 </span>            :         int ret;
+<span class="lineNum">     866 </span>            : 
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :         WARN_ON(!mutex_is_locked(&amp;dev-&gt;struct_mutex));</span>
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 :         WARN_ON(!drm_modeset_is_locked(&amp;dev-&gt;mode_config.connection_mutex));</span>
+<span class="lineNum">     869 </span>            : 
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         ret = intel_overlay_recover_from_interrupt(overlay);</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :         if (ret != 0)</span>
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     873 </span>            : 
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :         if (!overlay-&gt;active)</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     876 </span>            : 
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :         ret = intel_overlay_release_old_vid(overlay);</span>
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :         if (ret != 0)</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     880 </span>            : 
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :         regs = intel_overlay_map_regs(overlay);</span>
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :         iowrite32(0, &amp;regs-&gt;OCMD);</span>
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :         intel_overlay_unmap_regs(overlay, regs);</span>
+<span class="lineNum">     884 </span>            : 
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :         ret = intel_overlay_off(overlay);</span>
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :         if (ret != 0)</span>
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     888 </span>            : 
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :         intel_overlay_off_tail(overlay);</span>
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 :         return 0;</span>
+<a name="891"><span class="lineNum">     891 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     892 </span>            : 
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 : static int check_overlay_possible_on_crtc(struct intel_overlay *overlay,</span>
+<span class="lineNum">     894 </span>            :                                           struct intel_crtc *crtc)
+<span class="lineNum">     895 </span>            : {
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :         if (!crtc-&gt;active)</span>
+<span class="lineNum">     897 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     898 </span>            : 
+<span class="lineNum">     899 </span>            :         /* can't use the overlay with double wide pipe */
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :         if (crtc-&gt;config-&gt;double_wide)</span>
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     902 </span>            : 
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :         return 0;</span>
+<a name="904"><span class="lineNum">     904 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     905 </span>            : 
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 : static void update_pfit_vscale_ratio(struct intel_overlay *overlay)</span>
+<span class="lineNum">     907 </span>            : {
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :         struct drm_device *dev = overlay-&gt;dev;</span>
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :         u32 pfit_control = I915_READ(PFIT_CONTROL);</span>
+<span class="lineNum">     911 </span>            :         u32 ratio;
+<span class="lineNum">     912 </span>            : 
+<span class="lineNum">     913 </span>            :         /* XXX: This is not the same logic as in the xorg driver, but more in
+<span class="lineNum">     914 </span>            :          * line with the intel documentation for the i965
+<span class="lineNum">     915 </span>            :          */
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev)-&gt;gen &gt;= 4) {</span>
+<span class="lineNum">     917 </span>            :                 /* on i965 use the PGM reg to read out the autoscaler values */
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :                 ratio = I915_READ(PFIT_PGM_RATIOS) &gt;&gt; PFIT_VERT_SCALE_SHIFT_965;</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :                 if (pfit_control &amp; VERT_AUTO_SCALE)</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :                         ratio = I915_READ(PFIT_AUTO_RATIOS);</span>
+<span class="lineNum">     922 </span>            :                 else
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :                         ratio = I915_READ(PFIT_PGM_RATIOS);</span>
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :                 ratio &gt;&gt;= PFIT_VERT_SCALE_SHIFT;</span>
+<span class="lineNum">     925 </span>            :         }
+<span class="lineNum">     926 </span>            : 
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :         overlay-&gt;pfit_vscale_ratio = ratio;</span>
+<a name="928"><span class="lineNum">     928 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     929 </span>            : 
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 : static int check_overlay_dst(struct intel_overlay *overlay,</span>
+<span class="lineNum">     931 </span>            :                              struct drm_intel_overlay_put_image *rec)
+<span class="lineNum">     932 </span>            : {
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :         struct drm_display_mode *mode = &amp;overlay-&gt;crtc-&gt;base.mode;</span>
+<span class="lineNum">     934 </span>            : 
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :         if (rec-&gt;dst_x &lt; mode-&gt;hdisplay &amp;&amp;</span>
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :             rec-&gt;dst_x + rec-&gt;dst_width &lt;= mode-&gt;hdisplay &amp;&amp;</span>
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :             rec-&gt;dst_y &lt; mode-&gt;vdisplay &amp;&amp;</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :             rec-&gt;dst_y + rec-&gt;dst_height &lt;= mode-&gt;vdisplay)</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     940 </span>            :         else
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<a name="942"><span class="lineNum">     942 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     943 </span>            : 
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 : static int check_overlay_scaling(struct put_image_params *rec)</span>
+<span class="lineNum">     945 </span>            : {
+<span class="lineNum">     946 </span>            :         u32 tmp;
+<span class="lineNum">     947 </span>            : 
+<span class="lineNum">     948 </span>            :         /* downscaling limit is 8.0 */
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :         tmp = ((rec-&gt;src_scan_h &lt;&lt; 16) / rec-&gt;dst_h) &gt;&gt; 16;</span>
+<span class="lineNum">     950 </span><span class="lineNoCov">          0 :         if (tmp &gt; 7)</span>
+<span class="lineNum">     951 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     952 </span><span class="lineNoCov">          0 :         tmp = ((rec-&gt;src_scan_w &lt;&lt; 16) / rec-&gt;dst_w) &gt;&gt; 16;</span>
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 :         if (tmp &gt; 7)</span>
+<span class="lineNum">     954 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     955 </span>            : 
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :         return 0;</span>
+<a name="957"><span class="lineNum">     957 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     958 </span>            : 
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 : static int check_overlay_src(struct drm_device *dev,</span>
+<span class="lineNum">     960 </span>            :                              struct drm_intel_overlay_put_image *rec,
+<span class="lineNum">     961 </span>            :                              struct drm_i915_gem_object *new_bo)
+<span class="lineNum">     962 </span>            : {
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         int uv_hscale = uv_hsubsampling(rec-&gt;flags);</span>
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :         int uv_vscale = uv_vsubsampling(rec-&gt;flags);</span>
+<span class="lineNum">     965 </span>            :         u32 stride_mask;
+<span class="lineNum">     966 </span>            :         int depth;
+<span class="lineNum">     967 </span>            :         u32 tmp;
+<span class="lineNum">     968 </span>            : 
+<span class="lineNum">     969 </span>            :         /* check src dimensions */
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :         if (IS_845G(dev) || IS_I830(dev)) {</span>
+<span class="lineNum">     971 </span><span class="lineNoCov">          0 :                 if (rec-&gt;src_height &gt; IMAGE_MAX_HEIGHT_LEGACY ||</span>
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :                     rec-&gt;src_width  &gt; IMAGE_MAX_WIDTH_LEGACY)</span>
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">     974 </span>            :         } else {
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 :                 if (rec-&gt;src_height &gt; IMAGE_MAX_HEIGHT ||</span>
+<span class="lineNum">     976 </span><span class="lineNoCov">          0 :                     rec-&gt;src_width  &gt; IMAGE_MAX_WIDTH)</span>
+<span class="lineNum">     977 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">     978 </span>            :         }
+<span class="lineNum">     979 </span>            : 
+<span class="lineNum">     980 </span>            :         /* better safe than sorry, use 4 as the maximal subsampling ratio */
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 :         if (rec-&gt;src_height &lt; N_VERT_Y_TAPS*4 ||</span>
+<span class="lineNum">     982 </span><span class="lineNoCov">          0 :             rec-&gt;src_width  &lt; N_HORIZ_Y_TAPS*4)</span>
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     984 </span>            : 
+<span class="lineNum">     985 </span>            :         /* check alignment constraints */
+<span class="lineNum">     986 </span><span class="lineNoCov">          0 :         switch (rec-&gt;flags &amp; I915_OVERLAY_TYPE_MASK) {</span>
+<span class="lineNum">     987 </span>            :         case I915_OVERLAY_RGB:
+<span class="lineNum">     988 </span>            :                 /* not implemented */
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     990 </span>            : 
+<span class="lineNum">     991 </span>            :         case I915_OVERLAY_YUV_PACKED:
+<span class="lineNum">     992 </span><span class="lineNoCov">          0 :                 if (uv_vscale != 1)</span>
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">     994 </span>            : 
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :                 depth = packed_depth_bytes(rec-&gt;flags);</span>
+<span class="lineNum">     996 </span><span class="lineNoCov">          0 :                 if (depth &lt; 0)</span>
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :                         return depth;</span>
+<span class="lineNum">     998 </span>            : 
+<span class="lineNum">     999 </span>            :                 /* ignore UV planes */
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :                 rec-&gt;stride_UV = 0;</span>
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :                 rec-&gt;offset_U = 0;</span>
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 :                 rec-&gt;offset_V = 0;</span>
+<span class="lineNum">    1003 </span>            :                 /* check pixel alignment */
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :                 if (rec-&gt;offset_Y % depth)</span>
+<span class="lineNum">    1005 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1006 </span>            :                 break;
+<span class="lineNum">    1007 </span>            : 
+<span class="lineNum">    1008 </span>            :         case I915_OVERLAY_YUV_PLANAR:
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 :                 if (uv_vscale &lt; 0 || uv_hscale &lt; 0)</span>
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1011 </span>            :                 /* no offset restrictions for planar formats */
+<span class="lineNum">    1012 </span>            :                 break;
+<span class="lineNum">    1013 </span>            : 
+<span class="lineNum">    1014 </span>            :         default:
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1016 </span>            :         }
+<span class="lineNum">    1017 </span>            : 
+<span class="lineNum">    1018 </span><span class="lineNoCov">          0 :         if (rec-&gt;src_width % uv_hscale)</span>
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1020 </span>            : 
+<span class="lineNum">    1021 </span>            :         /* stride checking */
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :         if (IS_I830(dev) || IS_845G(dev))</span>
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 :                 stride_mask = 255;</span>
+<span class="lineNum">    1024 </span>            :         else
+<span class="lineNum">    1025 </span>            :                 stride_mask = 63;
+<span class="lineNum">    1026 </span>            : 
+<span class="lineNum">    1027 </span><span class="lineNoCov">          0 :         if (rec-&gt;stride_Y &amp; stride_mask || rec-&gt;stride_UV &amp; stride_mask)</span>
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :         if (IS_GEN4(dev) &amp;&amp; rec-&gt;stride_Y &lt; 512)</span>
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1031 </span>            : 
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :         tmp = (rec-&gt;flags &amp; I915_OVERLAY_TYPE_MASK) == I915_OVERLAY_YUV_PLANAR ?</span>
+<span class="lineNum">    1033 </span>            :                 4096 : 8192;
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :         if (rec-&gt;stride_Y &gt; tmp || rec-&gt;stride_UV &gt; 2*1024)</span>
+<span class="lineNum">    1035 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1036 </span>            : 
+<span class="lineNum">    1037 </span>            :         /* check buffer dimensions */
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 :         switch (rec-&gt;flags &amp; I915_OVERLAY_TYPE_MASK) {</span>
+<span class="lineNum">    1039 </span>            :         case I915_OVERLAY_RGB:
+<span class="lineNum">    1040 </span>            :         case I915_OVERLAY_YUV_PACKED:
+<span class="lineNum">    1041 </span>            :                 /* always 4 Y values per depth pixels */
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :                 if (packed_width_bytes(rec-&gt;flags, rec-&gt;src_width) &gt; rec-&gt;stride_Y)</span>
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1044 </span>            : 
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :                 tmp = rec-&gt;stride_Y*rec-&gt;src_height;</span>
+<span class="lineNum">    1046 </span><span class="lineNoCov">          0 :                 if (rec-&gt;offset_Y + tmp &gt; new_bo-&gt;base.size)</span>
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1048 </span>            :                 break;
+<span class="lineNum">    1049 </span>            : 
+<span class="lineNum">    1050 </span>            :         case I915_OVERLAY_YUV_PLANAR:
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :                 if (rec-&gt;src_width &gt; rec-&gt;stride_Y)</span>
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 :                 if (rec-&gt;src_width/uv_hscale &gt; rec-&gt;stride_UV)</span>
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1055 </span>            : 
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :                 tmp = rec-&gt;stride_Y * rec-&gt;src_height;</span>
+<span class="lineNum">    1057 </span><span class="lineNoCov">          0 :                 if (rec-&gt;offset_Y + tmp &gt; new_bo-&gt;base.size)</span>
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1059 </span>            : 
+<span class="lineNum">    1060 </span><span class="lineNoCov">          0 :                 tmp = rec-&gt;stride_UV * (rec-&gt;src_height / uv_vscale);</span>
+<span class="lineNum">    1061 </span><span class="lineNoCov">          0 :                 if (rec-&gt;offset_U + tmp &gt; new_bo-&gt;base.size ||</span>
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 :                     rec-&gt;offset_V + tmp &gt; new_bo-&gt;base.size)</span>
+<span class="lineNum">    1063 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1064 </span>            :                 break;
+<span class="lineNum">    1065 </span>            :         }
+<span class="lineNum">    1066 </span>            : 
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1069 </span>            : 
+<span class="lineNum">    1070 </span>            : /**
+<span class="lineNum">    1071 </span>            :  * Return the pipe currently connected to the panel fitter,
+<a name="1072"><span class="lineNum">    1072 </span>            :  * or -1 if the panel fitter is not present or not in use</a>
+<span class="lineNum">    1073 </span>            :  */
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 : static int intel_panel_fitter_pipe(struct drm_device *dev)</span>
+<span class="lineNum">    1075 </span>            : {
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">    1077 </span>            :         u32  pfit_control;
+<span class="lineNum">    1078 </span>            : 
+<span class="lineNum">    1079 </span>            :         /* i830 doesn't have a panel fitter */
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev)-&gt;gen &lt;= 3 &amp;&amp; (IS_I830(dev) || !IS_MOBILE(dev)))</span>
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">    1082 </span>            : 
+<span class="lineNum">    1083 </span><span class="lineNoCov">          0 :         pfit_control = I915_READ(PFIT_CONTROL);</span>
+<span class="lineNum">    1084 </span>            : 
+<span class="lineNum">    1085 </span>            :         /* See if the panel fitter is in use */
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 :         if ((pfit_control &amp; PFIT_ENABLE) == 0)</span>
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">    1088 </span>            : 
+<span class="lineNum">    1089 </span>            :         /* 965 can place panel fitter on either pipe */
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :         if (IS_GEN4(dev))</span>
+<span class="lineNum">    1091 </span><span class="lineNoCov">          0 :                 return (pfit_control &gt;&gt; 29) &amp; 0x3;</span>
+<span class="lineNum">    1092 </span>            : 
+<span class="lineNum">    1093 </span>            :         /* older chips can only use pipe 1 */
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :         return 1;</span>
+<a name="1095"><span class="lineNum">    1095 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1096 </span>            : 
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 : int intel_overlay_put_image(struct drm_device *dev, void *data,</span>
+<span class="lineNum">    1098 </span>            :                             struct drm_file *file_priv)
+<span class="lineNum">    1099 </span>            : {
+<span class="lineNum">    1100 </span><span class="lineNoCov">          0 :         struct drm_intel_overlay_put_image *put_image_rec = data;</span>
+<span class="lineNum">    1101 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">    1102 </span>            :         struct intel_overlay *overlay;
+<span class="lineNum">    1103 </span>            :         struct drm_crtc *drmmode_crtc;
+<span class="lineNum">    1104 </span>            :         struct intel_crtc *crtc;
+<span class="lineNum">    1105 </span>            :         struct drm_i915_gem_object *new_bo;
+<span class="lineNum">    1106 </span>            :         struct put_image_params *params;
+<span class="lineNum">    1107 </span>            :         int ret;
+<span class="lineNum">    1108 </span>            : 
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 :         overlay = dev_priv-&gt;overlay;</span>
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :         if (!overlay) {</span>
+<span class="lineNum">    1111 </span>            :                 DRM_DEBUG(&quot;userspace bug: no overlay\n&quot;);
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 :                 return -ENODEV;</span>
+<span class="lineNum">    1113 </span>            :         }
+<span class="lineNum">    1114 </span>            : 
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 :         if (!(put_image_rec-&gt;flags &amp; I915_OVERLAY_ENABLE)) {</span>
+<span class="lineNum">    1116 </span><span class="lineNoCov">          0 :                 drm_modeset_lock_all(dev);</span>
+<span class="lineNum">    1117 </span><span class="lineNoCov">          0 :                 mutex_lock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1118 </span>            : 
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :                 ret = intel_overlay_switch_off(overlay);</span>
+<span class="lineNum">    1120 </span>            : 
+<span class="lineNum">    1121 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :                 drm_modeset_unlock_all(dev);</span>
+<span class="lineNum">    1123 </span>            : 
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">    1125 </span>            :         }
+<span class="lineNum">    1126 </span>            : 
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :         params = kmalloc(sizeof(*params), GFP_KERNEL);</span>
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 :         if (!params)</span>
+<span class="lineNum">    1129 </span><span class="lineNoCov">          0 :                 return -ENOMEM;</span>
+<span class="lineNum">    1130 </span>            : 
+<span class="lineNum">    1131 </span><span class="lineNoCov">          0 :         drmmode_crtc = drm_crtc_find(dev, put_image_rec-&gt;crtc_id);</span>
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 :         if (!drmmode_crtc) {</span>
+<span class="lineNum">    1133 </span>            :                 ret = -ENOENT;
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :                 goto out_free;</span>
+<span class="lineNum">    1135 </span>            :         }
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         crtc = to_intel_crtc(drmmode_crtc);</span>
+<span class="lineNum">    1137 </span>            : 
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :         new_bo = to_intel_bo(drm_gem_object_lookup(dev, file_priv,</span>
+<span class="lineNum">    1139 </span>            :                                                    put_image_rec-&gt;bo_handle));
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :         if (&amp;new_bo-&gt;base == NULL) {</span>
+<span class="lineNum">    1141 </span>            :                 ret = -ENOENT;
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :                 goto out_free;</span>
+<span class="lineNum">    1143 </span>            :         }
+<span class="lineNum">    1144 </span>            : 
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :         drm_modeset_lock_all(dev);</span>
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1147 </span>            : 
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :         if (new_bo-&gt;tiling_mode) {</span>
+<span class="lineNum">    1149 </span>            :                 DRM_DEBUG_KMS(&quot;buffer used for overlay image can not be tiled\n&quot;);
+<span class="lineNum">    1150 </span>            :                 ret = -EINVAL;
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 :                 goto out_unlock;</span>
+<span class="lineNum">    1152 </span>            :         }
+<span class="lineNum">    1153 </span>            : 
+<span class="lineNum">    1154 </span><span class="lineNoCov">          0 :         ret = intel_overlay_recover_from_interrupt(overlay);</span>
+<span class="lineNum">    1155 </span><span class="lineNoCov">          0 :         if (ret != 0)</span>
+<span class="lineNum">    1156 </span>            :                 goto out_unlock;
+<span class="lineNum">    1157 </span>            : 
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 :         if (overlay-&gt;crtc != crtc) {</span>
+<span class="lineNum">    1159 </span><span class="lineNoCov">          0 :                 struct drm_display_mode *mode = &amp;crtc-&gt;base.mode;</span>
+<span class="lineNum">    1160 </span><span class="lineNoCov">          0 :                 ret = intel_overlay_switch_off(overlay);</span>
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :                 if (ret != 0)</span>
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 :                         goto out_unlock;</span>
+<span class="lineNum">    1163 </span>            : 
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :                 ret = check_overlay_possible_on_crtc(overlay, crtc);</span>
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 :                 if (ret != 0)</span>
+<span class="lineNum">    1166 </span><span class="lineNoCov">          0 :                         goto out_unlock;</span>
+<span class="lineNum">    1167 </span>            : 
+<span class="lineNum">    1168 </span><span class="lineNoCov">          0 :                 overlay-&gt;crtc = crtc;</span>
+<span class="lineNum">    1169 </span><span class="lineNoCov">          0 :                 crtc-&gt;overlay = overlay;</span>
+<span class="lineNum">    1170 </span>            : 
+<span class="lineNum">    1171 </span>            :                 /* line too wide, i.e. one-line-mode */
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :                 if (mode-&gt;hdisplay &gt; 1024 &amp;&amp;</span>
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 :                     intel_panel_fitter_pipe(dev) == crtc-&gt;pipe) {</span>
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :                         overlay-&gt;pfit_active = true;</span>
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :                         update_pfit_vscale_ratio(overlay);</span>
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :                         overlay-&gt;pfit_active = false;</span>
+<span class="lineNum">    1178 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1179 </span>            : 
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :         ret = check_overlay_dst(overlay, put_image_rec);</span>
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 :         if (ret != 0)</span>
+<span class="lineNum">    1182 </span>            :                 goto out_unlock;
+<span class="lineNum">    1183 </span>            : 
+<span class="lineNum">    1184 </span><span class="lineNoCov">          0 :         if (overlay-&gt;pfit_active) {</span>
+<span class="lineNum">    1185 </span><span class="lineNoCov">          0 :                 params-&gt;dst_y = ((((u32)put_image_rec-&gt;dst_y) &lt;&lt; 12) /</span>
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :                                  overlay-&gt;pfit_vscale_ratio);</span>
+<span class="lineNum">    1187 </span>            :                 /* shifting right rounds downwards, so add 1 */
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :                 params-&gt;dst_h = ((((u32)put_image_rec-&gt;dst_height) &lt;&lt; 12) /</span>
+<span class="lineNum">    1189 </span><span class="lineNoCov">          0 :                                  overlay-&gt;pfit_vscale_ratio) + 1;</span>
+<span class="lineNum">    1190 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :                 params-&gt;dst_y = put_image_rec-&gt;dst_y;</span>
+<span class="lineNum">    1192 </span><span class="lineNoCov">          0 :                 params-&gt;dst_h = put_image_rec-&gt;dst_height;</span>
+<span class="lineNum">    1193 </span>            :         }
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 :         params-&gt;dst_x = put_image_rec-&gt;dst_x;</span>
+<span class="lineNum">    1195 </span><span class="lineNoCov">          0 :         params-&gt;dst_w = put_image_rec-&gt;dst_width;</span>
+<span class="lineNum">    1196 </span>            : 
+<span class="lineNum">    1197 </span><span class="lineNoCov">          0 :         params-&gt;src_w = put_image_rec-&gt;src_width;</span>
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 :         params-&gt;src_h = put_image_rec-&gt;src_height;</span>
+<span class="lineNum">    1199 </span><span class="lineNoCov">          0 :         params-&gt;src_scan_w = put_image_rec-&gt;src_scan_width;</span>
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 :         params-&gt;src_scan_h = put_image_rec-&gt;src_scan_height;</span>
+<span class="lineNum">    1201 </span><span class="lineNoCov">          0 :         if (params-&gt;src_scan_h &gt; params-&gt;src_h ||</span>
+<span class="lineNum">    1202 </span><span class="lineNoCov">          0 :             params-&gt;src_scan_w &gt; params-&gt;src_w) {</span>
+<span class="lineNum">    1203 </span>            :                 ret = -EINVAL;
+<span class="lineNum">    1204 </span><span class="lineNoCov">          0 :                 goto out_unlock;</span>
+<span class="lineNum">    1205 </span>            :         }
+<span class="lineNum">    1206 </span>            : 
+<span class="lineNum">    1207 </span><span class="lineNoCov">          0 :         ret = check_overlay_src(dev, put_image_rec, new_bo);</span>
+<span class="lineNum">    1208 </span><span class="lineNoCov">          0 :         if (ret != 0)</span>
+<span class="lineNum">    1209 </span>            :                 goto out_unlock;
+<span class="lineNum">    1210 </span><span class="lineNoCov">          0 :         params-&gt;format = put_image_rec-&gt;flags &amp; ~I915_OVERLAY_FLAGS_MASK;</span>
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :         params-&gt;stride_Y = put_image_rec-&gt;stride_Y;</span>
+<span class="lineNum">    1212 </span><span class="lineNoCov">          0 :         params-&gt;stride_UV = put_image_rec-&gt;stride_UV;</span>
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :         params-&gt;offset_Y = put_image_rec-&gt;offset_Y;</span>
+<span class="lineNum">    1214 </span><span class="lineNoCov">          0 :         params-&gt;offset_U = put_image_rec-&gt;offset_U;</span>
+<span class="lineNum">    1215 </span><span class="lineNoCov">          0 :         params-&gt;offset_V = put_image_rec-&gt;offset_V;</span>
+<span class="lineNum">    1216 </span>            : 
+<span class="lineNum">    1217 </span>            :         /* Check scaling after src size to prevent a divide-by-zero. */
+<span class="lineNum">    1218 </span><span class="lineNoCov">          0 :         ret = check_overlay_scaling(params);</span>
+<span class="lineNum">    1219 </span><span class="lineNoCov">          0 :         if (ret != 0)</span>
+<span class="lineNum">    1220 </span>            :                 goto out_unlock;
+<span class="lineNum">    1221 </span>            : 
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 :         ret = intel_overlay_do_put_image(overlay, new_bo, params);</span>
+<span class="lineNum">    1223 </span><span class="lineNoCov">          0 :         if (ret != 0)</span>
+<span class="lineNum">    1224 </span>            :                 goto out_unlock;
+<span class="lineNum">    1225 </span>            : 
+<span class="lineNum">    1226 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1227 </span><span class="lineNoCov">          0 :         drm_modeset_unlock_all(dev);</span>
+<span class="lineNum">    1228 </span>            : 
+<span class="lineNum">    1229 </span><span class="lineNoCov">          0 :         kfree(params);</span>
+<span class="lineNum">    1230 </span>            : 
+<span class="lineNum">    1231 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1232 </span>            : 
+<span class="lineNum">    1233 </span>            : out_unlock:
+<span class="lineNum">    1234 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1235 </span><span class="lineNoCov">          0 :         drm_modeset_unlock_all(dev);</span>
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :         drm_gem_object_unreference_unlocked(&amp;new_bo-&gt;base);</span>
+<span class="lineNum">    1237 </span>            : out_free:
+<span class="lineNum">    1238 </span><span class="lineNoCov">          0 :         kfree(params);</span>
+<span class="lineNum">    1239 </span>            : 
+<span class="lineNum">    1240 </span><span class="lineNoCov">          0 :         return ret;</span>
+<a name="1241"><span class="lineNum">    1241 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1242 </span>            : 
+<span class="lineNum">    1243 </span><span class="lineNoCov">          0 : static void update_reg_attrs(struct intel_overlay *overlay,</span>
+<span class="lineNum">    1244 </span>            :                              struct overlay_registers __iomem *regs)
+<span class="lineNum">    1245 </span>            : {
+<span class="lineNum">    1246 </span><span class="lineNoCov">          0 :         iowrite32((overlay-&gt;contrast &lt;&lt; 18) | (overlay-&gt;brightness &amp; 0xff),</span>
+<span class="lineNum">    1247 </span><span class="lineNoCov">          0 :                   &amp;regs-&gt;OCLRC0);</span>
+<span class="lineNum">    1248 </span><span class="lineNoCov">          0 :         iowrite32(overlay-&gt;saturation, &amp;regs-&gt;OCLRC1);</span>
+<a name="1249"><span class="lineNum">    1249 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1250 </span>            : 
+<span class="lineNum">    1251 </span><span class="lineNoCov">          0 : static bool check_gamma_bounds(u32 gamma1, u32 gamma2)</span>
+<span class="lineNum">    1252 </span>            : {
+<span class="lineNum">    1253 </span>            :         int i;
+<span class="lineNum">    1254 </span>            : 
+<span class="lineNum">    1255 </span><span class="lineNoCov">          0 :         if (gamma1 &amp; 0xff000000 || gamma2 &amp; 0xff000000)</span>
+<span class="lineNum">    1256 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">    1257 </span>            : 
+<span class="lineNum">    1258 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; 3; i++) {</span>
+<span class="lineNum">    1259 </span><span class="lineNoCov">          0 :                 if (((gamma1 &gt;&gt; i*8) &amp; 0xff) &gt;= ((gamma2 &gt;&gt; i*8) &amp; 0xff))</span>
+<span class="lineNum">    1260 </span><span class="lineNoCov">          0 :                         return false;</span>
+<span class="lineNum">    1261 </span>            :         }
+<span class="lineNum">    1262 </span>            : 
+<span class="lineNum">    1263 </span><span class="lineNoCov">          0 :         return true;</span>
+<a name="1264"><span class="lineNum">    1264 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1265 </span>            : 
+<span class="lineNum">    1266 </span><span class="lineNoCov">          0 : static bool check_gamma5_errata(u32 gamma5)</span>
+<span class="lineNum">    1267 </span>            : {
+<span class="lineNum">    1268 </span>            :         int i;
+<span class="lineNum">    1269 </span>            : 
+<span class="lineNum">    1270 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; 3; i++) {</span>
+<span class="lineNum">    1271 </span><span class="lineNoCov">          0 :                 if (((gamma5 &gt;&gt; i*8) &amp; 0xff) == 0x80)</span>
+<span class="lineNum">    1272 </span><span class="lineNoCov">          0 :                         return false;</span>
+<span class="lineNum">    1273 </span>            :         }
+<span class="lineNum">    1274 </span>            : 
+<span class="lineNum">    1275 </span><span class="lineNoCov">          0 :         return true;</span>
+<a name="1276"><span class="lineNum">    1276 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1277 </span>            : 
+<span class="lineNum">    1278 </span><span class="lineNoCov">          0 : static int check_gamma(struct drm_intel_overlay_attrs *attrs)</span>
+<span class="lineNum">    1279 </span>            : {
+<span class="lineNum">    1280 </span><span class="lineNoCov">          0 :         if (!check_gamma_bounds(0, attrs-&gt;gamma0) ||</span>
+<span class="lineNum">    1281 </span><span class="lineNoCov">          0 :             !check_gamma_bounds(attrs-&gt;gamma0, attrs-&gt;gamma1) ||</span>
+<span class="lineNum">    1282 </span><span class="lineNoCov">          0 :             !check_gamma_bounds(attrs-&gt;gamma1, attrs-&gt;gamma2) ||</span>
+<span class="lineNum">    1283 </span><span class="lineNoCov">          0 :             !check_gamma_bounds(attrs-&gt;gamma2, attrs-&gt;gamma3) ||</span>
+<span class="lineNum">    1284 </span><span class="lineNoCov">          0 :             !check_gamma_bounds(attrs-&gt;gamma3, attrs-&gt;gamma4) ||</span>
+<span class="lineNum">    1285 </span><span class="lineNoCov">          0 :             !check_gamma_bounds(attrs-&gt;gamma4, attrs-&gt;gamma5) ||</span>
+<span class="lineNum">    1286 </span><span class="lineNoCov">          0 :             !check_gamma_bounds(attrs-&gt;gamma5, 0x00ffffff))</span>
+<span class="lineNum">    1287 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1288 </span>            : 
+<span class="lineNum">    1289 </span><span class="lineNoCov">          0 :         if (!check_gamma5_errata(attrs-&gt;gamma5))</span>
+<span class="lineNum">    1290 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1291 </span>            : 
+<span class="lineNum">    1292 </span><span class="lineNoCov">          0 :         return 0;</span>
+<a name="1293"><span class="lineNum">    1293 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1294 </span>            : 
+<span class="lineNum">    1295 </span><span class="lineNoCov">          0 : int intel_overlay_attrs(struct drm_device *dev, void *data,</span>
+<span class="lineNum">    1296 </span>            :                         struct drm_file *file_priv)
+<span class="lineNum">    1297 </span>            : {
+<span class="lineNum">    1298 </span><span class="lineNoCov">          0 :         struct drm_intel_overlay_attrs *attrs = data;</span>
+<span class="lineNum">    1299 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">    1300 </span>            :         struct intel_overlay *overlay;
+<span class="lineNum">    1301 </span>            :         struct overlay_registers __iomem *regs;
+<span class="lineNum">    1302 </span>            :         int ret;
+<span class="lineNum">    1303 </span>            : 
+<span class="lineNum">    1304 </span><span class="lineNoCov">          0 :         overlay = dev_priv-&gt;overlay;</span>
+<span class="lineNum">    1305 </span><span class="lineNoCov">          0 :         if (!overlay) {</span>
+<span class="lineNum">    1306 </span>            :                 DRM_DEBUG(&quot;userspace bug: no overlay\n&quot;);
+<span class="lineNum">    1307 </span><span class="lineNoCov">          0 :                 return -ENODEV;</span>
+<span class="lineNum">    1308 </span>            :         }
+<span class="lineNum">    1309 </span>            : 
+<span class="lineNum">    1310 </span><span class="lineNoCov">          0 :         drm_modeset_lock_all(dev);</span>
+<span class="lineNum">    1311 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1312 </span>            : 
+<span class="lineNum">    1313 </span>            :         ret = -EINVAL;
+<span class="lineNum">    1314 </span><span class="lineNoCov">          0 :         if (!(attrs-&gt;flags &amp; I915_OVERLAY_UPDATE_ATTRS)) {</span>
+<span class="lineNum">    1315 </span><span class="lineNoCov">          0 :                 attrs-&gt;color_key  = overlay-&gt;color_key;</span>
+<span class="lineNum">    1316 </span><span class="lineNoCov">          0 :                 attrs-&gt;brightness = overlay-&gt;brightness;</span>
+<span class="lineNum">    1317 </span><span class="lineNoCov">          0 :                 attrs-&gt;contrast   = overlay-&gt;contrast;</span>
+<span class="lineNum">    1318 </span><span class="lineNoCov">          0 :                 attrs-&gt;saturation = overlay-&gt;saturation;</span>
+<span class="lineNum">    1319 </span>            : 
+<span class="lineNum">    1320 </span><span class="lineNoCov">          0 :                 if (!IS_GEN2(dev)) {</span>
+<span class="lineNum">    1321 </span><span class="lineNoCov">          0 :                         attrs-&gt;gamma0 = I915_READ(OGAMC0);</span>
+<span class="lineNum">    1322 </span><span class="lineNoCov">          0 :                         attrs-&gt;gamma1 = I915_READ(OGAMC1);</span>
+<span class="lineNum">    1323 </span><span class="lineNoCov">          0 :                         attrs-&gt;gamma2 = I915_READ(OGAMC2);</span>
+<span class="lineNum">    1324 </span><span class="lineNoCov">          0 :                         attrs-&gt;gamma3 = I915_READ(OGAMC3);</span>
+<span class="lineNum">    1325 </span><span class="lineNoCov">          0 :                         attrs-&gt;gamma4 = I915_READ(OGAMC4);</span>
+<span class="lineNum">    1326 </span><span class="lineNoCov">          0 :                         attrs-&gt;gamma5 = I915_READ(OGAMC5);</span>
+<span class="lineNum">    1327 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1328 </span>            :         } else {
+<span class="lineNum">    1329 </span><span class="lineNoCov">          0 :                 if (attrs-&gt;brightness &lt; -128 || attrs-&gt;brightness &gt; 127)</span>
+<span class="lineNum">    1330 </span>            :                         goto out_unlock;
+<span class="lineNum">    1331 </span><span class="lineNoCov">          0 :                 if (attrs-&gt;contrast &gt; 255)</span>
+<span class="lineNum">    1332 </span>            :                         goto out_unlock;
+<span class="lineNum">    1333 </span><span class="lineNoCov">          0 :                 if (attrs-&gt;saturation &gt; 1023)</span>
+<span class="lineNum">    1334 </span>            :                         goto out_unlock;
+<span class="lineNum">    1335 </span>            : 
+<span class="lineNum">    1336 </span><span class="lineNoCov">          0 :                 overlay-&gt;color_key  = attrs-&gt;color_key;</span>
+<span class="lineNum">    1337 </span><span class="lineNoCov">          0 :                 overlay-&gt;brightness = attrs-&gt;brightness;</span>
+<span class="lineNum">    1338 </span><span class="lineNoCov">          0 :                 overlay-&gt;contrast   = attrs-&gt;contrast;</span>
+<span class="lineNum">    1339 </span><span class="lineNoCov">          0 :                 overlay-&gt;saturation = attrs-&gt;saturation;</span>
+<span class="lineNum">    1340 </span>            : 
+<span class="lineNum">    1341 </span><span class="lineNoCov">          0 :                 regs = intel_overlay_map_regs(overlay);</span>
+<span class="lineNum">    1342 </span><span class="lineNoCov">          0 :                 if (!regs) {</span>
+<span class="lineNum">    1343 </span>            :                         ret = -ENOMEM;
+<span class="lineNum">    1344 </span><span class="lineNoCov">          0 :                         goto out_unlock;</span>
+<span class="lineNum">    1345 </span>            :                 }
+<span class="lineNum">    1346 </span>            : 
+<span class="lineNum">    1347 </span><span class="lineNoCov">          0 :                 update_reg_attrs(overlay, regs);</span>
+<span class="lineNum">    1348 </span>            : 
+<span class="lineNum">    1349 </span><span class="lineNoCov">          0 :                 intel_overlay_unmap_regs(overlay, regs);</span>
+<span class="lineNum">    1350 </span>            : 
+<span class="lineNum">    1351 </span><span class="lineNoCov">          0 :                 if (attrs-&gt;flags &amp; I915_OVERLAY_UPDATE_GAMMA) {</span>
+<span class="lineNum">    1352 </span><span class="lineNoCov">          0 :                         if (IS_GEN2(dev))</span>
+<span class="lineNum">    1353 </span>            :                                 goto out_unlock;
+<span class="lineNum">    1354 </span>            : 
+<span class="lineNum">    1355 </span><span class="lineNoCov">          0 :                         if (overlay-&gt;active) {</span>
+<span class="lineNum">    1356 </span>            :                                 ret = -EBUSY;
+<span class="lineNum">    1357 </span><span class="lineNoCov">          0 :                                 goto out_unlock;</span>
+<span class="lineNum">    1358 </span>            :                         }
+<span class="lineNum">    1359 </span>            : 
+<span class="lineNum">    1360 </span><span class="lineNoCov">          0 :                         ret = check_gamma(attrs);</span>
+<span class="lineNum">    1361 </span><span class="lineNoCov">          0 :                         if (ret)</span>
+<span class="lineNum">    1362 </span>            :                                 goto out_unlock;
+<span class="lineNum">    1363 </span>            : 
+<span class="lineNum">    1364 </span><span class="lineNoCov">          0 :                         I915_WRITE(OGAMC0, attrs-&gt;gamma0);</span>
+<span class="lineNum">    1365 </span><span class="lineNoCov">          0 :                         I915_WRITE(OGAMC1, attrs-&gt;gamma1);</span>
+<span class="lineNum">    1366 </span><span class="lineNoCov">          0 :                         I915_WRITE(OGAMC2, attrs-&gt;gamma2);</span>
+<span class="lineNum">    1367 </span><span class="lineNoCov">          0 :                         I915_WRITE(OGAMC3, attrs-&gt;gamma3);</span>
+<span class="lineNum">    1368 </span><span class="lineNoCov">          0 :                         I915_WRITE(OGAMC4, attrs-&gt;gamma4);</span>
+<span class="lineNum">    1369 </span><span class="lineNoCov">          0 :                         I915_WRITE(OGAMC5, attrs-&gt;gamma5);</span>
+<span class="lineNum">    1370 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1371 </span>            :         }
+<span class="lineNum">    1372 </span><span class="lineNoCov">          0 :         overlay-&gt;color_key_enabled = (attrs-&gt;flags &amp; I915_OVERLAY_DISABLE_DEST_COLORKEY) == 0;</span>
+<span class="lineNum">    1373 </span>            : 
+<span class="lineNum">    1374 </span><span class="lineNoCov">          0 :         ret = 0;</span>
+<span class="lineNum">    1375 </span>            : out_unlock:
+<span class="lineNum">    1376 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1377 </span><span class="lineNoCov">          0 :         drm_modeset_unlock_all(dev);</span>
+<span class="lineNum">    1378 </span>            : 
+<span class="lineNum">    1379 </span><span class="lineNoCov">          0 :         return ret;</span>
+<a name="1380"><span class="lineNum">    1380 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1381 </span>            : 
+<span class="lineNum">    1382 </span><span class="lineNoCov">          0 : void intel_setup_overlay(struct drm_device *dev)</span>
+<span class="lineNum">    1383 </span>            : {
+<span class="lineNum">    1384 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">    1385 </span>            :         struct intel_overlay *overlay;
+<span class="lineNum">    1386 </span>            :         struct drm_i915_gem_object *reg_bo;
+<span class="lineNum">    1387 </span>            :         struct overlay_registers __iomem *regs;
+<span class="lineNum">    1388 </span>            :         int ret;
+<span class="lineNum">    1389 </span>            : 
+<span class="lineNum">    1390 </span><span class="lineNoCov">          0 :         if (!HAS_OVERLAY(dev))</span>
+<span class="lineNum">    1391 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1392 </span>            : 
+<span class="lineNum">    1393 </span><span class="lineNoCov">          0 :         overlay = kzalloc(sizeof(*overlay), GFP_KERNEL);</span>
+<span class="lineNum">    1394 </span><span class="lineNoCov">          0 :         if (!overlay)</span>
+<span class="lineNum">    1395 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1396 </span>            : 
+<span class="lineNum">    1397 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1398 </span><span class="lineNoCov">          0 :         if (WARN_ON(dev_priv-&gt;overlay))</span>
+<span class="lineNum">    1399 </span>            :                 goto out_free;
+<span class="lineNum">    1400 </span>            : 
+<span class="lineNum">    1401 </span><span class="lineNoCov">          0 :         overlay-&gt;dev = dev;</span>
+<span class="lineNum">    1402 </span>            : 
+<span class="lineNum">    1403 </span>            :         reg_bo = NULL;
+<span class="lineNum">    1404 </span><span class="lineNoCov">          0 :         if (!OVERLAY_NEEDS_PHYSICAL(dev))</span>
+<span class="lineNum">    1405 </span><span class="lineNoCov">          0 :                 reg_bo = i915_gem_object_create_stolen(dev, PAGE_SIZE);</span>
+<span class="lineNum">    1406 </span><span class="lineNoCov">          0 :         if (reg_bo == NULL)</span>
+<span class="lineNum">    1407 </span><span class="lineNoCov">          0 :                 reg_bo = i915_gem_alloc_object(dev, PAGE_SIZE);</span>
+<span class="lineNum">    1408 </span><span class="lineNoCov">          0 :         if (reg_bo == NULL)</span>
+<span class="lineNum">    1409 </span>            :                 goto out_free;
+<span class="lineNum">    1410 </span><span class="lineNoCov">          0 :         overlay-&gt;reg_bo = reg_bo;</span>
+<span class="lineNum">    1411 </span>            : 
+<span class="lineNum">    1412 </span><span class="lineNoCov">          0 :         if (OVERLAY_NEEDS_PHYSICAL(dev)) {</span>
+<span class="lineNum">    1413 </span><span class="lineNoCov">          0 :                 ret = i915_gem_object_attach_phys(reg_bo, PAGE_SIZE);</span>
+<span class="lineNum">    1414 </span><span class="lineNoCov">          0 :                 if (ret) {</span>
+<span class="lineNum">    1415 </span><span class="lineNoCov">          0 :                         DRM_ERROR(&quot;failed to attach phys overlay regs\n&quot;);</span>
+<span class="lineNum">    1416 </span><span class="lineNoCov">          0 :                         goto out_free_bo;</span>
+<span class="lineNum">    1417 </span>            :                 }
+<span class="lineNum">    1418 </span><span class="lineNoCov">          0 :                 overlay-&gt;flip_addr = reg_bo-&gt;phys_handle-&gt;busaddr;</span>
+<span class="lineNum">    1419 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1420 </span><span class="lineNoCov">          0 :                 ret = i915_gem_obj_ggtt_pin(reg_bo, PAGE_SIZE, PIN_MAPPABLE);</span>
+<span class="lineNum">    1421 </span><span class="lineNoCov">          0 :                 if (ret) {</span>
+<span class="lineNum">    1422 </span><span class="lineNoCov">          0 :                         DRM_ERROR(&quot;failed to pin overlay register bo\n&quot;);</span>
+<span class="lineNum">    1423 </span><span class="lineNoCov">          0 :                         goto out_free_bo;</span>
+<span class="lineNum">    1424 </span>            :                 }
+<span class="lineNum">    1425 </span><span class="lineNoCov">          0 :                 overlay-&gt;flip_addr = i915_gem_obj_ggtt_offset(reg_bo);</span>
+<span class="lineNum">    1426 </span>            : 
+<span class="lineNum">    1427 </span><span class="lineNoCov">          0 :                 ret = i915_gem_object_set_to_gtt_domain(reg_bo, true);</span>
+<span class="lineNum">    1428 </span><span class="lineNoCov">          0 :                 if (ret) {</span>
+<span class="lineNum">    1429 </span><span class="lineNoCov">          0 :                         DRM_ERROR(&quot;failed to move overlay register bo into the GTT\n&quot;);</span>
+<span class="lineNum">    1430 </span><span class="lineNoCov">          0 :                         goto out_unpin_bo;</span>
+<span class="lineNum">    1431 </span>            :                 }
+<span class="lineNum">    1432 </span>            :         }
+<span class="lineNum">    1433 </span>            : 
+<span class="lineNum">    1434 </span>            :         /* init all values */
+<span class="lineNum">    1435 </span><span class="lineNoCov">          0 :         overlay-&gt;color_key = 0x0101fe;</span>
+<span class="lineNum">    1436 </span><span class="lineNoCov">          0 :         overlay-&gt;color_key_enabled = true;</span>
+<span class="lineNum">    1437 </span><span class="lineNoCov">          0 :         overlay-&gt;brightness = -19;</span>
+<span class="lineNum">    1438 </span><span class="lineNoCov">          0 :         overlay-&gt;contrast = 75;</span>
+<span class="lineNum">    1439 </span><span class="lineNoCov">          0 :         overlay-&gt;saturation = 146;</span>
+<span class="lineNum">    1440 </span>            : 
+<span class="lineNum">    1441 </span><span class="lineNoCov">          0 :         regs = intel_overlay_map_regs(overlay);</span>
+<span class="lineNum">    1442 </span><span class="lineNoCov">          0 :         if (!regs)</span>
+<span class="lineNum">    1443 </span>            :                 goto out_unpin_bo;
+<span class="lineNum">    1444 </span>            : 
+<span class="lineNum">    1445 </span><span class="lineNoCov">          0 :         memset_io(regs, 0, sizeof(struct overlay_registers));</span>
+<span class="lineNum">    1446 </span><span class="lineNoCov">          0 :         update_polyphase_filter(regs);</span>
+<span class="lineNum">    1447 </span><span class="lineNoCov">          0 :         update_reg_attrs(overlay, regs);</span>
+<span class="lineNum">    1448 </span>            : 
+<span class="lineNum">    1449 </span><span class="lineNoCov">          0 :         intel_overlay_unmap_regs(overlay, regs);</span>
+<span class="lineNum">    1450 </span>            : 
+<span class="lineNum">    1451 </span><span class="lineNoCov">          0 :         dev_priv-&gt;overlay = overlay;</span>
+<span class="lineNum">    1452 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1453 </span>            :         DRM_INFO(&quot;initialized overlay support\n&quot;);
+<span class="lineNum">    1454 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">    1455 </span>            : 
+<span class="lineNum">    1456 </span>            : out_unpin_bo:
+<span class="lineNum">    1457 </span><span class="lineNoCov">          0 :         if (!OVERLAY_NEEDS_PHYSICAL(dev))</span>
+<span class="lineNum">    1458 </span><span class="lineNoCov">          0 :                 i915_gem_object_ggtt_unpin(reg_bo);</span>
+<span class="lineNum">    1459 </span>            : out_free_bo:
+<span class="lineNum">    1460 </span><span class="lineNoCov">          0 :         drm_gem_object_unreference(&amp;reg_bo-&gt;base);</span>
+<span class="lineNum">    1461 </span>            : out_free:
+<span class="lineNum">    1462 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1463 </span><span class="lineNoCov">          0 :         kfree(overlay);</span>
+<span class="lineNum">    1464 </span><span class="lineNoCov">          0 :         return;</span>
+<a name="1465"><span class="lineNum">    1465 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1466 </span>            : 
+<span class="lineNum">    1467 </span><span class="lineNoCov">          0 : void intel_cleanup_overlay(struct drm_device *dev)</span>
+<span class="lineNum">    1468 </span>            : {
+<span class="lineNum">    1469 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">    1470 </span>            : 
+<span class="lineNum">    1471 </span><span class="lineNoCov">          0 :         if (!dev_priv-&gt;overlay)</span>
+<span class="lineNum">    1472 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1473 </span>            : 
+<span class="lineNum">    1474 </span>            :         /* The bo's should be free'd by the generic code already.
+<span class="lineNum">    1475 </span>            :          * Furthermore modesetting teardown happens beforehand so the
+<span class="lineNum">    1476 </span>            :          * hardware should be off already */
+<span class="lineNum">    1477 </span><span class="lineNoCov">          0 :         WARN_ON(dev_priv-&gt;overlay-&gt;active);</span>
+<span class="lineNum">    1478 </span>            : 
+<span class="lineNum">    1479 </span><span class="lineNoCov">          0 :         drm_gem_object_unreference_unlocked(&amp;dev_priv-&gt;overlay-&gt;reg_bo-&gt;base);</span>
+<span class="lineNum">    1480 </span><span class="lineNoCov">          0 :         kfree(dev_priv-&gt;overlay);</span>
+<span class="lineNum">    1481 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1482 </span>            : 
+<span class="lineNum">    1483 </span>            : #ifdef __linux__
+<span class="lineNum">    1484 </span>            : 
+<span class="lineNum">    1485 </span>            : struct intel_overlay_error_state {
+<span class="lineNum">    1486 </span>            :         struct overlay_registers regs;
+<span class="lineNum">    1487 </span>            :         unsigned long base;
+<span class="lineNum">    1488 </span>            :         u32 dovsta;
+<span class="lineNum">    1489 </span>            :         u32 isr;
+<span class="lineNum">    1490 </span>            : };
+<span class="lineNum">    1491 </span>            : 
+<span class="lineNum">    1492 </span>            : static struct overlay_registers __iomem *
+<span class="lineNum">    1493 </span>            : intel_overlay_map_regs_atomic(struct intel_overlay *overlay)
+<span class="lineNum">    1494 </span>            : {
+<span class="lineNum">    1495 </span>            :         struct drm_i915_private *dev_priv = overlay-&gt;dev-&gt;dev_private;
+<span class="lineNum">    1496 </span>            :         struct overlay_registers __iomem *regs;
+<span class="lineNum">    1497 </span>            : 
+<span class="lineNum">    1498 </span>            :         if (OVERLAY_NEEDS_PHYSICAL(overlay-&gt;dev))
+<span class="lineNum">    1499 </span>            :                 /* Cast to make sparse happy, but it's wc memory anyway, so
+<span class="lineNum">    1500 </span>            :                  * equivalent to the wc io mapping on X86. */
+<span class="lineNum">    1501 </span>            :                 regs = (struct overlay_registers __iomem *)
+<span class="lineNum">    1502 </span>            :                         overlay-&gt;reg_bo-&gt;phys_handle-&gt;vaddr;
+<span class="lineNum">    1503 </span>            :         else
+<span class="lineNum">    1504 </span>            :                 regs = io_mapping_map_atomic_wc(dev_priv-&gt;gtt.mappable,
+<span class="lineNum">    1505 </span>            :                                                 i915_gem_obj_ggtt_offset(overlay-&gt;reg_bo));
+<span class="lineNum">    1506 </span>            : 
+<span class="lineNum">    1507 </span>            :         return regs;
+<span class="lineNum">    1508 </span>            : }
+<span class="lineNum">    1509 </span>            : 
+<span class="lineNum">    1510 </span>            : static void intel_overlay_unmap_regs_atomic(struct intel_overlay *overlay,
+<span class="lineNum">    1511 </span>            :                                         struct overlay_registers __iomem *regs)
+<span class="lineNum">    1512 </span>            : {
+<span class="lineNum">    1513 </span>            :         if (!OVERLAY_NEEDS_PHYSICAL(overlay-&gt;dev))
+<span class="lineNum">    1514 </span>            :                 io_mapping_unmap_atomic(regs);
+<span class="lineNum">    1515 </span>            : }
+<span class="lineNum">    1516 </span>            : 
+<span class="lineNum">    1517 </span>            : 
+<span class="lineNum">    1518 </span>            : struct intel_overlay_error_state *
+<span class="lineNum">    1519 </span>            : intel_overlay_capture_error_state(struct drm_device *dev)
+<span class="lineNum">    1520 </span>            : {
+<span class="lineNum">    1521 </span>            :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;
+<span class="lineNum">    1522 </span>            :         struct intel_overlay *overlay = dev_priv-&gt;overlay;
+<span class="lineNum">    1523 </span>            :         struct intel_overlay_error_state *error;
+<span class="lineNum">    1524 </span>            :         struct overlay_registers __iomem *regs;
+<span class="lineNum">    1525 </span>            : 
+<span class="lineNum">    1526 </span>            :         if (!overlay || !overlay-&gt;active)
+<span class="lineNum">    1527 </span>            :                 return NULL;
+<span class="lineNum">    1528 </span>            : 
+<span class="lineNum">    1529 </span>            :         error = kmalloc(sizeof(*error), GFP_ATOMIC);
+<span class="lineNum">    1530 </span>            :         if (error == NULL)
+<span class="lineNum">    1531 </span>            :                 return NULL;
+<span class="lineNum">    1532 </span>            : 
+<span class="lineNum">    1533 </span>            :         error-&gt;dovsta = I915_READ(DOVSTA);
+<span class="lineNum">    1534 </span>            :         error-&gt;isr = I915_READ(ISR);
+<span class="lineNum">    1535 </span>            :         if (OVERLAY_NEEDS_PHYSICAL(overlay-&gt;dev))
+<span class="lineNum">    1536 </span>            :                 error-&gt;base = (__force long)overlay-&gt;reg_bo-&gt;phys_handle-&gt;vaddr;
+<span class="lineNum">    1537 </span>            :         else
+<span class="lineNum">    1538 </span>            :                 error-&gt;base = i915_gem_obj_ggtt_offset(overlay-&gt;reg_bo);
+<span class="lineNum">    1539 </span>            : 
+<span class="lineNum">    1540 </span>            :         regs = intel_overlay_map_regs_atomic(overlay);
+<span class="lineNum">    1541 </span>            :         if (!regs)
+<span class="lineNum">    1542 </span>            :                 goto err;
+<span class="lineNum">    1543 </span>            : 
+<span class="lineNum">    1544 </span>            :         memcpy_fromio(&amp;error-&gt;regs, regs, sizeof(struct overlay_registers));
+<span class="lineNum">    1545 </span>            :         intel_overlay_unmap_regs_atomic(overlay, regs);
+<span class="lineNum">    1546 </span>            : 
+<span class="lineNum">    1547 </span>            :         return error;
+<span class="lineNum">    1548 </span>            : 
+<span class="lineNum">    1549 </span>            : err:
+<span class="lineNum">    1550 </span>            :         kfree(error);
+<span class="lineNum">    1551 </span>            :         return NULL;
+<span class="lineNum">    1552 </span>            : }
+<span class="lineNum">    1553 </span>            : 
+<span class="lineNum">    1554 </span>            : void
+<span class="lineNum">    1555 </span>            : intel_overlay_print_error_state(struct drm_i915_error_state_buf *m,
+<span class="lineNum">    1556 </span>            :                                 struct intel_overlay_error_state *error)
+<span class="lineNum">    1557 </span>            : {
+<span class="lineNum">    1558 </span>            :         i915_error_printf(m, &quot;Overlay, status: 0x%08x, interrupt: 0x%08x\n&quot;,
+<span class="lineNum">    1559 </span>            :                           error-&gt;dovsta, error-&gt;isr);
+<span class="lineNum">    1560 </span>            :         i915_error_printf(m, &quot;  Register file at 0x%08lx:\n&quot;,
+<span class="lineNum">    1561 </span>            :                           error-&gt;base);
+<span class="lineNum">    1562 </span>            : 
+<span class="lineNum">    1563 </span>            : #define P(x) i915_error_printf(m, &quot;    &quot; #x &quot;:   0x%08x\n&quot;, error-&gt;regs.x)
+<span class="lineNum">    1564 </span>            :         P(OBUF_0Y);
+<span class="lineNum">    1565 </span>            :         P(OBUF_1Y);
+<span class="lineNum">    1566 </span>            :         P(OBUF_0U);
+<span class="lineNum">    1567 </span>            :         P(OBUF_0V);
+<span class="lineNum">    1568 </span>            :         P(OBUF_1U);
+<span class="lineNum">    1569 </span>            :         P(OBUF_1V);
+<span class="lineNum">    1570 </span>            :         P(OSTRIDE);
+<span class="lineNum">    1571 </span>            :         P(YRGB_VPH);
+<span class="lineNum">    1572 </span>            :         P(UV_VPH);
+<span class="lineNum">    1573 </span>            :         P(HORZ_PH);
+<span class="lineNum">    1574 </span>            :         P(INIT_PHS);
+<span class="lineNum">    1575 </span>            :         P(DWINPOS);
+<span class="lineNum">    1576 </span>            :         P(DWINSZ);
+<span class="lineNum">    1577 </span>            :         P(SWIDTH);
+<span class="lineNum">    1578 </span>            :         P(SWIDTHSW);
+<span class="lineNum">    1579 </span>            :         P(SHEIGHT);
+<span class="lineNum">    1580 </span>            :         P(YRGBSCALE);
+<span class="lineNum">    1581 </span>            :         P(UVSCALE);
+<span class="lineNum">    1582 </span>            :         P(OCLRC0);
+<span class="lineNum">    1583 </span>            :         P(OCLRC1);
+<span class="lineNum">    1584 </span>            :         P(DCLRKV);
+<span class="lineNum">    1585 </span>            :         P(DCLRKM);
+<span class="lineNum">    1586 </span>            :         P(SCLRKVH);
+<span class="lineNum">    1587 </span>            :         P(SCLRKVL);
+<span class="lineNum">    1588 </span>            :         P(SCLRKEN);
+<span class="lineNum">    1589 </span>            :         P(OCONFIG);
+<span class="lineNum">    1590 </span>            :         P(OCMD);
+<span class="lineNum">    1591 </span>            :         P(OSTART_0Y);
+<span class="lineNum">    1592 </span>            :         P(OSTART_1Y);
+<span class="lineNum">    1593 </span>            :         P(OSTART_0U);
+<span class="lineNum">    1594 </span>            :         P(OSTART_0V);
+<span class="lineNum">    1595 </span>            :         P(OSTART_1U);
+<span class="lineNum">    1596 </span>            :         P(OSTART_1V);
+<span class="lineNum">    1597 </span>            :         P(OTILEOFF_0Y);
+<span class="lineNum">    1598 </span>            :         P(OTILEOFF_1Y);
+<span class="lineNum">    1599 </span>            :         P(OTILEOFF_0U);
+<span class="lineNum">    1600 </span>            :         P(OTILEOFF_0V);
+<span class="lineNum">    1601 </span>            :         P(OTILEOFF_1U);
+<span class="lineNum">    1602 </span>            :         P(OTILEOFF_1V);
+<span class="lineNum">    1603 </span>            :         P(FASTHSCALE);
+<span class="lineNum">    1604 </span>            :         P(UVSCALEV);
+<span class="lineNum">    1605 </span>            : #undef P
+<span class="lineNum">    1606 </span>            : }
+<span class="lineNum">    1607 </span>            : 
+<span class="lineNum">    1608 </span>            : #else
+<a name="1609"><span class="lineNum">    1609 </span>            : </a>
+<span class="lineNum">    1610 </span>            : struct intel_overlay_error_state *
+<span class="lineNum">    1611 </span><span class="lineNoCov">          0 : intel_overlay_capture_error_state(struct drm_device *dev)</span>
+<span class="lineNum">    1612 </span>            : {
+<span class="lineNum">    1613 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">    1614 </span>            : }
+<a name="1615"><span class="lineNum">    1615 </span>            : </a>
+<span class="lineNum">    1616 </span>            : void
+<span class="lineNum">    1617 </span><span class="lineNoCov">          0 : intel_overlay_print_error_state(struct drm_i915_error_state_buf *m,</span>
+<span class="lineNum">    1618 </span>            :                                 struct intel_overlay_error_state *error)
+<span class="lineNum">    1619 </span>            : {
+<span class="lineNum">    1620 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1621 </span>            : 
+<span class="lineNum">    1622 </span>            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

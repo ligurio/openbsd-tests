@@ -1,0 +1,1307 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/i915/i915_cmd_parser.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">dev/pci/drm/i915</a> - i915_cmd_parser.c<span style="font-size: 80%;"> (source / <a href="i915_cmd_parser.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">286</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">19</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * Copyright © 2013 Intel Corporation
+<span class="lineNum">       3 </span>            :  *
+<span class="lineNum">       4 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       5 </span>            :  * copy of this software and associated documentation files (the &quot;Software&quot;),
+<span class="lineNum">       6 </span>            :  * to deal in the Software without restriction, including without limitation
+<span class="lineNum">       7 </span>            :  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+<span class="lineNum">       8 </span>            :  * and/or sell copies of the Software, and to permit persons to whom the
+<span class="lineNum">       9 </span>            :  * Software is furnished to do so, subject to the following conditions:
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * The above copyright notice and this permission notice (including the next
+<span class="lineNum">      12 </span>            :  * paragraph) shall be included in all copies or substantial portions of the
+<span class="lineNum">      13 </span>            :  * Software.
+<span class="lineNum">      14 </span>            :  *
+<span class="lineNum">      15 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      16 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      17 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+<span class="lineNum">      18 </span>            :  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+<span class="lineNum">      19 </span>            :  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+<span class="lineNum">      20 </span>            :  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+<span class="lineNum">      21 </span>            :  * IN THE SOFTWARE.
+<span class="lineNum">      22 </span>            :  *
+<span class="lineNum">      23 </span>            :  * Authors:
+<span class="lineNum">      24 </span>            :  *    Brad Volkin &lt;bradley.d.volkin@intel.com&gt;
+<span class="lineNum">      25 </span>            :  *
+<span class="lineNum">      26 </span>            :  */
+<span class="lineNum">      27 </span>            : 
+<span class="lineNum">      28 </span>            : #include &quot;i915_drv.h&quot;
+<span class="lineNum">      29 </span>            : 
+<span class="lineNum">      30 </span>            : /**
+<span class="lineNum">      31 </span>            :  * DOC: batch buffer command parser
+<span class="lineNum">      32 </span>            :  *
+<span class="lineNum">      33 </span>            :  * Motivation:
+<span class="lineNum">      34 </span>            :  * Certain OpenGL features (e.g. transform feedback, performance monitoring)
+<span class="lineNum">      35 </span>            :  * require userspace code to submit batches containing commands such as
+<span class="lineNum">      36 </span>            :  * MI_LOAD_REGISTER_IMM to access various registers. Unfortunately, some
+<span class="lineNum">      37 </span>            :  * generations of the hardware will noop these commands in &quot;unsecure&quot; batches
+<span class="lineNum">      38 </span>            :  * (which includes all userspace batches submitted via i915) even though the
+<span class="lineNum">      39 </span>            :  * commands may be safe and represent the intended programming model of the
+<span class="lineNum">      40 </span>            :  * device.
+<span class="lineNum">      41 </span>            :  *
+<span class="lineNum">      42 </span>            :  * The software command parser is similar in operation to the command parsing
+<span class="lineNum">      43 </span>            :  * done in hardware for unsecure batches. However, the software parser allows
+<span class="lineNum">      44 </span>            :  * some operations that would be noop'd by hardware, if the parser determines
+<span class="lineNum">      45 </span>            :  * the operation is safe, and submits the batch as &quot;secure&quot; to prevent hardware
+<span class="lineNum">      46 </span>            :  * parsing.
+<span class="lineNum">      47 </span>            :  *
+<span class="lineNum">      48 </span>            :  * Threats:
+<span class="lineNum">      49 </span>            :  * At a high level, the hardware (and software) checks attempt to prevent
+<span class="lineNum">      50 </span>            :  * granting userspace undue privileges. There are three categories of privilege.
+<span class="lineNum">      51 </span>            :  *
+<span class="lineNum">      52 </span>            :  * First, commands which are explicitly defined as privileged or which should
+<span class="lineNum">      53 </span>            :  * only be used by the kernel driver. The parser generally rejects such
+<span class="lineNum">      54 </span>            :  * commands, though it may allow some from the drm master process.
+<span class="lineNum">      55 </span>            :  *
+<span class="lineNum">      56 </span>            :  * Second, commands which access registers. To support correct/enhanced
+<span class="lineNum">      57 </span>            :  * userspace functionality, particularly certain OpenGL extensions, the parser
+<span class="lineNum">      58 </span>            :  * provides a whitelist of registers which userspace may safely access (for both
+<span class="lineNum">      59 </span>            :  * normal and drm master processes).
+<span class="lineNum">      60 </span>            :  *
+<span class="lineNum">      61 </span>            :  * Third, commands which access privileged memory (i.e. GGTT, HWS page, etc).
+<span class="lineNum">      62 </span>            :  * The parser always rejects such commands.
+<span class="lineNum">      63 </span>            :  *
+<span class="lineNum">      64 </span>            :  * The majority of the problematic commands fall in the MI_* range, with only a
+<span class="lineNum">      65 </span>            :  * few specific commands on each ring (e.g. PIPE_CONTROL and MI_FLUSH_DW).
+<span class="lineNum">      66 </span>            :  *
+<span class="lineNum">      67 </span>            :  * Implementation:
+<span class="lineNum">      68 </span>            :  * Each ring maintains tables of commands and registers which the parser uses in
+<span class="lineNum">      69 </span>            :  * scanning batch buffers submitted to that ring.
+<span class="lineNum">      70 </span>            :  *
+<span class="lineNum">      71 </span>            :  * Since the set of commands that the parser must check for is significantly
+<span class="lineNum">      72 </span>            :  * smaller than the number of commands supported, the parser tables contain only
+<span class="lineNum">      73 </span>            :  * those commands required by the parser. This generally works because command
+<span class="lineNum">      74 </span>            :  * opcode ranges have standard command length encodings. So for commands that
+<span class="lineNum">      75 </span>            :  * the parser does not need to check, it can easily skip them. This is
+<span class="lineNum">      76 </span>            :  * implemented via a per-ring length decoding vfunc.
+<span class="lineNum">      77 </span>            :  *
+<span class="lineNum">      78 </span>            :  * Unfortunately, there are a number of commands that do not follow the standard
+<span class="lineNum">      79 </span>            :  * length encoding for their opcode range, primarily amongst the MI_* commands.
+<span class="lineNum">      80 </span>            :  * To handle this, the parser provides a way to define explicit &quot;skip&quot; entries
+<span class="lineNum">      81 </span>            :  * in the per-ring command tables.
+<span class="lineNum">      82 </span>            :  *
+<span class="lineNum">      83 </span>            :  * Other command table entries map fairly directly to high level categories
+<span class="lineNum">      84 </span>            :  * mentioned above: rejected, master-only, register whitelist. The parser
+<span class="lineNum">      85 </span>            :  * implements a number of checks, including the privileged memory checks, via a
+<span class="lineNum">      86 </span>            :  * general bitmasking mechanism.
+<span class="lineNum">      87 </span>            :  */
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span>            : #define STD_MI_OPCODE_MASK  0xFF800000
+<span class="lineNum">      90 </span>            : #define STD_3D_OPCODE_MASK  0xFFFF0000
+<span class="lineNum">      91 </span>            : #define STD_2D_OPCODE_MASK  0xFFC00000
+<span class="lineNum">      92 </span>            : #define STD_MFX_OPCODE_MASK 0xFFFF0000
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span>            : #define CMD(op, opm, f, lm, fl, ...)                            \
+<span class="lineNum">      95 </span>            :         {                                                       \
+<span class="lineNum">      96 </span>            :                 .flags = (fl) | ((f) ? CMD_DESC_FIXED : 0),     \
+<span class="lineNum">      97 </span>            :                 .cmd = { (op), (opm) },                         \
+<span class="lineNum">      98 </span>            :                 .length = { (lm) },                             \
+<span class="lineNum">      99 </span>            :                 __VA_ARGS__                                     \
+<span class="lineNum">     100 </span>            :         }
+<span class="lineNum">     101 </span>            : 
+<span class="lineNum">     102 </span>            : /* Convenience macros to compress the tables */
+<span class="lineNum">     103 </span>            : #define SMI STD_MI_OPCODE_MASK
+<span class="lineNum">     104 </span>            : #define S3D STD_3D_OPCODE_MASK
+<span class="lineNum">     105 </span>            : #define S2D STD_2D_OPCODE_MASK
+<span class="lineNum">     106 </span>            : #define SMFX STD_MFX_OPCODE_MASK
+<span class="lineNum">     107 </span>            : #define F true
+<span class="lineNum">     108 </span>            : #define S CMD_DESC_SKIP
+<span class="lineNum">     109 </span>            : #define R CMD_DESC_REJECT
+<span class="lineNum">     110 </span>            : #define W CMD_DESC_REGISTER
+<span class="lineNum">     111 </span>            : #define B CMD_DESC_BITMASK
+<span class="lineNum">     112 </span>            : #define M CMD_DESC_MASTER
+<span class="lineNum">     113 </span>            : 
+<span class="lineNum">     114 </span>            : /*            Command                          Mask   Fixed Len   Action
+<span class="lineNum">     115 </span>            :               ---------------------------------------------------------- */
+<span class="lineNum">     116 </span>            : static const struct drm_i915_cmd_descriptor common_cmds[] = {
+<span class="lineNum">     117 </span>            :         CMD(  MI_NOOP,                          SMI,    F,  1,      S  ),
+<span class="lineNum">     118 </span>            :         CMD(  MI_USER_INTERRUPT,                SMI,    F,  1,      R  ),
+<span class="lineNum">     119 </span>            :         CMD(  MI_WAIT_FOR_EVENT,                SMI,    F,  1,      M  ),
+<span class="lineNum">     120 </span>            :         CMD(  MI_ARB_CHECK,                     SMI,    F,  1,      S  ),
+<span class="lineNum">     121 </span>            :         CMD(  MI_REPORT_HEAD,                   SMI,    F,  1,      S  ),
+<span class="lineNum">     122 </span>            :         CMD(  MI_SUSPEND_FLUSH,                 SMI,    F,  1,      S  ),
+<span class="lineNum">     123 </span>            :         CMD(  MI_SEMAPHORE_MBOX,                SMI,   !F,  0xFF,   R  ),
+<span class="lineNum">     124 </span>            :         CMD(  MI_STORE_DWORD_INDEX,             SMI,   !F,  0xFF,   R  ),
+<span class="lineNum">     125 </span>            :         CMD(  MI_LOAD_REGISTER_IMM(1),          SMI,   !F,  0xFF,   W,
+<span class="lineNum">     126 </span>            :               .reg = { .offset = 1, .mask = 0x007FFFFC, .step = 2 }    ),
+<span class="lineNum">     127 </span>            :         CMD(  MI_STORE_REGISTER_MEM,            SMI,    F,  3,     W | B,
+<span class="lineNum">     128 </span>            :               .reg = { .offset = 1, .mask = 0x007FFFFC },
+<span class="lineNum">     129 </span>            :               .bits = {{
+<span class="lineNum">     130 </span>            :                         .offset = 0,
+<span class="lineNum">     131 </span>            :                         .mask = MI_GLOBAL_GTT,
+<span class="lineNum">     132 </span>            :                         .expected = 0,
+<span class="lineNum">     133 </span>            :               }},                                                      ),
+<span class="lineNum">     134 </span>            :         CMD(  MI_LOAD_REGISTER_MEM,             SMI,    F,  3,     W | B,
+<span class="lineNum">     135 </span>            :               .reg = { .offset = 1, .mask = 0x007FFFFC },
+<span class="lineNum">     136 </span>            :               .bits = {{
+<span class="lineNum">     137 </span>            :                         .offset = 0,
+<span class="lineNum">     138 </span>            :                         .mask = MI_GLOBAL_GTT,
+<span class="lineNum">     139 </span>            :                         .expected = 0,
+<span class="lineNum">     140 </span>            :               }},                                                      ),
+<span class="lineNum">     141 </span>            :         /*
+<span class="lineNum">     142 </span>            :          * MI_BATCH_BUFFER_START requires some special handling. It's not
+<span class="lineNum">     143 </span>            :          * really a 'skip' action but it doesn't seem like it's worth adding
+<span class="lineNum">     144 </span>            :          * a new action. See i915_parse_cmds().
+<span class="lineNum">     145 </span>            :          */
+<span class="lineNum">     146 </span>            :         CMD(  MI_BATCH_BUFFER_START,            SMI,   !F,  0xFF,   S  ),
+<span class="lineNum">     147 </span>            : };
+<span class="lineNum">     148 </span>            : 
+<span class="lineNum">     149 </span>            : static const struct drm_i915_cmd_descriptor render_cmds[] = {
+<span class="lineNum">     150 </span>            :         CMD(  MI_FLUSH,                         SMI,    F,  1,      S  ),
+<span class="lineNum">     151 </span>            :         CMD(  MI_ARB_ON_OFF,                    SMI,    F,  1,      R  ),
+<span class="lineNum">     152 </span>            :         CMD(  MI_PREDICATE,                     SMI,    F,  1,      S  ),
+<span class="lineNum">     153 </span>            :         CMD(  MI_TOPOLOGY_FILTER,               SMI,    F,  1,      S  ),
+<span class="lineNum">     154 </span>            :         CMD(  MI_SET_APPID,                     SMI,    F,  1,      S  ),
+<span class="lineNum">     155 </span>            :         CMD(  MI_DISPLAY_FLIP,                  SMI,   !F,  0xFF,   R  ),
+<span class="lineNum">     156 </span>            :         CMD(  MI_SET_CONTEXT,                   SMI,   !F,  0xFF,   R  ),
+<span class="lineNum">     157 </span>            :         CMD(  MI_URB_CLEAR,                     SMI,   !F,  0xFF,   S  ),
+<span class="lineNum">     158 </span>            :         CMD(  MI_STORE_DWORD_IMM,               SMI,   !F,  0x3F,   B,
+<span class="lineNum">     159 </span>            :               .bits = {{
+<span class="lineNum">     160 </span>            :                         .offset = 0,
+<span class="lineNum">     161 </span>            :                         .mask = MI_GLOBAL_GTT,
+<span class="lineNum">     162 </span>            :                         .expected = 0,
+<span class="lineNum">     163 </span>            :               }},                                                      ),
+<span class="lineNum">     164 </span>            :         CMD(  MI_UPDATE_GTT,                    SMI,   !F,  0xFF,   R  ),
+<span class="lineNum">     165 </span>            :         CMD(  MI_CLFLUSH,                       SMI,   !F,  0x3FF,  B,
+<span class="lineNum">     166 </span>            :               .bits = {{
+<span class="lineNum">     167 </span>            :                         .offset = 0,
+<span class="lineNum">     168 </span>            :                         .mask = MI_GLOBAL_GTT,
+<span class="lineNum">     169 </span>            :                         .expected = 0,
+<span class="lineNum">     170 </span>            :               }},                                                      ),
+<span class="lineNum">     171 </span>            :         CMD(  MI_REPORT_PERF_COUNT,             SMI,   !F,  0x3F,   B,
+<span class="lineNum">     172 </span>            :               .bits = {{
+<span class="lineNum">     173 </span>            :                         .offset = 1,
+<span class="lineNum">     174 </span>            :                         .mask = MI_REPORT_PERF_COUNT_GGTT,
+<span class="lineNum">     175 </span>            :                         .expected = 0,
+<span class="lineNum">     176 </span>            :               }},                                                      ),
+<span class="lineNum">     177 </span>            :         CMD(  MI_CONDITIONAL_BATCH_BUFFER_END,  SMI,   !F,  0xFF,   B,
+<span class="lineNum">     178 </span>            :               .bits = {{
+<span class="lineNum">     179 </span>            :                         .offset = 0,
+<span class="lineNum">     180 </span>            :                         .mask = MI_GLOBAL_GTT,
+<span class="lineNum">     181 </span>            :                         .expected = 0,
+<span class="lineNum">     182 </span>            :               }},                                                      ),
+<span class="lineNum">     183 </span>            :         CMD(  GFX_OP_3DSTATE_VF_STATISTICS,     S3D,    F,  1,      S  ),
+<span class="lineNum">     184 </span>            :         CMD(  PIPELINE_SELECT,                  S3D,    F,  1,      S  ),
+<span class="lineNum">     185 </span>            :         CMD(  MEDIA_VFE_STATE,                  S3D,   !F,  0xFFFF, B,
+<span class="lineNum">     186 </span>            :               .bits = {{
+<span class="lineNum">     187 </span>            :                         .offset = 2,
+<span class="lineNum">     188 </span>            :                         .mask = MEDIA_VFE_STATE_MMIO_ACCESS_MASK,
+<span class="lineNum">     189 </span>            :                         .expected = 0,
+<span class="lineNum">     190 </span>            :               }},                                                      ),
+<span class="lineNum">     191 </span>            :         CMD(  GPGPU_OBJECT,                     S3D,   !F,  0xFF,   S  ),
+<span class="lineNum">     192 </span>            :         CMD(  GPGPU_WALKER,                     S3D,   !F,  0xFF,   S  ),
+<span class="lineNum">     193 </span>            :         CMD(  GFX_OP_3DSTATE_SO_DECL_LIST,      S3D,   !F,  0x1FF,  S  ),
+<span class="lineNum">     194 </span>            :         CMD(  GFX_OP_PIPE_CONTROL(5),           S3D,   !F,  0xFF,   B,
+<span class="lineNum">     195 </span>            :               .bits = {{
+<span class="lineNum">     196 </span>            :                         .offset = 1,
+<span class="lineNum">     197 </span>            :                         .mask = (PIPE_CONTROL_MMIO_WRITE | PIPE_CONTROL_NOTIFY),
+<span class="lineNum">     198 </span>            :                         .expected = 0,
+<span class="lineNum">     199 </span>            :               },
+<span class="lineNum">     200 </span>            :               {
+<span class="lineNum">     201 </span>            :                         .offset = 1,
+<span class="lineNum">     202 </span>            :                         .mask = (PIPE_CONTROL_GLOBAL_GTT_IVB |
+<span class="lineNum">     203 </span>            :                                  PIPE_CONTROL_STORE_DATA_INDEX),
+<span class="lineNum">     204 </span>            :                         .expected = 0,
+<span class="lineNum">     205 </span>            :                         .condition_offset = 1,
+<span class="lineNum">     206 </span>            :                         .condition_mask = PIPE_CONTROL_POST_SYNC_OP_MASK,
+<span class="lineNum">     207 </span>            :               }},                                                      ),
+<span class="lineNum">     208 </span>            : };
+<span class="lineNum">     209 </span>            : 
+<span class="lineNum">     210 </span>            : static const struct drm_i915_cmd_descriptor hsw_render_cmds[] = {
+<span class="lineNum">     211 </span>            :         CMD(  MI_SET_PREDICATE,                 SMI,    F,  1,      S  ),
+<span class="lineNum">     212 </span>            :         CMD(  MI_RS_CONTROL,                    SMI,    F,  1,      S  ),
+<span class="lineNum">     213 </span>            :         CMD(  MI_URB_ATOMIC_ALLOC,              SMI,    F,  1,      S  ),
+<span class="lineNum">     214 </span>            :         CMD(  MI_SET_APPID,                     SMI,    F,  1,      S  ),
+<span class="lineNum">     215 </span>            :         CMD(  MI_RS_CONTEXT,                    SMI,    F,  1,      S  ),
+<span class="lineNum">     216 </span>            :         CMD(  MI_LOAD_SCAN_LINES_INCL,          SMI,   !F,  0x3F,   M  ),
+<span class="lineNum">     217 </span>            :         CMD(  MI_LOAD_SCAN_LINES_EXCL,          SMI,   !F,  0x3F,   R  ),
+<span class="lineNum">     218 </span>            :         CMD(  MI_LOAD_REGISTER_REG,             SMI,   !F,  0xFF,   R  ),
+<span class="lineNum">     219 </span>            :         CMD(  MI_RS_STORE_DATA_IMM,             SMI,   !F,  0xFF,   S  ),
+<span class="lineNum">     220 </span>            :         CMD(  MI_LOAD_URB_MEM,                  SMI,   !F,  0xFF,   S  ),
+<span class="lineNum">     221 </span>            :         CMD(  MI_STORE_URB_MEM,                 SMI,   !F,  0xFF,   S  ),
+<span class="lineNum">     222 </span>            :         CMD(  GFX_OP_3DSTATE_DX9_CONSTANTF_VS,  S3D,   !F,  0x7FF,  S  ),
+<span class="lineNum">     223 </span>            :         CMD(  GFX_OP_3DSTATE_DX9_CONSTANTF_PS,  S3D,   !F,  0x7FF,  S  ),
+<span class="lineNum">     224 </span>            : 
+<span class="lineNum">     225 </span>            :         CMD(  GFX_OP_3DSTATE_BINDING_TABLE_EDIT_VS,  S3D,   !F,  0x1FF,  S  ),
+<span class="lineNum">     226 </span>            :         CMD(  GFX_OP_3DSTATE_BINDING_TABLE_EDIT_GS,  S3D,   !F,  0x1FF,  S  ),
+<span class="lineNum">     227 </span>            :         CMD(  GFX_OP_3DSTATE_BINDING_TABLE_EDIT_HS,  S3D,   !F,  0x1FF,  S  ),
+<span class="lineNum">     228 </span>            :         CMD(  GFX_OP_3DSTATE_BINDING_TABLE_EDIT_DS,  S3D,   !F,  0x1FF,  S  ),
+<span class="lineNum">     229 </span>            :         CMD(  GFX_OP_3DSTATE_BINDING_TABLE_EDIT_PS,  S3D,   !F,  0x1FF,  S  ),
+<span class="lineNum">     230 </span>            : };
+<span class="lineNum">     231 </span>            : 
+<span class="lineNum">     232 </span>            : static const struct drm_i915_cmd_descriptor video_cmds[] = {
+<span class="lineNum">     233 </span>            :         CMD(  MI_ARB_ON_OFF,                    SMI,    F,  1,      R  ),
+<span class="lineNum">     234 </span>            :         CMD(  MI_SET_APPID,                     SMI,    F,  1,      S  ),
+<span class="lineNum">     235 </span>            :         CMD(  MI_STORE_DWORD_IMM,               SMI,   !F,  0xFF,   B,
+<span class="lineNum">     236 </span>            :               .bits = {{
+<span class="lineNum">     237 </span>            :                         .offset = 0,
+<span class="lineNum">     238 </span>            :                         .mask = MI_GLOBAL_GTT,
+<span class="lineNum">     239 </span>            :                         .expected = 0,
+<span class="lineNum">     240 </span>            :               }},                                                      ),
+<span class="lineNum">     241 </span>            :         CMD(  MI_UPDATE_GTT,                    SMI,   !F,  0x3F,   R  ),
+<span class="lineNum">     242 </span>            :         CMD(  MI_FLUSH_DW,                      SMI,   !F,  0x3F,   B,
+<span class="lineNum">     243 </span>            :               .bits = {{
+<span class="lineNum">     244 </span>            :                         .offset = 0,
+<span class="lineNum">     245 </span>            :                         .mask = MI_FLUSH_DW_NOTIFY,
+<span class="lineNum">     246 </span>            :                         .expected = 0,
+<span class="lineNum">     247 </span>            :               },
+<span class="lineNum">     248 </span>            :               {
+<span class="lineNum">     249 </span>            :                         .offset = 1,
+<span class="lineNum">     250 </span>            :                         .mask = MI_FLUSH_DW_USE_GTT,
+<span class="lineNum">     251 </span>            :                         .expected = 0,
+<span class="lineNum">     252 </span>            :                         .condition_offset = 0,
+<span class="lineNum">     253 </span>            :                         .condition_mask = MI_FLUSH_DW_OP_MASK,
+<span class="lineNum">     254 </span>            :               },
+<span class="lineNum">     255 </span>            :               {
+<span class="lineNum">     256 </span>            :                         .offset = 0,
+<span class="lineNum">     257 </span>            :                         .mask = MI_FLUSH_DW_STORE_INDEX,
+<span class="lineNum">     258 </span>            :                         .expected = 0,
+<span class="lineNum">     259 </span>            :                         .condition_offset = 0,
+<span class="lineNum">     260 </span>            :                         .condition_mask = MI_FLUSH_DW_OP_MASK,
+<span class="lineNum">     261 </span>            :               }},                                                      ),
+<span class="lineNum">     262 </span>            :         CMD(  MI_CONDITIONAL_BATCH_BUFFER_END,  SMI,   !F,  0xFF,   B,
+<span class="lineNum">     263 </span>            :               .bits = {{
+<span class="lineNum">     264 </span>            :                         .offset = 0,
+<span class="lineNum">     265 </span>            :                         .mask = MI_GLOBAL_GTT,
+<span class="lineNum">     266 </span>            :                         .expected = 0,
+<span class="lineNum">     267 </span>            :               }},                                                      ),
+<span class="lineNum">     268 </span>            :         /*
+<span class="lineNum">     269 </span>            :          * MFX_WAIT doesn't fit the way we handle length for most commands.
+<span class="lineNum">     270 </span>            :          * It has a length field but it uses a non-standard length bias.
+<span class="lineNum">     271 </span>            :          * It is always 1 dword though, so just treat it as fixed length.
+<span class="lineNum">     272 </span>            :          */
+<span class="lineNum">     273 </span>            :         CMD(  MFX_WAIT,                         SMFX,   F,  1,      S  ),
+<span class="lineNum">     274 </span>            : };
+<span class="lineNum">     275 </span>            : 
+<span class="lineNum">     276 </span>            : static const struct drm_i915_cmd_descriptor vecs_cmds[] = {
+<span class="lineNum">     277 </span>            :         CMD(  MI_ARB_ON_OFF,                    SMI,    F,  1,      R  ),
+<span class="lineNum">     278 </span>            :         CMD(  MI_SET_APPID,                     SMI,    F,  1,      S  ),
+<span class="lineNum">     279 </span>            :         CMD(  MI_STORE_DWORD_IMM,               SMI,   !F,  0xFF,   B,
+<span class="lineNum">     280 </span>            :               .bits = {{
+<span class="lineNum">     281 </span>            :                         .offset = 0,
+<span class="lineNum">     282 </span>            :                         .mask = MI_GLOBAL_GTT,
+<span class="lineNum">     283 </span>            :                         .expected = 0,
+<span class="lineNum">     284 </span>            :               }},                                                      ),
+<span class="lineNum">     285 </span>            :         CMD(  MI_UPDATE_GTT,                    SMI,   !F,  0x3F,   R  ),
+<span class="lineNum">     286 </span>            :         CMD(  MI_FLUSH_DW,                      SMI,   !F,  0x3F,   B,
+<span class="lineNum">     287 </span>            :               .bits = {{
+<span class="lineNum">     288 </span>            :                         .offset = 0,
+<span class="lineNum">     289 </span>            :                         .mask = MI_FLUSH_DW_NOTIFY,
+<span class="lineNum">     290 </span>            :                         .expected = 0,
+<span class="lineNum">     291 </span>            :               },
+<span class="lineNum">     292 </span>            :               {
+<span class="lineNum">     293 </span>            :                         .offset = 1,
+<span class="lineNum">     294 </span>            :                         .mask = MI_FLUSH_DW_USE_GTT,
+<span class="lineNum">     295 </span>            :                         .expected = 0,
+<span class="lineNum">     296 </span>            :                         .condition_offset = 0,
+<span class="lineNum">     297 </span>            :                         .condition_mask = MI_FLUSH_DW_OP_MASK,
+<span class="lineNum">     298 </span>            :               },
+<span class="lineNum">     299 </span>            :               {
+<span class="lineNum">     300 </span>            :                         .offset = 0,
+<span class="lineNum">     301 </span>            :                         .mask = MI_FLUSH_DW_STORE_INDEX,
+<span class="lineNum">     302 </span>            :                         .expected = 0,
+<span class="lineNum">     303 </span>            :                         .condition_offset = 0,
+<span class="lineNum">     304 </span>            :                         .condition_mask = MI_FLUSH_DW_OP_MASK,
+<span class="lineNum">     305 </span>            :               }},                                                      ),
+<span class="lineNum">     306 </span>            :         CMD(  MI_CONDITIONAL_BATCH_BUFFER_END,  SMI,   !F,  0xFF,   B,
+<span class="lineNum">     307 </span>            :               .bits = {{
+<span class="lineNum">     308 </span>            :                         .offset = 0,
+<span class="lineNum">     309 </span>            :                         .mask = MI_GLOBAL_GTT,
+<span class="lineNum">     310 </span>            :                         .expected = 0,
+<span class="lineNum">     311 </span>            :               }},                                                      ),
+<span class="lineNum">     312 </span>            : };
+<span class="lineNum">     313 </span>            : 
+<span class="lineNum">     314 </span>            : static const struct drm_i915_cmd_descriptor blt_cmds[] = {
+<span class="lineNum">     315 </span>            :         CMD(  MI_DISPLAY_FLIP,                  SMI,   !F,  0xFF,   R  ),
+<span class="lineNum">     316 </span>            :         CMD(  MI_STORE_DWORD_IMM,               SMI,   !F,  0x3FF,  B,
+<span class="lineNum">     317 </span>            :               .bits = {{
+<span class="lineNum">     318 </span>            :                         .offset = 0,
+<span class="lineNum">     319 </span>            :                         .mask = MI_GLOBAL_GTT,
+<span class="lineNum">     320 </span>            :                         .expected = 0,
+<span class="lineNum">     321 </span>            :               }},                                                      ),
+<span class="lineNum">     322 </span>            :         CMD(  MI_UPDATE_GTT,                    SMI,   !F,  0x3F,   R  ),
+<span class="lineNum">     323 </span>            :         CMD(  MI_FLUSH_DW,                      SMI,   !F,  0x3F,   B,
+<span class="lineNum">     324 </span>            :               .bits = {{
+<span class="lineNum">     325 </span>            :                         .offset = 0,
+<span class="lineNum">     326 </span>            :                         .mask = MI_FLUSH_DW_NOTIFY,
+<span class="lineNum">     327 </span>            :                         .expected = 0,
+<span class="lineNum">     328 </span>            :               },
+<span class="lineNum">     329 </span>            :               {
+<span class="lineNum">     330 </span>            :                         .offset = 1,
+<span class="lineNum">     331 </span>            :                         .mask = MI_FLUSH_DW_USE_GTT,
+<span class="lineNum">     332 </span>            :                         .expected = 0,
+<span class="lineNum">     333 </span>            :                         .condition_offset = 0,
+<span class="lineNum">     334 </span>            :                         .condition_mask = MI_FLUSH_DW_OP_MASK,
+<span class="lineNum">     335 </span>            :               },
+<span class="lineNum">     336 </span>            :               {
+<span class="lineNum">     337 </span>            :                         .offset = 0,
+<span class="lineNum">     338 </span>            :                         .mask = MI_FLUSH_DW_STORE_INDEX,
+<span class="lineNum">     339 </span>            :                         .expected = 0,
+<span class="lineNum">     340 </span>            :                         .condition_offset = 0,
+<span class="lineNum">     341 </span>            :                         .condition_mask = MI_FLUSH_DW_OP_MASK,
+<span class="lineNum">     342 </span>            :               }},                                                      ),
+<span class="lineNum">     343 </span>            :         CMD(  COLOR_BLT,                        S2D,   !F,  0x3F,   S  ),
+<span class="lineNum">     344 </span>            :         CMD(  SRC_COPY_BLT,                     S2D,   !F,  0x3F,   S  ),
+<span class="lineNum">     345 </span>            : };
+<span class="lineNum">     346 </span>            : 
+<span class="lineNum">     347 </span>            : static const struct drm_i915_cmd_descriptor hsw_blt_cmds[] = {
+<span class="lineNum">     348 </span>            :         CMD(  MI_LOAD_SCAN_LINES_INCL,          SMI,   !F,  0x3F,   M  ),
+<span class="lineNum">     349 </span>            :         CMD(  MI_LOAD_SCAN_LINES_EXCL,          SMI,   !F,  0x3F,   R  ),
+<span class="lineNum">     350 </span>            : };
+<span class="lineNum">     351 </span>            : 
+<span class="lineNum">     352 </span>            : #undef CMD
+<span class="lineNum">     353 </span>            : #undef SMI
+<span class="lineNum">     354 </span>            : #undef S3D
+<span class="lineNum">     355 </span>            : #undef S2D
+<span class="lineNum">     356 </span>            : #undef SMFX
+<span class="lineNum">     357 </span>            : #undef F
+<span class="lineNum">     358 </span>            : #undef S
+<span class="lineNum">     359 </span>            : #undef R
+<span class="lineNum">     360 </span>            : #undef W
+<span class="lineNum">     361 </span>            : #undef B
+<span class="lineNum">     362 </span>            : #undef M
+<span class="lineNum">     363 </span>            : 
+<span class="lineNum">     364 </span>            : static const struct drm_i915_cmd_table gen7_render_cmds[] = {
+<span class="lineNum">     365 </span>            :         { common_cmds, ARRAY_SIZE(common_cmds) },
+<span class="lineNum">     366 </span>            :         { render_cmds, ARRAY_SIZE(render_cmds) },
+<span class="lineNum">     367 </span>            : };
+<span class="lineNum">     368 </span>            : 
+<span class="lineNum">     369 </span>            : static const struct drm_i915_cmd_table hsw_render_ring_cmds[] = {
+<span class="lineNum">     370 </span>            :         { common_cmds, ARRAY_SIZE(common_cmds) },
+<span class="lineNum">     371 </span>            :         { render_cmds, ARRAY_SIZE(render_cmds) },
+<span class="lineNum">     372 </span>            :         { hsw_render_cmds, ARRAY_SIZE(hsw_render_cmds) },
+<span class="lineNum">     373 </span>            : };
+<span class="lineNum">     374 </span>            : 
+<span class="lineNum">     375 </span>            : static const struct drm_i915_cmd_table gen7_video_cmds[] = {
+<span class="lineNum">     376 </span>            :         { common_cmds, ARRAY_SIZE(common_cmds) },
+<span class="lineNum">     377 </span>            :         { video_cmds, ARRAY_SIZE(video_cmds) },
+<span class="lineNum">     378 </span>            : };
+<span class="lineNum">     379 </span>            : 
+<span class="lineNum">     380 </span>            : static const struct drm_i915_cmd_table hsw_vebox_cmds[] = {
+<span class="lineNum">     381 </span>            :         { common_cmds, ARRAY_SIZE(common_cmds) },
+<span class="lineNum">     382 </span>            :         { vecs_cmds, ARRAY_SIZE(vecs_cmds) },
+<span class="lineNum">     383 </span>            : };
+<span class="lineNum">     384 </span>            : 
+<span class="lineNum">     385 </span>            : static const struct drm_i915_cmd_table gen7_blt_cmds[] = {
+<span class="lineNum">     386 </span>            :         { common_cmds, ARRAY_SIZE(common_cmds) },
+<span class="lineNum">     387 </span>            :         { blt_cmds, ARRAY_SIZE(blt_cmds) },
+<span class="lineNum">     388 </span>            : };
+<span class="lineNum">     389 </span>            : 
+<span class="lineNum">     390 </span>            : static const struct drm_i915_cmd_table hsw_blt_ring_cmds[] = {
+<span class="lineNum">     391 </span>            :         { common_cmds, ARRAY_SIZE(common_cmds) },
+<span class="lineNum">     392 </span>            :         { blt_cmds, ARRAY_SIZE(blt_cmds) },
+<span class="lineNum">     393 </span>            :         { hsw_blt_cmds, ARRAY_SIZE(hsw_blt_cmds) },
+<span class="lineNum">     394 </span>            : };
+<span class="lineNum">     395 </span>            : 
+<span class="lineNum">     396 </span>            : /*
+<span class="lineNum">     397 </span>            :  * Register whitelists, sorted by increasing register offset.
+<span class="lineNum">     398 </span>            :  */
+<span class="lineNum">     399 </span>            : 
+<span class="lineNum">     400 </span>            : /*
+<span class="lineNum">     401 </span>            :  * An individual whitelist entry granting access to register addr.  If
+<span class="lineNum">     402 </span>            :  * mask is non-zero the argument of immediate register writes will be
+<span class="lineNum">     403 </span>            :  * AND-ed with mask, and the command will be rejected if the result
+<span class="lineNum">     404 </span>            :  * doesn't match value.
+<span class="lineNum">     405 </span>            :  *
+<span class="lineNum">     406 </span>            :  * Registers with non-zero mask are only allowed to be written using
+<span class="lineNum">     407 </span>            :  * LRI.
+<span class="lineNum">     408 </span>            :  */
+<span class="lineNum">     409 </span>            : struct drm_i915_reg_descriptor {
+<span class="lineNum">     410 </span>            :         u32 addr;
+<span class="lineNum">     411 </span>            :         u32 mask;
+<span class="lineNum">     412 </span>            :         u32 value;
+<span class="lineNum">     413 </span>            : };
+<span class="lineNum">     414 </span>            : 
+<span class="lineNum">     415 </span>            : /* Convenience macro for adding 32-bit registers. */
+<span class="lineNum">     416 </span>            : #define REG32(address, ...)                             \
+<span class="lineNum">     417 </span>            :         { .addr = address, __VA_ARGS__ }
+<span class="lineNum">     418 </span>            : 
+<span class="lineNum">     419 </span>            : /*
+<span class="lineNum">     420 </span>            :  * Convenience macro for adding 64-bit registers.
+<span class="lineNum">     421 </span>            :  *
+<span class="lineNum">     422 </span>            :  * Some registers that userspace accesses are 64 bits. The register
+<span class="lineNum">     423 </span>            :  * access commands only allow 32-bit accesses. Hence, we have to include
+<span class="lineNum">     424 </span>            :  * entries for both halves of the 64-bit registers.
+<span class="lineNum">     425 </span>            :  */
+<span class="lineNum">     426 </span>            : #define REG64(addr)                                     \
+<span class="lineNum">     427 </span>            :         REG32(addr), REG32(addr + sizeof(u32))
+<span class="lineNum">     428 </span>            : 
+<span class="lineNum">     429 </span>            : static const struct drm_i915_reg_descriptor gen7_render_regs[] = {
+<span class="lineNum">     430 </span>            :         REG64(GPGPU_THREADS_DISPATCHED),
+<span class="lineNum">     431 </span>            :         REG64(HS_INVOCATION_COUNT),
+<span class="lineNum">     432 </span>            :         REG64(DS_INVOCATION_COUNT),
+<span class="lineNum">     433 </span>            :         REG64(IA_VERTICES_COUNT),
+<span class="lineNum">     434 </span>            :         REG64(IA_PRIMITIVES_COUNT),
+<span class="lineNum">     435 </span>            :         REG64(VS_INVOCATION_COUNT),
+<span class="lineNum">     436 </span>            :         REG64(GS_INVOCATION_COUNT),
+<span class="lineNum">     437 </span>            :         REG64(GS_PRIMITIVES_COUNT),
+<span class="lineNum">     438 </span>            :         REG64(CL_INVOCATION_COUNT),
+<span class="lineNum">     439 </span>            :         REG64(CL_PRIMITIVES_COUNT),
+<span class="lineNum">     440 </span>            :         REG64(PS_INVOCATION_COUNT),
+<span class="lineNum">     441 </span>            :         REG64(PS_DEPTH_COUNT),
+<span class="lineNum">     442 </span>            :         REG32(OACONTROL), /* Only allowed for LRI and SRM. See below. */
+<span class="lineNum">     443 </span>            :         REG64(MI_PREDICATE_SRC0),
+<span class="lineNum">     444 </span>            :         REG64(MI_PREDICATE_SRC1),
+<span class="lineNum">     445 </span>            :         REG32(GEN7_3DPRIM_END_OFFSET),
+<span class="lineNum">     446 </span>            :         REG32(GEN7_3DPRIM_START_VERTEX),
+<span class="lineNum">     447 </span>            :         REG32(GEN7_3DPRIM_VERTEX_COUNT),
+<span class="lineNum">     448 </span>            :         REG32(GEN7_3DPRIM_INSTANCE_COUNT),
+<span class="lineNum">     449 </span>            :         REG32(GEN7_3DPRIM_START_INSTANCE),
+<span class="lineNum">     450 </span>            :         REG32(GEN7_3DPRIM_BASE_VERTEX),
+<span class="lineNum">     451 </span>            :         REG32(GEN7_GPGPU_DISPATCHDIMX),
+<span class="lineNum">     452 </span>            :         REG32(GEN7_GPGPU_DISPATCHDIMY),
+<span class="lineNum">     453 </span>            :         REG32(GEN7_GPGPU_DISPATCHDIMZ),
+<span class="lineNum">     454 </span>            :         REG64(GEN7_SO_NUM_PRIMS_WRITTEN(0)),
+<span class="lineNum">     455 </span>            :         REG64(GEN7_SO_NUM_PRIMS_WRITTEN(1)),
+<span class="lineNum">     456 </span>            :         REG64(GEN7_SO_NUM_PRIMS_WRITTEN(2)),
+<span class="lineNum">     457 </span>            :         REG64(GEN7_SO_NUM_PRIMS_WRITTEN(3)),
+<span class="lineNum">     458 </span>            :         REG64(GEN7_SO_PRIM_STORAGE_NEEDED(0)),
+<span class="lineNum">     459 </span>            :         REG64(GEN7_SO_PRIM_STORAGE_NEEDED(1)),
+<span class="lineNum">     460 </span>            :         REG64(GEN7_SO_PRIM_STORAGE_NEEDED(2)),
+<span class="lineNum">     461 </span>            :         REG64(GEN7_SO_PRIM_STORAGE_NEEDED(3)),
+<span class="lineNum">     462 </span>            :         REG32(GEN7_SO_WRITE_OFFSET(0)),
+<span class="lineNum">     463 </span>            :         REG32(GEN7_SO_WRITE_OFFSET(1)),
+<span class="lineNum">     464 </span>            :         REG32(GEN7_SO_WRITE_OFFSET(2)),
+<span class="lineNum">     465 </span>            :         REG32(GEN7_SO_WRITE_OFFSET(3)),
+<span class="lineNum">     466 </span>            :         REG32(GEN7_L3SQCREG1),
+<span class="lineNum">     467 </span>            :         REG32(GEN7_L3CNTLREG2),
+<span class="lineNum">     468 </span>            :         REG32(GEN7_L3CNTLREG3),
+<span class="lineNum">     469 </span>            :         REG32(HSW_SCRATCH1,
+<span class="lineNum">     470 </span>            :               .mask = ~HSW_SCRATCH1_L3_DATA_ATOMICS_DISABLE,
+<span class="lineNum">     471 </span>            :               .value = 0),
+<span class="lineNum">     472 </span>            :         REG32(HSW_ROW_CHICKEN3,
+<span class="lineNum">     473 </span>            :               .mask = ~(HSW_ROW_CHICKEN3_L3_GLOBAL_ATOMICS_DISABLE &lt;&lt; 16 |
+<span class="lineNum">     474 </span>            :                         HSW_ROW_CHICKEN3_L3_GLOBAL_ATOMICS_DISABLE),
+<span class="lineNum">     475 </span>            :               .value = 0),
+<span class="lineNum">     476 </span>            : };
+<span class="lineNum">     477 </span>            : 
+<span class="lineNum">     478 </span>            : static const struct drm_i915_reg_descriptor gen7_blt_regs[] = {
+<span class="lineNum">     479 </span>            :         REG32(BCS_SWCTRL),
+<span class="lineNum">     480 </span>            : };
+<span class="lineNum">     481 </span>            : 
+<span class="lineNum">     482 </span>            : static const struct drm_i915_reg_descriptor ivb_master_regs[] = {
+<span class="lineNum">     483 </span>            :         REG32(FORCEWAKE_MT),
+<span class="lineNum">     484 </span>            :         REG32(DERRMR),
+<span class="lineNum">     485 </span>            :         REG32(GEN7_PIPE_DE_LOAD_SL(PIPE_A)),
+<span class="lineNum">     486 </span>            :         REG32(GEN7_PIPE_DE_LOAD_SL(PIPE_B)),
+<span class="lineNum">     487 </span>            :         REG32(GEN7_PIPE_DE_LOAD_SL(PIPE_C)),
+<span class="lineNum">     488 </span>            : };
+<span class="lineNum">     489 </span>            : 
+<span class="lineNum">     490 </span>            : static const struct drm_i915_reg_descriptor hsw_master_regs[] = {
+<span class="lineNum">     491 </span>            :         REG32(FORCEWAKE_MT),
+<span class="lineNum">     492 </span>            :         REG32(DERRMR),
+<span class="lineNum">     493 </span>            : };
+<span class="lineNum">     494 </span>            : 
+<span class="lineNum">     495 </span>            : #undef REG64
+<a name="496"><span class="lineNum">     496 </span>            : #undef REG32</a>
+<span class="lineNum">     497 </span>            : 
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 : static u32 gen7_render_get_cmd_length_mask(u32 cmd_header)</span>
+<span class="lineNum">     499 </span>            : {
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :         u32 client = (cmd_header &amp; INSTR_CLIENT_MASK) &gt;&gt; INSTR_CLIENT_SHIFT;</span>
+<span class="lineNum">     501 </span>            :         u32 subclient =
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                 (cmd_header &amp; INSTR_SUBCLIENT_MASK) &gt;&gt; INSTR_SUBCLIENT_SHIFT;</span>
+<span class="lineNum">     503 </span>            : 
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :         if (client == INSTR_MI_CLIENT)</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :                 return 0x3F;</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :         else if (client == INSTR_RC_CLIENT) {</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :                 if (subclient == INSTR_MEDIA_SUBCLIENT)</span>
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :                         return 0xFFFF;</span>
+<span class="lineNum">     509 </span>            :                 else
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :                         return 0xFF;</span>
+<span class="lineNum">     511 </span>            :         }
+<span class="lineNum">     512 </span>            : 
+<span class="lineNum">     513 </span>            :         DRM_DEBUG_DRIVER(&quot;CMD: Abnormal rcs cmd length! 0x%08X\n&quot;, cmd_header);
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :         return 0;</span>
+<a name="515"><span class="lineNum">     515 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 : static u32 gen7_bsd_get_cmd_length_mask(u32 cmd_header)</span>
+<span class="lineNum">     518 </span>            : {
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :         u32 client = (cmd_header &amp; INSTR_CLIENT_MASK) &gt;&gt; INSTR_CLIENT_SHIFT;</span>
+<span class="lineNum">     520 </span>            :         u32 subclient =
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                 (cmd_header &amp; INSTR_SUBCLIENT_MASK) &gt;&gt; INSTR_SUBCLIENT_SHIFT;</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :         u32 op = (cmd_header &amp; INSTR_26_TO_24_MASK) &gt;&gt; INSTR_26_TO_24_SHIFT;</span>
+<span class="lineNum">     523 </span>            : 
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :         if (client == INSTR_MI_CLIENT)</span>
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                 return 0x3F;</span>
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :         else if (client == INSTR_RC_CLIENT) {</span>
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                 if (subclient == INSTR_MEDIA_SUBCLIENT) {</span>
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :                         if (op == 6)</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                                 return 0xFFFF;</span>
+<span class="lineNum">     530 </span>            :                         else
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :                                 return 0xFFF;</span>
+<span class="lineNum">     532 </span>            :                 } else
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :                         return 0xFF;</span>
+<span class="lineNum">     534 </span>            :         }
+<span class="lineNum">     535 </span>            : 
+<span class="lineNum">     536 </span>            :         DRM_DEBUG_DRIVER(&quot;CMD: Abnormal bsd cmd length! 0x%08X\n&quot;, cmd_header);
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :         return 0;</span>
+<a name="538"><span class="lineNum">     538 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     539 </span>            : 
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 : static u32 gen7_blt_get_cmd_length_mask(u32 cmd_header)</span>
+<span class="lineNum">     541 </span>            : {
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :         u32 client = (cmd_header &amp; INSTR_CLIENT_MASK) &gt;&gt; INSTR_CLIENT_SHIFT;</span>
+<span class="lineNum">     543 </span>            : 
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :         if (client == INSTR_MI_CLIENT)</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :                 return 0x3F;</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :         else if (client == INSTR_BC_CLIENT)</span>
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 :                 return 0xFF;</span>
+<span class="lineNum">     548 </span>            : 
+<span class="lineNum">     549 </span>            :         DRM_DEBUG_DRIVER(&quot;CMD: Abnormal blt cmd length! 0x%08X\n&quot;, cmd_header);
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :         return 0;</span>
+<a name="551"><span class="lineNum">     551 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     552 </span>            : 
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 : static bool validate_cmds_sorted(struct intel_engine_cs *ring,</span>
+<span class="lineNum">     554 </span>            :                                  const struct drm_i915_cmd_table *cmd_tables,
+<span class="lineNum">     555 </span>            :                                  int cmd_table_count)
+<span class="lineNum">     556 </span>            : {
+<span class="lineNum">     557 </span>            :         int i;
+<span class="lineNum">     558 </span>            :         bool ret = true;
+<span class="lineNum">     559 </span>            : 
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :         if (!cmd_tables || cmd_table_count == 0)</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">     562 </span>            : 
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; cmd_table_count; i++) {</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :                 const struct drm_i915_cmd_table *table = &amp;cmd_tables[i];</span>
+<span class="lineNum">     565 </span>            :                 u32 previous = 0;
+<span class="lineNum">     566 </span>            :                 int j;
+<span class="lineNum">     567 </span>            : 
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                 for (j = 0; j &lt; table-&gt;count; j++) {</span>
+<span class="lineNum">     569 </span>            :                         const struct drm_i915_cmd_descriptor *desc =
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :                                 &amp;table-&gt;table[j];</span>
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :                         u32 curr = desc-&gt;cmd.value &amp; desc-&gt;cmd.mask;</span>
+<span class="lineNum">     572 </span>            : 
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :                         if (curr &lt; previous) {</span>
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :                                 DRM_ERROR(&quot;CMD: table not sorted ring=%d table=%d entry=%d cmd=0x%08X prev=0x%08X\n&quot;,</span>
+<span class="lineNum">     575 </span>            :                                           ring-&gt;id, i, j, curr, previous);
+<span class="lineNum">     576 </span>            :                                 ret = false;
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     578 </span>            : 
+<span class="lineNum">     579 </span>            :                         previous = curr;
+<span class="lineNum">     580 </span>            :                 }
+<span class="lineNum">     581 </span>            :         }
+<span class="lineNum">     582 </span>            : 
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :         return ret;</span>
+<a name="584"><span class="lineNum">     584 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     585 </span>            : 
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 : static bool check_sorted(int ring_id,</span>
+<span class="lineNum">     587 </span>            :                          const struct drm_i915_reg_descriptor *reg_table,
+<span class="lineNum">     588 </span>            :                          int reg_count)
+<span class="lineNum">     589 </span>            : {
+<span class="lineNum">     590 </span>            :         int i;
+<span class="lineNum">     591 </span>            :         u32 previous = 0;
+<span class="lineNum">     592 </span>            :         bool ret = true;
+<span class="lineNum">     593 </span>            : 
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; reg_count; i++) {</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                 u32 curr = reg_table[i].addr;</span>
+<span class="lineNum">     596 </span>            : 
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :                 if (curr &lt; previous) {</span>
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :                         DRM_ERROR(&quot;CMD: table not sorted ring=%d entry=%d reg=0x%08X prev=0x%08X\n&quot;,</span>
+<span class="lineNum">     599 </span>            :                                   ring_id, i, curr, previous);
+<span class="lineNum">     600 </span>            :                         ret = false;
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     602 </span>            : 
+<span class="lineNum">     603 </span>            :                 previous = curr;
+<span class="lineNum">     604 </span>            :         }
+<span class="lineNum">     605 </span>            : 
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :         return ret;</span>
+<a name="607"><span class="lineNum">     607 </span>            : }</a>
+<span class="lineNum">     608 </span>            : 
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 : static bool validate_regs_sorted(struct intel_engine_cs *ring)</span>
+<span class="lineNum">     610 </span>            : {
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :         return check_sorted(ring-&gt;id, ring-&gt;reg_table, ring-&gt;reg_count) &amp;&amp;</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                 check_sorted(ring-&gt;id, ring-&gt;master_reg_table,</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :                              ring-&gt;master_reg_count);</span>
+<span class="lineNum">     614 </span>            : }
+<span class="lineNum">     615 </span>            : 
+<span class="lineNum">     616 </span>            : struct cmd_node {
+<span class="lineNum">     617 </span>            :         const struct drm_i915_cmd_descriptor *desc;
+<span class="lineNum">     618 </span>            :         struct hlist_node node;
+<span class="lineNum">     619 </span>            : };
+<span class="lineNum">     620 </span>            : 
+<span class="lineNum">     621 </span>            : /*
+<span class="lineNum">     622 </span>            :  * Different command ranges have different numbers of bits for the opcode. For
+<span class="lineNum">     623 </span>            :  * example, MI commands use bits 31:23 while 3D commands use bits 31:16. The
+<span class="lineNum">     624 </span>            :  * problem is that, for example, MI commands use bits 22:16 for other fields
+<span class="lineNum">     625 </span>            :  * such as GGTT vs PPGTT bits. If we include those bits in the mask then when
+<span class="lineNum">     626 </span>            :  * we mask a command from a batch it could hash to the wrong bucket due to
+<span class="lineNum">     627 </span>            :  * non-opcode bits being set. But if we don't include those bits, some 3D
+<span class="lineNum">     628 </span>            :  * commands may hash to the same bucket due to not including opcode bits that
+<span class="lineNum">     629 </span>            :  * make the command unique. For now, we will risk hashing to the same bucket.
+<span class="lineNum">     630 </span>            :  *
+<span class="lineNum">     631 </span>            :  * If we attempt to generate a perfect hash, we should be able to look at bits
+<span class="lineNum">     632 </span>            :  * 31:29 of a command from a batch buffer and use the full mask for that
+<span class="lineNum">     633 </span>            :  * client. The existing INSTR_CLIENT_MASK/SHIFT defines can be used for this.
+<span class="lineNum">     634 </span>            :  */
+<a name="635"><span class="lineNum">     635 </span>            : #define CMD_HASH_MASK STD_MI_OPCODE_MASK</a>
+<span class="lineNum">     636 </span>            : 
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 : static int init_hash_table(struct intel_engine_cs *ring,</span>
+<span class="lineNum">     638 </span>            :                            const struct drm_i915_cmd_table *cmd_tables,
+<span class="lineNum">     639 </span>            :                            int cmd_table_count)
+<span class="lineNum">     640 </span>            : {
+<span class="lineNum">     641 </span>            :         int i, j;
+<span class="lineNum">     642 </span>            : 
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :         hash_init(ring-&gt;cmd_hash);</span>
+<span class="lineNum">     644 </span>            : 
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; cmd_table_count; i++) {</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :                 const struct drm_i915_cmd_table *table = &amp;cmd_tables[i];</span>
+<span class="lineNum">     647 </span>            : 
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :                 for (j = 0; j &lt; table-&gt;count; j++) {</span>
+<span class="lineNum">     649 </span>            :                         const struct drm_i915_cmd_descriptor *desc =
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :                                 &amp;table-&gt;table[j];</span>
+<span class="lineNum">     651 </span>            :                         struct cmd_node *desc_node =
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :                                 kmalloc(sizeof(*desc_node), GFP_KERNEL);</span>
+<span class="lineNum">     653 </span>            : 
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :                         if (!desc_node)</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                                 return -ENOMEM;</span>
+<span class="lineNum">     656 </span>            : 
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                         desc_node-&gt;desc = desc;</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                         hash_add(ring-&gt;cmd_hash, &amp;desc_node-&gt;node,</span>
+<span class="lineNum">     659 </span>            :                                  desc-&gt;cmd.value &amp; CMD_HASH_MASK);
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     662 </span>            : 
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :         return 0;</span>
+<a name="664"><span class="lineNum">     664 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     665 </span>            : 
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 : static void fini_hash_table(struct intel_engine_cs *ring)</span>
+<span class="lineNum">     667 </span>            : {
+<span class="lineNum">     668 </span>            :         struct hlist_node *tmp;
+<span class="lineNum">     669 </span>            :         struct cmd_node *desc_node;
+<span class="lineNum">     670 </span>            :         int i;
+<span class="lineNum">     671 </span>            : 
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :         hash_for_each_safe(ring-&gt;cmd_hash, i, tmp, desc_node, node) {</span>
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :                 hash_del(&amp;desc_node-&gt;node);</span>
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :                 kfree(desc_node);</span>
+<span class="lineNum">     675 </span>            :         }
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     677 </span>            : 
+<span class="lineNum">     678 </span>            : /**
+<span class="lineNum">     679 </span>            :  * i915_cmd_parser_init_ring() - set cmd parser related fields for a ringbuffer
+<span class="lineNum">     680 </span>            :  * @ring: the ringbuffer to initialize
+<span class="lineNum">     681 </span>            :  *
+<span class="lineNum">     682 </span>            :  * Optionally initializes fields related to batch buffer command parsing in the
+<span class="lineNum">     683 </span>            :  * struct intel_engine_cs based on whether the platform requires software
+<span class="lineNum">     684 </span>            :  * command parsing.
+<span class="lineNum">     685 </span>            :  *
+<a name="686"><span class="lineNum">     686 </span>            :  * Return: non-zero if initialization fails</a>
+<span class="lineNum">     687 </span>            :  */
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 : int i915_cmd_parser_init_ring(struct intel_engine_cs *ring)</span>
+<span class="lineNum">     689 </span>            : {
+<span class="lineNum">     690 </span>            :         const struct drm_i915_cmd_table *cmd_tables;
+<span class="lineNum">     691 </span>            :         int cmd_table_count;
+<span class="lineNum">     692 </span>            :         int ret;
+<span class="lineNum">     693 </span>            : 
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :         if (!IS_GEN7(ring-&gt;dev))</span>
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     696 </span>            : 
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :         switch (ring-&gt;id) {</span>
+<span class="lineNum">     698 </span>            :         case RCS:
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :                 if (IS_HASWELL(ring-&gt;dev)) {</span>
+<span class="lineNum">     700 </span>            :                         cmd_tables = hsw_render_ring_cmds;
+<span class="lineNum">     701 </span>            :                         cmd_table_count =
+<span class="lineNum">     702 </span>            :                                 ARRAY_SIZE(hsw_render_ring_cmds);
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     704 </span>            :                         cmd_tables = gen7_render_cmds;
+<span class="lineNum">     705 </span>            :                         cmd_table_count = ARRAY_SIZE(gen7_render_cmds);
+<span class="lineNum">     706 </span>            :                 }
+<span class="lineNum">     707 </span>            : 
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :                 ring-&gt;reg_table = gen7_render_regs;</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :                 ring-&gt;reg_count = ARRAY_SIZE(gen7_render_regs);</span>
+<span class="lineNum">     710 </span>            : 
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                 if (IS_HASWELL(ring-&gt;dev)) {</span>
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :                         ring-&gt;master_reg_table = hsw_master_regs;</span>
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 :                         ring-&gt;master_reg_count = ARRAY_SIZE(hsw_master_regs);</span>
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :                         ring-&gt;master_reg_table = ivb_master_regs;</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :                         ring-&gt;master_reg_count = ARRAY_SIZE(ivb_master_regs);</span>
+<span class="lineNum">     717 </span>            :                 }
+<span class="lineNum">     718 </span>            : 
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :                 ring-&gt;get_cmd_length_mask = gen7_render_get_cmd_length_mask;</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     721 </span>            :         case VCS:
+<span class="lineNum">     722 </span>            :                 cmd_tables = gen7_video_cmds;
+<span class="lineNum">     723 </span>            :                 cmd_table_count = ARRAY_SIZE(gen7_video_cmds);
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :                 ring-&gt;get_cmd_length_mask = gen7_bsd_get_cmd_length_mask;</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     726 </span>            :         case BCS:
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :                 if (IS_HASWELL(ring-&gt;dev)) {</span>
+<span class="lineNum">     728 </span>            :                         cmd_tables = hsw_blt_ring_cmds;
+<span class="lineNum">     729 </span>            :                         cmd_table_count = ARRAY_SIZE(hsw_blt_ring_cmds);
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     731 </span>            :                         cmd_tables = gen7_blt_cmds;
+<span class="lineNum">     732 </span>            :                         cmd_table_count = ARRAY_SIZE(gen7_blt_cmds);
+<span class="lineNum">     733 </span>            :                 }
+<span class="lineNum">     734 </span>            : 
+<span class="lineNum">     735 </span><span class="lineNoCov">          0 :                 ring-&gt;reg_table = gen7_blt_regs;</span>
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :                 ring-&gt;reg_count = ARRAY_SIZE(gen7_blt_regs);</span>
+<span class="lineNum">     737 </span>            : 
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :                 if (IS_HASWELL(ring-&gt;dev)) {</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :                         ring-&gt;master_reg_table = hsw_master_regs;</span>
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :                         ring-&gt;master_reg_count = ARRAY_SIZE(hsw_master_regs);</span>
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :                         ring-&gt;master_reg_table = ivb_master_regs;</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :                         ring-&gt;master_reg_count = ARRAY_SIZE(ivb_master_regs);</span>
+<span class="lineNum">     744 </span>            :                 }
+<span class="lineNum">     745 </span>            : 
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :                 ring-&gt;get_cmd_length_mask = gen7_blt_get_cmd_length_mask;</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     748 </span>            :         case VECS:
+<span class="lineNum">     749 </span>            :                 cmd_tables = hsw_vebox_cmds;
+<span class="lineNum">     750 </span>            :                 cmd_table_count = ARRAY_SIZE(hsw_vebox_cmds);
+<span class="lineNum">     751 </span>            :                 /* VECS can use the same length_mask function as VCS */
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :                 ring-&gt;get_cmd_length_mask = gen7_bsd_get_cmd_length_mask;</span>
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     754 </span>            :         default:
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;CMD: cmd_parser_init with unknown ring: %d\n&quot;,</span>
+<span class="lineNum">     756 </span>            :                           ring-&gt;id);
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :                 BUG();</span>
+<span class="lineNum">     758 </span>            :         }
+<span class="lineNum">     759 </span>            : 
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         BUG_ON(!validate_cmds_sorted(ring, cmd_tables, cmd_table_count));</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :         BUG_ON(!validate_regs_sorted(ring));</span>
+<span class="lineNum">     762 </span>            : 
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :         WARN_ON(!hash_empty(ring-&gt;cmd_hash));</span>
+<span class="lineNum">     764 </span>            : 
+<span class="lineNum">     765 </span><span class="lineNoCov">          0 :         ret = init_hash_table(ring, cmd_tables, cmd_table_count);</span>
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :         if (ret) {</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;CMD: cmd_parser_init failed!\n&quot;);</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :                 fini_hash_table(ring);</span>
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     770 </span>            :         }
+<span class="lineNum">     771 </span>            : 
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :         ring-&gt;needs_cmd_parser = true;</span>
+<span class="lineNum">     773 </span>            : 
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     775 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     776 </span>            : 
+<span class="lineNum">     777 </span>            : /**
+<span class="lineNum">     778 </span>            :  * i915_cmd_parser_fini_ring() - clean up cmd parser related fields
+<span class="lineNum">     779 </span>            :  * @ring: the ringbuffer to clean up
+<span class="lineNum">     780 </span>            :  *
+<span class="lineNum">     781 </span>            :  * Releases any resources related to command parsing that may have been
+<a name="782"><span class="lineNum">     782 </span>            :  * initialized for the specified ring.</a>
+<span class="lineNum">     783 </span>            :  */
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 : void i915_cmd_parser_fini_ring(struct intel_engine_cs *ring)</span>
+<span class="lineNum">     785 </span>            : {
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :         if (!ring-&gt;needs_cmd_parser)</span>
+<span class="lineNum">     787 </span>            :                 return;
+<span class="lineNum">     788 </span>            : 
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 :         fini_hash_table(ring);</span>
+<span class="lineNum">     790 </span><span class="lineNoCov">          0 : }</span>
+<a name="791"><span class="lineNum">     791 </span>            : </a>
+<span class="lineNum">     792 </span>            : static const struct drm_i915_cmd_descriptor*
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 : find_cmd_in_table(struct intel_engine_cs *ring,</span>
+<span class="lineNum">     794 </span>            :                   u32 cmd_header)
+<span class="lineNum">     795 </span>            : {
+<span class="lineNum">     796 </span>            :         struct cmd_node *desc_node;
+<span class="lineNum">     797 </span>            : 
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :         hash_for_each_possible(ring-&gt;cmd_hash, desc_node, node,</span>
+<span class="lineNum">     799 </span>            :                                cmd_header &amp; CMD_HASH_MASK) {
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :                 const struct drm_i915_cmd_descriptor *desc = desc_node-&gt;desc;</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :                 u32 masked_cmd = desc-&gt;cmd.mask &amp; cmd_header;</span>
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :                 u32 masked_value = desc-&gt;cmd.value &amp; desc-&gt;cmd.mask;</span>
+<span class="lineNum">     803 </span>            : 
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :                 if (masked_cmd == masked_value)</span>
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :                         return desc;</span>
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     807 </span>            : 
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     810 </span>            : 
+<span class="lineNum">     811 </span>            : /*
+<span class="lineNum">     812 </span>            :  * Returns a pointer to a descriptor for the command specified by cmd_header.
+<span class="lineNum">     813 </span>            :  *
+<span class="lineNum">     814 </span>            :  * The caller must supply space for a default descriptor via the default_desc
+<span class="lineNum">     815 </span>            :  * parameter. If no descriptor for the specified command exists in the ring's
+<span class="lineNum">     816 </span>            :  * command parser tables, this function fills in default_desc based on the
+<span class="lineNum">     817 </span>            :  * ring's default length encoding and returns default_desc.
+<a name="818"><span class="lineNum">     818 </span>            :  */</a>
+<span class="lineNum">     819 </span>            : static const struct drm_i915_cmd_descriptor*
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 : find_cmd(struct intel_engine_cs *ring,</span>
+<span class="lineNum">     821 </span>            :          u32 cmd_header,
+<span class="lineNum">     822 </span>            :          struct drm_i915_cmd_descriptor *default_desc)
+<span class="lineNum">     823 </span>            : {
+<span class="lineNum">     824 </span>            :         const struct drm_i915_cmd_descriptor *desc;
+<span class="lineNum">     825 </span>            :         u32 mask;
+<span class="lineNum">     826 </span>            : 
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :         desc = find_cmd_in_table(ring, cmd_header);</span>
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :         if (desc)</span>
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :                 return desc;</span>
+<span class="lineNum">     830 </span>            : 
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :         mask = ring-&gt;get_cmd_length_mask(cmd_header);</span>
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :         if (!mask)</span>
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     834 </span>            : 
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         BUG_ON(!default_desc);</span>
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :         default_desc-&gt;flags = CMD_DESC_SKIP;</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :         default_desc-&gt;length.mask = mask;</span>
+<span class="lineNum">     838 </span>            : 
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :         return default_desc;</span>
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 : }</span>
+<a name="841"><span class="lineNum">     841 </span>            : </a>
+<span class="lineNum">     842 </span>            : static const struct drm_i915_reg_descriptor *
+<span class="lineNum">     843 </span><span class="lineNoCov">          0 : find_reg(const struct drm_i915_reg_descriptor *table,</span>
+<span class="lineNum">     844 </span>            :          int count, u32 addr)
+<span class="lineNum">     845 </span>            : {
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :         if (table) {</span>
+<span class="lineNum">     847 </span>            :                 int i;
+<span class="lineNum">     848 </span>            : 
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; count; i++) {</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :                         if (table[i].addr == addr)</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                                 return &amp;table[i];</span>
+<span class="lineNum">     852 </span>            :                 }
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     854 </span>            : 
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<a name="856"><span class="lineNum">     856 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     857 </span>            : 
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 : static u32 *vmap_batch(struct drm_i915_gem_object *obj,</span>
+<span class="lineNum">     859 </span>            :                        unsigned start, unsigned len)
+<span class="lineNum">     860 </span>            : {
+<span class="lineNum">     861 </span>            :         int i;
+<span class="lineNum">     862 </span>            :         void *addr = NULL;
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :         struct sg_page_iter sg_iter;</span>
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :         int first_page = start &gt;&gt; PAGE_SHIFT;</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :         int last_page = (len + start + 4095) &gt;&gt; PAGE_SHIFT;</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :         int npages = last_page - first_page;</span>
+<span class="lineNum">     867 </span>            :         struct vm_page **pages;
+<span class="lineNum">     868 </span>            : 
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :         pages = drm_malloc_ab(npages, sizeof(*pages));</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         if (pages == NULL) {</span>
+<span class="lineNum">     871 </span>            :                 DRM_DEBUG_DRIVER(&quot;Failed to get space for pages\n&quot;);
+<span class="lineNum">     872 </span>            :                 goto finish;
+<span class="lineNum">     873 </span>            :         }
+<span class="lineNum">     874 </span>            : 
+<span class="lineNum">     875 </span>            :         i = 0;
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :         for_each_sg_page(obj-&gt;pages-&gt;sgl, &amp;sg_iter, obj-&gt;pages-&gt;nents, first_page) {</span>
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :                 pages[i++] = sg_page_iter_page(&amp;sg_iter);</span>
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :                 if (i == npages)</span>
+<span class="lineNum">     879 </span>            :                         break;
+<span class="lineNum">     880 </span>            :         }
+<span class="lineNum">     881 </span>            : 
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :         addr = vmap(pages, i, 0, PAGE_KERNEL);</span>
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :         if (addr == NULL) {</span>
+<span class="lineNum">     884 </span>            :                 DRM_DEBUG_DRIVER(&quot;Failed to vmap pages\n&quot;);
+<span class="lineNum">     885 </span>            :                 goto finish;
+<span class="lineNum">     886 </span>            :         }
+<span class="lineNum">     887 </span>            : 
+<span class="lineNum">     888 </span>            : finish:
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :         if (pages)</span>
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 :                 drm_free_large(pages);</span>
+<span class="lineNum">     891 </span><span class="lineNoCov">          0 :         return (u32*)addr;</span>
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 : }</span>
+<a name="893"><span class="lineNum">     893 </span>            : </a>
+<span class="lineNum">     894 </span>            : /* Returns a vmap'd pointer to dest_obj, which the caller must unmap */
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 : static u32 *copy_batch(struct drm_i915_gem_object *dest_obj,</span>
+<span class="lineNum">     896 </span>            :                        struct drm_i915_gem_object *src_obj,
+<span class="lineNum">     897 </span>            :                        u32 batch_start_offset,
+<span class="lineNum">     898 </span>            :                        u32 batch_len)
+<span class="lineNum">     899 </span>            : {
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :         int needs_clflush = 0;</span>
+<span class="lineNum">     901 </span>            :         void *src_base, *src;
+<span class="lineNum">     902 </span>            :         void *dst = NULL;
+<span class="lineNum">     903 </span>            :         int ret;
+<span class="lineNum">     904 </span>            : 
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :         if (batch_len &gt; dest_obj-&gt;base.size ||</span>
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :             batch_len + batch_start_offset &gt; src_obj-&gt;base.size)</span>
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :                 return ERR_PTR(-E2BIG);</span>
+<span class="lineNum">     908 </span>            : 
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :         if (WARN_ON(dest_obj-&gt;pages_pin_count == 0))</span>
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :                 return ERR_PTR(-ENODEV);</span>
+<span class="lineNum">     911 </span>            : 
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :         ret = i915_gem_obj_prepare_shmem_read(src_obj, &amp;needs_clflush);</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :         if (ret) {</span>
+<span class="lineNum">     914 </span>            :                 DRM_DEBUG_DRIVER(&quot;CMD: failed to prepare shadow batch\n&quot;);
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :                 return ERR_PTR(ret);</span>
+<span class="lineNum">     916 </span>            :         }
+<span class="lineNum">     917 </span>            : 
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :         src_base = vmap_batch(src_obj, batch_start_offset, batch_len);</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :         if (!src_base) {</span>
+<span class="lineNum">     920 </span>            :                 DRM_DEBUG_DRIVER(&quot;CMD: Failed to vmap batch\n&quot;);
+<span class="lineNum">     921 </span>            :                 ret = -ENOMEM;
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :                 goto unpin_src;</span>
+<span class="lineNum">     923 </span>            :         }
+<span class="lineNum">     924 </span>            : 
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :         ret = i915_gem_object_set_to_cpu_domain(dest_obj, true);</span>
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :         if (ret) {</span>
+<span class="lineNum">     927 </span>            :                 DRM_DEBUG_DRIVER(&quot;CMD: Failed to set shadow batch to CPU\n&quot;);
+<span class="lineNum">     928 </span>            :                 goto unmap_src;
+<span class="lineNum">     929 </span>            :         }
+<span class="lineNum">     930 </span>            : 
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :         dst = vmap_batch(dest_obj, 0, batch_len);</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :         if (!dst) {</span>
+<span class="lineNum">     933 </span>            :                 DRM_DEBUG_DRIVER(&quot;CMD: Failed to vmap shadow batch\n&quot;);
+<span class="lineNum">     934 </span>            :                 ret = -ENOMEM;
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :                 goto unmap_src;</span>
+<span class="lineNum">     936 </span>            :         }
+<span class="lineNum">     937 </span>            : 
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :         src = src_base + offset_in_page(batch_start_offset);</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :         if (needs_clflush)</span>
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :                 drm_clflush_virt_range(src, batch_len);</span>
+<span class="lineNum">     941 </span>            : 
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :         memcpy(dst, src, batch_len);</span>
+<span class="lineNum">     943 </span>            : 
+<span class="lineNum">     944 </span>            : unmap_src:
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 :         vunmap(src_base, batch_len); /* XXX */</span>
+<span class="lineNum">     946 </span>            : unpin_src:
+<span class="lineNum">     947 </span><span class="lineNoCov">          0 :         i915_gem_object_unpin_pages(src_obj);</span>
+<span class="lineNum">     948 </span>            : 
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :         return ret ? ERR_PTR(ret) : dst;</span>
+<span class="lineNum">     950 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     951 </span>            : 
+<span class="lineNum">     952 </span>            : /**
+<span class="lineNum">     953 </span>            :  * i915_needs_cmd_parser() - should a given ring use software command parsing?
+<span class="lineNum">     954 </span>            :  * @ring: the ring in question
+<span class="lineNum">     955 </span>            :  *
+<span class="lineNum">     956 </span>            :  * Only certain platforms require software batch buffer command parsing, and
+<span class="lineNum">     957 </span>            :  * only when enabled via module parameter.
+<span class="lineNum">     958 </span>            :  *
+<a name="959"><span class="lineNum">     959 </span>            :  * Return: true if the ring requires software command parsing</a>
+<span class="lineNum">     960 </span>            :  */
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 : bool i915_needs_cmd_parser(struct intel_engine_cs *ring)</span>
+<span class="lineNum">     962 </span>            : {
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         if (!ring-&gt;needs_cmd_parser)</span>
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     965 </span>            : 
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :         if (!USES_PPGTT(ring-&gt;dev))</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     968 </span>            : 
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :         return (i915.enable_cmd_parser == 1);</span>
+<a name="970"><span class="lineNum">     970 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     971 </span>            : 
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 : static bool check_cmd(const struct intel_engine_cs *ring,</span>
+<span class="lineNum">     973 </span>            :                       const struct drm_i915_cmd_descriptor *desc,
+<span class="lineNum">     974 </span>            :                       const u32 *cmd, u32 length,
+<span class="lineNum">     975 </span>            :                       const bool is_master,
+<span class="lineNum">     976 </span>            :                       bool *oacontrol_set)
+<span class="lineNum">     977 </span>            : {
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 :         if (desc-&gt;flags &amp; CMD_DESC_REJECT) {</span>
+<span class="lineNum">     979 </span>            :                 DRM_DEBUG_DRIVER(&quot;CMD: Rejected command: 0x%08X\n&quot;, *cmd);
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     981 </span>            :         }
+<span class="lineNum">     982 </span>            : 
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 :         if ((desc-&gt;flags &amp; CMD_DESC_MASTER) &amp;&amp; !is_master) {</span>
+<span class="lineNum">     984 </span>            :                 DRM_DEBUG_DRIVER(&quot;CMD: Rejected master-only command: 0x%08X\n&quot;,
+<span class="lineNum">     985 </span>            :                                  *cmd);
+<span class="lineNum">     986 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     987 </span>            :         }
+<span class="lineNum">     988 </span>            : 
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 :         if (desc-&gt;flags &amp; CMD_DESC_REGISTER) {</span>
+<span class="lineNum">     990 </span>            :                 /*
+<span class="lineNum">     991 </span>            :                  * Get the distance between individual register offset
+<span class="lineNum">     992 </span>            :                  * fields if the command can perform more than one
+<span class="lineNum">     993 </span>            :                  * access at a time.
+<span class="lineNum">     994 </span>            :                  */
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :                 const u32 step = desc-&gt;reg.step ? desc-&gt;reg.step : length;</span>
+<span class="lineNum">     996 </span>            :                 u32 offset;
+<span class="lineNum">     997 </span>            : 
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 :                 for (offset = desc-&gt;reg.offset; offset &lt; length;</span>
+<span class="lineNum">     999 </span><span class="lineNoCov">          0 :                      offset += step) {</span>
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :                         const u32 reg_addr = cmd[offset] &amp; desc-&gt;reg.mask;</span>
+<span class="lineNum">    1001 </span>            :                         const struct drm_i915_reg_descriptor *reg =
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 :                                 find_reg(ring-&gt;reg_table, ring-&gt;reg_count,</span>
+<span class="lineNum">    1003 </span>            :                                          reg_addr);
+<span class="lineNum">    1004 </span>            : 
+<span class="lineNum">    1005 </span><span class="lineNoCov">          0 :                         if (!reg &amp;&amp; is_master)</span>
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :                                 reg = find_reg(ring-&gt;master_reg_table,</span>
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 :                                                ring-&gt;master_reg_count,</span>
+<span class="lineNum">    1008 </span>            :                                                reg_addr);
+<span class="lineNum">    1009 </span>            : 
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :                         if (!reg) {</span>
+<span class="lineNum">    1011 </span>            :                                 DRM_DEBUG_DRIVER(&quot;CMD: Rejected register 0x%08X in command: 0x%08X (ring=%d)\n&quot;,
+<span class="lineNum">    1012 </span>            :                                                  reg_addr, *cmd, ring-&gt;id);
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                                 return false;</span>
+<span class="lineNum">    1014 </span>            :                         }
+<span class="lineNum">    1015 </span>            : 
+<span class="lineNum">    1016 </span>            :                         /*
+<span class="lineNum">    1017 </span>            :                          * OACONTROL requires some special handling for
+<span class="lineNum">    1018 </span>            :                          * writes. We want to make sure that any batch which
+<span class="lineNum">    1019 </span>            :                          * enables OA also disables it before the end of the
+<span class="lineNum">    1020 </span>            :                          * batch. The goal is to prevent one process from
+<span class="lineNum">    1021 </span>            :                          * snooping on the perf data from another process. To do
+<span class="lineNum">    1022 </span>            :                          * that, we need to check the value that will be written
+<span class="lineNum">    1023 </span>            :                          * to the register. Hence, limit OACONTROL writes to
+<span class="lineNum">    1024 </span>            :                          * only MI_LOAD_REGISTER_IMM commands.
+<span class="lineNum">    1025 </span>            :                          */
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :                         if (reg_addr == OACONTROL) {</span>
+<span class="lineNum">    1027 </span><span class="lineNoCov">          0 :                                 if (desc-&gt;cmd.value == MI_LOAD_REGISTER_MEM) {</span>
+<span class="lineNum">    1028 </span>            :                                         DRM_DEBUG_DRIVER(&quot;CMD: Rejected LRM to OACONTROL\n&quot;);
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :                                         return false;</span>
+<span class="lineNum">    1030 </span>            :                                 }
+<span class="lineNum">    1031 </span>            : 
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :                                 if (desc-&gt;cmd.value == MI_LOAD_REGISTER_IMM(1))</span>
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :                                         *oacontrol_set = (cmd[offset + 1] != 0);</span>
+<span class="lineNum">    1034 </span>            :                         }
+<span class="lineNum">    1035 </span>            : 
+<span class="lineNum">    1036 </span>            :                         /*
+<span class="lineNum">    1037 </span>            :                          * Check the value written to the register against the
+<span class="lineNum">    1038 </span>            :                          * allowed mask/value pair given in the whitelist entry.
+<span class="lineNum">    1039 </span>            :                          */
+<span class="lineNum">    1040 </span><span class="lineNoCov">          0 :                         if (reg-&gt;mask) {</span>
+<span class="lineNum">    1041 </span><span class="lineNoCov">          0 :                                 if (desc-&gt;cmd.value == MI_LOAD_REGISTER_MEM) {</span>
+<span class="lineNum">    1042 </span>            :                                         DRM_DEBUG_DRIVER(&quot;CMD: Rejected LRM to masked register 0x%08X\n&quot;,
+<span class="lineNum">    1043 </span>            :                                                          reg_addr);
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 :                                         return false;</span>
+<span class="lineNum">    1045 </span>            :                                 }
+<span class="lineNum">    1046 </span>            : 
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :                                 if (desc-&gt;cmd.value == MI_LOAD_REGISTER_IMM(1) &amp;&amp;</span>
+<span class="lineNum">    1048 </span><span class="lineNoCov">          0 :                                     (offset + 2 &gt; length ||</span>
+<span class="lineNum">    1049 </span><span class="lineNoCov">          0 :                                      (cmd[offset + 1] &amp; reg-&gt;mask) != reg-&gt;value)) {</span>
+<span class="lineNum">    1050 </span>            :                                         DRM_DEBUG_DRIVER(&quot;CMD: Rejected LRI to masked register 0x%08X\n&quot;,
+<span class="lineNum">    1051 </span>            :                                                          reg_addr);
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :                                         return false;</span>
+<span class="lineNum">    1053 </span>            :                                 }
+<span class="lineNum">    1054 </span>            :                         }
+<span class="lineNum">    1055 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1057 </span>            : 
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :         if (desc-&gt;flags &amp; CMD_DESC_BITMASK) {</span>
+<span class="lineNum">    1059 </span>            :                 int i;
+<span class="lineNum">    1060 </span>            : 
+<span class="lineNum">    1061 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; MAX_CMD_DESC_BITMASKS; i++) {</span>
+<span class="lineNum">    1062 </span>            :                         u32 dword;
+<span class="lineNum">    1063 </span>            : 
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :                         if (desc-&gt;bits[i].mask == 0)</span>
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">    1066 </span>            : 
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :                         if (desc-&gt;bits[i].condition_mask != 0) {</span>
+<span class="lineNum">    1068 </span>            :                                 u32 offset =
+<span class="lineNum">    1069 </span><span class="lineNoCov">          0 :                                         desc-&gt;bits[i].condition_offset;</span>
+<span class="lineNum">    1070 </span><span class="lineNoCov">          0 :                                 u32 condition = cmd[offset] &amp;</span>
+<span class="lineNum">    1071 </span>            :                                         desc-&gt;bits[i].condition_mask;
+<span class="lineNum">    1072 </span>            : 
+<span class="lineNum">    1073 </span><span class="lineNoCov">          0 :                                 if (condition == 0)</span>
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :                                         continue;</span>
+<span class="lineNum">    1075 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">    1076 </span>            : 
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :                         dword = cmd[desc-&gt;bits[i].offset] &amp;</span>
+<span class="lineNum">    1078 </span><span class="lineNoCov">          0 :                                 desc-&gt;bits[i].mask;</span>
+<span class="lineNum">    1079 </span>            : 
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 :                         if (dword != desc-&gt;bits[i].expected) {</span>
+<span class="lineNum">    1081 </span>            :                                 DRM_DEBUG_DRIVER(&quot;CMD: Rejected command 0x%08X for bitmask 0x%08X (exp=0x%08X act=0x%08X) (ring=%d)\n&quot;,
+<span class="lineNum">    1082 </span>            :                                                  *cmd,
+<span class="lineNum">    1083 </span>            :                                                  desc-&gt;bits[i].mask,
+<span class="lineNum">    1084 </span>            :                                                  desc-&gt;bits[i].expected,
+<span class="lineNum">    1085 </span>            :                                                  dword, ring-&gt;id);
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 :                                 return false;</span>
+<span class="lineNum">    1087 </span>            :                         }
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1089 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1090 </span>            : 
+<span class="lineNum">    1091 </span><span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1093 </span>            : 
+<span class="lineNum">    1094 </span>            : #define LENGTH_BIAS 2
+<span class="lineNum">    1095 </span>            : 
+<span class="lineNum">    1096 </span>            : /**
+<span class="lineNum">    1097 </span>            :  * i915_parse_cmds() - parse a submitted batch buffer for privilege violations
+<span class="lineNum">    1098 </span>            :  * @ring: the ring on which the batch is to execute
+<span class="lineNum">    1099 </span>            :  * @batch_obj: the batch buffer in question
+<span class="lineNum">    1100 </span>            :  * @shadow_batch_obj: copy of the batch buffer in question
+<span class="lineNum">    1101 </span>            :  * @batch_start_offset: byte offset in the batch at which execution starts
+<span class="lineNum">    1102 </span>            :  * @batch_len: length of the commands in batch_obj
+<span class="lineNum">    1103 </span>            :  * @is_master: is the submitting process the drm master?
+<span class="lineNum">    1104 </span>            :  *
+<span class="lineNum">    1105 </span>            :  * Parses the specified batch buffer looking for privilege violations as
+<span class="lineNum">    1106 </span>            :  * described in the overview.
+<span class="lineNum">    1107 </span>            :  *
+<span class="lineNum">    1108 </span>            :  * Return: non-zero if the parser finds violations or otherwise fails; -EACCES
+<a name="1109"><span class="lineNum">    1109 </span>            :  * if the batch appears legal but should use hardware parsing</a>
+<span class="lineNum">    1110 </span>            :  */
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 : int i915_parse_cmds(struct intel_engine_cs *ring,</span>
+<span class="lineNum">    1112 </span>            :                     struct drm_i915_gem_object *batch_obj,
+<span class="lineNum">    1113 </span>            :                     struct drm_i915_gem_object *shadow_batch_obj,
+<span class="lineNum">    1114 </span>            :                     u32 batch_start_offset,
+<span class="lineNum">    1115 </span>            :                     u32 batch_len,
+<span class="lineNum">    1116 </span>            :                     bool is_master)
+<span class="lineNum">    1117 </span>            : {
+<span class="lineNum">    1118 </span>            :         u32 *cmd, *batch_base, *batch_end;
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :         struct drm_i915_cmd_descriptor default_desc = { 0 };</span>
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 :         bool oacontrol_set = false; /* OACONTROL tracking. See check_cmd() */</span>
+<span class="lineNum">    1121 </span>            :         int ret = 0;
+<span class="lineNum">    1122 </span>            : 
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 :         batch_base = copy_batch(shadow_batch_obj, batch_obj,</span>
+<span class="lineNum">    1124 </span>            :                                 batch_start_offset, batch_len);
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :         if (IS_ERR(batch_base)) {</span>
+<span class="lineNum">    1126 </span>            :                 DRM_DEBUG_DRIVER(&quot;CMD: Failed to copy batch\n&quot;);
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :                 return PTR_ERR(batch_base);</span>
+<span class="lineNum">    1128 </span>            :         }
+<span class="lineNum">    1129 </span>            : 
+<span class="lineNum">    1130 </span>            :         /*
+<span class="lineNum">    1131 </span>            :          * We use the batch length as size because the shadow object is as
+<span class="lineNum">    1132 </span>            :          * large or larger and copy_batch() will write MI_NOPs to the extra
+<span class="lineNum">    1133 </span>            :          * space. Parsing should be faster in some cases this way.
+<span class="lineNum">    1134 </span>            :          */
+<span class="lineNum">    1135 </span><span class="lineNoCov">          0 :         batch_end = batch_base + (batch_len / sizeof(*batch_end));</span>
+<span class="lineNum">    1136 </span>            : 
+<span class="lineNum">    1137 </span>            :         cmd = batch_base;
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :         while (cmd &lt; batch_end) {</span>
+<span class="lineNum">    1139 </span>            :                 const struct drm_i915_cmd_descriptor *desc;
+<span class="lineNum">    1140 </span>            :                 u32 length;
+<span class="lineNum">    1141 </span>            : 
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :                 if (*cmd == MI_BATCH_BUFFER_END)</span>
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1144 </span>            : 
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :                 desc = find_cmd(ring, *cmd, &amp;default_desc);</span>
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :                 if (!desc) {</span>
+<span class="lineNum">    1147 </span>            :                         DRM_DEBUG_DRIVER(&quot;CMD: Unrecognized command: 0x%08X\n&quot;,
+<span class="lineNum">    1148 </span>            :                                          *cmd);
+<span class="lineNum">    1149 </span>            :                         ret = -EINVAL;
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1151 </span>            :                 }
+<span class="lineNum">    1152 </span>            : 
+<span class="lineNum">    1153 </span>            :                 /*
+<span class="lineNum">    1154 </span>            :                  * If the batch buffer contains a chained batch, return an
+<span class="lineNum">    1155 </span>            :                  * error that tells the caller to abort and dispatch the
+<span class="lineNum">    1156 </span>            :                  * workload as a non-secure batch.
+<span class="lineNum">    1157 </span>            :                  */
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 :                 if (desc-&gt;cmd.value == MI_BATCH_BUFFER_START) {</span>
+<span class="lineNum">    1159 </span>            :                         ret = -EACCES;
+<span class="lineNum">    1160 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1161 </span>            :                 }
+<span class="lineNum">    1162 </span>            : 
+<span class="lineNum">    1163 </span><span class="lineNoCov">          0 :                 if (desc-&gt;flags &amp; CMD_DESC_FIXED)</span>
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :                         length = desc-&gt;length.fixed;</span>
+<span class="lineNum">    1165 </span>            :                 else
+<span class="lineNum">    1166 </span><span class="lineNoCov">          0 :                         length = ((*cmd &amp; desc-&gt;length.mask) + LENGTH_BIAS);</span>
+<span class="lineNum">    1167 </span>            : 
+<span class="lineNum">    1168 </span><span class="lineNoCov">          0 :                 if ((batch_end - cmd) &lt; length) {</span>
+<span class="lineNum">    1169 </span>            :                         DRM_DEBUG_DRIVER(&quot;CMD: Command length exceeds batch length: 0x%08X length=%u batchlen=%td\n&quot;,
+<span class="lineNum">    1170 </span>            :                                          *cmd,
+<span class="lineNum">    1171 </span>            :                                          length,
+<span class="lineNum">    1172 </span>            :                                          batch_end - cmd);
+<span class="lineNum">    1173 </span>            :                         ret = -EINVAL;
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1175 </span>            :                 }
+<span class="lineNum">    1176 </span>            : 
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :                 if (!check_cmd(ring, desc, cmd, length, is_master,</span>
+<span class="lineNum">    1178 </span>            :                                &amp;oacontrol_set)) {
+<span class="lineNum">    1179 </span>            :                         ret = -EINVAL;
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1181 </span>            :                 }
+<span class="lineNum">    1182 </span>            : 
+<span class="lineNum">    1183 </span><span class="lineNoCov">          0 :                 cmd += length;</span>
+<span class="lineNum">    1184 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1185 </span>            : 
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :         if (oacontrol_set) {</span>
+<span class="lineNum">    1187 </span>            :                 DRM_DEBUG_DRIVER(&quot;CMD: batch set OACONTROL but did not clear it\n&quot;);
+<span class="lineNum">    1188 </span>            :                 ret = -EINVAL;
+<span class="lineNum">    1189 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1190 </span>            : 
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :         if (cmd &gt;= batch_end) {</span>
+<span class="lineNum">    1192 </span>            :                 DRM_DEBUG_DRIVER(&quot;CMD: Got to the end of the buffer w/o a BBE cmd!\n&quot;);
+<span class="lineNum">    1193 </span>            :                 ret = -EINVAL;
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1195 </span>            : 
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :         vunmap(batch_base, batch_len); /* XXX */</span>
+<span class="lineNum">    1197 </span>            : 
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 :         return ret;</span>
+<span class="lineNum">    1199 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1200 </span>            : 
+<span class="lineNum">    1201 </span>            : /**
+<span class="lineNum">    1202 </span>            :  * i915_cmd_parser_get_version() - get the cmd parser version number
+<span class="lineNum">    1203 </span>            :  *
+<span class="lineNum">    1204 </span>            :  * The cmd parser maintains a simple increasing integer version number suitable
+<span class="lineNum">    1205 </span>            :  * for passing to userspace clients to determine what operations are permitted.
+<span class="lineNum">    1206 </span>            :  *
+<a name="1207"><span class="lineNum">    1207 </span>            :  * Return: the current version number of the cmd parser</a>
+<span class="lineNum">    1208 </span>            :  */
+<span class="lineNum">    1209 </span><span class="lineNoCov">          0 : int i915_cmd_parser_get_version(void)</span>
+<span class="lineNum">    1210 </span>            : {
+<span class="lineNum">    1211 </span>            :         /*
+<span class="lineNum">    1212 </span>            :          * Command parser version history
+<span class="lineNum">    1213 </span>            :          *
+<span class="lineNum">    1214 </span>            :          * 1. Initial version. Checks batches and reports violations, but leaves
+<span class="lineNum">    1215 </span>            :          *    hardware parsing enabled (so does not allow new use cases).
+<span class="lineNum">    1216 </span>            :          * 2. Allow access to the MI_PREDICATE_SRC0 and
+<span class="lineNum">    1217 </span>            :          *    MI_PREDICATE_SRC1 registers.
+<span class="lineNum">    1218 </span>            :          * 3. Allow access to the GPGPU_THREADS_DISPATCHED register.
+<span class="lineNum">    1219 </span>            :          * 4. L3 atomic chicken bits of HSW_SCRATCH1 and HSW_ROW_CHICKEN3.
+<span class="lineNum">    1220 </span>            :          * 5. GPGPU dispatch compute indirect registers.
+<span class="lineNum">    1221 </span>            :          */
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 :         return 5;</span>
+<span class="lineNum">    1223 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

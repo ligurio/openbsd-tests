@@ -1,0 +1,503 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - kern/kern_lock.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">kern</a> - kern_lock.c<span style="font-size: 80%;"> (source / <a href="kern_lock.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">17</td>
+            <td class="headerCovTableEntry">108</td>
+            <td class="headerCovTableEntryLo">15.7 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">16</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: kern_lock.c,v 1.66 2018/06/15 13:59:53 visa Exp $     */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2017 Visa Hankala
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2014 David Gwynne &lt;dlg@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  * Copyright (c) 2004 Artur Grabowski &lt;art@openbsd.org&gt;
+<span class="lineNum">       7 </span>            :  *
+<span class="lineNum">       8 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       9 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">      10 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      11 </span>            :  *
+<span class="lineNum">      12 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      13 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      14 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      15 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      16 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      17 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      18 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      19 </span>            :  */
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/sched.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/atomic.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/witness.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/mutex.h&gt;
+<span class="lineNum">      27 </span>            : 
+<span class="lineNum">      28 </span>            : #include &lt;ddb/db_output.h&gt;
+<span class="lineNum">      29 </span>            : 
+<span class="lineNum">      30 </span>            : #ifdef MP_LOCKDEBUG
+<span class="lineNum">      31 </span>            : #ifndef DDB
+<span class="lineNum">      32 </span>            : #error &quot;MP_LOCKDEBUG requires DDB&quot;
+<span class="lineNum">      33 </span>            : #endif
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : /* CPU-dependent timing, this needs to be settable from ddb. */
+<span class="lineNum">      36 </span>            : int __mp_lock_spinout = 200000000;
+<span class="lineNum">      37 </span>            : #endif /* MP_LOCKDEBUG */
+<span class="lineNum">      38 </span>            : 
+<span class="lineNum">      39 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">      40 </span>            : 
+<span class="lineNum">      41 </span>            : #include &lt;sys/mplock.h&gt;
+<span class="lineNum">      42 </span>            : struct __mp_lock kernel_lock;
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : /*
+<span class="lineNum">      45 </span>            :  * Functions for manipulating the kernel_lock.  We put them here
+<span class="lineNum">      46 </span>            :  * so that they show up in profiles.
+<span class="lineNum">      47 </span>            :  */
+<a name="48"><span class="lineNum">      48 </span>            : </a>
+<span class="lineNum">      49 </span>            : void
+<span class="lineNum">      50 </span><span class="lineNoCov">          0 : _kernel_lock_init(void)</span>
+<span class="lineNum">      51 </span>            : {
+<span class="lineNum">      52 </span><span class="lineNoCov">          0 :         __mp_lock_init(&amp;kernel_lock);</span>
+<span class="lineNum">      53 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      54 </span>            : 
+<span class="lineNum">      55 </span>            : /*
+<span class="lineNum">      56 </span>            :  * Acquire/release the kernel lock.  Intended for use in the scheduler
+<span class="lineNum">      57 </span>            :  * and the lower half of the kernel.
+<span class="lineNum">      58 </span>            :  */
+<a name="59"><span class="lineNum">      59 </span>            : </a>
+<span class="lineNum">      60 </span>            : void
+<span class="lineNum">      61 </span><span class="lineNoCov">          0 : _kernel_lock(const char *file, int line)</span>
+<span class="lineNum">      62 </span>            : {
+<span class="lineNum">      63 </span><span class="lineCov">        199 :         SCHED_ASSERT_UNLOCKED();</span>
+<span class="lineNum">      64 </span>            : #ifdef WITNESS
+<span class="lineNum">      65 </span>            :         ___mp_lock(&amp;kernel_lock, file, line);
+<span class="lineNum">      66 </span>            : #else
+<span class="lineNum">      67 </span><span class="lineNoCov">          0 :         __mp_lock(&amp;kernel_lock);</span>
+<span class="lineNum">      68 </span>            : #endif
+<span class="lineNum">      69 </span><span class="lineNoCov">          0 : }</span>
+<a name="70"><span class="lineNum">      70 </span>            : </a>
+<span class="lineNum">      71 </span>            : void
+<span class="lineNum">      72 </span><span class="lineNoCov">          0 : _kernel_unlock(void)</span>
+<span class="lineNum">      73 </span>            : {
+<span class="lineNum">      74 </span><span class="lineNoCov">          0 :         __mp_unlock(&amp;kernel_lock);</span>
+<span class="lineNum">      75 </span><span class="lineNoCov">          0 : }</span>
+<a name="76"><span class="lineNum">      76 </span>            : </a>
+<span class="lineNum">      77 </span>            : int
+<span class="lineNum">      78 </span><span class="lineNoCov">          0 : _kernel_lock_held(void)</span>
+<span class="lineNum">      79 </span>            : {
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 :         if (panicstr || db_active)</span>
+<span class="lineNum">      81 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">      82 </span><span class="lineNoCov">          0 :         return (__mp_lock_held(&amp;kernel_lock, curcpu()));</span>
+<span class="lineNum">      83 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      84 </span>            : 
+<span class="lineNum">      85 </span>            : #ifdef __USE_MI_MPLOCK
+<span class="lineNum">      86 </span>            : 
+<span class="lineNum">      87 </span>            : /* Ticket lock implementation */
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span>            : #include &lt;machine/cpu.h&gt;
+<a name="90"><span class="lineNum">      90 </span>            : </a>
+<span class="lineNum">      91 </span>            : void
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 : ___mp_lock_init(struct __mp_lock *mpl, const struct lock_type *type)</span>
+<span class="lineNum">      93 </span>            : {
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :         memset(mpl-&gt;mpl_cpus, 0, sizeof(mpl-&gt;mpl_cpus));</span>
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         mpl-&gt;mpl_users = 0;</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :         mpl-&gt;mpl_ticket = 1;</span>
+<span class="lineNum">      97 </span>            : 
+<span class="lineNum">      98 </span>            : #ifdef WITNESS
+<span class="lineNum">      99 </span>            :         mpl-&gt;mpl_lock_obj.lo_name = type-&gt;lt_name;
+<span class="lineNum">     100 </span>            :         mpl-&gt;mpl_lock_obj.lo_type = type;
+<span class="lineNum">     101 </span>            :         if (mpl == &amp;kernel_lock)
+<span class="lineNum">     102 </span>            :                 mpl-&gt;mpl_lock_obj.lo_flags = LO_WITNESS | LO_INITIALIZED |
+<span class="lineNum">     103 </span>            :                     LO_SLEEPABLE | (LO_CLASS_KERNEL_LOCK &lt;&lt; LO_CLASSSHIFT);
+<span class="lineNum">     104 </span>            :         else if (mpl == &amp;sched_lock)
+<span class="lineNum">     105 </span>            :                 mpl-&gt;mpl_lock_obj.lo_flags = LO_WITNESS | LO_INITIALIZED |
+<span class="lineNum">     106 </span>            :                     LO_RECURSABLE | (LO_CLASS_SCHED_LOCK &lt;&lt; LO_CLASSSHIFT);
+<span class="lineNum">     107 </span>            :         WITNESS_INIT(&amp;mpl-&gt;mpl_lock_obj, type);
+<span class="lineNum">     108 </span>            : #endif
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 : }</span>
+<a name="110"><span class="lineNum">     110 </span>            : </a>
+<span class="lineNum">     111 </span>            : static __inline void
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 : __mp_lock_spin(struct __mp_lock *mpl, u_int me)</span>
+<span class="lineNum">     113 </span>            : {
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         struct schedstate_percpu *spc = &amp;curcpu()-&gt;ci_schedstate;</span>
+<span class="lineNum">     115 </span>            : #ifdef MP_LOCKDEBUG
+<span class="lineNum">     116 </span>            :         int nticks = __mp_lock_spinout;
+<span class="lineNum">     117 </span>            : #endif
+<span class="lineNum">     118 </span>            : 
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :         spc-&gt;spc_spinning++;</span>
+<span class="lineNum">     120 </span><span class="lineCov">        197 :         while (mpl-&gt;mpl_ticket != me) {</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :                 CPU_BUSY_CYCLE();</span>
+<span class="lineNum">     122 </span>            : 
+<span class="lineNum">     123 </span>            : #ifdef MP_LOCKDEBUG
+<span class="lineNum">     124 </span>            :                 if (--nticks &lt;= 0) {
+<span class="lineNum">     125 </span>            :                         db_printf(&quot;%s: %p lock spun out&quot;, __func__, mpl);
+<span class="lineNum">     126 </span>            :                         db_enter();
+<span class="lineNum">     127 </span>            :                         nticks = __mp_lock_spinout;
+<span class="lineNum">     128 </span>            :                 }
+<span class="lineNum">     129 </span>            : #endif
+<span class="lineNum">     130 </span>            :         }
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :         spc-&gt;spc_spinning--;</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 : }</span>
+<a name="133"><span class="lineNum">     133 </span>            : </a>
+<span class="lineNum">     134 </span>            : void
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 : ___mp_lock(struct __mp_lock *mpl LOCK_FL_VARS)</span>
+<span class="lineNum">     136 </span>            : {
+<span class="lineNum">     137 </span><span class="lineCov">        197 :         struct __mp_lock_cpu *cpu = &amp;mpl-&gt;mpl_cpus[cpu_number()];</span>
+<span class="lineNum">     138 </span>            :         unsigned long s;
+<span class="lineNum">     139 </span>            : 
+<span class="lineNum">     140 </span>            : #ifdef WITNESS
+<span class="lineNum">     141 </span>            :         if (!__mp_lock_held(mpl, curcpu()))
+<span class="lineNum">     142 </span>            :                 WITNESS_CHECKORDER(&amp;mpl-&gt;mpl_lock_obj,
+<span class="lineNum">     143 </span>            :                     LOP_EXCLUSIVE | LOP_NEWORDER, file, line, NULL);
+<span class="lineNum">     144 </span>            : #endif
+<span class="lineNum">     145 </span>            : 
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         s = intr_disable();</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         if (cpu-&gt;mplc_depth++ == 0)</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :                 cpu-&gt;mplc_ticket = atomic_inc_int_nv(&amp;mpl-&gt;mpl_users);</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         intr_restore(s);</span>
+<span class="lineNum">     150 </span>            : 
+<span class="lineNum">     151 </span><span class="lineCov">        118 :         __mp_lock_spin(mpl, cpu-&gt;mplc_ticket);</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         membar_enter_after_atomic();</span>
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span>            :         WITNESS_LOCK(&amp;mpl-&gt;mpl_lock_obj, LOP_EXCLUSIVE, file, line);
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 : }</span>
+<a name="156"><span class="lineNum">     156 </span>            : </a>
+<span class="lineNum">     157 </span>            : void
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 : ___mp_unlock(struct __mp_lock *mpl LOCK_FL_VARS)</span>
+<span class="lineNum">     159 </span>            : {
+<span class="lineNum">     160 </span><span class="lineCov">        180 :         struct __mp_lock_cpu *cpu = &amp;mpl-&gt;mpl_cpus[cpu_number()];</span>
+<span class="lineNum">     161 </span>            :         unsigned long s;
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span>            : #ifdef MP_LOCKDEBUG
+<span class="lineNum">     164 </span>            :         if (!__mp_lock_held(mpl, curcpu())) {
+<span class="lineNum">     165 </span>            :                 db_printf(&quot;__mp_unlock(%p): not held lock\n&quot;, mpl);
+<span class="lineNum">     166 </span>            :                 db_enter();
+<span class="lineNum">     167 </span>            :         }
+<span class="lineNum">     168 </span>            : #endif
+<span class="lineNum">     169 </span>            : 
+<span class="lineNum">     170 </span>            :         WITNESS_UNLOCK(&amp;mpl-&gt;mpl_lock_obj, LOP_EXCLUSIVE, file, line);
+<span class="lineNum">     171 </span>            : 
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :         s = intr_disable();</span>
+<span class="lineNum">     173 </span><span class="lineCov">         90 :         if (--cpu-&gt;mplc_depth == 0) {</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :                 membar_exit();</span>
+<span class="lineNum">     175 </span><span class="lineCov">         90 :                 mpl-&gt;mpl_ticket++;</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :         intr_restore(s);</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 : }</span>
+<a name="179"><span class="lineNum">     179 </span>            : </a>
+<span class="lineNum">     180 </span>            : int
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 : ___mp_release_all(struct __mp_lock *mpl LOCK_FL_VARS)</span>
+<span class="lineNum">     182 </span>            : {
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         struct __mp_lock_cpu *cpu = &amp;mpl-&gt;mpl_cpus[cpu_number()];</span>
+<span class="lineNum">     184 </span>            :         unsigned long s;
+<span class="lineNum">     185 </span>            :         int rv;
+<span class="lineNum">     186 </span>            : #ifdef WITNESS
+<span class="lineNum">     187 </span>            :         int i;
+<span class="lineNum">     188 </span>            : #endif
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         s = intr_disable();</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         rv = cpu-&gt;mplc_depth;</span>
+<span class="lineNum">     192 </span>            : #ifdef WITNESS
+<span class="lineNum">     193 </span>            :         for (i = 0; i &lt; rv; i++)
+<span class="lineNum">     194 </span>            :                 WITNESS_UNLOCK(&amp;mpl-&gt;mpl_lock_obj, LOP_EXCLUSIVE, file, line);
+<span class="lineNum">     195 </span>            : #endif
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         cpu-&gt;mplc_depth = 0;</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         membar_exit();</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         mpl-&gt;mpl_ticket++;</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         intr_restore(s);</span>
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     202 </span>            : }
+<a name="203"><span class="lineNum">     203 </span>            : </a>
+<span class="lineNum">     204 </span>            : int
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 : ___mp_release_all_but_one(struct __mp_lock *mpl LOCK_FL_VARS)</span>
+<span class="lineNum">     206 </span>            : {
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :         struct __mp_lock_cpu *cpu = &amp;mpl-&gt;mpl_cpus[cpu_number()];</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         int rv = cpu-&gt;mplc_depth - 1;</span>
+<span class="lineNum">     209 </span>            : #ifdef WITNESS
+<span class="lineNum">     210 </span>            :         int i;
+<span class="lineNum">     211 </span>            : 
+<span class="lineNum">     212 </span>            :         for (i = 0; i &lt; rv; i++)
+<span class="lineNum">     213 </span>            :                 WITNESS_UNLOCK(&amp;mpl-&gt;mpl_lock_obj, LOP_EXCLUSIVE, file, line);
+<span class="lineNum">     214 </span>            : #endif
+<span class="lineNum">     215 </span>            : 
+<span class="lineNum">     216 </span>            : #ifdef MP_LOCKDEBUG
+<span class="lineNum">     217 </span>            :         if (!__mp_lock_held(mpl, curcpu())) {
+<span class="lineNum">     218 </span>            :                 db_printf(&quot;__mp_release_all_but_one(%p): not held lock\n&quot;, mpl);
+<span class="lineNum">     219 </span>            :                 db_enter();
+<span class="lineNum">     220 </span>            :         }
+<span class="lineNum">     221 </span>            : #endif
+<span class="lineNum">     222 </span>            : 
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :         cpu-&gt;mplc_depth = 1;</span>
+<span class="lineNum">     224 </span>            : 
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     226 </span>            : }
+<a name="227"><span class="lineNum">     227 </span>            : </a>
+<span class="lineNum">     228 </span>            : void
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 : ___mp_acquire_count(struct __mp_lock *mpl, int count LOCK_FL_VARS)</span>
+<span class="lineNum">     230 </span>            : {
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :         while (count--)</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                 ___mp_lock(mpl LOCK_FL_ARGS);</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 : }</span>
+<a name="234"><span class="lineNum">     234 </span>            : </a>
+<span class="lineNum">     235 </span>            : int
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 : __mp_lock_held(struct __mp_lock *mpl, struct cpu_info *ci)</span>
+<span class="lineNum">     237 </span>            : {
+<span class="lineNum">     238 </span><span class="lineCov">        198 :         struct __mp_lock_cpu *cpu = &amp;mpl-&gt;mpl_cpus[CPU_INFO_UNIT(ci)];</span>
+<span class="lineNum">     239 </span>            : 
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :         return (cpu-&gt;mplc_ticket == mpl-&gt;mpl_ticket &amp;&amp; cpu-&gt;mplc_depth &gt; 0);</span>
+<span class="lineNum">     241 </span>            : }
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span>            : #endif /* __USE_MI_MPLOCK */
+<span class="lineNum">     244 </span>            : 
+<span class="lineNum">     245 </span>            : #endif /* MULTIPROCESSOR */
+<span class="lineNum">     246 </span>            : 
+<span class="lineNum">     247 </span>            : 
+<a name="248"><span class="lineNum">     248 </span>            : #ifdef __USE_MI_MUTEX</a>
+<span class="lineNum">     249 </span>            : void
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 : __mtx_init(struct mutex *mtx, int wantipl)</span>
+<span class="lineNum">     251 </span>            : {
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         mtx-&gt;mtx_owner = NULL;</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         mtx-&gt;mtx_wantipl = wantipl;</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         mtx-&gt;mtx_oldipl = IPL_NONE;</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     256 </span>            : 
+<a name="257"><span class="lineNum">     257 </span>            : #ifdef MULTIPROCESSOR</a>
+<span class="lineNum">     258 </span>            : void
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 : __mtx_enter(struct mutex *mtx)</span>
+<span class="lineNum">     260 </span>            : {
+<span class="lineNum">     261 </span><span class="lineCov">        770 :         struct schedstate_percpu *spc = &amp;curcpu()-&gt;ci_schedstate;</span>
+<span class="lineNum">     262 </span>            : #ifdef MP_LOCKDEBUG
+<span class="lineNum">     263 </span>            :         int nticks = __mp_lock_spinout;
+<span class="lineNum">     264 </span>            : #endif
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         spc-&gt;spc_spinning++;</span>
+<span class="lineNum">     267 </span><span class="lineCov">        765 :         while (__mtx_enter_try(mtx) == 0) {</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :                 CPU_BUSY_CYCLE();</span>
+<span class="lineNum">     269 </span>            : 
+<span class="lineNum">     270 </span>            : #ifdef MP_LOCKDEBUG
+<span class="lineNum">     271 </span>            :                 if (--nticks == 0) {
+<span class="lineNum">     272 </span>            :                         db_printf(&quot;%s: %p lock spun out&quot;, __func__, mtx);
+<span class="lineNum">     273 </span>            :                         db_enter();
+<span class="lineNum">     274 </span>            :                         nticks = __mp_lock_spinout;
+<span class="lineNum">     275 </span>            :                 }
+<span class="lineNum">     276 </span>            : #endif
+<span class="lineNum">     277 </span>            :         }
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :         spc-&gt;spc_spinning--;</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 : }</span>
+<a name="280"><span class="lineNum">     280 </span>            : </a>
+<span class="lineNum">     281 </span>            : int
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 : __mtx_enter_try(struct mutex *mtx)</span>
+<span class="lineNum">     283 </span>            : {
+<span class="lineNum">     284 </span><span class="lineCov">        767 :         struct cpu_info *owner, *ci = curcpu();</span>
+<span class="lineNum">     285 </span>            :         int s;
+<span class="lineNum">     286 </span>            : 
+<span class="lineNum">     287 </span>            :         /* Avoid deadlocks after panic or in DDB */
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         if (panicstr || db_active)</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     290 </span>            : 
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         if (mtx-&gt;mtx_wantipl != IPL_NONE)</span>
+<span class="lineNum">     292 </span><span class="lineCov">        706 :                 s = splraise(mtx-&gt;mtx_wantipl);</span>
+<span class="lineNum">     293 </span>            : 
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         owner = atomic_cas_ptr(&amp;mtx-&gt;mtx_owner, NULL, ci);</span>
+<span class="lineNum">     295 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         if (__predict_false(owner == ci))</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                 panic(&quot;mtx %p: locking against myself&quot;, mtx);</span>
+<span class="lineNum">     298 </span>            : #endif
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :         if (owner == NULL) {</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                 membar_enter_after_atomic();</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :                 if (mtx-&gt;mtx_wantipl != IPL_NONE)</span>
+<span class="lineNum">     302 </span><span class="lineCov">        705 :                         mtx-&gt;mtx_oldipl = s;</span>
+<span class="lineNum">     303 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     304 </span><span class="lineCov">         60 :                 ci-&gt;ci_mutex_level++;</span>
+<span class="lineNum">     305 </span>            : #endif
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     307 </span>            :         }
+<span class="lineNum">     308 </span>            : 
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         if (mtx-&gt;mtx_wantipl != IPL_NONE)</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">     311 </span>            : 
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     314 </span>            : #else
+<span class="lineNum">     315 </span>            : void
+<span class="lineNum">     316 </span>            : __mtx_enter(struct mutex *mtx)
+<span class="lineNum">     317 </span>            : {
+<span class="lineNum">     318 </span>            :         struct cpu_info *ci = curcpu();
+<span class="lineNum">     319 </span>            : 
+<span class="lineNum">     320 </span>            :         /* Avoid deadlocks after panic or in DDB */
+<span class="lineNum">     321 </span>            :         if (panicstr || db_active)
+<span class="lineNum">     322 </span>            :                 return;
+<span class="lineNum">     323 </span>            : 
+<span class="lineNum">     324 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     325 </span>            :         if (__predict_false(mtx-&gt;mtx_owner == ci))
+<span class="lineNum">     326 </span>            :                 panic(&quot;mtx %p: locking against myself&quot;, mtx);
+<span class="lineNum">     327 </span>            : #endif
+<span class="lineNum">     328 </span>            : 
+<span class="lineNum">     329 </span>            :         if (mtx-&gt;mtx_wantipl != IPL_NONE)
+<span class="lineNum">     330 </span>            :                 mtx-&gt;mtx_oldipl = splraise(mtx-&gt;mtx_wantipl);
+<span class="lineNum">     331 </span>            : 
+<span class="lineNum">     332 </span>            :         mtx-&gt;mtx_owner = ci;
+<span class="lineNum">     333 </span>            : 
+<span class="lineNum">     334 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     335 </span>            :         ci-&gt;ci_mutex_level++;
+<span class="lineNum">     336 </span>            : #endif
+<span class="lineNum">     337 </span>            : }
+<span class="lineNum">     338 </span>            : 
+<span class="lineNum">     339 </span>            : int
+<span class="lineNum">     340 </span>            : __mtx_enter_try(struct mutex *mtx)
+<span class="lineNum">     341 </span>            : {
+<span class="lineNum">     342 </span>            :         __mtx_enter(mtx);
+<span class="lineNum">     343 </span>            :         return (1);
+<span class="lineNum">     344 </span>            : }
+<span class="lineNum">     345 </span>            : #endif
+<a name="346"><span class="lineNum">     346 </span>            : </a>
+<span class="lineNum">     347 </span>            : void
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 : __mtx_leave(struct mutex *mtx)</span>
+<span class="lineNum">     349 </span>            : {
+<span class="lineNum">     350 </span>            :         int s;
+<span class="lineNum">     351 </span>            : 
+<span class="lineNum">     352 </span>            :         /* Avoid deadlocks after panic or in DDB */
+<span class="lineNum">     353 </span><span class="lineCov">        753 :         if (panicstr || db_active)</span>
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     355 </span>            : 
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :         MUTEX_ASSERT_LOCKED(mtx);</span>
+<span class="lineNum">     357 </span>            : 
+<span class="lineNum">     358 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :         curcpu()-&gt;ci_mutex_level--;</span>
+<span class="lineNum">     360 </span>            : #endif
+<span class="lineNum">     361 </span>            : 
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :         s = mtx-&gt;mtx_oldipl;</span>
+<span class="lineNum">     363 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :         membar_exit_before_atomic();</span>
+<span class="lineNum">     365 </span>            : #endif
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         mtx-&gt;mtx_owner = NULL;</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :         if (mtx-&gt;mtx_wantipl != IPL_NONE)</span>
+<span class="lineNum">     368 </span><span class="lineCov">        693 :                 splx(s);</span>
+<span class="lineNum">     369 </span><span class="lineCov">         60 : }</span>
+<span class="lineNum">     370 </span>            : #endif /* __USE_MI_MUTEX */
+<span class="lineNum">     371 </span>            : 
+<span class="lineNum">     372 </span>            : #ifdef WITNESS
+<span class="lineNum">     373 </span>            : void
+<span class="lineNum">     374 </span>            : _mtx_init_flags(struct mutex *m, int ipl, const char *name, int flags,
+<span class="lineNum">     375 </span>            :     const struct lock_type *type)
+<span class="lineNum">     376 </span>            : {
+<span class="lineNum">     377 </span>            :         struct lock_object *lo = MUTEX_LOCK_OBJECT(m);
+<span class="lineNum">     378 </span>            : 
+<span class="lineNum">     379 </span>            :         lo-&gt;lo_flags = MTX_LO_FLAGS(flags);
+<span class="lineNum">     380 </span>            :         if (name != NULL)
+<span class="lineNum">     381 </span>            :                 lo-&gt;lo_name = name;
+<span class="lineNum">     382 </span>            :         else
+<span class="lineNum">     383 </span>            :                 lo-&gt;lo_name = type-&gt;lt_name;
+<span class="lineNum">     384 </span>            :         WITNESS_INIT(lo, type);
+<span class="lineNum">     385 </span>            : 
+<span class="lineNum">     386 </span>            :         _mtx_init(m, ipl);
+<span class="lineNum">     387 </span>            : }
+<span class="lineNum">     388 </span>            : 
+<span class="lineNum">     389 </span>            : void
+<span class="lineNum">     390 </span>            : _mtx_enter(struct mutex *m, const char *file, int line)
+<span class="lineNum">     391 </span>            : {
+<span class="lineNum">     392 </span>            :         struct lock_object *lo = MUTEX_LOCK_OBJECT(m);
+<span class="lineNum">     393 </span>            : 
+<span class="lineNum">     394 </span>            :         WITNESS_CHECKORDER(lo, LOP_EXCLUSIVE | LOP_NEWORDER, file, line, NULL);
+<span class="lineNum">     395 </span>            :         __mtx_enter(m);
+<span class="lineNum">     396 </span>            :         WITNESS_LOCK(lo, LOP_EXCLUSIVE, file, line);
+<span class="lineNum">     397 </span>            : }
+<span class="lineNum">     398 </span>            : 
+<span class="lineNum">     399 </span>            : int
+<span class="lineNum">     400 </span>            : _mtx_enter_try(struct mutex *m, const char *file, int line)
+<span class="lineNum">     401 </span>            : {
+<span class="lineNum">     402 </span>            :         struct lock_object *lo = MUTEX_LOCK_OBJECT(m);
+<span class="lineNum">     403 </span>            : 
+<span class="lineNum">     404 </span>            :         if (__mtx_enter_try(m)) {
+<span class="lineNum">     405 </span>            :                 WITNESS_LOCK(lo, LOP_EXCLUSIVE, file, line);
+<span class="lineNum">     406 </span>            :                 return 1;
+<span class="lineNum">     407 </span>            :         }
+<span class="lineNum">     408 </span>            :         return 0;
+<span class="lineNum">     409 </span>            : }
+<span class="lineNum">     410 </span>            : 
+<span class="lineNum">     411 </span>            : void
+<span class="lineNum">     412 </span>            : _mtx_leave(struct mutex *m, const char *file, int line)
+<span class="lineNum">     413 </span>            : {
+<span class="lineNum">     414 </span>            :         struct lock_object *lo = MUTEX_LOCK_OBJECT(m);
+<span class="lineNum">     415 </span>            : 
+<span class="lineNum">     416 </span>            :         WITNESS_UNLOCK(lo, LOP_EXCLUSIVE, file, line);
+<span class="lineNum">     417 </span>            :         __mtx_leave(m);
+<span class="lineNum">     418 </span>            : }
+<span class="lineNum">     419 </span>            : #endif /* WITNESS */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

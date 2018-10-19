@@ -1,0 +1,1614 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/usb/if_urndis.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/usb</a> - if_urndis.c<span style="font-size: 80%;"> (source / <a href="if_urndis.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">648</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">28</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: if_urndis.c,v 1.67 2017/07/19 16:31:56 mikeb Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2010 Jonathan Armani &lt;armani@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2010 Fabien Romano &lt;fabien@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  * Copyright (c) 2010 Michael Knudsen &lt;mk@openbsd.org&gt;
+<span class="lineNum">       7 </span>            :  * All rights reserved.
+<span class="lineNum">       8 </span>            :  *
+<span class="lineNum">       9 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">      10 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">      11 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      12 </span>            :  *
+<span class="lineNum">      13 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      14 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      15 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      16 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      17 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      18 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      19 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      20 </span>            :  */
+<span class="lineNum">      21 </span>            : 
+<span class="lineNum">      22 </span>            : #include &quot;bpfilter.h&quot;
+<span class="lineNum">      23 </span>            : 
+<span class="lineNum">      24 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/sockio.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/rwlock.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      31 </span>            : 
+<span class="lineNum">      32 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      33 </span>            : 
+<span class="lineNum">      34 </span>            : #include &lt;machine/bus.h&gt;
+<span class="lineNum">      35 </span>            : 
+<span class="lineNum">      36 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      37 </span>            : #include &lt;net/if_media.h&gt;
+<span class="lineNum">      38 </span>            : 
+<span class="lineNum">      39 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">      40 </span>            : #include &lt;net/bpf.h&gt;
+<span class="lineNum">      41 </span>            : #endif
+<span class="lineNum">      42 </span>            : 
+<span class="lineNum">      43 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      44 </span>            : #include &lt;netinet/if_ether.h&gt;
+<span class="lineNum">      45 </span>            : 
+<span class="lineNum">      46 </span>            : #include &lt;dev/usb/usb.h&gt;
+<span class="lineNum">      47 </span>            : #include &lt;dev/usb/usbdi.h&gt;
+<span class="lineNum">      48 </span>            : #include &lt;dev/usb/usbdi_util.h&gt;
+<span class="lineNum">      49 </span>            : #include &lt;dev/usb/usbdivar.h&gt;
+<span class="lineNum">      50 </span>            : #include &lt;dev/usb/usbdevs.h&gt;
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : #include &lt;dev/rndis.h&gt;
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span>            : #include &lt;dev/usb/if_urndisreg.h&gt;
+<span class="lineNum">      55 </span>            : 
+<span class="lineNum">      56 </span>            : #ifdef URNDIS_DEBUG
+<span class="lineNum">      57 </span>            : #define DPRINTF(x)      do { printf x; } while (0)
+<span class="lineNum">      58 </span>            : #else
+<span class="lineNum">      59 </span>            : #define DPRINTF(x)
+<span class="lineNum">      60 </span>            : #endif
+<span class="lineNum">      61 </span>            : 
+<span class="lineNum">      62 </span>            : #define DEVNAME(sc)     ((sc)-&gt;sc_dev.dv_xname)
+<span class="lineNum">      63 </span>            : 
+<span class="lineNum">      64 </span>            : int urndis_newbuf(struct urndis_softc *, struct urndis_chain *);
+<span class="lineNum">      65 </span>            : 
+<span class="lineNum">      66 </span>            : int urndis_ioctl(struct ifnet *, u_long, caddr_t);
+<span class="lineNum">      67 </span>            : #if 0
+<span class="lineNum">      68 </span>            : void urndis_watchdog(struct ifnet *);
+<span class="lineNum">      69 </span>            : #endif
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : void urndis_start(struct ifnet *);
+<span class="lineNum">      72 </span>            : void urndis_rxeof(struct usbd_xfer *, void *, usbd_status);
+<span class="lineNum">      73 </span>            : void urndis_txeof(struct usbd_xfer *, void *, usbd_status);
+<span class="lineNum">      74 </span>            : int urndis_rx_list_init(struct urndis_softc *);
+<span class="lineNum">      75 </span>            : int urndis_tx_list_init(struct urndis_softc *);
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            : void urndis_init(struct urndis_softc *);
+<span class="lineNum">      78 </span>            : void urndis_stop(struct urndis_softc *);
+<span class="lineNum">      79 </span>            : 
+<span class="lineNum">      80 </span>            : usbd_status urndis_ctrl_msg(struct urndis_softc *, uint8_t, uint8_t,
+<span class="lineNum">      81 </span>            :     uint16_t, uint16_t, void *, size_t);
+<span class="lineNum">      82 </span>            : usbd_status urndis_ctrl_send(struct urndis_softc *, void *, size_t);
+<span class="lineNum">      83 </span>            : struct rndis_comp_hdr *urndis_ctrl_recv(struct urndis_softc *);
+<span class="lineNum">      84 </span>            : 
+<span class="lineNum">      85 </span>            : u_int32_t urndis_ctrl_handle(struct urndis_softc *,
+<span class="lineNum">      86 </span>            :     struct rndis_comp_hdr *, void **, size_t *);
+<span class="lineNum">      87 </span>            : u_int32_t urndis_ctrl_handle_init(struct urndis_softc *,
+<span class="lineNum">      88 </span>            :     const struct rndis_comp_hdr *);
+<span class="lineNum">      89 </span>            : u_int32_t urndis_ctrl_handle_query(struct urndis_softc *,
+<span class="lineNum">      90 </span>            :     const struct rndis_comp_hdr *, void **, size_t *);
+<span class="lineNum">      91 </span>            : u_int32_t urndis_ctrl_handle_reset(struct urndis_softc *,
+<span class="lineNum">      92 </span>            :     const struct rndis_comp_hdr *);
+<span class="lineNum">      93 </span>            : u_int32_t urndis_ctrl_handle_status(struct urndis_softc *,
+<span class="lineNum">      94 </span>            :     const struct rndis_comp_hdr *);
+<span class="lineNum">      95 </span>            : 
+<span class="lineNum">      96 </span>            : u_int32_t urndis_ctrl_init(struct urndis_softc *);
+<span class="lineNum">      97 </span>            : u_int32_t urndis_ctrl_halt(struct urndis_softc *);
+<span class="lineNum">      98 </span>            : u_int32_t urndis_ctrl_query(struct urndis_softc *, u_int32_t, void *, size_t,
+<span class="lineNum">      99 </span>            :     void **, size_t *);
+<span class="lineNum">     100 </span>            : u_int32_t urndis_ctrl_set(struct urndis_softc *, u_int32_t, void *, size_t);
+<span class="lineNum">     101 </span>            : u_int32_t urndis_ctrl_set_param(struct urndis_softc *, const char *, u_int32_t,
+<span class="lineNum">     102 </span>            :     void *, size_t);
+<span class="lineNum">     103 </span>            : #if 0
+<span class="lineNum">     104 </span>            : u_int32_t urndis_ctrl_reset(struct urndis_softc *);
+<span class="lineNum">     105 </span>            : u_int32_t urndis_ctrl_keepalive(struct urndis_softc *);
+<span class="lineNum">     106 </span>            : #endif
+<span class="lineNum">     107 </span>            : 
+<span class="lineNum">     108 </span>            : int urndis_encap(struct urndis_softc *, struct mbuf *, int);
+<span class="lineNum">     109 </span>            : void urndis_decap(struct urndis_softc *, struct urndis_chain *, u_int32_t);
+<span class="lineNum">     110 </span>            : 
+<span class="lineNum">     111 </span>            : const struct urndis_class *urndis_lookup(usb_interface_descriptor_t *);
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span>            : int urndis_match(struct device *, void *, void *);
+<span class="lineNum">     114 </span>            : void urndis_attach(struct device *, struct device *, void *);
+<span class="lineNum">     115 </span>            : int urndis_detach(struct device *, int);
+<span class="lineNum">     116 </span>            : 
+<span class="lineNum">     117 </span>            : struct cfdriver urndis_cd = {
+<span class="lineNum">     118 </span>            :         NULL, &quot;urndis&quot;, DV_IFNET
+<span class="lineNum">     119 </span>            : };
+<span class="lineNum">     120 </span>            : 
+<span class="lineNum">     121 </span>            : struct cfattach urndis_ca = {
+<span class="lineNum">     122 </span>            :         sizeof(struct urndis_softc), urndis_match, urndis_attach, urndis_detach
+<span class="lineNum">     123 </span>            : };
+<span class="lineNum">     124 </span>            : 
+<span class="lineNum">     125 </span>            : const struct urndis_class {
+<span class="lineNum">     126 </span>            :         u_int8_t class;
+<span class="lineNum">     127 </span>            :         u_int8_t subclass;
+<span class="lineNum">     128 </span>            :         u_int8_t protocol;
+<span class="lineNum">     129 </span>            :         const char *typestr;
+<span class="lineNum">     130 </span>            : } urndis_class[] = {
+<span class="lineNum">     131 </span>            :         { UICLASS_CDC, UISUBCLASS_ABSTRACT_CONTROL_MODEL, 0xff, &quot;Vendor&quot; },
+<span class="lineNum">     132 </span>            :         { UICLASS_WIRELESS, UISUBCLASS_RF, UIPROTO_RNDIS, &quot;RNDIS&quot; },
+<span class="lineNum">     133 </span>            :         { UICLASS_MISC, UISUBCLASS_SYNC, UIPROTO_ACTIVESYNC, &quot;Activesync&quot; }
+<span class="lineNum">     134 </span>            : };
+<a name="135"><span class="lineNum">     135 </span>            : </a>
+<span class="lineNum">     136 </span>            : usbd_status
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 : urndis_ctrl_msg(struct urndis_softc *sc, uint8_t rt, uint8_t r,</span>
+<span class="lineNum">     138 </span>            :     uint16_t index, uint16_t value, void *buf, size_t buflen)
+<span class="lineNum">     139 </span>            : {
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :         usb_device_request_t req;</span>
+<span class="lineNum">     141 </span>            : 
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         req.bmRequestType = rt;</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         req.bRequest = r;</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         USETW(req.wValue, value);</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         USETW(req.wIndex, index);</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         USETW(req.wLength, buflen);</span>
+<span class="lineNum">     147 </span>            : 
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         return usbd_do_request(sc-&gt;sc_udev, &amp;req, buf);</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 : }</span>
+<a name="150"><span class="lineNum">     150 </span>            : </a>
+<span class="lineNum">     151 </span>            : usbd_status
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 : urndis_ctrl_send(struct urndis_softc *sc, void *buf, size_t len)</span>
+<span class="lineNum">     153 </span>            : {
+<span class="lineNum">     154 </span>            :         usbd_status err;
+<span class="lineNum">     155 </span>            : 
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;sc_udev))</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :                 return(0);</span>
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         err = urndis_ctrl_msg(sc, UT_WRITE_CLASS_INTERFACE, UR_GET_STATUS,</span>
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :             sc-&gt;sc_ifaceno_ctl, 0, buf, len);</span>
+<span class="lineNum">     161 </span>            : 
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :         if (err != USBD_NORMAL_COMPLETION)</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: %s\n&quot;, DEVNAME(sc), usbd_errstr(err));</span>
+<span class="lineNum">     164 </span>            : 
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         return err;</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 : }</span>
+<a name="167"><span class="lineNum">     167 </span>            : </a>
+<span class="lineNum">     168 </span>            : struct rndis_comp_hdr *
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 : urndis_ctrl_recv(struct urndis_softc *sc)</span>
+<span class="lineNum">     170 </span>            : {
+<span class="lineNum">     171 </span>            : #define RNDIS_RESPONSE_LEN 0x400
+<span class="lineNum">     172 </span>            :         struct rndis_comp_hdr   *hdr;
+<span class="lineNum">     173 </span>            :         char                    *buf;
+<span class="lineNum">     174 </span>            :         usbd_status              err;
+<span class="lineNum">     175 </span>            : 
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :         buf = malloc(RNDIS_RESPONSE_LEN, M_TEMP, M_WAITOK | M_CANFAIL);</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :         if (buf == NULL) {</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: out of memory\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     180 </span>            :         }
+<span class="lineNum">     181 </span>            : 
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         err = urndis_ctrl_msg(sc, UT_READ_CLASS_INTERFACE, UR_CLEAR_FEATURE,</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :             sc-&gt;sc_ifaceno_ctl, 0, buf, RNDIS_RESPONSE_LEN);</span>
+<span class="lineNum">     184 </span>            : 
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         if (err != USBD_NORMAL_COMPLETION &amp;&amp; err != USBD_SHORT_XFER) {</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: %s\n&quot;, DEVNAME(sc), usbd_errstr(err));</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :                 free(buf, M_TEMP, RNDIS_RESPONSE_LEN);</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     189 </span>            :         }
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         hdr = (struct rndis_comp_hdr *)buf;</span>
+<span class="lineNum">     192 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_recv: type 0x%x len %u\n&quot;,
+<span class="lineNum">     193 </span>            :             DEVNAME(sc),
+<span class="lineNum">     194 </span>            :             letoh32(hdr-&gt;rm_type),
+<span class="lineNum">     195 </span>            :             letoh32(hdr-&gt;rm_len)));
+<span class="lineNum">     196 </span>            : 
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         if (letoh32(hdr-&gt;rm_len) &gt; RNDIS_RESPONSE_LEN) {</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: ctrl message error: wrong size %u &gt; %u\n&quot;,</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                     DEVNAME(sc),</span>
+<span class="lineNum">     200 </span>            :                     letoh32(hdr-&gt;rm_len),
+<span class="lineNum">     201 </span>            :                     RNDIS_RESPONSE_LEN);
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                 free(buf, M_TEMP, RNDIS_RESPONSE_LEN);</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     204 </span>            :         }
+<span class="lineNum">     205 </span>            : 
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         return hdr;</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 : }</span>
+<a name="208"><span class="lineNum">     208 </span>            : </a>
+<span class="lineNum">     209 </span>            : u_int32_t
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 : urndis_ctrl_handle(struct urndis_softc *sc, struct rndis_comp_hdr *hdr,</span>
+<span class="lineNum">     211 </span>            :     void **buf, size_t *bufsz)
+<span class="lineNum">     212 </span>            : {
+<span class="lineNum">     213 </span>            :         u_int32_t rval;
+<span class="lineNum">     214 </span>            : 
+<span class="lineNum">     215 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_handle\n&quot;, DEVNAME(sc)));
+<span class="lineNum">     216 </span>            : 
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         if (buf &amp;&amp; bufsz) {</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                 *buf = NULL;</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                 *bufsz = 0;</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         switch (letoh32(hdr-&gt;rm_type)) {</span>
+<span class="lineNum">     223 </span>            :                 case REMOTE_NDIS_INITIALIZE_CMPLT:
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :                         rval = urndis_ctrl_handle_init(sc, hdr);</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     226 </span>            : 
+<span class="lineNum">     227 </span>            :                 case REMOTE_NDIS_QUERY_CMPLT:
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                         rval = urndis_ctrl_handle_query(sc, hdr, buf, bufsz);</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     230 </span>            : 
+<span class="lineNum">     231 </span>            :                 case REMOTE_NDIS_RESET_CMPLT:
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                         rval = urndis_ctrl_handle_reset(sc, hdr);</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     234 </span>            : 
+<span class="lineNum">     235 </span>            :                 case REMOTE_NDIS_KEEPALIVE_CMPLT:
+<span class="lineNum">     236 </span>            :                 case REMOTE_NDIS_SET_CMPLT:
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :                         rval = letoh32(hdr-&gt;rm_status);</span>
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     239 </span>            : 
+<span class="lineNum">     240 </span>            :                 case REMOTE_NDIS_INDICATE_STATUS_MSG:
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                         rval = urndis_ctrl_handle_status(sc, hdr);</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     243 </span>            : 
+<span class="lineNum">     244 </span>            :                 default:
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: ctrl message error: unknown event 0x%x\n&quot;,</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :                             DEVNAME(sc), letoh32(hdr-&gt;rm_type));</span>
+<span class="lineNum">     247 </span>            :                         rval = RNDIS_STATUS_FAILURE;
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     249 </span>            : 
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         free(hdr, M_TEMP, RNDIS_RESPONSE_LEN);</span>
+<span class="lineNum">     251 </span>            : 
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         return rval;</span>
+<span class="lineNum">     253 </span>            : }
+<a name="254"><span class="lineNum">     254 </span>            : </a>
+<span class="lineNum">     255 </span>            : u_int32_t
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 : urndis_ctrl_handle_init(struct urndis_softc *sc,</span>
+<span class="lineNum">     257 </span>            :     const struct rndis_comp_hdr *hdr)
+<span class="lineNum">     258 </span>            : {
+<span class="lineNum">     259 </span>            :         const struct rndis_init_comp    *msg;
+<span class="lineNum">     260 </span>            : 
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         msg = (struct rndis_init_comp *) hdr;</span>
+<span class="lineNum">     262 </span>            : 
+<span class="lineNum">     263 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_handle_init: len %u rid %u status 0x%x &quot;
+<span class="lineNum">     264 </span>            :             &quot;ver_major %u ver_minor %u devflags 0x%x medium 0x%x pktmaxcnt %u &quot;
+<span class="lineNum">     265 </span>            :             &quot;pktmaxsz %u align %u aflistoffset %u aflistsz %u\n&quot;,
+<span class="lineNum">     266 </span>            :             DEVNAME(sc),
+<span class="lineNum">     267 </span>            :             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     268 </span>            :             letoh32(msg-&gt;rm_rid),
+<span class="lineNum">     269 </span>            :             letoh32(msg-&gt;rm_status),
+<span class="lineNum">     270 </span>            :             letoh32(msg-&gt;rm_ver_major),
+<span class="lineNum">     271 </span>            :             letoh32(msg-&gt;rm_ver_minor),
+<span class="lineNum">     272 </span>            :             letoh32(msg-&gt;rm_devflags),
+<span class="lineNum">     273 </span>            :             letoh32(msg-&gt;rm_medium),
+<span class="lineNum">     274 </span>            :             letoh32(msg-&gt;rm_pktmaxcnt),
+<span class="lineNum">     275 </span>            :             letoh32(msg-&gt;rm_pktmaxsz),
+<span class="lineNum">     276 </span>            :             letoh32(msg-&gt;rm_align),
+<span class="lineNum">     277 </span>            :             letoh32(msg-&gt;rm_aflistoffset),
+<span class="lineNum">     278 </span>            :             letoh32(msg-&gt;rm_aflistsz)));
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         if (letoh32(msg-&gt;rm_status) != RNDIS_STATUS_SUCCESS) {</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: init failed 0x%x\n&quot;,</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :                     DEVNAME(sc),</span>
+<span class="lineNum">     283 </span>            :                     letoh32(msg-&gt;rm_status));
+<span class="lineNum">     284 </span>            : 
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                 return letoh32(msg-&gt;rm_status);</span>
+<span class="lineNum">     286 </span>            :         }
+<span class="lineNum">     287 </span>            : 
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         if (letoh32(msg-&gt;rm_devflags) != RNDIS_DF_CONNECTIONLESS) {</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: wrong device type (current type: 0x%x)\n&quot;,</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                     DEVNAME(sc),</span>
+<span class="lineNum">     291 </span>            :                     letoh32(msg-&gt;rm_devflags));
+<span class="lineNum">     292 </span>            : 
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     294 </span>            :         }
+<span class="lineNum">     295 </span>            : 
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         if (letoh32(msg-&gt;rm_medium) != RNDIS_MEDIUM_802_3) {</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: medium not 802.3 (current medium: 0x%x)\n&quot;,</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :                     DEVNAME(sc), letoh32(msg-&gt;rm_medium));</span>
+<span class="lineNum">     299 </span>            : 
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     301 </span>            :         }
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         sc-&gt;sc_lim_pktsz = letoh32(msg-&gt;rm_pktmaxsz);</span>
+<span class="lineNum">     304 </span>            : 
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         return letoh32(msg-&gt;rm_status);</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 : }</span>
+<a name="307"><span class="lineNum">     307 </span>            : </a>
+<span class="lineNum">     308 </span>            : u_int32_t
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 : urndis_ctrl_handle_query(struct urndis_softc *sc,</span>
+<span class="lineNum">     310 </span>            :     const struct rndis_comp_hdr *hdr, void **buf, size_t *bufsz)
+<span class="lineNum">     311 </span>            : {
+<span class="lineNum">     312 </span>            :         const struct rndis_query_comp   *msg;
+<span class="lineNum">     313 </span>            : 
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :         msg = (struct rndis_query_comp *) hdr;</span>
+<span class="lineNum">     315 </span>            : 
+<span class="lineNum">     316 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_handle_query: len %u rid %u status 0x%x &quot;
+<span class="lineNum">     317 </span>            :             &quot;buflen %u bufoff %u\n&quot;,
+<span class="lineNum">     318 </span>            :             DEVNAME(sc),
+<span class="lineNum">     319 </span>            :             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     320 </span>            :             letoh32(msg-&gt;rm_rid),
+<span class="lineNum">     321 </span>            :             letoh32(msg-&gt;rm_status),
+<span class="lineNum">     322 </span>            :             letoh32(msg-&gt;rm_infobuflen),
+<span class="lineNum">     323 </span>            :             letoh32(msg-&gt;rm_infobufoffset)));
+<span class="lineNum">     324 </span>            : 
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         if (buf &amp;&amp; bufsz) {</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :                 *buf = NULL;</span>
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :                 *bufsz = 0;</span>
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     329 </span>            : 
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         if (letoh32(msg-&gt;rm_status) != RNDIS_STATUS_SUCCESS) {</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: query failed 0x%x\n&quot;,</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                     DEVNAME(sc),</span>
+<span class="lineNum">     333 </span>            :                     letoh32(msg-&gt;rm_status));
+<span class="lineNum">     334 </span>            : 
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                 return letoh32(msg-&gt;rm_status);</span>
+<span class="lineNum">     336 </span>            :         }
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         if (letoh32(msg-&gt;rm_infobuflen) + letoh32(msg-&gt;rm_infobufoffset) +</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :             RNDIS_HEADER_OFFSET &gt; letoh32(msg-&gt;rm_len)) {</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: ctrl message error: invalid query info &quot;</span>
+<span class="lineNum">     341 </span>            :                     &quot;len/offset/end_position(%u/%u/%zu) -&gt; &quot;
+<span class="lineNum">     342 </span>            :                     &quot;go out of buffer limit %u\n&quot;,
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :                     DEVNAME(sc),</span>
+<span class="lineNum">     344 </span>            :                     letoh32(msg-&gt;rm_infobuflen),
+<span class="lineNum">     345 </span>            :                     letoh32(msg-&gt;rm_infobufoffset),
+<span class="lineNum">     346 </span>            :                     letoh32(msg-&gt;rm_infobuflen) +
+<span class="lineNum">     347 </span>            :                     letoh32(msg-&gt;rm_infobufoffset) + RNDIS_HEADER_OFFSET,
+<span class="lineNum">     348 </span>            :                     letoh32(msg-&gt;rm_len));
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     350 </span>            :         }
+<span class="lineNum">     351 </span>            : 
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :         if (buf &amp;&amp; bufsz) {</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :                 *buf = malloc(letoh32(msg-&gt;rm_infobuflen),</span>
+<span class="lineNum">     354 </span>            :                     M_TEMP, M_WAITOK | M_CANFAIL);
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :                 if (*buf == NULL) {</span>
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: out of memory\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :                         return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     358 </span>            :                 } else {
+<span class="lineNum">     359 </span>            :                         char *p;
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :                         *bufsz = letoh32(msg-&gt;rm_infobuflen);</span>
+<span class="lineNum">     361 </span>            : 
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :                         p = (char *)&amp;msg-&gt;rm_rid;</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :                         p += letoh32(msg-&gt;rm_infobufoffset);</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :                         memcpy(*buf, p, letoh32(msg-&gt;rm_infobuflen));</span>
+<span class="lineNum">     365 </span>            :                 }
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     367 </span>            : 
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         return letoh32(msg-&gt;rm_status);</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 : }</span>
+<a name="370"><span class="lineNum">     370 </span>            : </a>
+<span class="lineNum">     371 </span>            : u_int32_t
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 : urndis_ctrl_handle_reset(struct urndis_softc *sc,</span>
+<span class="lineNum">     373 </span>            :     const struct rndis_comp_hdr *hdr)
+<span class="lineNum">     374 </span>            : {
+<span class="lineNum">     375 </span>            :         const struct rndis_reset_comp   *msg;
+<span class="lineNum">     376 </span>            :         u_int32_t                        rval;
+<span class="lineNum">     377 </span>            : 
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :         msg = (struct rndis_reset_comp *) hdr;</span>
+<span class="lineNum">     379 </span>            : 
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :         rval = letoh32(msg-&gt;rm_status);</span>
+<span class="lineNum">     381 </span>            : 
+<span class="lineNum">     382 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_handle_reset: len %u status 0x%x &quot;
+<span class="lineNum">     383 </span>            :             &quot;adrreset %u\n&quot;,
+<span class="lineNum">     384 </span>            :             DEVNAME(sc),
+<span class="lineNum">     385 </span>            :             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     386 </span>            :             rval,
+<span class="lineNum">     387 </span>            :             letoh32(msg-&gt;rm_adrreset)));
+<span class="lineNum">     388 </span>            : 
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         if (rval != RNDIS_STATUS_SUCCESS) {</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: reset failed 0x%x\n&quot;, DEVNAME(sc), rval);</span>
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :                 return rval;</span>
+<span class="lineNum">     392 </span>            :         }
+<span class="lineNum">     393 </span>            : 
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :         if (letoh32(msg-&gt;rm_adrreset) != 0) {</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                 u_int32_t filter;</span>
+<span class="lineNum">     396 </span>            : 
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 filter = htole32(sc-&gt;sc_filter);</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                 rval = urndis_ctrl_set(sc, OID_GEN_CURRENT_PACKET_FILTER,</span>
+<span class="lineNum">     399 </span>            :                     &amp;filter, sizeof(filter));
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :                 if (rval != RNDIS_STATUS_SUCCESS) {</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: unable to reset data filters\n&quot;,</span>
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                             DEVNAME(sc));</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                         return rval;</span>
+<span class="lineNum">     404 </span>            :                 }
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     406 </span>            : 
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         return rval;</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 : }</span>
+<a name="409"><span class="lineNum">     409 </span>            : </a>
+<span class="lineNum">     410 </span>            : u_int32_t
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 : urndis_ctrl_handle_status(struct urndis_softc *sc,</span>
+<span class="lineNum">     412 </span>            :     const struct rndis_comp_hdr *hdr)
+<span class="lineNum">     413 </span>            : {
+<span class="lineNum">     414 </span>            :         const struct rndis_status_msg   *msg;
+<span class="lineNum">     415 </span>            :         u_int32_t                        rval;
+<span class="lineNum">     416 </span>            : 
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :         msg = (struct rndis_status_msg *)hdr;</span>
+<span class="lineNum">     418 </span>            : 
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :         rval = letoh32(msg-&gt;rm_status);</span>
+<span class="lineNum">     420 </span>            : 
+<span class="lineNum">     421 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_handle_status: len %u status 0x%x &quot;
+<span class="lineNum">     422 </span>            :             &quot;stbuflen %u\n&quot;,
+<span class="lineNum">     423 </span>            :             DEVNAME(sc),
+<span class="lineNum">     424 </span>            :             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     425 </span>            :             rval,
+<span class="lineNum">     426 </span>            :             letoh32(msg-&gt;rm_stbuflen)));
+<span class="lineNum">     427 </span>            : 
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :         switch (rval) {</span>
+<span class="lineNum">     429 </span>            :                 case RNDIS_STATUS_MEDIA_CONNECT:
+<span class="lineNum">     430 </span>            :                 case RNDIS_STATUS_MEDIA_DISCONNECT:
+<span class="lineNum">     431 </span>            :                 case RNDIS_STATUS_OFFLOAD_CURRENT_CONFIG:
+<span class="lineNum">     432 </span>            :                         rval = RNDIS_STATUS_SUCCESS;
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     434 </span>            : 
+<span class="lineNum">     435 </span>            :                 default:
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: status 0x%x\n&quot;, DEVNAME(sc), rval);</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     438 </span>            : 
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         return rval;</span>
+<span class="lineNum">     440 </span>            : }
+<a name="441"><span class="lineNum">     441 </span>            : </a>
+<span class="lineNum">     442 </span>            : u_int32_t
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 : urndis_ctrl_init(struct urndis_softc *sc)</span>
+<span class="lineNum">     444 </span>            : {
+<span class="lineNum">     445 </span>            :         struct rndis_init_req   *msg;
+<span class="lineNum">     446 </span>            :         u_int32_t                rval;
+<span class="lineNum">     447 </span>            :         struct rndis_comp_hdr   *hdr;
+<span class="lineNum">     448 </span>            : 
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :         msg = malloc(sizeof(*msg), M_TEMP, M_WAITOK | M_CANFAIL);</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :         if (msg == NULL) {</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: out of memory\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     453 </span>            :         }
+<span class="lineNum">     454 </span>            : 
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :         msg-&gt;rm_type = htole32(REMOTE_NDIS_INITIALIZE_MSG);</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :         msg-&gt;rm_len = htole32(sizeof(*msg));</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :         msg-&gt;rm_rid = htole32(0);</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :         msg-&gt;rm_ver_major = htole32(1);</span>
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :         msg-&gt;rm_ver_minor = htole32(1);</span>
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :         msg-&gt;rm_max_xfersz = htole32(RNDIS_BUFSZ);</span>
+<span class="lineNum">     461 </span>            : 
+<span class="lineNum">     462 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_init send: type %u len %u rid %u ver_major %u &quot;
+<span class="lineNum">     463 </span>            :             &quot;ver_minor %u max_xfersz %u\n&quot;,
+<span class="lineNum">     464 </span>            :             DEVNAME(sc),
+<span class="lineNum">     465 </span>            :             letoh32(msg-&gt;rm_type),
+<span class="lineNum">     466 </span>            :             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     467 </span>            :             letoh32(msg-&gt;rm_rid),
+<span class="lineNum">     468 </span>            :             letoh32(msg-&gt;rm_ver_major),
+<span class="lineNum">     469 </span>            :             letoh32(msg-&gt;rm_ver_minor),
+<span class="lineNum">     470 </span>            :             letoh32(msg-&gt;rm_max_xfersz)));
+<span class="lineNum">     471 </span>            : 
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :         rval = urndis_ctrl_send(sc, msg, sizeof(*msg));</span>
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :         free(msg, M_TEMP, sizeof *msg);</span>
+<span class="lineNum">     474 </span>            : 
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :         if (rval != RNDIS_STATUS_SUCCESS) {</span>
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: init failed\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :                 return rval;</span>
+<span class="lineNum">     478 </span>            :         }
+<span class="lineNum">     479 </span>            : 
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :         if ((hdr = urndis_ctrl_recv(sc)) == NULL) {</span>
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to get init response\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     483 </span>            :         }
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         rval = urndis_ctrl_handle(sc, hdr, NULL, NULL);</span>
+<span class="lineNum">     485 </span>            : 
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :         return rval;</span>
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 : }</span>
+<a name="488"><span class="lineNum">     488 </span>            : </a>
+<span class="lineNum">     489 </span>            : u_int32_t
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 : urndis_ctrl_halt(struct urndis_softc *sc)</span>
+<span class="lineNum">     491 </span>            : {
+<span class="lineNum">     492 </span>            :         struct rndis_halt_req   *msg;
+<span class="lineNum">     493 </span>            :         u_int32_t                rval;
+<span class="lineNum">     494 </span>            : 
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :         msg = malloc(sizeof(*msg), M_TEMP, M_WAITOK | M_CANFAIL);</span>
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :         if (msg == NULL) {</span>
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: out of memory\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     499 </span>            :         }
+<span class="lineNum">     500 </span>            : 
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         msg-&gt;rm_type = htole32(REMOTE_NDIS_HALT_MSG);</span>
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :         msg-&gt;rm_len = htole32(sizeof(*msg));</span>
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :         msg-&gt;rm_rid = 0;</span>
+<span class="lineNum">     504 </span>            : 
+<span class="lineNum">     505 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_halt send: type %u len %u rid %u\n&quot;,
+<span class="lineNum">     506 </span>            :             DEVNAME(sc),
+<span class="lineNum">     507 </span>            :             letoh32(msg-&gt;rm_type),
+<span class="lineNum">     508 </span>            :             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     509 </span>            :             letoh32(msg-&gt;rm_rid)));
+<span class="lineNum">     510 </span>            : 
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :         rval = urndis_ctrl_send(sc, msg, sizeof(*msg));</span>
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :         free(msg, M_TEMP, sizeof *msg);</span>
+<span class="lineNum">     513 </span>            : 
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :         if (rval != RNDIS_STATUS_SUCCESS)</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: halt failed\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :         return rval;</span>
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 : }</span>
+<a name="519"><span class="lineNum">     519 </span>            : </a>
+<span class="lineNum">     520 </span>            : u_int32_t
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 : urndis_ctrl_query(struct urndis_softc *sc, u_int32_t oid,</span>
+<span class="lineNum">     522 </span>            :     void *qbuf, size_t qlen,
+<span class="lineNum">     523 </span>            :     void **rbuf, size_t *rbufsz)
+<span class="lineNum">     524 </span>            : {
+<span class="lineNum">     525 </span>            :         struct rndis_query_req  *msg;
+<span class="lineNum">     526 </span>            :         u_int32_t                rval;
+<span class="lineNum">     527 </span>            :         struct rndis_comp_hdr   *hdr;
+<span class="lineNum">     528 </span>            : 
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :         msg = malloc(sizeof(*msg) + qlen, M_TEMP, M_WAITOK | M_CANFAIL);</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :         if (msg == NULL) {</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: out of memory\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     533 </span>            :         }
+<span class="lineNum">     534 </span>            : 
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :         msg-&gt;rm_type = htole32(REMOTE_NDIS_QUERY_MSG);</span>
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         msg-&gt;rm_len = htole32(sizeof(*msg) + qlen);</span>
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :         msg-&gt;rm_rid = 0; /* XXX */</span>
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :         msg-&gt;rm_oid = htole32(oid);</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :         msg-&gt;rm_infobuflen = htole32(qlen);</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :         if (qlen != 0) {</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                 msg-&gt;rm_infobufoffset = htole32(20);</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                 memcpy((char*)msg + 20, qbuf, qlen);</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :                 msg-&gt;rm_infobufoffset = 0;</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         msg-&gt;rm_devicevchdl = 0;</span>
+<span class="lineNum">     546 </span>            : 
+<span class="lineNum">     547 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_query send: type %u len %u rid %u oid 0x%x &quot;
+<span class="lineNum">     548 </span>            :             &quot;infobuflen %u infobufoffset %u devicevchdl %u\n&quot;,
+<span class="lineNum">     549 </span>            :             DEVNAME(sc),
+<span class="lineNum">     550 </span>            :             letoh32(msg-&gt;rm_type),
+<span class="lineNum">     551 </span>            :             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     552 </span>            :             letoh32(msg-&gt;rm_rid),
+<span class="lineNum">     553 </span>            :             letoh32(msg-&gt;rm_oid),
+<span class="lineNum">     554 </span>            :             letoh32(msg-&gt;rm_infobuflen),
+<span class="lineNum">     555 </span>            :             letoh32(msg-&gt;rm_infobufoffset),
+<span class="lineNum">     556 </span>            :             letoh32(msg-&gt;rm_devicevchdl)));
+<span class="lineNum">     557 </span>            : 
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :         rval = urndis_ctrl_send(sc, msg, sizeof(*msg));</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :         free(msg, M_TEMP, sizeof *msg + qlen);</span>
+<span class="lineNum">     560 </span>            : 
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :         if (rval != RNDIS_STATUS_SUCCESS) {</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: query failed\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                 return rval;</span>
+<span class="lineNum">     564 </span>            :         }
+<span class="lineNum">     565 </span>            : 
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :         if ((hdr = urndis_ctrl_recv(sc)) == NULL) {</span>
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to get query response\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     569 </span>            :         }
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :         rval = urndis_ctrl_handle(sc, hdr, rbuf, rbufsz);</span>
+<span class="lineNum">     571 </span>            : 
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :         return rval;</span>
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 : }</span>
+<a name="574"><span class="lineNum">     574 </span>            : </a>
+<span class="lineNum">     575 </span>            : u_int32_t
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 : urndis_ctrl_set(struct urndis_softc *sc, u_int32_t oid, void *buf, size_t len)</span>
+<span class="lineNum">     577 </span>            : {
+<span class="lineNum">     578 </span>            :         struct rndis_set_req    *msg;
+<span class="lineNum">     579 </span>            :         u_int32_t                rval;
+<span class="lineNum">     580 </span>            :         struct rndis_comp_hdr   *hdr;
+<span class="lineNum">     581 </span>            : 
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :         msg = malloc(sizeof(*msg) + len, M_TEMP, M_WAITOK | M_CANFAIL);</span>
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :         if (msg == NULL) {</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: out of memory\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     586 </span>            :         }
+<span class="lineNum">     587 </span>            : 
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :         msg-&gt;rm_type = htole32(REMOTE_NDIS_SET_MSG);</span>
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :         msg-&gt;rm_len = htole32(sizeof(*msg) + len);</span>
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :         msg-&gt;rm_rid = 0; /* XXX */</span>
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :         msg-&gt;rm_oid = htole32(oid);</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :         msg-&gt;rm_infobuflen = htole32(len);</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :         if (len != 0) {</span>
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :                 msg-&gt;rm_infobufoffset = htole32(20);</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                 memcpy((char*)msg + 28, buf, len);</span>
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :                 msg-&gt;rm_infobufoffset = 0;</span>
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :         msg-&gt;rm_devicevchdl = 0;</span>
+<span class="lineNum">     599 </span>            : 
+<span class="lineNum">     600 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_set send: type %u len %u rid %u oid 0x%x &quot;
+<span class="lineNum">     601 </span>            :             &quot;infobuflen %u infobufoffset %u devicevchdl %u\n&quot;,
+<span class="lineNum">     602 </span>            :             DEVNAME(sc),
+<span class="lineNum">     603 </span>            :             letoh32(msg-&gt;rm_type),
+<span class="lineNum">     604 </span>            :             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     605 </span>            :             letoh32(msg-&gt;rm_rid),
+<span class="lineNum">     606 </span>            :             letoh32(msg-&gt;rm_oid),
+<span class="lineNum">     607 </span>            :             letoh32(msg-&gt;rm_infobuflen),
+<span class="lineNum">     608 </span>            :             letoh32(msg-&gt;rm_infobufoffset),
+<span class="lineNum">     609 </span>            :             letoh32(msg-&gt;rm_devicevchdl)));
+<span class="lineNum">     610 </span>            : 
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :         rval = urndis_ctrl_send(sc, msg, sizeof(*msg) + len);</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :         free(msg, M_TEMP, sizeof *msg + len);</span>
+<span class="lineNum">     613 </span>            : 
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :         if (rval != RNDIS_STATUS_SUCCESS) {</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: set failed\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :                 return rval;</span>
+<span class="lineNum">     617 </span>            :         }
+<span class="lineNum">     618 </span>            : 
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :         if ((hdr = urndis_ctrl_recv(sc)) == NULL) {</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to get set response\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     622 </span>            :         }
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :         rval = urndis_ctrl_handle(sc, hdr, NULL, NULL);</span>
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :         if (rval != RNDIS_STATUS_SUCCESS)</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: set failed 0x%x\n&quot;, DEVNAME(sc), rval);</span>
+<span class="lineNum">     626 </span>            : 
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :         return rval;</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 : }</span>
+<a name="629"><span class="lineNum">     629 </span>            : </a>
+<span class="lineNum">     630 </span>            : u_int32_t
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 : urndis_ctrl_set_param(struct urndis_softc *sc,</span>
+<span class="lineNum">     632 </span>            :     const char *name,
+<span class="lineNum">     633 </span>            :     u_int32_t type,
+<span class="lineNum">     634 </span>            :     void *buf,
+<span class="lineNum">     635 </span>            :     size_t len)
+<span class="lineNum">     636 </span>            : {
+<span class="lineNum">     637 </span>            :         struct rndis_set_parameter      *param;
+<span class="lineNum">     638 </span>            :         u_int32_t                        rval;
+<span class="lineNum">     639 </span>            :         size_t                           namelen, tlen;
+<span class="lineNum">     640 </span>            : 
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :         if (name)</span>
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :                 namelen = strlen(name);</span>
+<span class="lineNum">     643 </span>            :         else
+<span class="lineNum">     644 </span>            :                 namelen = 0;
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :         tlen = sizeof(*param) + len + namelen;</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :         param = malloc(tlen, M_TEMP, M_WAITOK | M_CANFAIL);</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         if (param == NULL) {</span>
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: out of memory\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :                 return RNDIS_STATUS_FAILURE;</span>
+<span class="lineNum">     650 </span>            :         }
+<span class="lineNum">     651 </span>            : 
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :         param-&gt;rm_namelen = htole32(namelen);</span>
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :         param-&gt;rm_valuelen = htole32(len);</span>
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :         param-&gt;rm_type = htole32(type);</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :         if (namelen != 0) {</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :                 param-&gt;rm_nameoffset = htole32(20);</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                 memcpy(param + 20, name, namelen);</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                 param-&gt;rm_nameoffset = 0;</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         if (len != 0) {</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                 param-&gt;rm_valueoffset = htole32(20 + namelen);</span>
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :                 memcpy(param + 20 + namelen, buf, len);</span>
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                 param-&gt;rm_valueoffset = 0;</span>
+<span class="lineNum">     665 </span>            : 
+<span class="lineNum">     666 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_set_param send: nameoffset %u namelen %u &quot;
+<span class="lineNum">     667 </span>            :             &quot;type 0x%x valueoffset %u valuelen %u\n&quot;,
+<span class="lineNum">     668 </span>            :             DEVNAME(sc),
+<span class="lineNum">     669 </span>            :             letoh32(param-&gt;rm_nameoffset),
+<span class="lineNum">     670 </span>            :             letoh32(param-&gt;rm_namelen),
+<span class="lineNum">     671 </span>            :             letoh32(param-&gt;rm_type),
+<span class="lineNum">     672 </span>            :             letoh32(param-&gt;rm_valueoffset),
+<span class="lineNum">     673 </span>            :             letoh32(param-&gt;rm_valuelen)));
+<span class="lineNum">     674 </span>            : 
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         rval = urndis_ctrl_set(sc, OID_GEN_RNDIS_CONFIG_PARAMETER, param, tlen);</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :         free(param, M_TEMP, tlen);</span>
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :         if (rval != RNDIS_STATUS_SUCCESS)</span>
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: set param failed 0x%x\n&quot;, DEVNAME(sc), rval);</span>
+<span class="lineNum">     679 </span>            : 
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :         return rval;</span>
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     682 </span>            : 
+<span class="lineNum">     683 </span>            : #if 0
+<span class="lineNum">     684 </span>            : /* XXX : adrreset, get it from response */
+<span class="lineNum">     685 </span>            : u_int32_t
+<span class="lineNum">     686 </span>            : urndis_ctrl_reset(struct urndis_softc *sc)
+<span class="lineNum">     687 </span>            : {
+<span class="lineNum">     688 </span>            :         struct rndis_reset_req          *reset;
+<span class="lineNum">     689 </span>            :         u_int32_t                        rval;
+<span class="lineNum">     690 </span>            :         struct rndis_comp_hdr           *hdr;
+<span class="lineNum">     691 </span>            : 
+<span class="lineNum">     692 </span>            :         reset = malloc(sizeof(*reset), M_TEMP, M_WAITOK | M_CANFAIL);
+<span class="lineNum">     693 </span>            :         if (reset == NULL) {
+<span class="lineNum">     694 </span>            :                 printf(&quot;%s: out of memory\n&quot;, DEVNAME(sc));
+<span class="lineNum">     695 </span>            :                 return RNDIS_STATUS_FAILURE;
+<span class="lineNum">     696 </span>            :         }
+<span class="lineNum">     697 </span>            : 
+<span class="lineNum">     698 </span>            :         reset-&gt;rm_type = htole32(REMOTE_NDIS_RESET_MSG);
+<span class="lineNum">     699 </span>            :         reset-&gt;rm_len = htole32(sizeof(*reset));
+<span class="lineNum">     700 </span>            :         reset-&gt;rm_rid = 0; /* XXX rm_rid == reserved ... remove ? */
+<span class="lineNum">     701 </span>            : 
+<span class="lineNum">     702 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_reset send: type %u len %u rid %u\n&quot;,
+<span class="lineNum">     703 </span>            :             DEVNAME(sc),
+<span class="lineNum">     704 </span>            :             letoh32(reset-&gt;rm_type),
+<span class="lineNum">     705 </span>            :             letoh32(reset-&gt;rm_len),
+<span class="lineNum">     706 </span>            :             letoh32(reset-&gt;rm_rid)));
+<span class="lineNum">     707 </span>            : 
+<span class="lineNum">     708 </span>            :         rval = urndis_ctrl_send(sc, reset, sizeof(*reset));
+<span class="lineNum">     709 </span>            :         free(reset, M_TEMP, sizeof *reset);
+<span class="lineNum">     710 </span>            : 
+<span class="lineNum">     711 </span>            :         if (rval != RNDIS_STATUS_SUCCESS) {
+<span class="lineNum">     712 </span>            :                 printf(&quot;%s: reset failed\n&quot;, DEVNAME(sc));
+<span class="lineNum">     713 </span>            :                 return rval;
+<span class="lineNum">     714 </span>            :         }
+<span class="lineNum">     715 </span>            : 
+<span class="lineNum">     716 </span>            :         if ((hdr = urndis_ctrl_recv(sc)) == NULL) {
+<span class="lineNum">     717 </span>            :                 printf(&quot;%s: unable to get reset response\n&quot;, DEVNAME(sc));
+<span class="lineNum">     718 </span>            :                 return RNDIS_STATUS_FAILURE;
+<span class="lineNum">     719 </span>            :         }
+<span class="lineNum">     720 </span>            :         rval = urndis_ctrl_handle(sc, hdr, NULL, NULL);
+<span class="lineNum">     721 </span>            : 
+<span class="lineNum">     722 </span>            :         return rval;
+<span class="lineNum">     723 </span>            : }
+<span class="lineNum">     724 </span>            : 
+<span class="lineNum">     725 </span>            : u_int32_t
+<span class="lineNum">     726 </span>            : urndis_ctrl_keepalive(struct urndis_softc *sc)
+<span class="lineNum">     727 </span>            : {
+<span class="lineNum">     728 </span>            :         struct rndis_keepalive_req      *keep;
+<span class="lineNum">     729 </span>            :         u_int32_t                        rval;
+<span class="lineNum">     730 </span>            :         struct rndis_comp_hdr           *hdr;
+<span class="lineNum">     731 </span>            : 
+<span class="lineNum">     732 </span>            :         keep = malloc(sizeof(*keep), M_TEMP, M_WAITOK | M_CANFAIL);
+<span class="lineNum">     733 </span>            :         if (keep == NULL) {
+<span class="lineNum">     734 </span>            :                 printf(&quot;%s: out of memory\n&quot;, DEVNAME(sc));
+<span class="lineNum">     735 </span>            :                 return RNDIS_STATUS_FAILURE;
+<span class="lineNum">     736 </span>            :         }
+<span class="lineNum">     737 </span>            : 
+<span class="lineNum">     738 </span>            :         keep-&gt;rm_type = htole32(REMOTE_NDIS_KEEPALIVE_MSG);
+<span class="lineNum">     739 </span>            :         keep-&gt;rm_len = htole32(sizeof(*keep));
+<span class="lineNum">     740 </span>            :         keep-&gt;rm_rid = 0; /* XXX rm_rid == reserved ... remove ? */
+<span class="lineNum">     741 </span>            : 
+<span class="lineNum">     742 </span>            :         DPRINTF((&quot;%s: urndis_ctrl_keepalive: type %u len %u rid %u\n&quot;,
+<span class="lineNum">     743 </span>            :             DEVNAME(sc),
+<span class="lineNum">     744 </span>            :             letoh32(keep-&gt;rm_type),
+<span class="lineNum">     745 </span>            :             letoh32(keep-&gt;rm_len),
+<span class="lineNum">     746 </span>            :             letoh32(keep-&gt;rm_rid)));
+<span class="lineNum">     747 </span>            : 
+<span class="lineNum">     748 </span>            :         rval = urndis_ctrl_send(sc, keep, sizeof(*keep));
+<span class="lineNum">     749 </span>            :         free(keep, M_TEMP, sizeof *keep);
+<span class="lineNum">     750 </span>            : 
+<span class="lineNum">     751 </span>            :         if (rval != RNDIS_STATUS_SUCCESS) {
+<span class="lineNum">     752 </span>            :                 printf(&quot;%s: keepalive failed\n&quot;, DEVNAME(sc));
+<span class="lineNum">     753 </span>            :                 return rval;
+<span class="lineNum">     754 </span>            :         }
+<span class="lineNum">     755 </span>            : 
+<span class="lineNum">     756 </span>            :         if ((hdr = urndis_ctrl_recv(sc)) == NULL) {
+<span class="lineNum">     757 </span>            :                 printf(&quot;%s: unable to get keepalive response\n&quot;, DEVNAME(sc));
+<span class="lineNum">     758 </span>            :                 return RNDIS_STATUS_FAILURE;
+<span class="lineNum">     759 </span>            :         }
+<span class="lineNum">     760 </span>            :         rval = urndis_ctrl_handle(sc, hdr, NULL, NULL);
+<span class="lineNum">     761 </span>            :         if (rval != RNDIS_STATUS_SUCCESS) {
+<span class="lineNum">     762 </span>            :                 printf(&quot;%s: keepalive failed 0x%x\n&quot;, DEVNAME(sc), rval);
+<span class="lineNum">     763 </span>            :                 urndis_ctrl_reset(sc);
+<span class="lineNum">     764 </span>            :         }
+<span class="lineNum">     765 </span>            : 
+<span class="lineNum">     766 </span>            :         return rval;
+<span class="lineNum">     767 </span>            : }
+<span class="lineNum">     768 </span>            : #endif
+<a name="769"><span class="lineNum">     769 </span>            : </a>
+<span class="lineNum">     770 </span>            : int
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 : urndis_encap(struct urndis_softc *sc, struct mbuf *m, int idx)</span>
+<span class="lineNum">     772 </span>            : {
+<span class="lineNum">     773 </span>            :         struct urndis_chain             *c;
+<span class="lineNum">     774 </span>            :         usbd_status                      err;
+<span class="lineNum">     775 </span>            :         struct rndis_packet_msg         *msg;
+<span class="lineNum">     776 </span>            : 
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :         c = &amp;sc-&gt;sc_data.sc_tx_chain[idx];</span>
+<span class="lineNum">     778 </span>            : 
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :         msg = (struct rndis_packet_msg *)c-&gt;sc_buf;</span>
+<span class="lineNum">     780 </span>            : 
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :         memset(msg, 0, sizeof(*msg));</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :         msg-&gt;rm_type = htole32(REMOTE_NDIS_PACKET_MSG);</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :         msg-&gt;rm_len = htole32(sizeof(*msg) + m-&gt;m_pkthdr.len);</span>
+<span class="lineNum">     784 </span>            : 
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         msg-&gt;rm_dataoffset = htole32(RNDIS_DATA_OFFSET);</span>
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :         msg-&gt;rm_datalen = htole32(m-&gt;m_pkthdr.len);</span>
+<span class="lineNum">     787 </span>            : 
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :         m_copydata(m, 0, m-&gt;m_pkthdr.len,</span>
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 :             ((char*)msg + RNDIS_DATA_OFFSET + RNDIS_HEADER_OFFSET));</span>
+<span class="lineNum">     790 </span>            : 
+<span class="lineNum">     791 </span>            :         DPRINTF((&quot;%s: urndis_encap type 0x%x len %u data(off %u len %u)\n&quot;,
+<span class="lineNum">     792 </span>            :             DEVNAME(sc),
+<span class="lineNum">     793 </span>            :             letoh32(msg-&gt;rm_type),
+<span class="lineNum">     794 </span>            :             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     795 </span>            :             letoh32(msg-&gt;rm_dataoffset),
+<span class="lineNum">     796 </span>            :             letoh32(msg-&gt;rm_datalen)));
+<span class="lineNum">     797 </span>            : 
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :         c-&gt;sc_mbuf = m;</span>
+<span class="lineNum">     799 </span>            : 
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :         usbd_setup_xfer(c-&gt;sc_xfer, sc-&gt;sc_bulkout_pipe, c, c-&gt;sc_buf,</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :             letoh32(msg-&gt;rm_len), USBD_FORCE_SHORT_XFER | USBD_NO_COPY, 10000,</span>
+<span class="lineNum">     802 </span>            :             urndis_txeof);
+<span class="lineNum">     803 </span>            : 
+<span class="lineNum">     804 </span>            :         /* Transmit */
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :         err = usbd_transfer(c-&gt;sc_xfer);</span>
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         if (err != USBD_IN_PROGRESS) {</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :                 urndis_stop(sc);</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                 return(EIO);</span>
+<span class="lineNum">     809 </span>            :         }
+<span class="lineNum">     810 </span>            : 
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :         sc-&gt;sc_data.sc_tx_cnt++;</span>
+<span class="lineNum">     812 </span>            : 
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :         return(0);</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 : }</span>
+<a name="815"><span class="lineNum">     815 </span>            : </a>
+<span class="lineNum">     816 </span>            : void
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 : urndis_decap(struct urndis_softc *sc, struct urndis_chain *c, u_int32_t len)</span>
+<span class="lineNum">     818 </span>            : {
+<span class="lineNum">     819 </span>            :         struct mbuf             *m;
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :         struct mbuf_list         ml = MBUF_LIST_INITIALIZER();</span>
+<span class="lineNum">     821 </span>            :         struct rndis_packet_msg *msg;
+<span class="lineNum">     822 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">     823 </span>            :         int                      s;
+<span class="lineNum">     824 </span>            :         int                      offset;
+<span class="lineNum">     825 </span>            : 
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         ifp = GET_IFP(sc);</span>
+<span class="lineNum">     827 </span>            :         offset = 0;
+<span class="lineNum">     828 </span>            : 
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :         while (len &gt; 0) {</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :                 msg = (struct rndis_packet_msg *)((char*)c-&gt;sc_buf + offset);</span>
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :                 m = c-&gt;sc_mbuf;</span>
+<span class="lineNum">     832 </span>            : 
+<span class="lineNum">     833 </span>            :                 DPRINTF((&quot;%s: urndis_decap buffer size left %u\n&quot;, DEVNAME(sc),
+<span class="lineNum">     834 </span>            :                     len));
+<span class="lineNum">     835 </span>            : 
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :                 if (len &lt; sizeof(*msg)) {</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: urndis_decap invalid buffer len %u &lt; &quot;</span>
+<span class="lineNum">     838 </span>            :                             &quot;minimum header %zu\n&quot;,
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :                             DEVNAME(sc),</span>
+<span class="lineNum">     840 </span>            :                             len,
+<span class="lineNum">     841 </span>            :                             sizeof(*msg));
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     843 </span>            :                 }
+<span class="lineNum">     844 </span>            : 
+<span class="lineNum">     845 </span>            :                 DPRINTF((&quot;%s: urndis_decap len %u data(off:%u len:%u) &quot;
+<span class="lineNum">     846 </span>            :                     &quot;oobdata(off:%u len:%u nb:%u) perpacket(off:%u len:%u)\n&quot;,
+<span class="lineNum">     847 </span>            :                     DEVNAME(sc),
+<span class="lineNum">     848 </span>            :                     letoh32(msg-&gt;rm_len),
+<span class="lineNum">     849 </span>            :                     letoh32(msg-&gt;rm_dataoffset),
+<span class="lineNum">     850 </span>            :                     letoh32(msg-&gt;rm_datalen),
+<span class="lineNum">     851 </span>            :                     letoh32(msg-&gt;rm_oobdataoffset),
+<span class="lineNum">     852 </span>            :                     letoh32(msg-&gt;rm_oobdatalen),
+<span class="lineNum">     853 </span>            :                     letoh32(msg-&gt;rm_oobdataelements),
+<span class="lineNum">     854 </span>            :                     letoh32(msg-&gt;rm_pktinfooffset),
+<span class="lineNum">     855 </span>            :                     letoh32(msg-&gt;rm_pktinfooffset)));
+<span class="lineNum">     856 </span>            : 
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :                 if (letoh32(msg-&gt;rm_type) != REMOTE_NDIS_PACKET_MSG) {</span>
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: urndis_decap invalid type 0x%x != 0x%x\n&quot;,</span>
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                             DEVNAME(sc),</span>
+<span class="lineNum">     860 </span>            :                             letoh32(msg-&gt;rm_type),
+<span class="lineNum">     861 </span>            :                             REMOTE_NDIS_PACKET_MSG);
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     863 </span>            :                 }
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :                 if (letoh32(msg-&gt;rm_len) &lt; sizeof(*msg)) {</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: urndis_decap invalid msg len %u &lt; %zu\n&quot;,</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :                             DEVNAME(sc),</span>
+<span class="lineNum">     867 </span>            :                             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     868 </span>            :                             sizeof(*msg));
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     870 </span>            :                 }
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :                 if (letoh32(msg-&gt;rm_len) &gt; len) {</span>
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: urndis_decap invalid msg len %u &gt; buffer &quot;</span>
+<span class="lineNum">     873 </span>            :                             &quot;len %u\n&quot;,
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :                             DEVNAME(sc),</span>
+<span class="lineNum">     875 </span>            :                             letoh32(msg-&gt;rm_len),
+<span class="lineNum">     876 </span>            :                             len);
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     878 </span>            :                 }
+<span class="lineNum">     879 </span>            : 
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 :                 if (letoh32(msg-&gt;rm_dataoffset) +</span>
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :                     letoh32(msg-&gt;rm_datalen) + RNDIS_HEADER_OFFSET</span>
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :                         &gt; letoh32(msg-&gt;rm_len)) {</span>
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: urndis_decap invalid data &quot;</span>
+<span class="lineNum">     884 </span>            :                             &quot;len/offset/end_position(%u/%u/%zu) -&gt; &quot;
+<span class="lineNum">     885 </span>            :                             &quot;go out of receive buffer limit %u\n&quot;,
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :                             DEVNAME(sc),</span>
+<span class="lineNum">     887 </span>            :                             letoh32(msg-&gt;rm_datalen),
+<span class="lineNum">     888 </span>            :                             letoh32(msg-&gt;rm_dataoffset),
+<span class="lineNum">     889 </span>            :                             letoh32(msg-&gt;rm_dataoffset) +
+<span class="lineNum">     890 </span>            :                             letoh32(msg-&gt;rm_datalen) + RNDIS_HEADER_OFFSET,
+<span class="lineNum">     891 </span>            :                             letoh32(msg-&gt;rm_len));
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     893 </span>            :                 }
+<span class="lineNum">     894 </span>            : 
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :                 if (letoh32(msg-&gt;rm_datalen) &lt; sizeof(struct ether_header)) {</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_ierrors++;</span>
+<span class="lineNum">     897 </span>            :                         DPRINTF((&quot;%s: urndis_decap invalid ethernet size &quot;
+<span class="lineNum">     898 </span>            :                             &quot;%u &lt; %zu\n&quot;,
+<span class="lineNum">     899 </span>            :                             DEVNAME(sc),
+<span class="lineNum">     900 </span>            :                             letoh32(msg-&gt;rm_datalen),
+<span class="lineNum">     901 </span>            :                             sizeof(struct ether_header)));
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     903 </span>            :                 }
+<span class="lineNum">     904 </span>            : 
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :                 memcpy(mtod(m, char*),</span>
+<span class="lineNum">     906 </span>            :                     ((char*)&amp;msg-&gt;rm_dataoffset + letoh32(msg-&gt;rm_dataoffset)),
+<span class="lineNum">     907 </span>            :                     letoh32(msg-&gt;rm_datalen));
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :                 m-&gt;m_pkthdr.len = m-&gt;m_len = letoh32(msg-&gt;rm_datalen);</span>
+<span class="lineNum">     909 </span>            : 
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :                 if (urndis_newbuf(sc, c) == ENOBUFS) {</span>
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_ierrors++;</span>
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :                         ml_enqueue(&amp;ml, m);</span>
+<span class="lineNum">     914 </span>            :                 }
+<span class="lineNum">     915 </span>            : 
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :                 offset += letoh32(msg-&gt;rm_len);</span>
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 :                 len -= letoh32(msg-&gt;rm_len);</span>
+<span class="lineNum">     918 </span>            :         }
+<span class="lineNum">     919 </span>            : 
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :         if_input(ifp, &amp;ml);</span>
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 : }</span>
+<a name="924"><span class="lineNum">     924 </span>            : </a>
+<span class="lineNum">     925 </span>            : int
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 : urndis_newbuf(struct urndis_softc *sc, struct urndis_chain *c)</span>
+<span class="lineNum">     927 </span>            : {
+<span class="lineNum">     928 </span>            :         struct mbuf *m_new = NULL;
+<span class="lineNum">     929 </span>            : 
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :         MGETHDR(m_new, M_DONTWAIT, MT_DATA);</span>
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :         if (m_new == NULL) {</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: no memory for rx list -- packet dropped!\n&quot;,</span>
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :                     DEVNAME(sc));</span>
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">     935 </span>            :         }
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :         MCLGET(m_new, M_DONTWAIT);</span>
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :         if (!(m_new-&gt;m_flags &amp; M_EXT)) {</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: no memory for rx list -- packet dropped!\n&quot;,</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :                     DEVNAME(sc));</span>
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :                 m_freem(m_new);</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">     942 </span>            :         }
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :         m_new-&gt;m_len = m_new-&gt;m_pkthdr.len = MCLBYTES;</span>
+<span class="lineNum">     944 </span>            : 
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 :         m_adj(m_new, ETHER_ALIGN);</span>
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :         c-&gt;sc_mbuf = m_new;</span>
+<span class="lineNum">     947 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 : }</span>
+<a name="949"><span class="lineNum">     949 </span>            : </a>
+<span class="lineNum">     950 </span>            : int
+<span class="lineNum">     951 </span><span class="lineNoCov">          0 : urndis_rx_list_init(struct urndis_softc *sc)</span>
+<span class="lineNum">     952 </span>            : {
+<span class="lineNum">     953 </span>            :         struct urndis_cdata     *cd;
+<span class="lineNum">     954 </span>            :         struct urndis_chain     *c;
+<span class="lineNum">     955 </span>            :         int                      i;
+<span class="lineNum">     956 </span>            : 
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :         cd = &amp;sc-&gt;sc_data;</span>
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RNDIS_RX_LIST_CNT; i++) {</span>
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :                 c = &amp;cd-&gt;sc_rx_chain[i];</span>
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :                 c-&gt;sc_softc = sc;</span>
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :                 c-&gt;sc_idx = i;</span>
+<span class="lineNum">     962 </span>            : 
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :                 if (urndis_newbuf(sc, c) == ENOBUFS)</span>
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :                         return (ENOBUFS);</span>
+<span class="lineNum">     965 </span>            : 
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :                 if (c-&gt;sc_xfer == NULL) {</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :                         c-&gt;sc_xfer = usbd_alloc_xfer(sc-&gt;sc_udev);</span>
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :                         if (c-&gt;sc_xfer == NULL)</span>
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :                                 return (ENOBUFS);</span>
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :                         c-&gt;sc_buf = usbd_alloc_buffer(c-&gt;sc_xfer,</span>
+<span class="lineNum">     971 </span>            :                             RNDIS_BUFSZ);
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :                         if (c-&gt;sc_buf == NULL)</span>
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :                                 return (ENOBUFS);</span>
+<span class="lineNum">     974 </span>            :                 }
+<span class="lineNum">     975 </span>            :         }
+<span class="lineNum">     976 </span>            : 
+<span class="lineNum">     977 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 : }</span>
+<a name="979"><span class="lineNum">     979 </span>            : </a>
+<span class="lineNum">     980 </span>            : int
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 : urndis_tx_list_init(struct urndis_softc *sc)</span>
+<span class="lineNum">     982 </span>            : {
+<span class="lineNum">     983 </span>            :         struct urndis_cdata     *cd;
+<span class="lineNum">     984 </span>            :         struct urndis_chain     *c;
+<span class="lineNum">     985 </span>            :         int                      i;
+<span class="lineNum">     986 </span>            : 
+<span class="lineNum">     987 </span><span class="lineNoCov">          0 :         cd = &amp;sc-&gt;sc_data;</span>
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RNDIS_TX_LIST_CNT; i++) {</span>
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 :                 c = &amp;cd-&gt;sc_tx_chain[i];</span>
+<span class="lineNum">     990 </span><span class="lineNoCov">          0 :                 c-&gt;sc_softc = sc;</span>
+<span class="lineNum">     991 </span><span class="lineNoCov">          0 :                 c-&gt;sc_idx = i;</span>
+<span class="lineNum">     992 </span><span class="lineNoCov">          0 :                 c-&gt;sc_mbuf = NULL;</span>
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :                 if (c-&gt;sc_xfer == NULL) {</span>
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :                         c-&gt;sc_xfer = usbd_alloc_xfer(sc-&gt;sc_udev);</span>
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :                         if (c-&gt;sc_xfer == NULL)</span>
+<span class="lineNum">     996 </span><span class="lineNoCov">          0 :                                 return (ENOBUFS);</span>
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :                         c-&gt;sc_buf = usbd_alloc_buffer(c-&gt;sc_xfer,</span>
+<span class="lineNum">     998 </span>            :                             RNDIS_BUFSZ);
+<span class="lineNum">     999 </span><span class="lineNoCov">          0 :                         if (c-&gt;sc_buf == NULL)</span>
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :                                 return (ENOBUFS);</span>
+<span class="lineNum">    1001 </span>            :                 }
+<span class="lineNum">    1002 </span>            :         }
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 : }</span>
+<a name="1005"><span class="lineNum">    1005 </span>            : </a>
+<span class="lineNum">    1006 </span>            : int
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 : urndis_ioctl(struct ifnet *ifp, u_long command, caddr_t data)</span>
+<span class="lineNum">    1008 </span>            : {
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 :         struct urndis_softc     *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">    1010 </span>            :         int                      s, error = 0;
+<span class="lineNum">    1011 </span>            : 
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;sc_udev))</span>
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                 return (EIO);</span>
+<span class="lineNum">    1014 </span>            : 
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">    1016 </span>            : 
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :         switch(command) {</span>
+<span class="lineNum">    1018 </span>            :         case SIOCSIFADDR:
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_flags |= IFF_UP;</span>
+<span class="lineNum">    1020 </span><span class="lineNoCov">          0 :                 if (!(ifp-&gt;if_flags &amp; IFF_RUNNING))</span>
+<span class="lineNum">    1021 </span><span class="lineNoCov">          0 :                         urndis_init(sc);</span>
+<span class="lineNum">    1022 </span>            :                 break;
+<span class="lineNum">    1023 </span>            : 
+<span class="lineNum">    1024 </span>            :         case SIOCSIFFLAGS:
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_flags &amp; IFF_UP) {</span>
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">    1027 </span><span class="lineNoCov">          0 :                                 error = ENETRESET;</span>
+<span class="lineNum">    1028 </span>            :                         else
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :                                 urndis_init(sc);</span>
+<span class="lineNum">    1030 </span>            :                 } else {
+<span class="lineNum">    1031 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :                                 urndis_stop(sc);</span>
+<span class="lineNum">    1033 </span>            :                 }
+<span class="lineNum">    1034 </span>            :                 break;
+<span class="lineNum">    1035 </span>            : 
+<span class="lineNum">    1036 </span>            :         default:
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :                 error = ether_ioctl(ifp, &amp;sc-&gt;sc_arpcom, command, data);</span>
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1039 </span>            :         }
+<span class="lineNum">    1040 </span>            : 
+<span class="lineNum">    1041 </span><span class="lineNoCov">          0 :         if (error == ENETRESET)</span>
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :                 error = 0;</span>
+<span class="lineNum">    1043 </span>            : 
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">    1046 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1047 </span>            : 
+<span class="lineNum">    1048 </span>            : #if 0
+<span class="lineNum">    1049 </span>            : void
+<span class="lineNum">    1050 </span>            : urndis_watchdog(struct ifnet *ifp)
+<span class="lineNum">    1051 </span>            : {
+<span class="lineNum">    1052 </span>            :         struct urndis_softc *sc;
+<span class="lineNum">    1053 </span>            : 
+<span class="lineNum">    1054 </span>            :         sc = ifp-&gt;if_softc;
+<span class="lineNum">    1055 </span>            : 
+<span class="lineNum">    1056 </span>            :         if (usbd_is_dying(sc-&gt;sc_udev))
+<span class="lineNum">    1057 </span>            :                 return;
+<span class="lineNum">    1058 </span>            : 
+<span class="lineNum">    1059 </span>            :         ifp-&gt;if_oerrors++;
+<span class="lineNum">    1060 </span>            :         printf(&quot;%s: watchdog timeout\n&quot;, DEVNAME(sc));
+<span class="lineNum">    1061 </span>            : 
+<span class="lineNum">    1062 </span>            :         urndis_ctrl_keepalive(sc);
+<span class="lineNum">    1063 </span>            : }
+<span class="lineNum">    1064 </span>            : #endif
+<a name="1065"><span class="lineNum">    1065 </span>            : </a>
+<span class="lineNum">    1066 </span>            : void
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 : urndis_init(struct urndis_softc *sc)</span>
+<span class="lineNum">    1068 </span>            : {
+<span class="lineNum">    1069 </span><span class="lineNoCov">          0 :         struct ifnet            *ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1070 </span>            :         int                      i, s;
+<span class="lineNum">    1071 </span>            :         usbd_status              err;
+<span class="lineNum">    1072 </span>            : 
+<span class="lineNum">    1073 </span><span class="lineNoCov">          0 :         if (urndis_ctrl_init(sc) != RNDIS_STATUS_SUCCESS)</span>
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1075 </span>            : 
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">    1077 </span>            : 
+<span class="lineNum">    1078 </span><span class="lineNoCov">          0 :         if (urndis_tx_list_init(sc) == ENOBUFS) {</span>
+<span class="lineNum">    1079 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: tx list init failed\n&quot;,</span>
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 :                     DEVNAME(sc));</span>
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1083 </span>            :         }
+<span class="lineNum">    1084 </span>            : 
+<span class="lineNum">    1085 </span><span class="lineNoCov">          0 :         if (urndis_rx_list_init(sc) == ENOBUFS) {</span>
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: rx list init failed\n&quot;,</span>
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :                     DEVNAME(sc));</span>
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1089 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1090 </span>            :         }
+<span class="lineNum">    1091 </span>            : 
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :         err = usbd_open_pipe(sc-&gt;sc_iface_data, sc-&gt;sc_bulkin_no,</span>
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :             USBD_EXCLUSIVE_USE, &amp;sc-&gt;sc_bulkin_pipe);</span>
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :         if (err) {</span>
+<span class="lineNum">    1095 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: open rx pipe failed: %s\n&quot;, DEVNAME(sc),</span>
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 :                     usbd_errstr(err));</span>
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1099 </span>            :         }
+<span class="lineNum">    1100 </span>            : 
+<span class="lineNum">    1101 </span><span class="lineNoCov">          0 :         err = usbd_open_pipe(sc-&gt;sc_iface_data, sc-&gt;sc_bulkout_no,</span>
+<span class="lineNum">    1102 </span><span class="lineNoCov">          0 :             USBD_EXCLUSIVE_USE, &amp;sc-&gt;sc_bulkout_pipe);</span>
+<span class="lineNum">    1103 </span><span class="lineNoCov">          0 :         if (err) {</span>
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: open tx pipe failed: %s\n&quot;, DEVNAME(sc),</span>
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :                     usbd_errstr(err));</span>
+<span class="lineNum">    1106 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1107 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1108 </span>            :         }
+<span class="lineNum">    1109 </span>            : 
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RNDIS_RX_LIST_CNT; i++) {</span>
+<span class="lineNum">    1111 </span>            :                 struct urndis_chain *c;
+<span class="lineNum">    1112 </span>            : 
+<span class="lineNum">    1113 </span><span class="lineNoCov">          0 :                 c = &amp;sc-&gt;sc_data.sc_rx_chain[i];</span>
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :                 usbd_setup_xfer(c-&gt;sc_xfer, sc-&gt;sc_bulkin_pipe, c,</span>
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 :                     c-&gt;sc_buf, RNDIS_BUFSZ,</span>
+<span class="lineNum">    1116 </span>            :                     USBD_SHORT_XFER_OK | USBD_NO_COPY,
+<span class="lineNum">    1117 </span>            :                     USBD_NO_TIMEOUT, urndis_rxeof);
+<span class="lineNum">    1118 </span><span class="lineNoCov">          0 :                 usbd_transfer(c-&gt;sc_xfer);</span>
+<span class="lineNum">    1119 </span>            :         }
+<span class="lineNum">    1120 </span>            : 
+<span class="lineNum">    1121 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags |= IFF_RUNNING;</span>
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1123 </span>            : 
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 : }</span>
+<a name="1126"><span class="lineNum">    1126 </span>            : </a>
+<span class="lineNum">    1127 </span>            : void
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 : urndis_stop(struct urndis_softc *sc)</span>
+<span class="lineNum">    1129 </span>            : {
+<span class="lineNum">    1130 </span>            :         usbd_status      err;
+<span class="lineNum">    1131 </span>            :         struct ifnet    *ifp;
+<span class="lineNum">    1132 </span>            :         int              i;
+<span class="lineNum">    1133 </span>            : 
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :         ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1135 </span><span class="lineNoCov">          0 :         ifp-&gt;if_timer = 0;</span>
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags &amp;= ~IFF_RUNNING;</span>
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1138 </span>            : 
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_bulkin_pipe != NULL) {</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :                 usbd_abort_pipe(sc-&gt;sc_bulkin_pipe);</span>
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :                 err = usbd_close_pipe(sc-&gt;sc_bulkin_pipe);</span>
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :                 if (err)</span>
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: close rx pipe failed: %s\n&quot;,</span>
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 :                             DEVNAME(sc), usbd_errstr(err));</span>
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_bulkin_pipe = NULL;</span>
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1147 </span>            : 
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_bulkout_pipe != NULL) {</span>
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 :                 usbd_abort_pipe(sc-&gt;sc_bulkout_pipe);</span>
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :                 err = usbd_close_pipe(sc-&gt;sc_bulkout_pipe);</span>
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 :                 if (err)</span>
+<span class="lineNum">    1152 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: close tx pipe failed: %s\n&quot;,</span>
+<span class="lineNum">    1153 </span><span class="lineNoCov">          0 :                             DEVNAME(sc), usbd_errstr(err));</span>
+<span class="lineNum">    1154 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_bulkout_pipe = NULL;</span>
+<span class="lineNum">    1155 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1156 </span>            : 
+<span class="lineNum">    1157 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RNDIS_RX_LIST_CNT; i++) {</span>
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_data.sc_rx_chain[i].sc_mbuf != NULL) {</span>
+<span class="lineNum">    1159 </span><span class="lineNoCov">          0 :                         m_freem(sc-&gt;sc_data.sc_rx_chain[i].sc_mbuf);</span>
+<span class="lineNum">    1160 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_data.sc_rx_chain[i].sc_mbuf = NULL;</span>
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_data.sc_rx_chain[i].sc_xfer != NULL) {</span>
+<span class="lineNum">    1163 </span><span class="lineNoCov">          0 :                         usbd_free_xfer(sc-&gt;sc_data.sc_rx_chain[i].sc_xfer);</span>
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_data.sc_rx_chain[i].sc_xfer = NULL;</span>
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1166 </span>            :         }
+<span class="lineNum">    1167 </span>            : 
+<span class="lineNum">    1168 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RNDIS_TX_LIST_CNT; i++) {</span>
+<span class="lineNum">    1169 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_data.sc_tx_chain[i].sc_mbuf != NULL) {</span>
+<span class="lineNum">    1170 </span><span class="lineNoCov">          0 :                         m_freem(sc-&gt;sc_data.sc_tx_chain[i].sc_mbuf);</span>
+<span class="lineNum">    1171 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_data.sc_tx_chain[i].sc_mbuf = NULL;</span>
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_data.sc_tx_chain[i].sc_xfer != NULL) {</span>
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :                         usbd_free_xfer(sc-&gt;sc_data.sc_tx_chain[i].sc_xfer);</span>
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_data.sc_tx_chain[i].sc_xfer = NULL;</span>
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1177 </span>            :         }
+<span class="lineNum">    1178 </span><span class="lineNoCov">          0 : }</span>
+<a name="1179"><span class="lineNum">    1179 </span>            : </a>
+<span class="lineNum">    1180 </span>            : void
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 : urndis_start(struct ifnet *ifp)</span>
+<span class="lineNum">    1182 </span>            : {
+<span class="lineNum">    1183 </span>            :         struct urndis_softc     *sc;
+<span class="lineNum">    1184 </span>            :         struct mbuf             *m_head = NULL;
+<span class="lineNum">    1185 </span>            : 
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :         sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">    1187 </span>            : 
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;sc_udev) || ifq_is_oactive(&amp;ifp-&gt;if_snd))</span>
+<span class="lineNum">    1189 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1190 </span>            : 
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :         m_head = ifq_deq_begin(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1192 </span><span class="lineNoCov">          0 :         if (m_head == NULL)</span>
+<span class="lineNum">    1193 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1194 </span>            : 
+<span class="lineNum">    1195 </span><span class="lineNoCov">          0 :         if (urndis_encap(sc, m_head, 0)) {</span>
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :                 ifq_deq_rollback(&amp;ifp-&gt;if_snd, m_head);</span>
+<span class="lineNum">    1197 </span><span class="lineNoCov">          0 :                 ifq_set_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1199 </span>            :         }
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 :         ifq_deq_commit(&amp;ifp-&gt;if_snd, m_head);</span>
+<span class="lineNum">    1201 </span>            : 
+<span class="lineNum">    1202 </span>            :         /*
+<span class="lineNum">    1203 </span>            :          * If there's a BPF listener, bounce a copy of this frame
+<span class="lineNum">    1204 </span>            :          * to him.
+<span class="lineNum">    1205 </span>            :          */
+<span class="lineNum">    1206 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">    1207 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_bpf)</span>
+<span class="lineNum">    1208 </span><span class="lineNoCov">          0 :                 bpf_mtap(ifp-&gt;if_bpf, m_head, BPF_DIRECTION_OUT);</span>
+<span class="lineNum">    1209 </span>            : #endif
+<span class="lineNum">    1210 </span>            : 
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :         ifq_set_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1212 </span>            : 
+<span class="lineNum">    1213 </span>            :         /*
+<span class="lineNum">    1214 </span>            :          * Set a timeout in case the chip goes out to lunch.
+<span class="lineNum">    1215 </span>            :          */
+<span class="lineNum">    1216 </span><span class="lineNoCov">          0 :         ifp-&gt;if_timer = 5;</span>
+<span class="lineNum">    1217 </span>            : 
+<span class="lineNum">    1218 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">    1219 </span><span class="lineNoCov">          0 : }</span>
+<a name="1220"><span class="lineNum">    1220 </span>            : </a>
+<span class="lineNum">    1221 </span>            : void
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 : urndis_rxeof(struct usbd_xfer *xfer,</span>
+<span class="lineNum">    1223 </span>            :     void *priv,
+<span class="lineNum">    1224 </span>            :     usbd_status status)
+<span class="lineNum">    1225 </span>            : {
+<span class="lineNum">    1226 </span>            :         struct urndis_chain     *c;
+<span class="lineNum">    1227 </span>            :         struct urndis_softc     *sc;
+<span class="lineNum">    1228 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">    1229 </span><span class="lineNoCov">          0 :         u_int32_t                total_len;</span>
+<span class="lineNum">    1230 </span>            : 
+<span class="lineNum">    1231 </span><span class="lineNoCov">          0 :         c = priv;</span>
+<span class="lineNum">    1232 </span><span class="lineNoCov">          0 :         sc = c-&gt;sc_softc;</span>
+<span class="lineNum">    1233 </span><span class="lineNoCov">          0 :         ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1234 </span><span class="lineNoCov">          0 :         total_len = 0;</span>
+<span class="lineNum">    1235 </span>            : 
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;sc_udev) || !(ifp-&gt;if_flags &amp; IFF_RUNNING))</span>
+<span class="lineNum">    1237 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1238 </span>            : 
+<span class="lineNum">    1239 </span><span class="lineNoCov">          0 :         if (status != USBD_NORMAL_COMPLETION) {</span>
+<span class="lineNum">    1240 </span><span class="lineNoCov">          0 :                 if (status == USBD_NOT_STARTED || status == USBD_CANCELLED)</span>
+<span class="lineNum">    1241 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">    1242 </span><span class="lineNoCov">          0 :                 if (usbd_ratecheck(&amp;sc-&gt;sc_rx_notice)) {</span>
+<span class="lineNum">    1243 </span>            :                         DPRINTF((&quot;%s: usb errors on rx: %s\n&quot;,
+<span class="lineNum">    1244 </span>            :                             DEVNAME(sc), usbd_errstr(status)));
+<span class="lineNum">    1245 </span>            :                 }
+<span class="lineNum">    1246 </span><span class="lineNoCov">          0 :                 if (status == USBD_STALLED)</span>
+<span class="lineNum">    1247 </span><span class="lineNoCov">          0 :                         usbd_clear_endpoint_stall_async(sc-&gt;sc_bulkin_pipe);</span>
+<span class="lineNum">    1248 </span>            : 
+<span class="lineNum">    1249 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_ierrors++;</span>
+<span class="lineNum">    1250 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">    1251 </span>            :         }
+<span class="lineNum">    1252 </span>            : 
+<span class="lineNum">    1253 </span><span class="lineNoCov">          0 :         usbd_get_xfer_status(xfer, NULL, NULL, &amp;total_len, NULL);</span>
+<span class="lineNum">    1254 </span><span class="lineNoCov">          0 :         urndis_decap(sc, c, total_len);</span>
+<span class="lineNum">    1255 </span>            : 
+<span class="lineNum">    1256 </span>            : done:
+<span class="lineNum">    1257 </span>            :         /* Setup new transfer. */
+<span class="lineNum">    1258 </span><span class="lineNoCov">          0 :         usbd_setup_xfer(c-&gt;sc_xfer, sc-&gt;sc_bulkin_pipe, c, c-&gt;sc_buf,</span>
+<span class="lineNum">    1259 </span>            :             RNDIS_BUFSZ, USBD_SHORT_XFER_OK | USBD_NO_COPY, USBD_NO_TIMEOUT,
+<span class="lineNum">    1260 </span>            :             urndis_rxeof);
+<span class="lineNum">    1261 </span><span class="lineNoCov">          0 :         usbd_transfer(c-&gt;sc_xfer);</span>
+<span class="lineNum">    1262 </span><span class="lineNoCov">          0 : }</span>
+<a name="1263"><span class="lineNum">    1263 </span>            : </a>
+<span class="lineNum">    1264 </span>            : void
+<span class="lineNum">    1265 </span><span class="lineNoCov">          0 : urndis_txeof(struct usbd_xfer *xfer,</span>
+<span class="lineNum">    1266 </span>            :     void *priv,
+<span class="lineNum">    1267 </span>            :     usbd_status status)
+<span class="lineNum">    1268 </span>            : {
+<span class="lineNum">    1269 </span>            :         struct urndis_chain     *c;
+<span class="lineNum">    1270 </span>            :         struct urndis_softc     *sc;
+<span class="lineNum">    1271 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">    1272 </span><span class="lineNoCov">          0 :         usbd_status              err;</span>
+<span class="lineNum">    1273 </span>            :         int                      s;
+<span class="lineNum">    1274 </span>            : 
+<span class="lineNum">    1275 </span><span class="lineNoCov">          0 :         c = priv;</span>
+<span class="lineNum">    1276 </span><span class="lineNoCov">          0 :         sc = c-&gt;sc_softc;</span>
+<span class="lineNum">    1277 </span><span class="lineNoCov">          0 :         ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1278 </span>            : 
+<span class="lineNum">    1279 </span>            :         DPRINTF((&quot;%s: urndis_txeof\n&quot;, DEVNAME(sc)));
+<span class="lineNum">    1280 </span>            : 
+<span class="lineNum">    1281 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;sc_udev))</span>
+<span class="lineNum">    1282 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1283 </span>            : 
+<span class="lineNum">    1284 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">    1285 </span>            : 
+<span class="lineNum">    1286 </span><span class="lineNoCov">          0 :         ifp-&gt;if_timer = 0;</span>
+<span class="lineNum">    1287 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1288 </span>            : 
+<span class="lineNum">    1289 </span><span class="lineNoCov">          0 :         if (status != USBD_NORMAL_COMPLETION) {</span>
+<span class="lineNum">    1290 </span><span class="lineNoCov">          0 :                 if (status == USBD_NOT_STARTED || status == USBD_CANCELLED) {</span>
+<span class="lineNum">    1291 </span><span class="lineNoCov">          0 :                         splx(s);</span>
+<span class="lineNum">    1292 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">    1293 </span>            :                 }
+<span class="lineNum">    1294 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_oerrors++;</span>
+<span class="lineNum">    1295 </span>            :                 DPRINTF((&quot;%s: usb error on tx: %s\n&quot;, DEVNAME(sc),
+<span class="lineNum">    1296 </span>            :                     usbd_errstr(status)));
+<span class="lineNum">    1297 </span><span class="lineNoCov">          0 :                 if (status == USBD_STALLED)</span>
+<span class="lineNum">    1298 </span><span class="lineNoCov">          0 :                         usbd_clear_endpoint_stall_async(sc-&gt;sc_bulkout_pipe);</span>
+<span class="lineNum">    1299 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1300 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1301 </span>            :         }
+<span class="lineNum">    1302 </span>            : 
+<span class="lineNum">    1303 </span><span class="lineNoCov">          0 :         usbd_get_xfer_status(c-&gt;sc_xfer, NULL, NULL, NULL, &amp;err);</span>
+<span class="lineNum">    1304 </span>            : 
+<span class="lineNum">    1305 </span><span class="lineNoCov">          0 :         if (c-&gt;sc_mbuf != NULL) {</span>
+<span class="lineNum">    1306 </span><span class="lineNoCov">          0 :                 m_freem(c-&gt;sc_mbuf);</span>
+<span class="lineNum">    1307 </span><span class="lineNoCov">          0 :                 c-&gt;sc_mbuf = NULL;</span>
+<span class="lineNum">    1308 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1309 </span>            : 
+<span class="lineNum">    1310 </span><span class="lineNoCov">          0 :         if (err)</span>
+<span class="lineNum">    1311 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_oerrors++;</span>
+<span class="lineNum">    1312 </span>            : 
+<span class="lineNum">    1313 </span><span class="lineNoCov">          0 :         if (IFQ_IS_EMPTY(&amp;ifp-&gt;if_snd) == 0)</span>
+<span class="lineNum">    1314 </span><span class="lineNoCov">          0 :                 urndis_start(ifp);</span>
+<span class="lineNum">    1315 </span>            : 
+<span class="lineNum">    1316 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1317 </span><span class="lineNoCov">          0 : }</span>
+<a name="1318"><span class="lineNum">    1318 </span>            : </a>
+<span class="lineNum">    1319 </span>            : const struct urndis_class *
+<span class="lineNum">    1320 </span><span class="lineNoCov">          0 : urndis_lookup(usb_interface_descriptor_t *id)</span>
+<span class="lineNum">    1321 </span>            : {
+<span class="lineNum">    1322 </span>            :         const struct urndis_class       *uc;
+<span class="lineNum">    1323 </span>            :         int                              i;
+<span class="lineNum">    1324 </span>            : 
+<span class="lineNum">    1325 </span>            :         uc = urndis_class;
+<span class="lineNum">    1326 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; nitems(urndis_class); i++, uc++) {</span>
+<span class="lineNum">    1327 </span><span class="lineNoCov">          0 :                 if (uc-&gt;class == id-&gt;bInterfaceClass &amp;&amp;</span>
+<span class="lineNum">    1328 </span><span class="lineNoCov">          0 :                     uc-&gt;subclass == id-&gt;bInterfaceSubClass &amp;&amp;</span>
+<span class="lineNum">    1329 </span><span class="lineNoCov">          0 :                     uc-&gt;protocol == id-&gt;bInterfaceProtocol)</span>
+<span class="lineNum">    1330 </span><span class="lineNoCov">          0 :                         return (uc);</span>
+<span class="lineNum">    1331 </span>            :         }
+<span class="lineNum">    1332 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">    1333 </span><span class="lineNoCov">          0 : }</span>
+<a name="1334"><span class="lineNum">    1334 </span>            : </a>
+<span class="lineNum">    1335 </span>            : int
+<span class="lineNum">    1336 </span><span class="lineNoCov">          0 : urndis_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">    1337 </span>            : {
+<span class="lineNum">    1338 </span><span class="lineNoCov">          0 :         struct usb_attach_arg           *uaa = aux;</span>
+<span class="lineNum">    1339 </span>            :         usb_interface_descriptor_t      *id;
+<span class="lineNum">    1340 </span>            : 
+<span class="lineNum">    1341 </span>            :         /* Advertises both RNDIS and CDC Ethernet, but RNDIS doesn't work. */
+<span class="lineNum">    1342 </span><span class="lineNoCov">          0 :         if (uaa-&gt;vendor == USB_VENDOR_FUJITSUCOMP &amp;&amp;</span>
+<span class="lineNum">    1343 </span><span class="lineNoCov">          0 :             uaa-&gt;product == USB_PRODUCT_FUJITSUCOMP_VIRTETH)</span>
+<span class="lineNum">    1344 </span><span class="lineNoCov">          0 :                 return (UMATCH_NONE);</span>
+<span class="lineNum">    1345 </span>            : 
+<span class="lineNum">    1346 </span><span class="lineNoCov">          0 :         if (!uaa-&gt;iface)</span>
+<span class="lineNum">    1347 </span><span class="lineNoCov">          0 :                 return (UMATCH_NONE);</span>
+<span class="lineNum">    1348 </span>            : 
+<span class="lineNum">    1349 </span><span class="lineNoCov">          0 :         id = usbd_get_interface_descriptor(uaa-&gt;iface);</span>
+<span class="lineNum">    1350 </span><span class="lineNoCov">          0 :         if (id == NULL)</span>
+<span class="lineNum">    1351 </span><span class="lineNoCov">          0 :                 return (UMATCH_NONE);</span>
+<span class="lineNum">    1352 </span>            : 
+<span class="lineNum">    1353 </span><span class="lineNoCov">          0 :         return (urndis_lookup(id) ?</span>
+<span class="lineNum">    1354 </span>            :             UMATCH_IFACECLASS_IFACESUBCLASS_IFACEPROTO : UMATCH_NONE);
+<span class="lineNum">    1355 </span><span class="lineNoCov">          0 : }</span>
+<a name="1356"><span class="lineNum">    1356 </span>            : </a>
+<span class="lineNum">    1357 </span>            : void
+<span class="lineNum">    1358 </span><span class="lineNoCov">          0 : urndis_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">    1359 </span>            : {
+<span class="lineNum">    1360 </span>            :         const struct urndis_class       *uc;
+<span class="lineNum">    1361 </span>            :         struct urndis_softc             *sc;
+<span class="lineNum">    1362 </span>            :         struct usb_attach_arg           *uaa;
+<span class="lineNum">    1363 </span>            :         struct ifnet                    *ifp;
+<span class="lineNum">    1364 </span>            :         usb_interface_descriptor_t      *id;
+<span class="lineNum">    1365 </span>            :         usb_endpoint_descriptor_t       *ed;
+<span class="lineNum">    1366 </span>            :         usb_config_descriptor_t         *cd;
+<span class="lineNum">    1367 </span>            :         int                              i, j, altcnt;
+<span class="lineNum">    1368 </span>            :         int                              s;
+<span class="lineNum">    1369 </span><span class="lineNoCov">          0 :         u_char                           eaddr[ETHER_ADDR_LEN];</span>
+<span class="lineNum">    1370 </span><span class="lineNoCov">          0 :         void                            *buf;</span>
+<span class="lineNum">    1371 </span><span class="lineNoCov">          0 :         size_t                           bufsz;</span>
+<span class="lineNum">    1372 </span><span class="lineNoCov">          0 :         u_int32_t                        filter;</span>
+<span class="lineNum">    1373 </span>            : 
+<span class="lineNum">    1374 </span><span class="lineNoCov">          0 :         sc = (void *)self;</span>
+<span class="lineNum">    1375 </span><span class="lineNoCov">          0 :         uaa = aux;</span>
+<span class="lineNum">    1376 </span>            : 
+<span class="lineNum">    1377 </span><span class="lineNoCov">          0 :         sc-&gt;sc_attached = 0;</span>
+<span class="lineNum">    1378 </span><span class="lineNoCov">          0 :         sc-&gt;sc_udev = uaa-&gt;device;</span>
+<span class="lineNum">    1379 </span><span class="lineNoCov">          0 :         id = usbd_get_interface_descriptor(uaa-&gt;iface);</span>
+<span class="lineNum">    1380 </span><span class="lineNoCov">          0 :         sc-&gt;sc_ifaceno_ctl = id-&gt;bInterfaceNumber;</span>
+<span class="lineNum">    1381 </span>            : 
+<span class="lineNum">    1382 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; uaa-&gt;nifaces; i++) {</span>
+<span class="lineNum">    1383 </span><span class="lineNoCov">          0 :                 if (usbd_iface_claimed(sc-&gt;sc_udev, i))</span>
+<span class="lineNum">    1384 </span>            :                         continue;
+<span class="lineNum">    1385 </span>            : 
+<span class="lineNum">    1386 </span><span class="lineNoCov">          0 :                 if (uaa-&gt;ifaces[i] != uaa-&gt;iface) {</span>
+<span class="lineNum">    1387 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_iface_data = uaa-&gt;ifaces[i];</span>
+<span class="lineNum">    1388 </span><span class="lineNoCov">          0 :                         usbd_claim_iface(sc-&gt;sc_udev, i);</span>
+<span class="lineNum">    1389 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1390 </span>            :                 }
+<span class="lineNum">    1391 </span>            :         }
+<span class="lineNum">    1392 </span>            : 
+<span class="lineNum">    1393 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_iface_data == NULL) {</span>
+<span class="lineNum">    1394 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: no data interface\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1395 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1396 </span>            :         }
+<span class="lineNum">    1397 </span>            : 
+<span class="lineNum">    1398 </span><span class="lineNoCov">          0 :         uc = urndis_lookup(id);</span>
+<span class="lineNum">    1399 </span><span class="lineNoCov">          0 :         printf(&quot;%s: using %s&quot;, DEVNAME(sc), uc-&gt;typestr);</span>
+<span class="lineNum">    1400 </span>            : 
+<span class="lineNum">    1401 </span><span class="lineNoCov">          0 :         id = usbd_get_interface_descriptor(sc-&gt;sc_iface_data);</span>
+<span class="lineNum">    1402 </span><span class="lineNoCov">          0 :         cd = usbd_get_config_descriptor(sc-&gt;sc_udev);</span>
+<span class="lineNum">    1403 </span><span class="lineNoCov">          0 :         altcnt = usbd_get_no_alts(cd, id-&gt;bInterfaceNumber);</span>
+<span class="lineNum">    1404 </span>            : 
+<span class="lineNum">    1405 </span><span class="lineNoCov">          0 :         for (j = 0; j &lt; altcnt; j++) {</span>
+<span class="lineNum">    1406 </span><span class="lineNoCov">          0 :                 if (usbd_set_interface(sc-&gt;sc_iface_data, j)) {</span>
+<span class="lineNum">    1407 </span><span class="lineNoCov">          0 :                         printf(&quot;: interface alternate setting %u failed\n&quot;, j);</span>
+<span class="lineNum">    1408 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">    1409 </span>            :                 }
+<span class="lineNum">    1410 </span>            :                 /* Find endpoints. */
+<span class="lineNum">    1411 </span><span class="lineNoCov">          0 :                 id = usbd_get_interface_descriptor(sc-&gt;sc_iface_data);</span>
+<span class="lineNum">    1412 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_bulkin_no = sc-&gt;sc_bulkout_no = -1;</span>
+<span class="lineNum">    1413 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; id-&gt;bNumEndpoints; i++) {</span>
+<span class="lineNum">    1414 </span><span class="lineNoCov">          0 :                         ed = usbd_interface2endpoint_descriptor(</span>
+<span class="lineNum">    1415 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_iface_data, i);</span>
+<span class="lineNum">    1416 </span><span class="lineNoCov">          0 :                         if (!ed) {</span>
+<span class="lineNum">    1417 </span><span class="lineNoCov">          0 :                                 printf(&quot;: no descriptor for bulk endpoint &quot;</span>
+<span class="lineNum">    1418 </span>            :                                     &quot;%u\n&quot;, i);
+<span class="lineNum">    1419 </span><span class="lineNoCov">          0 :                                 return;</span>
+<span class="lineNum">    1420 </span>            :                         }
+<span class="lineNum">    1421 </span><span class="lineNoCov">          0 :                         if (UE_GET_DIR(ed-&gt;bEndpointAddress) == UE_DIR_IN &amp;&amp;</span>
+<span class="lineNum">    1422 </span><span class="lineNoCov">          0 :                             UE_GET_XFERTYPE(ed-&gt;bmAttributes) == UE_BULK) {</span>
+<span class="lineNum">    1423 </span><span class="lineNoCov">          0 :                                 sc-&gt;sc_bulkin_no = ed-&gt;bEndpointAddress;</span>
+<span class="lineNum">    1424 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">    1425 </span>            :                         else if (
+<span class="lineNum">    1426 </span><span class="lineNoCov">          0 :                             UE_GET_DIR(ed-&gt;bEndpointAddress) == UE_DIR_OUT &amp;&amp;</span>
+<span class="lineNum">    1427 </span><span class="lineNoCov">          0 :                             UE_GET_XFERTYPE(ed-&gt;bmAttributes) == UE_BULK) {</span>
+<span class="lineNum">    1428 </span><span class="lineNoCov">          0 :                                 sc-&gt;sc_bulkout_no = ed-&gt;bEndpointAddress;</span>
+<span class="lineNum">    1429 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">    1430 </span>            :                 }
+<span class="lineNum">    1431 </span>            : 
+<span class="lineNum">    1432 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_bulkin_no != -1 &amp;&amp; sc-&gt;sc_bulkout_no != -1) {</span>
+<span class="lineNum">    1433 </span>            :                         DPRINTF((&quot;%s: in=0x%x, out=0x%x\n&quot;,
+<span class="lineNum">    1434 </span>            :                             DEVNAME(sc),
+<span class="lineNum">    1435 </span>            :                             sc-&gt;sc_bulkin_no,
+<span class="lineNum">    1436 </span>            :                             sc-&gt;sc_bulkout_no));
+<span class="lineNum">    1437 </span>            :                         goto found;
+<span class="lineNum">    1438 </span>            :                 }
+<span class="lineNum">    1439 </span>            :         }
+<span class="lineNum">    1440 </span>            : 
+<span class="lineNum">    1441 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_bulkin_no == -1)</span>
+<span class="lineNum">    1442 </span><span class="lineNoCov">          0 :                 printf(&quot;: could not find data bulk in\n&quot;);</span>
+<span class="lineNum">    1443 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_bulkout_no == -1 )</span>
+<span class="lineNum">    1444 </span><span class="lineNoCov">          0 :                 printf(&quot;: could not find data bulk out\n&quot;);</span>
+<span class="lineNum">    1445 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">    1446 </span>            : 
+<span class="lineNum">    1447 </span>            :         found:
+<span class="lineNum">    1448 </span>            : 
+<span class="lineNum">    1449 </span><span class="lineNoCov">          0 :         ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1450 </span><span class="lineNoCov">          0 :         ifp-&gt;if_softc = sc;</span>
+<span class="lineNum">    1451 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;</span>
+<span class="lineNum">    1452 </span><span class="lineNoCov">          0 :         ifp-&gt;if_start = urndis_start;</span>
+<span class="lineNum">    1453 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ioctl = urndis_ioctl;</span>
+<span class="lineNum">    1454 </span>            : #if 0
+<span class="lineNum">    1455 </span>            :         ifp-&gt;if_watchdog = urndis_watchdog;
+<span class="lineNum">    1456 </span>            : #endif
+<span class="lineNum">    1457 </span>            : 
+<span class="lineNum">    1458 </span><span class="lineNoCov">          0 :         strlcpy(ifp-&gt;if_xname, DEVNAME(sc), IFNAMSIZ);</span>
+<span class="lineNum">    1459 </span>            : 
+<span class="lineNum">    1460 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">    1461 </span>            : 
+<span class="lineNum">    1462 </span><span class="lineNoCov">          0 :         if (urndis_ctrl_query(sc, OID_802_3_PERMANENT_ADDRESS, NULL, 0,</span>
+<span class="lineNum">    1463 </span><span class="lineNoCov">          0 :             &amp;buf, &amp;bufsz) != RNDIS_STATUS_SUCCESS) {</span>
+<span class="lineNum">    1464 </span><span class="lineNoCov">          0 :                 printf(&quot;: unable to get hardware address\n&quot;);</span>
+<span class="lineNum">    1465 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1466 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1467 </span>            :         }
+<span class="lineNum">    1468 </span>            : 
+<span class="lineNum">    1469 </span><span class="lineNoCov">          0 :         if (bufsz == ETHER_ADDR_LEN) {</span>
+<span class="lineNum">    1470 </span><span class="lineNoCov">          0 :                 memcpy(eaddr, buf, ETHER_ADDR_LEN);</span>
+<span class="lineNum">    1471 </span><span class="lineNoCov">          0 :                 printf(&quot;, address %s\n&quot;, ether_sprintf(eaddr));</span>
+<span class="lineNum">    1472 </span><span class="lineNoCov">          0 :                 free(buf, M_TEMP, bufsz);</span>
+<span class="lineNum">    1473 </span>            :         } else {
+<span class="lineNum">    1474 </span><span class="lineNoCov">          0 :                 printf(&quot;, invalid address\n&quot;);</span>
+<span class="lineNum">    1475 </span><span class="lineNoCov">          0 :                 free(buf, M_TEMP, bufsz);</span>
+<span class="lineNum">    1476 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1477 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1478 </span>            :         }
+<span class="lineNum">    1479 </span>            : 
+<span class="lineNum">    1480 </span>            :         /* Initialize packet filter */
+<span class="lineNum">    1481 </span><span class="lineNoCov">          0 :         sc-&gt;sc_filter = NDIS_PACKET_TYPE_BROADCAST;</span>
+<span class="lineNum">    1482 </span><span class="lineNoCov">          0 :         sc-&gt;sc_filter |= NDIS_PACKET_TYPE_ALL_MULTICAST;</span>
+<span class="lineNum">    1483 </span><span class="lineNoCov">          0 :         filter = htole32(sc-&gt;sc_filter);</span>
+<span class="lineNum">    1484 </span><span class="lineNoCov">          0 :         if (urndis_ctrl_set(sc, OID_GEN_CURRENT_PACKET_FILTER, &amp;filter,</span>
+<span class="lineNum">    1485 </span><span class="lineNoCov">          0 :             sizeof(filter)) != RNDIS_STATUS_SUCCESS) {</span>
+<span class="lineNum">    1486 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to set data filters\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1487 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1488 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1489 </span>            :         }
+<span class="lineNum">    1490 </span>            : 
+<span class="lineNum">    1491 </span><span class="lineNoCov">          0 :         bcopy(eaddr, (char *)&amp;sc-&gt;sc_arpcom.ac_enaddr, ETHER_ADDR_LEN);</span>
+<span class="lineNum">    1492 </span>            : 
+<span class="lineNum">    1493 </span><span class="lineNoCov">          0 :         if_attach(ifp);</span>
+<span class="lineNum">    1494 </span><span class="lineNoCov">          0 :         ether_ifattach(ifp);</span>
+<span class="lineNum">    1495 </span><span class="lineNoCov">          0 :         sc-&gt;sc_attached = 1;</span>
+<span class="lineNum">    1496 </span>            : 
+<span class="lineNum">    1497 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1498 </span><span class="lineNoCov">          0 : }</span>
+<a name="1499"><span class="lineNum">    1499 </span>            : </a>
+<span class="lineNum">    1500 </span>            : int
+<span class="lineNum">    1501 </span><span class="lineNoCov">          0 : urndis_detach(struct device *self, int flags)</span>
+<span class="lineNum">    1502 </span>            : {
+<span class="lineNum">    1503 </span>            :         struct urndis_softc     *sc;
+<span class="lineNum">    1504 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">    1505 </span>            :         int                      s;
+<span class="lineNum">    1506 </span>            : 
+<span class="lineNum">    1507 </span><span class="lineNoCov">          0 :         sc = (void*)self;</span>
+<span class="lineNum">    1508 </span>            : 
+<span class="lineNum">    1509 </span>            :         DPRINTF((&quot;urndis_detach: %s flags %u\n&quot;, DEVNAME(sc),
+<span class="lineNum">    1510 </span>            :             flags));
+<span class="lineNum">    1511 </span>            : 
+<span class="lineNum">    1512 </span><span class="lineNoCov">          0 :         if (!sc-&gt;sc_attached)</span>
+<span class="lineNum">    1513 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">    1514 </span>            : 
+<span class="lineNum">    1515 </span><span class="lineNoCov">          0 :         s = splusb();</span>
+<span class="lineNum">    1516 </span>            : 
+<span class="lineNum">    1517 </span><span class="lineNoCov">          0 :         ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1518 </span>            : 
+<span class="lineNum">    1519 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_softc != NULL) {</span>
+<span class="lineNum">    1520 </span><span class="lineNoCov">          0 :                 ether_ifdetach(ifp);</span>
+<span class="lineNum">    1521 </span><span class="lineNoCov">          0 :                 if_detach(ifp);</span>
+<span class="lineNum">    1522 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1523 </span>            : 
+<span class="lineNum">    1524 </span><span class="lineNoCov">          0 :         urndis_stop(sc);</span>
+<span class="lineNum">    1525 </span><span class="lineNoCov">          0 :         sc-&gt;sc_attached = 0;</span>
+<span class="lineNum">    1526 </span>            : 
+<span class="lineNum">    1527 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1528 </span>            : 
+<span class="lineNum">    1529 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1530 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,285 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pv/viornd.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/pv</a> - viornd.c<span style="font-size: 80%;"> (source / <a href="viornd.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">82</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: viornd.c,v 1.2 2018/04/28 15:44:59 jasper Exp $       */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2014 Stefan Fritsch &lt;sf@sfritsch.de&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      20 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;machine/bus.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;dev/rndvar.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;dev/pv/virtioreg.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;dev/pv/virtiovar.h&gt;
+<span class="lineNum">      29 </span>            : 
+<span class="lineNum">      30 </span>            : /*
+<span class="lineNum">      31 </span>            :  * The host may not have an unlimited supply of entropy. Therefore, we must
+<span class="lineNum">      32 </span>            :  * not blindly get as much entropy as we can. Instead, we just request
+<span class="lineNum">      33 </span>            :  * VIORND_BUFSIZE bytes at boot and every 15 * (1 &lt;&lt; interval_shift) seconds.
+<span class="lineNum">      34 </span>            :  * XXX There should be an API to check if we actually need more entropy.
+<span class="lineNum">      35 </span>            :  *
+<span class="lineNum">      36 </span>            :  * The lowest byte in the flags is used for transport specific settings.
+<span class="lineNum">      37 </span>            :  * Therefore we use the second byte.
+<span class="lineNum">      38 </span>            :  */
+<span class="lineNum">      39 </span>            : #define VIORND_INTERVAL_SHIFT(f)        ((f &gt;&gt; 8) &amp; 0xf)
+<span class="lineNum">      40 </span>            : #define VIORND_INTERVAL_SHIFT_DEFAULT   5
+<span class="lineNum">      41 </span>            : #define VIORND_ONESHOT                  0x1000
+<span class="lineNum">      42 </span>            : #define VIORND_BUFSIZE                  16
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : #define VIORND_DEBUG 0
+<span class="lineNum">      45 </span>            : 
+<span class="lineNum">      46 </span>            : struct viornd_softc {
+<span class="lineNum">      47 </span>            :         struct device            sc_dev;
+<span class="lineNum">      48 </span>            :         struct virtio_softc     *sc_virtio;
+<span class="lineNum">      49 </span>            : 
+<span class="lineNum">      50 </span>            :         struct virtqueue         sc_vq;
+<span class="lineNum">      51 </span>            :         int                     *sc_buf;
+<span class="lineNum">      52 </span>            :         bus_dmamap_t             sc_dmamap;
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span>            :         unsigned int             sc_interval;
+<span class="lineNum">      55 </span>            :         struct timeout           sc_tick;
+<span class="lineNum">      56 </span>            : };
+<span class="lineNum">      57 </span>            : 
+<span class="lineNum">      58 </span>            : int     viornd_match(struct device *, void *, void *);
+<span class="lineNum">      59 </span>            : void    viornd_attach(struct device *, struct device *, void *);
+<span class="lineNum">      60 </span>            : int     viornd_vq_done(struct virtqueue *);
+<span class="lineNum">      61 </span>            : void    viornd_tick(void *);
+<span class="lineNum">      62 </span>            : 
+<span class="lineNum">      63 </span>            : struct cfattach viornd_ca = {
+<span class="lineNum">      64 </span>            :         sizeof(struct viornd_softc),
+<span class="lineNum">      65 </span>            :         viornd_match,
+<span class="lineNum">      66 </span>            :         viornd_attach,
+<span class="lineNum">      67 </span>            :         NULL
+<span class="lineNum">      68 </span>            : };
+<span class="lineNum">      69 </span>            : 
+<span class="lineNum">      70 </span>            : struct cfdriver viornd_cd = {
+<span class="lineNum">      71 </span>            :         NULL, &quot;viornd&quot;, DV_DULL
+<span class="lineNum">      72 </span>            : };
+<a name="73"><span class="lineNum">      73 </span>            : </a>
+<span class="lineNum">      74 </span>            : 
+<span class="lineNum">      75 </span><span class="lineNoCov">          0 : int viornd_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">      76 </span>            : {
+<span class="lineNum">      77 </span><span class="lineNoCov">          0 :         struct virtio_softc *va = aux;</span>
+<span class="lineNum">      78 </span><span class="lineNoCov">          0 :         if (va-&gt;sc_childdevid == PCI_PRODUCT_VIRTIO_ENTROPY)</span>
+<span class="lineNum">      79 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">      81 </span><span class="lineNoCov">          0 : }</span>
+<a name="82"><span class="lineNum">      82 </span>            : </a>
+<span class="lineNum">      83 </span>            : void
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 : viornd_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">      85 </span>            : {
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :         struct viornd_softc *sc = (struct viornd_softc *)self;</span>
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :         struct virtio_softc *vsc = (struct virtio_softc *)parent;</span>
+<span class="lineNum">      88 </span>            :         unsigned int shift;
+<span class="lineNum">      89 </span>            : 
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :         vsc-&gt;sc_vqs = &amp;sc-&gt;sc_vq;</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :         vsc-&gt;sc_nvqs = 1;</span>
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 :         vsc-&gt;sc_config_change = 0;</span>
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :         if (vsc-&gt;sc_child != NULL)</span>
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :                 panic(&quot;already attached to something else&quot;);</span>
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         vsc-&gt;sc_child = self;</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :         vsc-&gt;sc_ipl = IPL_NET;</span>
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :         sc-&gt;sc_virtio = vsc;</span>
+<span class="lineNum">      98 </span>            : 
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :         virtio_negotiate_features(vsc, 0, NULL);</span>
+<span class="lineNum">     100 </span>            : 
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_dev.dv_cfdata-&gt;cf_flags &amp; VIORND_ONESHOT) {</span>
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_interval = 0;</span>
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 :                 shift = VIORND_INTERVAL_SHIFT(sc-&gt;sc_dev.dv_cfdata-&gt;cf_flags);</span>
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :                 if (shift == 0)</span>
+<span class="lineNum">     106 </span>            :                         shift = VIORND_INTERVAL_SHIFT_DEFAULT;
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_interval = 15 * (1 &lt;&lt; shift);</span>
+<span class="lineNum">     108 </span>            :         }
+<span class="lineNum">     109 </span>            : #if VIORND_DEBUG
+<span class="lineNum">     110 </span>            :         printf(&quot;: request interval: %us\n&quot;, sc-&gt;sc_interval);
+<span class="lineNum">     111 </span>            : #endif
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         sc-&gt;sc_buf = dma_alloc(VIORND_BUFSIZE, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_buf == NULL) {</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :                 printf(&quot;: Can't alloc dma buffer\n&quot;);</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     117 </span>            :         }
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :         if (bus_dmamap_create(sc-&gt;sc_virtio-&gt;sc_dmat, VIORND_BUFSIZE, 1,</span>
+<span class="lineNum">     119 </span>            :             VIORND_BUFSIZE, 0, BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW,
+<span class="lineNum">     120 </span>            :             &amp;sc-&gt;sc_dmamap)) {
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :                 printf(&quot;: Can't alloc dmamap\n&quot;);</span>
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     123 </span>            :         }
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         if (bus_dmamap_load(sc-&gt;sc_virtio-&gt;sc_dmat, sc-&gt;sc_dmamap,</span>
+<span class="lineNum">     125 </span>            :             sc-&gt;sc_buf, VIORND_BUFSIZE, NULL, BUS_DMA_NOWAIT|BUS_DMA_READ)) {
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :                 printf(&quot;: Can't load dmamap\n&quot;);</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :                 goto err2;</span>
+<span class="lineNum">     128 </span>            :         }
+<span class="lineNum">     129 </span>            : 
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         if (virtio_alloc_vq(vsc, &amp;sc-&gt;sc_vq, 0, VIORND_BUFSIZE, 1,</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :             &quot;Entropy request&quot;) != 0) {</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :                 printf(&quot;: Can't alloc virtqueue\n&quot;);</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :                 goto err2;</span>
+<span class="lineNum">     134 </span>            :         }
+<span class="lineNum">     135 </span>            : 
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         sc-&gt;sc_vq.vq_done = viornd_vq_done;</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :         virtio_start_vq_intr(vsc, &amp;sc-&gt;sc_vq);</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :         timeout_set(&amp;sc-&gt;sc_tick, viornd_tick, sc);</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         timeout_add(&amp;sc-&gt;sc_tick, 1);</span>
+<span class="lineNum">     140 </span>            : 
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     143 </span>            : err2:
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         bus_dmamap_destroy(vsc-&gt;sc_dmat, sc-&gt;sc_dmamap);</span>
+<span class="lineNum">     145 </span>            : err:
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         vsc-&gt;sc_child = VIRTIO_CHILD_ERROR;</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_buf != NULL) {</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :                 dma_free(sc-&gt;sc_buf, VIORND_BUFSIZE);</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_buf = NULL;</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 : }</span>
+<a name="153"><span class="lineNum">     153 </span>            : </a>
+<span class="lineNum">     154 </span>            : int
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 : viornd_vq_done(struct virtqueue *vq)</span>
+<span class="lineNum">     156 </span>            : {
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         struct virtio_softc *vsc = vq-&gt;vq_owner;</span>
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :         struct viornd_softc *sc = (struct viornd_softc *)vsc-&gt;sc_child;</span>
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         int slot, len, i;</span>
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         if (virtio_dequeue(vsc, vq, &amp;slot, &amp;len) != 0)</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(vsc-&gt;sc_dmat, sc-&gt;sc_dmamap, 0, VIORND_BUFSIZE,</span>
+<span class="lineNum">     164 </span>            :             BUS_DMASYNC_POSTREAD);
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         if (len &gt; VIORND_BUFSIZE) {</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: inconsistent descriptor length %d &gt; %d\n&quot;,</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname, len, VIORND_BUFSIZE);</span>
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                 goto out;</span>
+<span class="lineNum">     169 </span>            :         }
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span>            : #if VIORND_DEBUG
+<span class="lineNum">     172 </span>            :         printf(&quot;%s: got %d bytes of entropy\n&quot;, __func__, len);
+<span class="lineNum">     173 </span>            : #endif
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         for (i = 0; (i + 1) * sizeof(int) &lt;= len; i++)</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                 enqueue_randomness(sc-&gt;sc_buf[i]);</span>
+<span class="lineNum">     176 </span>            : 
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_interval)</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                 timeout_add_sec(&amp;sc-&gt;sc_tick, sc-&gt;sc_interval);</span>
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span>            : out:
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :         virtio_dequeue_commit(vq, slot);</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         return 1;</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 : }</span>
+<a name="184"><span class="lineNum">     184 </span>            : </a>
+<span class="lineNum">     185 </span>            : void
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 : viornd_tick(void *arg)</span>
+<span class="lineNum">     187 </span>            : {
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         struct viornd_softc *sc = arg;</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :         struct virtio_softc *vsc = sc-&gt;sc_virtio;</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         struct virtqueue *vq = &amp;sc-&gt;sc_vq;</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         int slot;</span>
+<span class="lineNum">     192 </span>            : 
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(vsc-&gt;sc_dmat, sc-&gt;sc_dmamap, 0, VIORND_BUFSIZE,</span>
+<span class="lineNum">     194 </span>            :             BUS_DMASYNC_PREREAD);
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         if (virtio_enqueue_prep(vq, &amp;slot) != 0 ||</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :             virtio_enqueue_reserve(vq, slot, 1) != 0) {</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :                 panic(&quot;%s: virtqueue enqueue failed&quot;, sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     198 </span>            :         }
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         virtio_enqueue(vq, slot, sc-&gt;sc_dmamap, 0);</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :         virtio_enqueue_commit(vsc, vq, slot, 1);</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

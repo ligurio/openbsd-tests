@@ -1,0 +1,1313 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - net/if_pflow.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">net</a> - if_pflow.c<span style="font-size: 80%;"> (source / <a href="if_pflow.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">681</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">31</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: if_pflow.c,v 1.90 2018/07/30 12:22:14 mpi Exp $       */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2011 Florian Obser &lt;florian@narrans.de&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2011 Sebastian Benoit &lt;benoit-lists@fb12.de&gt;
+<span class="lineNum">       6 </span>            :  * Copyright (c) 2008 Henning Brauer &lt;henning@openbsd.org&gt;
+<span class="lineNum">       7 </span>            :  * Copyright (c) 2008 Joerg Goltermann &lt;jg@osn.de&gt;
+<span class="lineNum">       8 </span>            :  *
+<span class="lineNum">       9 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">      10 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">      11 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      12 </span>            :  *
+<span class="lineNum">      13 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      14 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      15 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      16 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      17 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF MIND, USE, DATA OR PROFITS, WHETHER IN
+<span class="lineNum">      18 </span>            :  * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+<span class="lineNum">      19 </span>            :  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      20 </span>            :  */
+<span class="lineNum">      21 </span>            : 
+<span class="lineNum">      22 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/socketvar.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/sysctl.h&gt;
+<span class="lineNum">      33 </span>            : 
+<span class="lineNum">      34 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;net/if_types.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;net/bpf.h&gt;
+<span class="lineNum">      37 </span>            : #include &lt;net/route.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;netinet/if_ether.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;netinet/tcp.h&gt;
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : #include &lt;netinet/ip.h&gt;
+<span class="lineNum">      43 </span>            : #include &lt;netinet/ip_var.h&gt;
+<span class="lineNum">      44 </span>            : #include &lt;netinet/udp.h&gt;
+<span class="lineNum">      45 </span>            : #include &lt;netinet/udp_var.h&gt;
+<span class="lineNum">      46 </span>            : #include &lt;netinet/in_pcb.h&gt;
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : #include &lt;net/pfvar.h&gt;
+<span class="lineNum">      49 </span>            : #include &lt;net/if_pflow.h&gt;
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span>            : #include &quot;bpfilter.h&quot;
+<span class="lineNum">      52 </span>            : #include &quot;pflow.h&quot;
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span>            : #define PFLOW_MINMTU    \
+<span class="lineNum">      55 </span>            :     (sizeof(struct pflow_header) + sizeof(struct pflow_flow))
+<span class="lineNum">      56 </span>            : 
+<span class="lineNum">      57 </span>            : #ifdef PFLOWDEBUG
+<span class="lineNum">      58 </span>            : #define DPRINTF(x)      do { printf x ; } while (0)
+<span class="lineNum">      59 </span>            : #else
+<span class="lineNum">      60 </span>            : #define DPRINTF(x)
+<span class="lineNum">      61 </span>            : #endif
+<span class="lineNum">      62 </span>            : 
+<span class="lineNum">      63 </span>            : SLIST_HEAD(, pflow_softc) pflowif_list;
+<span class="lineNum">      64 </span>            : struct pflowstats        pflowstats;
+<span class="lineNum">      65 </span>            : 
+<span class="lineNum">      66 </span>            : void    pflowattach(int);
+<span class="lineNum">      67 </span>            : int     pflow_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+<span class="lineNum">      68 </span>            :         struct rtentry *rt);
+<span class="lineNum">      69 </span>            : void    pflow_output_process(void *);
+<span class="lineNum">      70 </span>            : int     pflow_clone_create(struct if_clone *, int);
+<span class="lineNum">      71 </span>            : int     pflow_clone_destroy(struct ifnet *);
+<span class="lineNum">      72 </span>            : int     pflow_set(struct pflow_softc *, struct pflowreq *);
+<span class="lineNum">      73 </span>            : void    pflow_init_timeouts(struct pflow_softc *);
+<span class="lineNum">      74 </span>            : int     pflow_calc_mtu(struct pflow_softc *, int, int);
+<span class="lineNum">      75 </span>            : void    pflow_setmtu(struct pflow_softc *, int);
+<span class="lineNum">      76 </span>            : int     pflowvalidsockaddr(const struct sockaddr *, int);
+<span class="lineNum">      77 </span>            : int     pflowioctl(struct ifnet *, u_long, caddr_t);
+<span class="lineNum">      78 </span>            : 
+<span class="lineNum">      79 </span>            : struct mbuf     *pflow_get_mbuf(struct pflow_softc *, u_int16_t);
+<span class="lineNum">      80 </span>            : void    pflow_flush(struct pflow_softc *);
+<span class="lineNum">      81 </span>            : int     pflow_sendout_v5(struct pflow_softc *);
+<span class="lineNum">      82 </span>            : int     pflow_sendout_ipfix(struct pflow_softc *, sa_family_t);
+<span class="lineNum">      83 </span>            : int     pflow_sendout_ipfix_tmpl(struct pflow_softc *);
+<span class="lineNum">      84 </span>            : int     pflow_sendout_mbuf(struct pflow_softc *, struct mbuf *);
+<span class="lineNum">      85 </span>            : void    pflow_timeout(void *);
+<span class="lineNum">      86 </span>            : void    pflow_timeout6(void *);
+<span class="lineNum">      87 </span>            : void    pflow_timeout_tmpl(void *);
+<span class="lineNum">      88 </span>            : void    copy_flow_data(struct pflow_flow *, struct pflow_flow *,
+<span class="lineNum">      89 </span>            :         struct pf_state *, struct pf_state_key *, int, int);
+<span class="lineNum">      90 </span>            : void    copy_flow_ipfix_4_data(struct pflow_ipfix_flow4 *,
+<span class="lineNum">      91 </span>            :         struct pflow_ipfix_flow4 *, struct pf_state *, struct pf_state_key *,
+<span class="lineNum">      92 </span>            :         struct pflow_softc *, int, int);
+<span class="lineNum">      93 </span>            : void    copy_flow_ipfix_6_data(struct pflow_ipfix_flow6 *,
+<span class="lineNum">      94 </span>            :         struct pflow_ipfix_flow6 *, struct pf_state *, struct pf_state_key *,
+<span class="lineNum">      95 </span>            :         struct pflow_softc *, int, int);
+<span class="lineNum">      96 </span>            : int     pflow_pack_flow(struct pf_state *, struct pf_state_key *,
+<span class="lineNum">      97 </span>            :         struct pflow_softc *);
+<span class="lineNum">      98 </span>            : int     pflow_pack_flow_ipfix(struct pf_state *, struct pf_state_key *,
+<span class="lineNum">      99 </span>            :         struct pflow_softc *);
+<span class="lineNum">     100 </span>            : int     export_pflow_if(struct pf_state*, struct pf_state_key *,
+<span class="lineNum">     101 </span>            :         struct pflow_softc *);
+<span class="lineNum">     102 </span>            : int     copy_flow_to_m(struct pflow_flow *flow, struct pflow_softc *sc);
+<span class="lineNum">     103 </span>            : int     copy_flow_ipfix_4_to_m(struct pflow_ipfix_flow4 *flow,
+<span class="lineNum">     104 </span>            :         struct pflow_softc *sc);
+<span class="lineNum">     105 </span>            : int     copy_flow_ipfix_6_to_m(struct pflow_ipfix_flow6 *flow,
+<span class="lineNum">     106 </span>            :         struct pflow_softc *sc);
+<span class="lineNum">     107 </span>            : 
+<span class="lineNum">     108 </span>            : struct if_clone pflow_cloner =
+<span class="lineNum">     109 </span>            :     IF_CLONE_INITIALIZER(&quot;pflow&quot;, pflow_clone_create,
+<span class="lineNum">     110 </span>            :     pflow_clone_destroy);
+<a name="111"><span class="lineNum">     111 </span>            : </a>
+<span class="lineNum">     112 </span>            : void
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 : pflowattach(int npflow)</span>
+<span class="lineNum">     114 </span>            : {
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         SLIST_INIT(&amp;pflowif_list);</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         if_clone_attach(&amp;pflow_cloner);</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 : }</span>
+<a name="118"><span class="lineNum">     118 </span>            : </a>
+<span class="lineNum">     119 </span>            : int
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 : pflow_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,</span>
+<span class="lineNum">     121 </span>            :         struct rtentry *rt)
+<span class="lineNum">     122 </span>            : {
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         m_freem(m);     /* drop packet */</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         return (EAFNOSUPPORT);</span>
+<span class="lineNum">     125 </span>            : }
+<a name="126"><span class="lineNum">     126 </span>            : </a>
+<span class="lineNum">     127 </span>            : void
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 : pflow_output_process(void *arg)</span>
+<span class="lineNum">     129 </span>            : {
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         struct mbuf_list ml;</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :         struct pflow_softc *sc = arg;</span>
+<span class="lineNum">     132 </span>            :         struct mbuf *m;
+<span class="lineNum">     133 </span>            : 
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         mq_delist(&amp;sc-&gt;sc_outputqueue, &amp;ml);</span>
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :         KERNEL_LOCK();</span>
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         while ((m = ml_dequeue(&amp;ml)) != NULL) {</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :                 pflow_sendout_mbuf(sc, m);</span>
+<span class="lineNum">     138 </span>            :         }
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         KERNEL_UNLOCK();</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 : }</span>
+<a name="141"><span class="lineNum">     141 </span>            : </a>
+<span class="lineNum">     142 </span>            : int
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 : pflow_clone_create(struct if_clone *ifc, int unit)</span>
+<span class="lineNum">     144 </span>            : {
+<span class="lineNum">     145 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">     146 </span>            :         struct pflow_softc      *pflowif;
+<span class="lineNum">     147 </span>            : 
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         pflowif = malloc(sizeof(*pflowif), M_DEVBUF, M_WAITOK|M_ZERO);</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         MGET(pflowif-&gt;send_nam, M_WAIT, MT_SONAME);</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_version = PFLOW_PROTO_DEFAULT;</span>
+<span class="lineNum">     151 </span>            : 
+<span class="lineNum">     152 </span>            :         /* ipfix template init */
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         bzero(&amp;pflowif-&gt;sc_tmpl_ipfix,sizeof(pflowif-&gt;sc_tmpl_ipfix));</span>
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.set_header.set_id =</span>
+<span class="lineNum">     155 </span>            :             htons(PFLOW_IPFIX_TMPL_SET_ID);
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.set_header.set_length =</span>
+<span class="lineNum">     157 </span>            :             htons(sizeof(struct pflow_ipfix_tmpl));
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span>            :         /* ipfix IPv4 template */
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.h.tmpl_id =</span>
+<span class="lineNum">     161 </span>            :             htons(PFLOW_IPFIX_TMPL_IPV4_ID);
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.h.field_count</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :             = htons(PFLOW_IPFIX_TMPL_IPV4_FIELD_COUNT);</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.src_ip.field_id =</span>
+<span class="lineNum">     165 </span>            :             htons(PFIX_IE_sourceIPv4Address);
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.src_ip.len = htons(4);</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.dest_ip.field_id =</span>
+<span class="lineNum">     168 </span>            :             htons(PFIX_IE_destinationIPv4Address);
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.dest_ip.len = htons(4);</span>
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.if_index_in.field_id =</span>
+<span class="lineNum">     171 </span>            :             htons(PFIX_IE_ingressInterface);
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.if_index_in.len = htons(4);</span>
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.if_index_out.field_id =</span>
+<span class="lineNum">     174 </span>            :             htons(PFIX_IE_egressInterface);
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.if_index_out.len = htons(4);</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.packets.field_id =</span>
+<span class="lineNum">     177 </span>            :             htons(PFIX_IE_packetDeltaCount);
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.packets.len = htons(8);</span>
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.octets.field_id =</span>
+<span class="lineNum">     180 </span>            :             htons(PFIX_IE_octetDeltaCount);
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.octets.len = htons(8);</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.start.field_id =</span>
+<span class="lineNum">     183 </span>            :             htons(PFIX_IE_flowStartMilliseconds);
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.start.len = htons(8);</span>
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.finish.field_id =</span>
+<span class="lineNum">     186 </span>            :             htons(PFIX_IE_flowEndMilliseconds);
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.finish.len = htons(8);</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.src_port.field_id =</span>
+<span class="lineNum">     189 </span>            :             htons(PFIX_IE_sourceTransportPort);
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.src_port.len = htons(2);</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.dest_port.field_id =</span>
+<span class="lineNum">     192 </span>            :             htons(PFIX_IE_destinationTransportPort);
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.dest_port.len = htons(2);</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.tos.field_id =</span>
+<span class="lineNum">     195 </span>            :             htons(PFIX_IE_ipClassOfService);
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.tos.len = htons(1);</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.protocol.field_id =</span>
+<span class="lineNum">     198 </span>            :             htons(PFIX_IE_protocolIdentifier);
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv4_tmpl.protocol.len = htons(1);</span>
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span>            :         /* ipfix IPv6 template */
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.h.tmpl_id =</span>
+<span class="lineNum">     203 </span>            :             htons(PFLOW_IPFIX_TMPL_IPV6_ID);
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.h.field_count =</span>
+<span class="lineNum">     205 </span>            :             htons(PFLOW_IPFIX_TMPL_IPV6_FIELD_COUNT);
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.src_ip.field_id =</span>
+<span class="lineNum">     207 </span>            :             htons(PFIX_IE_sourceIPv6Address);
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.src_ip.len = htons(16);</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.dest_ip.field_id =</span>
+<span class="lineNum">     210 </span>            :             htons(PFIX_IE_destinationIPv6Address);
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.dest_ip.len = htons(16);</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.if_index_in.field_id =</span>
+<span class="lineNum">     213 </span>            :             htons(PFIX_IE_ingressInterface);
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.if_index_in.len = htons(4);</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.if_index_out.field_id =</span>
+<span class="lineNum">     216 </span>            :             htons(PFIX_IE_egressInterface);
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.if_index_out.len = htons(4);</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.packets.field_id =</span>
+<span class="lineNum">     219 </span>            :             htons(PFIX_IE_packetDeltaCount);
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.packets.len = htons(8);</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.octets.field_id =</span>
+<span class="lineNum">     222 </span>            :             htons(PFIX_IE_octetDeltaCount);
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.octets.len = htons(8);</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.start.field_id =</span>
+<span class="lineNum">     225 </span>            :             htons(PFIX_IE_flowStartMilliseconds);
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.start.len = htons(8);</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.finish.field_id =</span>
+<span class="lineNum">     228 </span>            :             htons(PFIX_IE_flowEndMilliseconds);
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.finish.len = htons(8);</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.src_port.field_id =</span>
+<span class="lineNum">     231 </span>            :             htons(PFIX_IE_sourceTransportPort);
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.src_port.len = htons(2);</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.dest_port.field_id =</span>
+<span class="lineNum">     234 </span>            :             htons(PFIX_IE_destinationTransportPort);
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.dest_port.len = htons(2);</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.tos.field_id =</span>
+<span class="lineNum">     237 </span>            :             htons(PFIX_IE_ipClassOfService);
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.tos.len = htons(1);</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.protocol.field_id =</span>
+<span class="lineNum">     240 </span>            :             htons(PFIX_IE_protocolIdentifier);
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :         pflowif-&gt;sc_tmpl_ipfix.ipv6_tmpl.protocol.len = htons(1);</span>
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         ifp = &amp;pflowif-&gt;sc_if;</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :         snprintf(ifp-&gt;if_xname, sizeof ifp-&gt;if_xname, &quot;pflow%d&quot;, unit);</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         ifp-&gt;if_softc = pflowif;</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ioctl = pflowioctl;</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         ifp-&gt;if_output = pflow_output;</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :         ifp-&gt;if_start = NULL;</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :         ifp-&gt;if_xflags = IFXF_CLONED;</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         ifp-&gt;if_type = IFT_PFLOW;</span>
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :         IFQ_SET_MAXLEN(&amp;ifp-&gt;if_snd, IFQ_MAXLEN);</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         ifp-&gt;if_hdrlen = PFLOW_HDRLEN;</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags = IFF_UP;</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags &amp;= ~IFF_RUNNING;   /* not running, need receiver */</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         mq_init(&amp;pflowif-&gt;sc_outputqueue, 8192, IPL_SOFTNET);</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         pflow_setmtu(pflowif, ETHERMTU);</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         pflow_init_timeouts(pflowif);</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         if_attach(ifp);</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         if_alloc_sadl(ifp);</span>
+<span class="lineNum">     260 </span>            : 
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         task_set(&amp;pflowif-&gt;sc_outputtask, pflow_output_process, pflowif);</span>
+<span class="lineNum">     262 </span>            : 
+<span class="lineNum">     263 </span>            :         /* Insert into list of pflows */
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         NET_LOCK();</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         SLIST_INSERT_HEAD(&amp;pflowif_list, pflowif, sc_next);</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         NET_UNLOCK();</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     268 </span>            : }
+<a name="269"><span class="lineNum">     269 </span>            : </a>
+<span class="lineNum">     270 </span>            : int
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 : pflow_clone_destroy(struct ifnet *ifp)</span>
+<span class="lineNum">     272 </span>            : {
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         struct pflow_softc      *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     274 </span>            :         int                      error;
+<span class="lineNum">     275 </span>            : 
+<span class="lineNum">     276 </span>            :         error = 0;
+<span class="lineNum">     277 </span>            : 
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :         if (timeout_initialized(&amp;sc-&gt;sc_tmo))</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                 timeout_del(&amp;sc-&gt;sc_tmo);</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         if (timeout_initialized(&amp;sc-&gt;sc_tmo6))</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                 timeout_del(&amp;sc-&gt;sc_tmo6);</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :         if (timeout_initialized(&amp;sc-&gt;sc_tmo_tmpl))</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :                 timeout_del(&amp;sc-&gt;sc_tmo_tmpl);</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         pflow_flush(sc);</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         task_del(net_tq(ifp-&gt;if_index), &amp;sc-&gt;sc_outputtask);</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :         mq_purge(&amp;sc-&gt;sc_outputqueue);</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         m_freem(sc-&gt;send_nam);</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         if (sc-&gt;so != NULL) {</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :                 error = soclose(sc-&gt;so, MSG_DONTWAIT);</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                 sc-&gt;so = NULL;</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_flowdst != NULL)</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                 free(sc-&gt;sc_flowdst, M_DEVBUF, sc-&gt;sc_flowdst-&gt;sa_len);</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_flowsrc != NULL)</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :                 free(sc-&gt;sc_flowsrc, M_DEVBUF, sc-&gt;sc_flowsrc-&gt;sa_len);</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         if_detach(ifp);</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         NET_LOCK();</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         SLIST_REMOVE(&amp;pflowif_list, sc, pflow_softc, sc_next);</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :         NET_UNLOCK();</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         free(sc, M_DEVBUF, sizeof(*sc));</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     302 </span>            : }
+<a name="303"><span class="lineNum">     303 </span>            : </a>
+<span class="lineNum">     304 </span>            : int
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 : pflowvalidsockaddr(const struct sockaddr *sa, int ignore_port)</span>
+<span class="lineNum">     306 </span>            : {
+<span class="lineNum">     307 </span>            :         struct sockaddr_in6     *sin6;
+<span class="lineNum">     308 </span>            :         struct sockaddr_in      *sin;
+<span class="lineNum">     309 </span>            : 
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         if (sa == NULL)</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :         switch(sa-&gt;sa_family) {</span>
+<span class="lineNum">     313 </span>            :         case AF_INET:
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                 sin = (struct sockaddr_in*) sa;</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :                 return (sin-&gt;sin_addr.s_addr != INADDR_ANY &amp;&amp;</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                     (ignore_port || sin-&gt;sin_port != 0));</span>
+<span class="lineNum">     317 </span>            :         case AF_INET6:
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :                 sin6 = (struct sockaddr_in6*) sa;</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :                 return (!IN6_IS_ADDR_UNSPECIFIED(&amp;sin6-&gt;sin6_addr) &amp;&amp;</span>
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :                     (ignore_port || sin6-&gt;sin6_port != 0));</span>
+<span class="lineNum">     321 </span>            :         default:
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     323 </span>            :         }
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 : }</span>
+<a name="325"><span class="lineNum">     325 </span>            : </a>
+<span class="lineNum">     326 </span>            : int
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 : pflow_set(struct pflow_softc *sc, struct pflowreq *pflowr)</span>
+<span class="lineNum">     328 </span>            : {
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :         struct proc             *p = curproc;</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         struct socket           *so;</span>
+<span class="lineNum">     331 </span>            :         struct sockaddr         *sa;
+<span class="lineNum">     332 </span>            :         int                      error = 0;
+<span class="lineNum">     333 </span>            : 
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :         if (pflowr-&gt;addrmask &amp; PFLOW_MASK_VERSION) {</span>
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                 switch(pflowr-&gt;version) {</span>
+<span class="lineNum">     336 </span>            :                 case PFLOW_PROTO_5:
+<span class="lineNum">     337 </span>            :                 case PFLOW_PROTO_10:
+<span class="lineNum">     338 </span>            :                         break;
+<span class="lineNum">     339 </span>            :                 default:
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :                         return(EINVAL);</span>
+<span class="lineNum">     341 </span>            :                 }
+<span class="lineNum">     342 </span>            :         }
+<span class="lineNum">     343 </span>            : 
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         pflow_flush(sc);</span>
+<span class="lineNum">     345 </span>            : 
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         if (pflowr-&gt;addrmask &amp; PFLOW_MASK_DSTIP) {</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_flowdst != NULL &amp;&amp;</span>
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_flowdst-&gt;sa_family != pflowr-&gt;flowdst.ss_family) {</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                         free(sc-&gt;sc_flowdst, M_DEVBUF, sc-&gt;sc_flowdst-&gt;sa_len);</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_flowdst = NULL;</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                         if (sc-&gt;so != NULL) {</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                                 soclose(sc-&gt;so, MSG_DONTWAIT);</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :                                 sc-&gt;so = NULL;</span>
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     355 </span>            :                 }
+<span class="lineNum">     356 </span>            : 
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :                 switch (pflowr-&gt;flowdst.ss_family) {</span>
+<span class="lineNum">     358 </span>            :                 case AF_INET:
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :                         if (sc-&gt;sc_flowdst == NULL) {</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :                                 if ((sc-&gt;sc_flowdst = malloc(</span>
+<span class="lineNum">     361 </span>            :                                     sizeof(struct sockaddr_in),
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :                                     M_DEVBUF,  M_NOWAIT)) == NULL)</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :                                         return (ENOMEM);</span>
+<span class="lineNum">     364 </span>            :                         }
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                         memcpy(sc-&gt;sc_flowdst, &amp;pflowr-&gt;flowdst,</span>
+<span class="lineNum">     366 </span>            :                             sizeof(struct sockaddr_in));
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_flowdst-&gt;sa_len = sizeof(struct</span>
+<span class="lineNum">     368 </span>            :                             sockaddr_in);
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     370 </span>            :                 case AF_INET6:
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                         if (sc-&gt;sc_flowdst == NULL) {</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                                 if ((sc-&gt;sc_flowdst = malloc(</span>
+<span class="lineNum">     373 </span>            :                                     sizeof(struct sockaddr_in6),
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                                     M_DEVBUF, M_NOWAIT)) == NULL)</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                                         return (ENOMEM);</span>
+<span class="lineNum">     376 </span>            :                         }
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                         memcpy(sc-&gt;sc_flowdst, &amp;pflowr-&gt;flowdst,</span>
+<span class="lineNum">     378 </span>            :                             sizeof(struct sockaddr_in6));
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_flowdst-&gt;sa_len = sizeof(struct</span>
+<span class="lineNum">     380 </span>            :                             sockaddr_in6);
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     382 </span>            :                 default:
+<span class="lineNum">     383 </span>            :                         break;
+<span class="lineNum">     384 </span>            :                 }
+<span class="lineNum">     385 </span>            : 
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_flowdst != NULL) {</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :                         sc-&gt;send_nam-&gt;m_len = sc-&gt;sc_flowdst-&gt;sa_len;</span>
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                         sa = mtod(sc-&gt;send_nam, struct sockaddr *);</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :                         memcpy(sa, sc-&gt;sc_flowdst, sc-&gt;sc_flowdst-&gt;sa_len);</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     391 </span>            :         }
+<span class="lineNum">     392 </span>            : 
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         if (pflowr-&gt;addrmask &amp; PFLOW_MASK_SRCIP) {</span>
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_flowsrc != NULL)</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                         free(sc-&gt;sc_flowsrc, M_DEVBUF, sc-&gt;sc_flowsrc-&gt;sa_len);</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_flowsrc = NULL;</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 if (sc-&gt;so != NULL) {</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                         soclose(sc-&gt;so, MSG_DONTWAIT);</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                         sc-&gt;so = NULL;</span>
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :                 switch(pflowr-&gt;flowsrc.ss_family) {</span>
+<span class="lineNum">     402 </span>            :                 case AF_INET:
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                         if ((sc-&gt;sc_flowsrc = malloc(</span>
+<span class="lineNum">     404 </span>            :                             sizeof(struct sockaddr_in),
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                             M_DEVBUF, M_NOWAIT)) == NULL)</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :                                 return (ENOMEM);</span>
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :                         memcpy(sc-&gt;sc_flowsrc, &amp;pflowr-&gt;flowsrc,</span>
+<span class="lineNum">     408 </span>            :                             sizeof(struct sockaddr_in));
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_flowsrc-&gt;sa_len = sizeof(struct</span>
+<span class="lineNum">     410 </span>            :                             sockaddr_in);
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     412 </span>            :                 case AF_INET6:
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :                         if ((sc-&gt;sc_flowsrc = malloc(</span>
+<span class="lineNum">     414 </span>            :                             sizeof(struct sockaddr_in6),
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :                             M_DEVBUF, M_NOWAIT)) == NULL)</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :                                 return (ENOMEM);</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                         memcpy(sc-&gt;sc_flowsrc, &amp;pflowr-&gt;flowsrc,</span>
+<span class="lineNum">     418 </span>            :                             sizeof(struct sockaddr_in6));
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_flowsrc-&gt;sa_len = sizeof(struct</span>
+<span class="lineNum">     420 </span>            :                             sockaddr_in6);
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     422 </span>            :                 default:
+<span class="lineNum">     423 </span>            :                         break;
+<span class="lineNum">     424 </span>            :                 }
+<span class="lineNum">     425 </span>            :         }
+<span class="lineNum">     426 </span>            : 
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :         if (sc-&gt;so == NULL) {</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                 if (pflowvalidsockaddr(sc-&gt;sc_flowdst, 0)) {</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :                         error = socreate(sc-&gt;sc_flowdst-&gt;sa_family,</span>
+<span class="lineNum">     430 </span>            :                             &amp;so, SOCK_DGRAM, 0);
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :                         if (error)</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                                 return (error);</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :                         if (pflowvalidsockaddr(sc-&gt;sc_flowsrc, 1)) {</span>
+<span class="lineNum">     434 </span>            :                                 struct mbuf *m;
+<span class="lineNum">     435 </span>            :                                 int s;
+<span class="lineNum">     436 </span>            : 
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :                                 MGET(m, M_WAIT, MT_SONAME);</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                                 m-&gt;m_len = sc-&gt;sc_flowsrc-&gt;sa_len;</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :                                 sa = mtod(m, struct sockaddr *);</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :                                 memcpy(sa, sc-&gt;sc_flowsrc,</span>
+<span class="lineNum">     441 </span>            :                                     sc-&gt;sc_flowsrc-&gt;sa_len);
+<span class="lineNum">     442 </span>            : 
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :                                 s = solock(so);</span>
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :                                 error = sobind(so, m, p);</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                                 sounlock(so, s);</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                                 m_freem(m);</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                                 if (error) {</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                                         soclose(so, MSG_DONTWAIT);</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                                         return (error);</span>
+<span class="lineNum">     450 </span>            :                                 }
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                         sc-&gt;so = so;</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :         } else if (!pflowvalidsockaddr(sc-&gt;sc_flowdst, 0)) {</span>
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :                 soclose(sc-&gt;so, MSG_DONTWAIT);</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :                 sc-&gt;so = NULL;</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     458 </span>            : 
+<span class="lineNum">     459 </span>            :         /* error check is above */
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :         if (pflowr-&gt;addrmask &amp; PFLOW_MASK_VERSION)</span>
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_version = pflowr-&gt;version;</span>
+<span class="lineNum">     462 </span>            : 
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :         pflow_setmtu(sc, ETHERMTU);</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :         pflow_init_timeouts(sc);</span>
+<span class="lineNum">     465 </span>            : 
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 : }</span>
+<a name="468"><span class="lineNum">     468 </span>            : </a>
+<span class="lineNum">     469 </span>            : int
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 : pflowioctl(struct ifnet *ifp, u_long cmd, caddr_t data)</span>
+<span class="lineNum">     471 </span>            : {
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :         struct proc             *p = curproc;</span>
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :         struct pflow_softc      *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :         struct ifreq            *ifr = (struct ifreq *)data;</span>
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :         struct pflowreq          pflowr;</span>
+<span class="lineNum">     476 </span>            :         int                      error;
+<span class="lineNum">     477 </span>            : 
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     479 </span>            :         case SIOCSIFADDR:
+<span class="lineNum">     480 </span>            :         case SIOCSIFDSTADDR:
+<span class="lineNum">     481 </span>            :         case SIOCSIFFLAGS:
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :                 if ((ifp-&gt;if_flags &amp; IFF_UP) &amp;&amp; sc-&gt;so != NULL) {</span>
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_flags |= IFF_RUNNING;</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_gcounter=pflowstats.pflow_flows;</span>
+<span class="lineNum">     485 </span>            :                         /* send templates on startup */
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                         if (sc-&gt;sc_version == PFLOW_PROTO_10)</span>
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :                                 pflow_sendout_ipfix_tmpl(sc);</span>
+<span class="lineNum">     488 </span>            :                 } else
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_flags &amp;= ~IFF_RUNNING;</span>
+<span class="lineNum">     490 </span>            :                 break;
+<span class="lineNum">     491 </span>            :         case SIOCSIFMTU:
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :                 if (ifr-&gt;ifr_mtu &lt; PFLOW_MINMTU)</span>
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :                         return (EINVAL);</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                 if (ifr-&gt;ifr_mtu &gt; MCLBYTES)</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :                         ifr-&gt;ifr_mtu = MCLBYTES;</span>
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                 if (ifr-&gt;ifr_mtu &lt; ifp-&gt;if_mtu)</span>
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :                         pflow_flush(sc);</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :                 pflow_setmtu(sc, ifr-&gt;ifr_mtu);</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     500 </span>            : 
+<span class="lineNum">     501 </span>            :         case SIOCGETPFLOW:
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                 bzero(&amp;pflowr, sizeof(pflowr));</span>
+<span class="lineNum">     503 </span>            : 
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_flowsrc != NULL)</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :                         memcpy(&amp;pflowr.flowsrc, sc-&gt;sc_flowsrc,</span>
+<span class="lineNum">     506 </span>            :                             sc-&gt;sc_flowsrc-&gt;sa_len);
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_flowdst != NULL)</span>
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :                         memcpy(&amp;pflowr.flowdst, sc-&gt;sc_flowdst,</span>
+<span class="lineNum">     509 </span>            :                             sc-&gt;sc_flowdst-&gt;sa_len);
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :                 pflowr.version = sc-&gt;sc_version;</span>
+<span class="lineNum">     511 </span>            : 
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :                 if ((error = copyout(&amp;pflowr, ifr-&gt;ifr_data,</span>
+<span class="lineNum">     513 </span>            :                     sizeof(pflowr))))
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     515 </span>            :                 break;
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span>            :         case SIOCSETPFLOW:
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :                 if ((error = suser(p)) != 0)</span>
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :                 if ((error = copyin(ifr-&gt;ifr_data, &amp;pflowr,</span>
+<span class="lineNum">     521 </span>            :                     sizeof(pflowr))))
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     523 </span>            : 
+<span class="lineNum">     524 </span>            :                 /* XXXSMP breaks atomicity */
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                 NET_UNLOCK();</span>
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :                 error = pflow_set(sc, &amp;pflowr);</span>
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                 NET_LOCK();</span>
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :                 if (error != 0)</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     530 </span>            : 
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :                 if ((ifp-&gt;if_flags &amp; IFF_UP) &amp;&amp; sc-&gt;so != NULL) {</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_flags |= IFF_RUNNING;</span>
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_gcounter=pflowstats.pflow_flows;</span>
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :                         if (sc-&gt;sc_version == PFLOW_PROTO_10)</span>
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                                 pflow_sendout_ipfix_tmpl(sc);</span>
+<span class="lineNum">     536 </span>            :                 } else
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_flags &amp;= ~IFF_RUNNING;</span>
+<span class="lineNum">     538 </span>            : 
+<span class="lineNum">     539 </span>            :                 break;
+<span class="lineNum">     540 </span>            : 
+<span class="lineNum">     541 </span>            :         default:
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                 return (ENOTTY);</span>
+<span class="lineNum">     543 </span>            :         }
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 : }</span>
+<a name="546"><span class="lineNum">     546 </span>            : </a>
+<span class="lineNum">     547 </span>            : void
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 : pflow_init_timeouts(struct pflow_softc *sc)</span>
+<span class="lineNum">     549 </span>            : {
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :         switch (sc-&gt;sc_version) {</span>
+<span class="lineNum">     551 </span>            :         case PFLOW_PROTO_5:
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :                 if (timeout_initialized(&amp;sc-&gt;sc_tmo6))</span>
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 :                         timeout_del(&amp;sc-&gt;sc_tmo6);</span>
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :                 if (timeout_initialized(&amp;sc-&gt;sc_tmo_tmpl))</span>
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 :                         timeout_del(&amp;sc-&gt;sc_tmo_tmpl);</span>
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :                 if (!timeout_initialized(&amp;sc-&gt;sc_tmo))</span>
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :                         timeout_set_proc(&amp;sc-&gt;sc_tmo, pflow_timeout, sc);</span>
+<span class="lineNum">     558 </span>            :                 break;
+<span class="lineNum">     559 </span>            :         case PFLOW_PROTO_10:
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :                 if (!timeout_initialized(&amp;sc-&gt;sc_tmo_tmpl))</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                         timeout_set_proc(&amp;sc-&gt;sc_tmo_tmpl, pflow_timeout_tmpl,</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :                             sc);</span>
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                 if (!timeout_initialized(&amp;sc-&gt;sc_tmo))</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :                         timeout_set_proc(&amp;sc-&gt;sc_tmo, pflow_timeout, sc);</span>
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :                 if (!timeout_initialized(&amp;sc-&gt;sc_tmo6))</span>
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :                         timeout_set_proc(&amp;sc-&gt;sc_tmo6, pflow_timeout6, sc);</span>
+<span class="lineNum">     567 </span>            : 
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                 timeout_add_sec(&amp;sc-&gt;sc_tmo_tmpl, PFLOW_TMPL_TIMEOUT);</span>
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     570 </span>            :         default: /* NOTREACHED */
+<span class="lineNum">     571 </span>            :                 break;
+<span class="lineNum">     572 </span>            :         }
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 : }</span>
+<a name="574"><span class="lineNum">     574 </span>            : </a>
+<span class="lineNum">     575 </span>            : int
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 : pflow_calc_mtu(struct pflow_softc *sc, int mtu, int hdrsz)</span>
+<span class="lineNum">     577 </span>            : {
+<span class="lineNum">     578 </span>            : 
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :         sc-&gt;sc_maxcount4 = (mtu - hdrsz -</span>
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :             sizeof(struct udpiphdr)) / sizeof(struct pflow_ipfix_flow4);</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :         sc-&gt;sc_maxcount6 = (mtu - hdrsz -</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :             sizeof(struct udpiphdr)) / sizeof(struct pflow_ipfix_flow6);</span>
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_maxcount4 &gt; PFLOW_MAXFLOWS)</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_maxcount4 = PFLOW_MAXFLOWS;</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_maxcount6 &gt; PFLOW_MAXFLOWS)</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_maxcount6 = PFLOW_MAXFLOWS;</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :         return (hdrsz + sizeof(struct udpiphdr) +</span>
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :             MIN(sc-&gt;sc_maxcount4 * sizeof(struct pflow_ipfix_flow4),</span>
+<span class="lineNum">     589 </span>            :             sc-&gt;sc_maxcount6 * sizeof(struct pflow_ipfix_flow6)));
+<span class="lineNum">     590 </span>            : }
+<a name="591"><span class="lineNum">     591 </span>            : </a>
+<span class="lineNum">     592 </span>            : void
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 : pflow_setmtu(struct pflow_softc *sc, int mtu_req)</span>
+<span class="lineNum">     594 </span>            : {
+<span class="lineNum">     595 </span>            :         int     mtu;
+<span class="lineNum">     596 </span>            : 
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_pflow_ifp &amp;&amp; sc-&gt;sc_pflow_ifp-&gt;if_mtu &lt; mtu_req)</span>
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :                 mtu = sc-&gt;sc_pflow_ifp-&gt;if_mtu;</span>
+<span class="lineNum">     599 </span>            :         else
+<span class="lineNum">     600 </span>            :                 mtu = mtu_req;
+<span class="lineNum">     601 </span>            : 
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :         switch (sc-&gt;sc_version) {</span>
+<span class="lineNum">     603 </span>            :         case PFLOW_PROTO_5:
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_maxcount = (mtu - sizeof(struct pflow_header) -</span>
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :                     sizeof(struct udpiphdr)) / sizeof(struct pflow_flow);</span>
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_maxcount &gt; PFLOW_MAXFLOWS)</span>
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_maxcount = PFLOW_MAXFLOWS;</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_if.if_mtu = sizeof(struct pflow_header) +</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :                     sizeof(struct udpiphdr) +</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_maxcount * sizeof(struct pflow_flow);</span>
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     612 </span>            :         case PFLOW_PROTO_10:
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_if.if_mtu =</span>
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                     pflow_calc_mtu(sc, mtu, sizeof(struct pflow_v10_header));</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     616 </span>            :         default: /* NOTREACHED */
+<span class="lineNum">     617 </span>            :                 break;
+<span class="lineNum">     618 </span>            :         }
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 : }</span>
+<a name="620"><span class="lineNum">     620 </span>            : </a>
+<span class="lineNum">     621 </span>            : struct mbuf *
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 : pflow_get_mbuf(struct pflow_softc *sc, u_int16_t set_id)</span>
+<span class="lineNum">     623 </span>            : {
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :         struct pflow_set_header  set_hdr;</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :         struct pflow_header      h;</span>
+<span class="lineNum">     626 </span>            :         struct mbuf             *m;
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :         MGETHDR(m, M_DONTWAIT, MT_DATA);</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :         if (m == NULL) {</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :                 pflowstats.pflow_onomem++;</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     632 </span>            :         }
+<span class="lineNum">     633 </span>            : 
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 :         MCLGET(m, M_DONTWAIT);</span>
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :         if ((m-&gt;m_flags &amp; M_EXT) == 0) {</span>
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :                 m_free(m);</span>
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :                 pflowstats.pflow_onomem++;</span>
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     639 </span>            :         }
+<span class="lineNum">     640 </span>            : 
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :         m-&gt;m_len = m-&gt;m_pkthdr.len = 0;</span>
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         m-&gt;m_pkthdr.ph_ifidx = 0;</span>
+<span class="lineNum">     643 </span>            : 
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :         if (sc == NULL)         /* get only a new empty mbuf */</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :                 return (m);</span>
+<span class="lineNum">     646 </span>            : 
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         switch (sc-&gt;sc_version) {</span>
+<span class="lineNum">     648 </span>            :         case PFLOW_PROTO_5:
+<span class="lineNum">     649 </span>            :                 /* populate pflow_header */
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :                 h.reserved1 = 0;</span>
+<span class="lineNum">     651 </span><span class="lineNoCov">          0 :                 h.reserved2 = 0;</span>
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :                 h.count = 0;</span>
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :                 h.version = htons(PFLOW_PROTO_5);</span>
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :                 h.flow_sequence = htonl(sc-&gt;sc_gcounter);</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                 h.engine_type = PFLOW_ENGINE_TYPE;</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :                 h.engine_id = PFLOW_ENGINE_ID;</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                 m_copyback(m, 0, PFLOW_HDRLEN, &amp;h, M_NOWAIT);</span>
+<span class="lineNum">     658 </span>            : 
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_count = 0;</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :                 timeout_add_sec(&amp;sc-&gt;sc_tmo, PFLOW_TIMEOUT);</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     662 </span>            :         case PFLOW_PROTO_10:
+<span class="lineNum">     663 </span>            :                 /* populate pflow_set_header */
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                 set_hdr.set_length = 0;</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :                 set_hdr.set_id = htons(set_id);</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :                 m_copyback(m, 0, PFLOW_SET_HDRLEN, &amp;set_hdr, M_NOWAIT);</span>
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     668 </span>            :         default: /* NOTREACHED */
+<span class="lineNum">     669 </span>            :                 break;
+<span class="lineNum">     670 </span>            :         }
+<span class="lineNum">     671 </span>            : 
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 : }</span>
+<a name="674"><span class="lineNum">     674 </span>            : </a>
+<span class="lineNum">     675 </span>            : void
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 : copy_flow_data(struct pflow_flow *flow1, struct pflow_flow *flow2,</span>
+<span class="lineNum">     677 </span>            :     struct pf_state *st, struct pf_state_key *sk, int src, int dst)
+<span class="lineNum">     678 </span>            : {
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :         flow1-&gt;src_ip = flow2-&gt;dest_ip = sk-&gt;addr[src].v4.s_addr;</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :         flow1-&gt;src_port = flow2-&gt;dest_port = sk-&gt;port[src];</span>
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         flow1-&gt;dest_ip = flow2-&gt;src_ip = sk-&gt;addr[dst].v4.s_addr;</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :         flow1-&gt;dest_port = flow2-&gt;src_port = sk-&gt;port[dst];</span>
+<span class="lineNum">     683 </span>            : 
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :         flow1-&gt;dest_as = flow2-&gt;src_as =</span>
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :             flow1-&gt;src_as = flow2-&gt;dest_as = 0;</span>
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :         flow1-&gt;if_index_in = htons(st-&gt;if_index_in);</span>
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :         flow1-&gt;if_index_out = htons(st-&gt;if_index_out);</span>
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :         flow2-&gt;if_index_in = htons(st-&gt;if_index_out);</span>
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :         flow2-&gt;if_index_out = htons(st-&gt;if_index_in);</span>
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :         flow1-&gt;dest_mask = flow2-&gt;src_mask =</span>
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :             flow1-&gt;src_mask = flow2-&gt;dest_mask = 0;</span>
+<span class="lineNum">     692 </span>            : 
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :         flow1-&gt;flow_packets = htonl(st-&gt;packets[0]);</span>
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :         flow2-&gt;flow_packets = htonl(st-&gt;packets[1]);</span>
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :         flow1-&gt;flow_octets = htonl(st-&gt;bytes[0]);</span>
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :         flow2-&gt;flow_octets = htonl(st-&gt;bytes[1]);</span>
+<span class="lineNum">     697 </span>            : 
+<span class="lineNum">     698 </span>            :         /*
+<span class="lineNum">     699 </span>            :          * Pretend the flow was created or expired when the machine came up
+<span class="lineNum">     700 </span>            :          * when creation is in the future of the last time a package was seen
+<span class="lineNum">     701 </span>            :          * or was created / expired before this machine came up due to pfsync.
+<span class="lineNum">     702 </span>            :          */
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :         flow1-&gt;flow_start = flow2-&gt;flow_start = st-&gt;creation &lt; 0 ||</span>
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :             st-&gt;creation &gt; st-&gt;expire ? htonl(0) : htonl(st-&gt;creation * 1000);</span>
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :         flow1-&gt;flow_finish = flow2-&gt;flow_finish = st-&gt;expire &lt; 0 ? htonl(0) :</span>
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :             htonl(st-&gt;expire * 1000);</span>
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :         flow1-&gt;tcp_flags = flow2-&gt;tcp_flags = 0;</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :         flow1-&gt;protocol = flow2-&gt;protocol = sk-&gt;proto;</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :         flow1-&gt;tos = flow2-&gt;tos = st-&gt;rule.ptr-&gt;tos;</span>
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 : }</span>
+<a name="711"><span class="lineNum">     711 </span>            : </a>
+<span class="lineNum">     712 </span>            : void
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 : copy_flow_ipfix_4_data(struct pflow_ipfix_flow4 *flow1,</span>
+<span class="lineNum">     714 </span>            :     struct pflow_ipfix_flow4 *flow2, struct pf_state *st,
+<span class="lineNum">     715 </span>            :     struct pf_state_key *sk, struct pflow_softc *sc, int src, int dst)
+<span class="lineNum">     716 </span>            : {
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :         flow1-&gt;src_ip = flow2-&gt;dest_ip = sk-&gt;addr[src].v4.s_addr;</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :         flow1-&gt;src_port = flow2-&gt;dest_port = sk-&gt;port[src];</span>
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :         flow1-&gt;dest_ip = flow2-&gt;src_ip = sk-&gt;addr[dst].v4.s_addr;</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :         flow1-&gt;dest_port = flow2-&gt;src_port = sk-&gt;port[dst];</span>
+<span class="lineNum">     721 </span>            : 
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :         flow1-&gt;if_index_in = htonl(st-&gt;if_index_in);</span>
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :         flow1-&gt;if_index_out = htonl(st-&gt;if_index_out);</span>
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :         flow2-&gt;if_index_in = htonl(st-&gt;if_index_out);</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :         flow2-&gt;if_index_out = htonl(st-&gt;if_index_in);</span>
+<span class="lineNum">     726 </span>            : 
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :         flow1-&gt;flow_packets = htobe64(st-&gt;packets[0]);</span>
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :         flow2-&gt;flow_packets = htobe64(st-&gt;packets[1]);</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :         flow1-&gt;flow_octets = htobe64(st-&gt;bytes[0]);</span>
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :         flow2-&gt;flow_octets = htobe64(st-&gt;bytes[1]);</span>
+<span class="lineNum">     731 </span>            : 
+<span class="lineNum">     732 </span>            :         /*
+<span class="lineNum">     733 </span>            :          * Pretend the flow was created when the machine came up when creation
+<span class="lineNum">     734 </span>            :          * is in the future of the last time a package was seen due to pfsync.
+<span class="lineNum">     735 </span>            :          */
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :         if (st-&gt;creation &gt; st-&gt;expire)</span>
+<span class="lineNum">     737 </span><span class="lineNoCov">          0 :                 flow1-&gt;flow_start = flow2-&gt;flow_start = htobe64((time_second -</span>
+<span class="lineNum">     738 </span>            :                     time_uptime)*1000);
+<span class="lineNum">     739 </span>            :         else
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :                 flow1-&gt;flow_start = flow2-&gt;flow_start = htobe64((time_second -</span>
+<span class="lineNum">     741 </span>            :                     (time_uptime - st-&gt;creation))*1000);
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :         flow1-&gt;flow_finish = flow2-&gt;flow_finish = htobe64((time_second -</span>
+<span class="lineNum">     743 </span>            :             (time_uptime - st-&gt;expire))*1000);
+<span class="lineNum">     744 </span>            : 
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :         flow1-&gt;protocol = flow2-&gt;protocol = sk-&gt;proto;</span>
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :         flow1-&gt;tos = flow2-&gt;tos = st-&gt;rule.ptr-&gt;tos;</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 : }</span>
+<a name="748"><span class="lineNum">     748 </span>            : </a>
+<span class="lineNum">     749 </span>            : void
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 : copy_flow_ipfix_6_data(struct pflow_ipfix_flow6 *flow1,</span>
+<span class="lineNum">     751 </span>            :     struct pflow_ipfix_flow6 *flow2, struct pf_state *st,
+<span class="lineNum">     752 </span>            :     struct pf_state_key *sk, struct pflow_softc *sc, int src, int dst)
+<span class="lineNum">     753 </span>            : {
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :         bcopy(&amp;sk-&gt;addr[src].v6, &amp;flow1-&gt;src_ip, sizeof(flow1-&gt;src_ip));</span>
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :         bcopy(&amp;sk-&gt;addr[src].v6, &amp;flow2-&gt;dest_ip, sizeof(flow2-&gt;dest_ip));</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         flow1-&gt;src_port = flow2-&gt;dest_port = sk-&gt;port[src];</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :         bcopy(&amp;sk-&gt;addr[dst].v6, &amp;flow1-&gt;dest_ip, sizeof(flow1-&gt;dest_ip));</span>
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :         bcopy(&amp;sk-&gt;addr[dst].v6, &amp;flow2-&gt;src_ip, sizeof(flow2-&gt;src_ip));</span>
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :         flow1-&gt;dest_port = flow2-&gt;src_port = sk-&gt;port[dst];</span>
+<span class="lineNum">     760 </span>            : 
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :         flow1-&gt;if_index_in = htonl(st-&gt;if_index_in);</span>
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :         flow1-&gt;if_index_out = htonl(st-&gt;if_index_out);</span>
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :         flow2-&gt;if_index_in = htonl(st-&gt;if_index_out);</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :         flow2-&gt;if_index_out = htonl(st-&gt;if_index_in);</span>
+<span class="lineNum">     765 </span>            : 
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :         flow1-&gt;flow_packets = htobe64(st-&gt;packets[0]);</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :         flow2-&gt;flow_packets = htobe64(st-&gt;packets[1]);</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :         flow1-&gt;flow_octets = htobe64(st-&gt;bytes[0]);</span>
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :         flow2-&gt;flow_octets = htobe64(st-&gt;bytes[1]);</span>
+<span class="lineNum">     770 </span>            : 
+<span class="lineNum">     771 </span>            :         /*
+<span class="lineNum">     772 </span>            :          * Pretend the flow was created when the machine came up when creation
+<span class="lineNum">     773 </span>            :          * is in the future of the last time a package was seen due to pfsync.
+<span class="lineNum">     774 </span>            :          */
+<span class="lineNum">     775 </span><span class="lineNoCov">          0 :         if (st-&gt;creation &gt; st-&gt;expire)</span>
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :                 flow1-&gt;flow_start = flow2-&gt;flow_start = htobe64((time_second -</span>
+<span class="lineNum">     777 </span>            :                     time_uptime)*1000);
+<span class="lineNum">     778 </span>            :         else
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :                 flow1-&gt;flow_start = flow2-&gt;flow_start = htobe64((time_second -</span>
+<span class="lineNum">     780 </span>            :                     (time_uptime - st-&gt;creation))*1000);
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :         flow1-&gt;flow_finish = flow2-&gt;flow_finish = htobe64((time_second -</span>
+<span class="lineNum">     782 </span>            :             (time_uptime - st-&gt;expire))*1000);
+<span class="lineNum">     783 </span>            : 
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :         flow1-&gt;protocol = flow2-&gt;protocol = sk-&gt;proto;</span>
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         flow1-&gt;tos = flow2-&gt;tos = st-&gt;rule.ptr-&gt;tos;</span>
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 : }</span>
+<a name="787"><span class="lineNum">     787 </span>            : </a>
+<span class="lineNum">     788 </span>            : int
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 : export_pflow(struct pf_state *st)</span>
+<span class="lineNum">     790 </span>            : {
+<span class="lineNum">     791 </span>            :         struct pflow_softc      *sc = NULL;
+<span class="lineNum">     792 </span>            :         struct pf_state_key     *sk;
+<span class="lineNum">     793 </span>            : 
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :         sk = st-&gt;key[st-&gt;direction == PF_IN ? PF_SK_WIRE : PF_SK_STACK];</span>
+<span class="lineNum">     795 </span>            : 
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 :         SLIST_FOREACH(sc, &amp;pflowif_list, sc_next) {</span>
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :                 switch (sc-&gt;sc_version) {</span>
+<span class="lineNum">     798 </span>            :                 case PFLOW_PROTO_5:
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :                         if( sk-&gt;af == AF_INET )</span>
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :                                 export_pflow_if(st, sk, sc);</span>
+<span class="lineNum">     801 </span>            :                         break;
+<span class="lineNum">     802 </span>            :                 case PFLOW_PROTO_10:
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :                         if( sk-&gt;af == AF_INET || sk-&gt;af == AF_INET6 )</span>
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :                                 export_pflow_if(st, sk, sc);</span>
+<span class="lineNum">     805 </span>            :                         break;
+<span class="lineNum">     806 </span>            :                 default: /* NOTREACHED */
+<span class="lineNum">     807 </span>            :                         break;
+<span class="lineNum">     808 </span>            :                 }
+<span class="lineNum">     809 </span>            :         }
+<span class="lineNum">     810 </span>            : 
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     812 </span>            : }
+<a name="813"><span class="lineNum">     813 </span>            : </a>
+<span class="lineNum">     814 </span>            : int
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 : export_pflow_if(struct pf_state *st, struct pf_state_key *sk,</span>
+<span class="lineNum">     816 </span>            :     struct pflow_softc *sc)
+<span class="lineNum">     817 </span>            : {
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :         struct pf_state          pfs_copy;</span>
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 :         struct ifnet            *ifp = &amp;sc-&gt;sc_if;</span>
+<span class="lineNum">     820 </span>            :         u_int64_t                bytes[2];
+<span class="lineNum">     821 </span>            :         int                      ret = 0;
+<span class="lineNum">     822 </span>            : 
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :         if (!(ifp-&gt;if_flags &amp; IFF_RUNNING))</span>
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     825 </span>            : 
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_version == PFLOW_PROTO_10)</span>
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :                 return (pflow_pack_flow_ipfix(st, sk, sc));</span>
+<span class="lineNum">     828 </span>            : 
+<span class="lineNum">     829 </span>            :         /* PFLOW_PROTO_5 */
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :         if ((st-&gt;bytes[0] &lt; (u_int64_t)PFLOW_MAXBYTES)</span>
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :             &amp;&amp; (st-&gt;bytes[1] &lt; (u_int64_t)PFLOW_MAXBYTES))</span>
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                 return (pflow_pack_flow(st, sk, sc));</span>
+<span class="lineNum">     833 </span>            : 
+<span class="lineNum">     834 </span>            :         /* flow &gt; PFLOW_MAXBYTES need special handling */
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         bcopy(st, &amp;pfs_copy, sizeof(pfs_copy));</span>
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :         bytes[0] = pfs_copy.bytes[0];</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :         bytes[1] = pfs_copy.bytes[1];</span>
+<span class="lineNum">     838 </span>            : 
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :         while (bytes[0] &gt; PFLOW_MAXBYTES) {</span>
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 :                 pfs_copy.bytes[0] = PFLOW_MAXBYTES;</span>
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :                 pfs_copy.bytes[1] = 0;</span>
+<span class="lineNum">     842 </span>            : 
+<span class="lineNum">     843 </span><span class="lineNoCov">          0 :                 if ((ret = pflow_pack_flow(&amp;pfs_copy, sk, sc)) != 0)</span>
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :                         return (ret);</span>
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                 if ((bytes[0] - PFLOW_MAXBYTES) &gt; 0)</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :                         bytes[0] -= PFLOW_MAXBYTES;</span>
+<span class="lineNum">     847 </span>            :         }
+<span class="lineNum">     848 </span>            : 
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :         while (bytes[1] &gt; (u_int64_t)PFLOW_MAXBYTES) {</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :                 pfs_copy.bytes[1] = PFLOW_MAXBYTES;</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                 pfs_copy.bytes[0] = 0;</span>
+<span class="lineNum">     852 </span>            : 
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :                 if ((ret = pflow_pack_flow(&amp;pfs_copy, sk, sc)) != 0)</span>
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :                         return (ret);</span>
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :                 if ((bytes[1] - PFLOW_MAXBYTES) &gt; 0)</span>
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                         bytes[1] -= PFLOW_MAXBYTES;</span>
+<span class="lineNum">     857 </span>            :         }
+<span class="lineNum">     858 </span>            : 
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :         pfs_copy.bytes[0] = bytes[0];</span>
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :         pfs_copy.bytes[1] = bytes[1];</span>
+<span class="lineNum">     861 </span>            : 
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :         return (pflow_pack_flow(&amp;pfs_copy, sk, sc));</span>
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 : }</span>
+<a name="864"><span class="lineNum">     864 </span>            : </a>
+<span class="lineNum">     865 </span>            : int
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 : copy_flow_to_m(struct pflow_flow *flow, struct pflow_softc *sc)</span>
+<span class="lineNum">     867 </span>            : {
+<span class="lineNum">     868 </span>            :         int             ret = 0;
+<span class="lineNum">     869 </span>            : 
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_mbuf == NULL) {</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :                 if ((sc-&gt;sc_mbuf = pflow_get_mbuf(sc, 0)) == NULL)</span>
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                         return (ENOBUFS);</span>
+<span class="lineNum">     873 </span>            :         }
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :         m_copyback(sc-&gt;sc_mbuf, PFLOW_HDRLEN +</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :             (sc-&gt;sc_count * sizeof(struct pflow_flow)),</span>
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :             sizeof(struct pflow_flow), flow, M_NOWAIT);</span>
+<span class="lineNum">     877 </span>            : 
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :         if (pflowstats.pflow_flows == sc-&gt;sc_gcounter)</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :                 pflowstats.pflow_flows++;</span>
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 :         sc-&gt;sc_gcounter++;</span>
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :         sc-&gt;sc_count++;</span>
+<span class="lineNum">     882 </span>            : 
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_count &gt;= sc-&gt;sc_maxcount)</span>
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :                 ret = pflow_sendout_v5(sc);</span>
+<span class="lineNum">     885 </span>            : 
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :         return(ret);</span>
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 : }</span>
+<a name="888"><span class="lineNum">     888 </span>            : </a>
+<span class="lineNum">     889 </span>            : int
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 : copy_flow_ipfix_4_to_m(struct pflow_ipfix_flow4 *flow, struct pflow_softc *sc)</span>
+<span class="lineNum">     891 </span>            : {
+<span class="lineNum">     892 </span>            :         int             ret = 0;
+<span class="lineNum">     893 </span>            : 
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_mbuf == NULL) {</span>
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :                 if ((sc-&gt;sc_mbuf =</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :                     pflow_get_mbuf(sc, PFLOW_IPFIX_TMPL_IPV4_ID)) == NULL) {</span>
+<span class="lineNum">     897 </span><span class="lineNoCov">          0 :                         return (ENOBUFS);</span>
+<span class="lineNum">     898 </span>            :                 }
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_count4 = 0;</span>
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :                 timeout_add_sec(&amp;sc-&gt;sc_tmo, PFLOW_TIMEOUT);</span>
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :         m_copyback(sc-&gt;sc_mbuf, PFLOW_SET_HDRLEN +</span>
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :             (sc-&gt;sc_count4 * sizeof(struct pflow_ipfix_flow4)),</span>
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :             sizeof(struct pflow_ipfix_flow4), flow, M_NOWAIT);</span>
+<span class="lineNum">     905 </span>            : 
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :         if (pflowstats.pflow_flows == sc-&gt;sc_gcounter)</span>
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :                 pflowstats.pflow_flows++;</span>
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :         sc-&gt;sc_gcounter++;</span>
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :         sc-&gt;sc_count4++;</span>
+<span class="lineNum">     910 </span>            : 
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_count4 &gt;= sc-&gt;sc_maxcount4)</span>
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :                 ret = pflow_sendout_ipfix(sc, AF_INET);</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :         return(ret);</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 : }</span>
+<a name="915"><span class="lineNum">     915 </span>            : </a>
+<span class="lineNum">     916 </span>            : int
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 : copy_flow_ipfix_6_to_m(struct pflow_ipfix_flow6 *flow, struct pflow_softc *sc)</span>
+<span class="lineNum">     918 </span>            : {
+<span class="lineNum">     919 </span>            :         int             ret = 0;
+<span class="lineNum">     920 </span>            : 
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_mbuf6 == NULL) {</span>
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :                 if ((sc-&gt;sc_mbuf6 =</span>
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :                     pflow_get_mbuf(sc, PFLOW_IPFIX_TMPL_IPV6_ID)) == NULL) {</span>
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :                         return (ENOBUFS);</span>
+<span class="lineNum">     925 </span>            :                 }
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_count6 = 0;</span>
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :                 timeout_add_sec(&amp;sc-&gt;sc_tmo6, PFLOW_TIMEOUT);</span>
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :         m_copyback(sc-&gt;sc_mbuf6, PFLOW_SET_HDRLEN +</span>
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :             (sc-&gt;sc_count6 * sizeof(struct pflow_ipfix_flow6)),</span>
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :             sizeof(struct pflow_ipfix_flow6), flow, M_NOWAIT);</span>
+<span class="lineNum">     932 </span>            : 
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :         if (pflowstats.pflow_flows == sc-&gt;sc_gcounter)</span>
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :                 pflowstats.pflow_flows++;</span>
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :         sc-&gt;sc_gcounter++;</span>
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :         sc-&gt;sc_count6++;</span>
+<span class="lineNum">     937 </span>            : 
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_count6 &gt;= sc-&gt;sc_maxcount6)</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :                 ret = pflow_sendout_ipfix(sc, AF_INET6);</span>
+<span class="lineNum">     940 </span>            : 
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :         return(ret);</span>
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 : }</span>
+<a name="943"><span class="lineNum">     943 </span>            : </a>
+<span class="lineNum">     944 </span>            : int
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 : pflow_pack_flow(struct pf_state *st, struct pf_state_key *sk,</span>
+<span class="lineNum">     946 </span>            :     struct pflow_softc *sc)
+<span class="lineNum">     947 </span>            : {
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 :         struct pflow_flow        flow1;</span>
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :         struct pflow_flow        flow2;</span>
+<span class="lineNum">     950 </span>            :         int                      ret = 0;
+<span class="lineNum">     951 </span>            : 
+<span class="lineNum">     952 </span><span class="lineNoCov">          0 :         bzero(&amp;flow1, sizeof(flow1));</span>
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 :         bzero(&amp;flow2, sizeof(flow2));</span>
+<span class="lineNum">     954 </span>            : 
+<span class="lineNum">     955 </span><span class="lineNoCov">          0 :         if (st-&gt;direction == PF_OUT)</span>
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :                 copy_flow_data(&amp;flow1, &amp;flow2, st, sk, 1, 0);</span>
+<span class="lineNum">     957 </span>            :         else
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :                 copy_flow_data(&amp;flow1, &amp;flow2, st, sk, 0, 1);</span>
+<span class="lineNum">     959 </span>            : 
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :         if (st-&gt;bytes[0] != 0) /* first flow from state */</span>
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :                 ret = copy_flow_to_m(&amp;flow1, sc);</span>
+<span class="lineNum">     962 </span>            : 
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         if (st-&gt;bytes[1] != 0) /* second flow from state */</span>
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :                 ret = copy_flow_to_m(&amp;flow2, sc);</span>
+<span class="lineNum">     965 </span>            : 
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :         return (ret);</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 : }</span>
+<a name="968"><span class="lineNum">     968 </span>            : </a>
+<span class="lineNum">     969 </span>            : int
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 : pflow_pack_flow_ipfix(struct pf_state *st, struct pf_state_key *sk,</span>
+<span class="lineNum">     971 </span>            :     struct pflow_softc *sc)
+<span class="lineNum">     972 </span>            : {
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :         struct pflow_ipfix_flow4         flow4_1, flow4_2;</span>
+<span class="lineNum">     974 </span><span class="lineNoCov">          0 :         struct pflow_ipfix_flow6         flow6_1, flow6_2;</span>
+<span class="lineNum">     975 </span>            :         int                              ret = 0;
+<span class="lineNum">     976 </span><span class="lineNoCov">          0 :         if (sk-&gt;af == AF_INET) {</span>
+<span class="lineNum">     977 </span><span class="lineNoCov">          0 :                 bzero(&amp;flow4_1, sizeof(flow4_1));</span>
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 :                 bzero(&amp;flow4_2, sizeof(flow4_2));</span>
+<span class="lineNum">     979 </span>            : 
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 :                 if (st-&gt;direction == PF_OUT)</span>
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 :                         copy_flow_ipfix_4_data(&amp;flow4_1, &amp;flow4_2, st, sk, sc,</span>
+<span class="lineNum">     982 </span>            :                             1, 0);
+<span class="lineNum">     983 </span>            :                 else
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 :                         copy_flow_ipfix_4_data(&amp;flow4_1, &amp;flow4_2, st, sk, sc,</span>
+<span class="lineNum">     985 </span>            :                             0, 1);
+<span class="lineNum">     986 </span>            : 
+<span class="lineNum">     987 </span><span class="lineNoCov">          0 :                 if (st-&gt;bytes[0] != 0) /* first flow from state */</span>
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :                         ret = copy_flow_ipfix_4_to_m(&amp;flow4_1, sc);</span>
+<span class="lineNum">     989 </span>            : 
+<span class="lineNum">     990 </span><span class="lineNoCov">          0 :                 if (st-&gt;bytes[1] != 0) /* second flow from state */</span>
+<span class="lineNum">     991 </span><span class="lineNoCov">          0 :                         ret = copy_flow_ipfix_4_to_m(&amp;flow4_2, sc);</span>
+<span class="lineNum">     992 </span><span class="lineNoCov">          0 :         } else if (sk-&gt;af == AF_INET6) {</span>
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :                 bzero(&amp;flow6_1, sizeof(flow6_1));</span>
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :                 bzero(&amp;flow6_2, sizeof(flow6_2));</span>
+<span class="lineNum">     995 </span>            : 
+<span class="lineNum">     996 </span><span class="lineNoCov">          0 :                 if (st-&gt;direction == PF_OUT)</span>
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :                         copy_flow_ipfix_6_data(&amp;flow6_1, &amp;flow6_2, st, sk, sc,</span>
+<span class="lineNum">     998 </span>            :                             1, 0);
+<span class="lineNum">     999 </span>            :                 else
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :                         copy_flow_ipfix_6_data(&amp;flow6_1, &amp;flow6_2, st, sk, sc,</span>
+<span class="lineNum">    1001 </span>            :                             0, 1);
+<span class="lineNum">    1002 </span>            : 
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :                 if (st-&gt;bytes[0] != 0) /* first flow from state */</span>
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :                         ret = copy_flow_ipfix_6_to_m(&amp;flow6_1, sc);</span>
+<span class="lineNum">    1005 </span>            : 
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :                 if (st-&gt;bytes[1] != 0) /* second flow from state */</span>
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 :                         ret = copy_flow_ipfix_6_to_m(&amp;flow6_2, sc);</span>
+<span class="lineNum">    1008 </span>            :         }
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 :         return (ret);</span>
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 : }</span>
+<a name="1011"><span class="lineNum">    1011 </span>            : </a>
+<span class="lineNum">    1012 </span>            : void
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 : pflow_timeout(void *v)</span>
+<span class="lineNum">    1014 </span>            : {
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :         struct pflow_softc      *sc = v;</span>
+<span class="lineNum">    1016 </span>            : 
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :         switch (sc-&gt;sc_version) {</span>
+<span class="lineNum">    1018 </span>            :         case PFLOW_PROTO_5:
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :                 pflow_sendout_v5(sc);</span>
+<span class="lineNum">    1020 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1021 </span>            :         case PFLOW_PROTO_10:
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :                 pflow_sendout_ipfix(sc, AF_INET);</span>
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1024 </span>            :         default: /* NOTREACHED */
+<span class="lineNum">    1025 </span>            :                 break;
+<span class="lineNum">    1026 </span>            :         }
+<span class="lineNum">    1027 </span><span class="lineNoCov">          0 : }</span>
+<a name="1028"><span class="lineNum">    1028 </span>            : </a>
+<span class="lineNum">    1029 </span>            : void
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 : pflow_timeout6(void *v)</span>
+<span class="lineNum">    1031 </span>            : {
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :         struct pflow_softc      *sc = v;</span>
+<span class="lineNum">    1033 </span>            : 
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :         pflow_sendout_ipfix(sc, AF_INET6);</span>
+<span class="lineNum">    1035 </span><span class="lineNoCov">          0 : }</span>
+<a name="1036"><span class="lineNum">    1036 </span>            : </a>
+<span class="lineNum">    1037 </span>            : void
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 : pflow_timeout_tmpl(void *v)</span>
+<span class="lineNum">    1039 </span>            : {
+<span class="lineNum">    1040 </span><span class="lineNoCov">          0 :         struct pflow_softc      *sc = v;</span>
+<span class="lineNum">    1041 </span>            : 
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :         pflow_sendout_ipfix_tmpl(sc);</span>
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 : }</span>
+<a name="1044"><span class="lineNum">    1044 </span>            : </a>
+<span class="lineNum">    1045 </span>            : void
+<span class="lineNum">    1046 </span><span class="lineNoCov">          0 : pflow_flush(struct pflow_softc *sc)</span>
+<span class="lineNum">    1047 </span>            : {
+<span class="lineNum">    1048 </span><span class="lineNoCov">          0 :         switch (sc-&gt;sc_version) {</span>
+<span class="lineNum">    1049 </span>            :         case PFLOW_PROTO_5:
+<span class="lineNum">    1050 </span><span class="lineNoCov">          0 :                 pflow_sendout_v5(sc);</span>
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1052 </span>            :         case PFLOW_PROTO_10:
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 :                 pflow_sendout_ipfix(sc, AF_INET);</span>
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :                 pflow_sendout_ipfix(sc, AF_INET6);</span>
+<span class="lineNum">    1055 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1056 </span>            :         default: /* NOTREACHED */
+<span class="lineNum">    1057 </span>            :                 break;
+<span class="lineNum">    1058 </span>            :         }
+<span class="lineNum">    1059 </span><span class="lineNoCov">          0 : }</span>
+<a name="1060"><span class="lineNum">    1060 </span>            : </a>
+<span class="lineNum">    1061 </span>            : int
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 : pflow_sendout_v5(struct pflow_softc *sc)</span>
+<span class="lineNum">    1063 </span>            : {
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :         struct mbuf             *m = sc-&gt;sc_mbuf;</span>
+<span class="lineNum">    1065 </span>            :         struct pflow_header     *h;
+<span class="lineNum">    1066 </span><span class="lineNoCov">          0 :         struct ifnet            *ifp = &amp;sc-&gt;sc_if;</span>
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :         struct timespec         tv;</span>
+<span class="lineNum">    1068 </span>            : 
+<span class="lineNum">    1069 </span><span class="lineNoCov">          0 :         timeout_del(&amp;sc-&gt;sc_tmo);</span>
+<span class="lineNum">    1070 </span>            : 
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :         if (m == NULL)</span>
+<span class="lineNum">    1072 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1073 </span>            : 
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbuf = NULL;</span>
+<span class="lineNum">    1075 </span><span class="lineNoCov">          0 :         if (!(ifp-&gt;if_flags &amp; IFF_RUNNING)) {</span>
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1078 </span>            :         }
+<span class="lineNum">    1079 </span>            : 
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 :         pflowstats.pflow_packets++;</span>
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :         h = mtod(m, struct pflow_header *);</span>
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :         h-&gt;count = htons(sc-&gt;sc_count);</span>
+<span class="lineNum">    1083 </span>            : 
+<span class="lineNum">    1084 </span>            :         /* populate pflow_header */
+<span class="lineNum">    1085 </span><span class="lineNoCov">          0 :         h-&gt;uptime_ms = htonl(time_uptime * 1000);</span>
+<span class="lineNum">    1086 </span>            : 
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :         getnanotime(&amp;tv);</span>
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :         h-&gt;time_sec = htonl(tv.tv_sec);                      /* XXX 2038 */</span>
+<span class="lineNum">    1089 </span><span class="lineNoCov">          0 :         h-&gt;time_nanosec = htonl(tv.tv_nsec);</span>
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :         if (mq_enqueue(&amp;sc-&gt;sc_outputqueue, m) == 0)</span>
+<span class="lineNum">    1091 </span><span class="lineNoCov">          0 :                 task_add(net_tq(ifp-&gt;if_index), &amp;sc-&gt;sc_outputtask);</span>
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 : }</span>
+<a name="1094"><span class="lineNum">    1094 </span>            : </a>
+<span class="lineNum">    1095 </span>            : int
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 : pflow_sendout_ipfix(struct pflow_softc *sc, sa_family_t af)</span>
+<span class="lineNum">    1097 </span>            : {
+<span class="lineNum">    1098 </span>            :         struct mbuf                     *m;
+<span class="lineNum">    1099 </span>            :         struct pflow_v10_header         *h10;
+<span class="lineNum">    1100 </span>            :         struct pflow_set_header         *set_hdr;
+<span class="lineNum">    1101 </span><span class="lineNoCov">          0 :         struct ifnet                    *ifp = &amp;sc-&gt;sc_if;</span>
+<span class="lineNum">    1102 </span>            :         u_int32_t                        count;
+<span class="lineNum">    1103 </span>            :         int                              set_length;
+<span class="lineNum">    1104 </span>            : 
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :         switch (af) {</span>
+<span class="lineNum">    1106 </span>            :         case AF_INET:
+<span class="lineNum">    1107 </span><span class="lineNoCov">          0 :                 m = sc-&gt;sc_mbuf;</span>
+<span class="lineNum">    1108 </span><span class="lineNoCov">          0 :                 timeout_del(&amp;sc-&gt;sc_tmo);</span>
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 :                 if (m == NULL)</span>
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbuf = NULL;</span>
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 :                 count = sc-&gt;sc_count4;</span>
+<span class="lineNum">    1113 </span><span class="lineNoCov">          0 :                 set_length = sizeof(struct pflow_set_header)</span>
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :                     + sc-&gt;sc_count4 * sizeof(struct pflow_ipfix_flow4);</span>
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1116 </span>            :         case AF_INET6:
+<span class="lineNum">    1117 </span><span class="lineNoCov">          0 :                 m = sc-&gt;sc_mbuf6;</span>
+<span class="lineNum">    1118 </span><span class="lineNoCov">          0 :                 timeout_del(&amp;sc-&gt;sc_tmo6);</span>
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :                 if (m == NULL)</span>
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">    1121 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbuf6 = NULL;</span>
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :                 count = sc-&gt;sc_count6;</span>
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 :                 set_length = sizeof(struct pflow_set_header)</span>
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :                     + sc-&gt;sc_count6 * sizeof(struct pflow_ipfix_flow6);</span>
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1126 </span>            :         default:
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :                 unhandled_af(af);</span>
+<span class="lineNum">    1128 </span>            :         }
+<span class="lineNum">    1129 </span>            : 
+<span class="lineNum">    1130 </span><span class="lineNoCov">          0 :         if (!(ifp-&gt;if_flags &amp; IFF_RUNNING)) {</span>
+<span class="lineNum">    1131 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1133 </span>            :         }
+<span class="lineNum">    1134 </span>            : 
+<span class="lineNum">    1135 </span><span class="lineNoCov">          0 :         pflowstats.pflow_packets++;</span>
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         set_hdr = mtod(m, struct pflow_set_header *);</span>
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :         set_hdr-&gt;set_length = htons(set_length);</span>
+<span class="lineNum">    1138 </span>            : 
+<span class="lineNum">    1139 </span>            :         /* populate pflow_header */
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :         M_PREPEND(m, sizeof(struct pflow_v10_header), M_DONTWAIT);</span>
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :         if (m == NULL) {</span>
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :                 pflowstats.pflow_onomem++;</span>
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">    1144 </span>            :         }
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :         h10 = mtod(m, struct pflow_v10_header *);</span>
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :         h10-&gt;version = htons(PFLOW_PROTO_10);</span>
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 :         h10-&gt;length = htons(PFLOW_IPFIX_HDRLEN + set_length);</span>
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :         h10-&gt;time_sec = htonl(time_second);          /* XXX 2038 */</span>
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 :         h10-&gt;flow_sequence = htonl(sc-&gt;sc_sequence);</span>
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :         sc-&gt;sc_sequence += count;</span>
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 :         h10-&gt;observation_dom = htonl(PFLOW_ENGINE_TYPE);</span>
+<span class="lineNum">    1152 </span><span class="lineNoCov">          0 :         if (mq_enqueue(&amp;sc-&gt;sc_outputqueue, m) == 0)</span>
+<span class="lineNum">    1153 </span><span class="lineNoCov">          0 :                 task_add(net_tq(ifp-&gt;if_index), &amp;sc-&gt;sc_outputtask);</span>
+<span class="lineNum">    1154 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1155 </span><span class="lineNoCov">          0 : }</span>
+<a name="1156"><span class="lineNum">    1156 </span>            : </a>
+<span class="lineNum">    1157 </span>            : int
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 : pflow_sendout_ipfix_tmpl(struct pflow_softc *sc)</span>
+<span class="lineNum">    1159 </span>            : {
+<span class="lineNum">    1160 </span>            :         struct mbuf                     *m;
+<span class="lineNum">    1161 </span>            :         struct pflow_v10_header         *h10;
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 :         struct ifnet                    *ifp = &amp;sc-&gt;sc_if;</span>
+<span class="lineNum">    1163 </span>            : 
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :         timeout_del(&amp;sc-&gt;sc_tmo_tmpl);</span>
+<span class="lineNum">    1165 </span>            : 
+<span class="lineNum">    1166 </span><span class="lineNoCov">          0 :         if (!(ifp-&gt;if_flags &amp; IFF_RUNNING)) {</span>
+<span class="lineNum">    1167 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1168 </span>            :         }
+<span class="lineNum">    1169 </span><span class="lineNoCov">          0 :         m = pflow_get_mbuf(NULL, 0);</span>
+<span class="lineNum">    1170 </span><span class="lineNoCov">          0 :         if (m == NULL)</span>
+<span class="lineNum">    1171 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :         if (m_copyback(m, 0, sizeof(struct pflow_ipfix_tmpl),</span>
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 :             &amp;sc-&gt;sc_tmpl_ipfix, M_NOWAIT)) {</span>
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1176 </span>            :         }
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :         pflowstats.pflow_packets++;</span>
+<span class="lineNum">    1178 </span>            : 
+<span class="lineNum">    1179 </span>            :         /* populate pflow_header */
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :         M_PREPEND(m, sizeof(struct pflow_v10_header), M_DONTWAIT);</span>
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 :         if (m == NULL) {</span>
+<span class="lineNum">    1182 </span><span class="lineNoCov">          0 :                 pflowstats.pflow_onomem++;</span>
+<span class="lineNum">    1183 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">    1184 </span>            :         }
+<span class="lineNum">    1185 </span><span class="lineNoCov">          0 :         h10 = mtod(m, struct pflow_v10_header *);</span>
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :         h10-&gt;version = htons(PFLOW_PROTO_10);</span>
+<span class="lineNum">    1187 </span><span class="lineNoCov">          0 :         h10-&gt;length = htons(PFLOW_IPFIX_HDRLEN + sizeof(struct</span>
+<span class="lineNum">    1188 </span>            :             pflow_ipfix_tmpl));
+<span class="lineNum">    1189 </span><span class="lineNoCov">          0 :         h10-&gt;time_sec = htonl(time_second);          /* XXX 2038 */</span>
+<span class="lineNum">    1190 </span><span class="lineNoCov">          0 :         h10-&gt;flow_sequence = htonl(sc-&gt;sc_sequence);</span>
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :         h10-&gt;observation_dom = htonl(PFLOW_ENGINE_TYPE);</span>
+<span class="lineNum">    1192 </span>            : 
+<span class="lineNum">    1193 </span><span class="lineNoCov">          0 :         timeout_add_sec(&amp;sc-&gt;sc_tmo_tmpl, PFLOW_TMPL_TIMEOUT);</span>
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 :         if (mq_enqueue(&amp;sc-&gt;sc_outputqueue, m) == 0)</span>
+<span class="lineNum">    1195 </span><span class="lineNoCov">          0 :                 task_add(net_tq(ifp-&gt;if_index), &amp;sc-&gt;sc_outputtask);</span>
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1197 </span><span class="lineNoCov">          0 : }</span>
+<a name="1198"><span class="lineNum">    1198 </span>            : </a>
+<span class="lineNum">    1199 </span>            : int
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 : pflow_sendout_mbuf(struct pflow_softc *sc, struct mbuf *m)</span>
+<span class="lineNum">    1201 </span>            : {
+<span class="lineNum">    1202 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_opackets++;</span>
+<span class="lineNum">    1203 </span><span class="lineNoCov">          0 :         sc-&gt;sc_if.if_obytes += m-&gt;m_pkthdr.len;</span>
+<span class="lineNum">    1204 </span>            : 
+<span class="lineNum">    1205 </span><span class="lineNoCov">          0 :         if (sc-&gt;so == NULL) {</span>
+<span class="lineNum">    1206 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1207 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">    1208 </span>            :         }
+<span class="lineNum">    1209 </span><span class="lineNoCov">          0 :         return (sosend(sc-&gt;so, sc-&gt;send_nam, NULL, m, NULL, 0));</span>
+<span class="lineNum">    1210 </span><span class="lineNoCov">          0 : }</span>
+<a name="1211"><span class="lineNum">    1211 </span>            : </a>
+<span class="lineNum">    1212 </span>            : int
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 : pflow_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,</span>
+<span class="lineNum">    1214 </span>            :     void *newp, size_t newlen)
+<span class="lineNum">    1215 </span>            : {
+<span class="lineNum">    1216 </span><span class="lineNoCov">          0 :         if (namelen != 1)</span>
+<span class="lineNum">    1217 </span><span class="lineNoCov">          0 :                 return (ENOTDIR);</span>
+<span class="lineNum">    1218 </span>            : 
+<span class="lineNum">    1219 </span><span class="lineNoCov">          0 :         switch (name[0]) {</span>
+<span class="lineNum">    1220 </span>            :         case NET_PFLOW_STATS:
+<span class="lineNum">    1221 </span><span class="lineNoCov">          0 :                 if (newp != NULL)</span>
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 :                         return (EPERM);</span>
+<span class="lineNum">    1223 </span><span class="lineNoCov">          0 :                 return (sysctl_struct(oldp, oldlenp, newp, newlen,</span>
+<span class="lineNum">    1224 </span>            :                     &amp;pflowstats, sizeof(pflowstats)));
+<span class="lineNum">    1225 </span>            :         default:
+<span class="lineNum">    1226 </span><span class="lineNoCov">          0 :                 return (EOPNOTSUPP);</span>
+<span class="lineNum">    1227 </span>            :         }
+<span class="lineNum">    1228 </span>            :         return (0);
+<span class="lineNum">    1229 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,604 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/isa/aps.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/isa</a> - aps.c<span style="font-size: 80%;"> (source / <a href="aps.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">179</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">8</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: aps.c,v 1.26 2017/03/02 10:38:10 natano Exp $ */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2005 Jonathan Gray &lt;jsg@openbsd.org&gt;
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2008 Can Erkin Acar &lt;canacar@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /*
+<span class="lineNum">      20 </span>            :  * A driver for the ThinkPad Active Protection System based on notes from
+<span class="lineNum">      21 </span>            :  * http://www.almaden.ibm.com/cs/people/marksmith/tpaps.html
+<span class="lineNum">      22 </span>            :  */
+<span class="lineNum">      23 </span>            : 
+<span class="lineNum">      24 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/sensors.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;machine/bus.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/event.h&gt;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : #include &lt;dev/isa/isavar.h&gt;
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : #ifdef __i386__
+<span class="lineNum">      36 </span>            : #include &quot;apm.h&quot;
+<span class="lineNum">      37 </span>            : #include &lt;machine/acpiapm.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;machine/biosvar.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;machine/apmvar.h&gt;
+<span class="lineNum">      40 </span>            : #endif
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : #if defined(APSDEBUG)
+<span class="lineNum">      43 </span>            : #define DPRINTF(x)              do { printf x; } while (0)
+<span class="lineNum">      44 </span>            : #else
+<span class="lineNum">      45 </span>            : #define DPRINTF(x)
+<span class="lineNum">      46 </span>            : #endif
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : 
+<span class="lineNum">      49 </span>            : /*
+<span class="lineNum">      50 </span>            :  * EC interface on Thinkpad Laptops, from Linux HDAPS driver notes.
+<span class="lineNum">      51 </span>            :  * From Renesans H8S/2140B Group Hardware Manual
+<span class="lineNum">      52 </span>            :  * http://documentation.renesas.com/eng/products/mpumcu/rej09b0300_2140bhm.pdf
+<span class="lineNum">      53 </span>            :  *
+<span class="lineNum">      54 </span>            :  * EC uses LPC Channel 3 registers TWR0..15
+<span class="lineNum">      55 </span>            :  */
+<span class="lineNum">      56 </span>            : 
+<span class="lineNum">      57 </span>            : /* STR3 status register */
+<span class="lineNum">      58 </span>            : #define APS_STR3                0x04
+<span class="lineNum">      59 </span>            : 
+<span class="lineNum">      60 </span>            : #define APS_STR3_IBF3B  0x80    /* Input buffer full (host-&gt;slave) */
+<span class="lineNum">      61 </span>            : #define APS_STR3_OBF3B  0x40    /* Output buffer full (slave-&gt;host)*/
+<span class="lineNum">      62 </span>            : #define APS_STR3_MWMF   0x20    /* Master write mode */
+<span class="lineNum">      63 </span>            : #define APS_STR3_SWMF   0x10    /* Slave write mode */
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span>            : 
+<span class="lineNum">      66 </span>            : /* Base address of TWR registers */
+<span class="lineNum">      67 </span>            : #define APS_TWR_BASE            0x10
+<span class="lineNum">      68 </span>            : #define APS_TWR_RET             0x1f
+<span class="lineNum">      69 </span>            : 
+<span class="lineNum">      70 </span>            : /* TWR registers */
+<span class="lineNum">      71 </span>            : #define APS_CMD                 0x00
+<span class="lineNum">      72 </span>            : #define APS_ARG1                0x01
+<span class="lineNum">      73 </span>            : #define APS_ARG2                0x02
+<span class="lineNum">      74 </span>            : #define APS_ARG3                0x03
+<span class="lineNum">      75 </span>            : #define APS_RET                 0x0f
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            : /* Sensor values */
+<span class="lineNum">      78 </span>            : #define APS_STATE               0x01
+<span class="lineNum">      79 </span>            : #define APS_XACCEL              0x02
+<span class="lineNum">      80 </span>            : #define APS_YACCEL              0x04
+<span class="lineNum">      81 </span>            : #define APS_TEMP                0x06
+<span class="lineNum">      82 </span>            : #define APS_XVAR                0x07
+<span class="lineNum">      83 </span>            : #define APS_YVAR                0x09
+<span class="lineNum">      84 </span>            : #define APS_TEMP2               0x0b
+<span class="lineNum">      85 </span>            : #define APS_UNKNOWN             0x0c
+<span class="lineNum">      86 </span>            : #define APS_INPUT               0x0d
+<span class="lineNum">      87 </span>            : 
+<span class="lineNum">      88 </span>            : /* write masks for I/O, send command + 0-3 arguments*/
+<span class="lineNum">      89 </span>            : #define APS_WRITE_0             0x0001
+<span class="lineNum">      90 </span>            : #define APS_WRITE_1             0x0003
+<span class="lineNum">      91 </span>            : #define APS_WRITE_2             0x0007
+<span class="lineNum">      92 </span>            : #define APS_WRITE_3             0x000f
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span>            : /* read masks for I/O, read 0-3 values (skip command byte) */
+<span class="lineNum">      95 </span>            : #define APS_READ_0              0x0000
+<span class="lineNum">      96 </span>            : #define APS_READ_1              0x0002
+<span class="lineNum">      97 </span>            : #define APS_READ_2              0x0006
+<span class="lineNum">      98 </span>            : #define APS_READ_3              0x000e
+<span class="lineNum">      99 </span>            : 
+<span class="lineNum">     100 </span>            : #define APS_READ_RET            0x8000
+<span class="lineNum">     101 </span>            : #define APS_READ_ALL            0xffff
+<span class="lineNum">     102 </span>            : 
+<span class="lineNum">     103 </span>            : /* Bit definitions for APS_INPUT value */
+<span class="lineNum">     104 </span>            : #define APS_INPUT_KB            (1 &lt;&lt; 5)
+<span class="lineNum">     105 </span>            : #define APS_INPUT_MS            (1 &lt;&lt; 6)
+<span class="lineNum">     106 </span>            : #define APS_INPUT_LIDOPEN       (1 &lt;&lt; 7)
+<span class="lineNum">     107 </span>            : 
+<span class="lineNum">     108 </span>            : #define APS_ADDR_SIZE           0x1f
+<span class="lineNum">     109 </span>            : 
+<span class="lineNum">     110 </span>            : struct sensor_rec {
+<span class="lineNum">     111 </span>            :         u_int8_t        state;
+<span class="lineNum">     112 </span>            :         u_int16_t       x_accel;
+<span class="lineNum">     113 </span>            :         u_int16_t       y_accel;
+<span class="lineNum">     114 </span>            :         u_int8_t        temp1;
+<span class="lineNum">     115 </span>            :         u_int16_t       x_var;
+<span class="lineNum">     116 </span>            :         u_int16_t       y_var;
+<span class="lineNum">     117 </span>            :         u_int8_t        temp2;
+<span class="lineNum">     118 </span>            :         u_int8_t        unk;
+<span class="lineNum">     119 </span>            :         u_int8_t        input;
+<span class="lineNum">     120 </span>            : };
+<span class="lineNum">     121 </span>            : 
+<span class="lineNum">     122 </span>            : #define APS_NUM_SENSORS         9
+<span class="lineNum">     123 </span>            : 
+<span class="lineNum">     124 </span>            : #define APS_SENSOR_XACCEL       0
+<span class="lineNum">     125 </span>            : #define APS_SENSOR_YACCEL       1
+<span class="lineNum">     126 </span>            : #define APS_SENSOR_XVAR         2
+<span class="lineNum">     127 </span>            : #define APS_SENSOR_YVAR         3
+<span class="lineNum">     128 </span>            : #define APS_SENSOR_TEMP1        4
+<span class="lineNum">     129 </span>            : #define APS_SENSOR_TEMP2        5
+<span class="lineNum">     130 </span>            : #define APS_SENSOR_KBACT        6
+<span class="lineNum">     131 </span>            : #define APS_SENSOR_MSACT        7
+<span class="lineNum">     132 </span>            : #define APS_SENSOR_LIDOPEN      8
+<span class="lineNum">     133 </span>            : 
+<span class="lineNum">     134 </span>            : struct aps_softc {
+<span class="lineNum">     135 </span>            :         struct device sc_dev;
+<span class="lineNum">     136 </span>            : 
+<span class="lineNum">     137 </span>            :         bus_space_tag_t aps_iot;
+<span class="lineNum">     138 </span>            :         bus_space_handle_t aps_ioh;
+<span class="lineNum">     139 </span>            : 
+<span class="lineNum">     140 </span>            :         struct ksensor sensors[APS_NUM_SENSORS];
+<span class="lineNum">     141 </span>            :         struct ksensordev sensordev;
+<span class="lineNum">     142 </span>            :         void (*refresh_sensor_data)(struct aps_softc *);
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span>            :         struct sensor_rec aps_data;
+<span class="lineNum">     145 </span>            : };
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span>            : int      aps_match(struct device *, void *, void *);
+<span class="lineNum">     148 </span>            : void     aps_attach(struct device *, struct device *, void *);
+<span class="lineNum">     149 </span>            : int      aps_activate(struct device *, int);
+<span class="lineNum">     150 </span>            : 
+<span class="lineNum">     151 </span>            : int      aps_init(bus_space_tag_t, bus_space_handle_t);
+<span class="lineNum">     152 </span>            : int      aps_read_data(struct aps_softc *);
+<span class="lineNum">     153 </span>            : void     aps_refresh_sensor_data(struct aps_softc *);
+<span class="lineNum">     154 </span>            : void     aps_refresh(void *);
+<span class="lineNum">     155 </span>            : int      aps_do_io(bus_space_tag_t, bus_space_handle_t,
+<span class="lineNum">     156 </span>            :                    unsigned char *, int, int);
+<span class="lineNum">     157 </span>            : 
+<span class="lineNum">     158 </span>            : struct cfattach aps_ca = {
+<span class="lineNum">     159 </span>            :         sizeof(struct aps_softc),
+<span class="lineNum">     160 </span>            :         aps_match, aps_attach, NULL, aps_activate
+<span class="lineNum">     161 </span>            : };
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span>            : struct cfdriver aps_cd = {
+<span class="lineNum">     164 </span>            :         NULL, &quot;aps&quot;, DV_DULL
+<span class="lineNum">     165 </span>            : };
+<span class="lineNum">     166 </span>            : 
+<span class="lineNum">     167 </span>            : struct timeout aps_timeout;
+<span class="lineNum">     168 </span>            : 
+<span class="lineNum">     169 </span>            : 
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span>            : /* properly communicate with the controller, writing a set of memory
+<a name="172"><span class="lineNum">     172 </span>            :  * locations and reading back another set  */</a>
+<span class="lineNum">     173 </span>            : int
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 : aps_do_io(bus_space_tag_t iot, bus_space_handle_t ioh,</span>
+<span class="lineNum">     175 </span>            :           unsigned char *buf, int wmask, int rmask)
+<span class="lineNum">     176 </span>            : {
+<span class="lineNum">     177 </span>            :         int bp, stat, n;
+<span class="lineNum">     178 </span>            : 
+<span class="lineNum">     179 </span>            :         DPRINTF((&quot;aps_do_io: CMD: 0x%02x, wmask: 0x%04x, rmask: 0x%04x\n&quot;,
+<span class="lineNum">     180 </span>            :                buf[0], wmask, rmask));
+<span class="lineNum">     181 </span>            : 
+<span class="lineNum">     182 </span>            :         /* write init byte using arbitration */     
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         for (n = 0; n &lt; 100; n++) {</span>
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :                 stat = bus_space_read_1(iot, ioh, APS_STR3);</span>
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :                 if (stat &amp; (APS_STR3_OBF3B | APS_STR3_SWMF)) {</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                         bus_space_read_1(iot, ioh, APS_TWR_RET);</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     188 </span>            :                 }
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                 bus_space_write_1(iot, ioh, APS_TWR_BASE, buf[0]);</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :                 stat = bus_space_read_1(iot, ioh, APS_STR3);</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :                 if (stat &amp; (APS_STR3_MWMF))</span>
+<span class="lineNum">     192 </span>            :                         break;
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :                 delay(1);</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     195 </span>            : 
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         if (n == 100) {</span>
+<span class="lineNum">     197 </span>            :                 DPRINTF((&quot;aps_do_io: Failed to get bus\n&quot;));
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     199 </span>            :         }
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span>            :         /* write data bytes, init already sent */
+<span class="lineNum">     202 </span>            :         /* make sure last bye is always written as this will trigger slave */
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :         wmask |= APS_READ_RET;</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :         buf[APS_RET] = 0x01;</span>
+<span class="lineNum">     205 </span>            : 
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         for (n = 1, bp = 2; n &lt; 16; bp &lt;&lt;= 1, n++) {</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :                 if (wmask &amp; bp) {</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :                         bus_space_write_1(iot, ioh, APS_TWR_BASE + n, buf[n]);</span>
+<span class="lineNum">     209 </span>            :                         DPRINTF((&quot;aps_do_io:  write %2d 0x%02x\n&quot;, n, buf[n]));
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     211 </span>            :         }
+<span class="lineNum">     212 </span>            : 
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         for (n = 0; n &lt; 100; n++) {</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                 stat = bus_space_read_1(iot, ioh, APS_STR3);</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                 if (stat &amp; (APS_STR3_OBF3B))</span>
+<span class="lineNum">     216 </span>            :                         break;
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :                 delay(5 * 100);</span>
+<span class="lineNum">     218 </span>            :         }
+<span class="lineNum">     219 </span>            : 
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         if (n == 100) {</span>
+<span class="lineNum">     221 </span>            :                 DPRINTF((&quot;aps_do_io: timeout waiting response\n&quot;));
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     223 </span>            :         }
+<span class="lineNum">     224 </span>            :         /* wait for data available */
+<span class="lineNum">     225 </span>            :         /* make sure to read the final byte to clear status */
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :         rmask |= APS_READ_RET;</span>
+<span class="lineNum">     227 </span>            : 
+<span class="lineNum">     228 </span>            :         /* read cmd and data bytes */
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         for (n = 0, bp = 1; n &lt; 16; bp &lt;&lt;= 1, n++) {</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                 if (rmask &amp; bp) {</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                         buf[n] = bus_space_read_1(iot, ioh, APS_TWR_BASE + n);</span>
+<span class="lineNum">     232 </span>            :                         DPRINTF((&quot;aps_do_io:  read %2d 0x%02x\n&quot;, n, buf[n]));
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     234 </span>            :         }
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 : }</span>
+<a name="238"><span class="lineNum">     238 </span>            : </a>
+<span class="lineNum">     239 </span>            : int
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 : aps_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     241 </span>            : {
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         struct isa_attach_args *ia = aux;</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         bus_space_tag_t iot = ia-&gt;ia_iot;</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :         bus_space_handle_t ioh;</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         int iobase = ia-&gt;ipa_io[0].base;</span>
+<span class="lineNum">     246 </span>            :         u_int8_t cr;
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         unsigned char iobuf[16];</span>
+<span class="lineNum">     248 </span>            : 
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :         if (bus_space_map(iot, iobase, APS_ADDR_SIZE, 0, &amp;ioh)) {</span>
+<span class="lineNum">     250 </span>            :                 DPRINTF((&quot;aps: can't map i/o space\n&quot;));
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     252 </span>            :         }
+<span class="lineNum">     253 </span>            :         /* get APS mode */
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         iobuf[APS_CMD] = 0x13;</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         if (aps_do_io(iot, ioh, iobuf, APS_WRITE_0, APS_READ_1)) {</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :                 bus_space_unmap(iot, ioh, APS_ADDR_SIZE);</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     258 </span>            :         }
+<span class="lineNum">     259 </span>            : 
+<span class="lineNum">     260 </span>            :         /*
+<span class="lineNum">     261 </span>            :          * Observed values from Linux driver:
+<span class="lineNum">     262 </span>            :          * 0x01: T42
+<span class="lineNum">     263 </span>            :          * 0x02: chip already initialised
+<span class="lineNum">     264 </span>            :          * 0x03: T41
+<span class="lineNum">     265 </span>            :          * 0x05: T61
+<span class="lineNum">     266 </span>            :          */
+<span class="lineNum">     267 </span>            : 
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         cr = iobuf[APS_ARG1];</span>
+<span class="lineNum">     269 </span>            :         DPRINTF((&quot;aps: state register 0x%x\n&quot;, cr));
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         if (aps_init(iot, ioh)) {</span>
+<span class="lineNum">     272 </span>            :                 bus_space_unmap(iot, ioh, APS_ADDR_SIZE);
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     274 </span>            :         }
+<span class="lineNum">     275 </span>            : 
+<span class="lineNum">     276 </span>            :         bus_space_unmap(iot, ioh, APS_ADDR_SIZE);
+<span class="lineNum">     277 </span>            : 
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :         if (iobuf[APS_RET] != 0 || cr &lt; 1 || cr &gt; 5) {</span>
+<span class="lineNum">     279 </span>            :                 DPRINTF((&quot;aps0: unsupported state %d\n&quot;, cr));
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     281 </span>            :         }
+<span class="lineNum">     282 </span>            : 
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         ia-&gt;ipa_nio = 1;</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         ia-&gt;ipa_io[0].length = APS_ADDR_SIZE;</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         ia-&gt;ipa_nmem = 0;</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :         ia-&gt;ipa_nirq = 0;</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         ia-&gt;ipa_ndrq = 0;</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 : }</span>
+<a name="290"><span class="lineNum">     290 </span>            : </a>
+<span class="lineNum">     291 </span>            : void
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 : aps_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     293 </span>            : {
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         struct aps_softc *sc = (void *)self;</span>
+<span class="lineNum">     295 </span>            :         int iobase, i;
+<span class="lineNum">     296 </span>            :         bus_space_tag_t iot;
+<span class="lineNum">     297 </span>            :         bus_space_handle_t ioh;
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         struct isa_attach_args *ia = aux;</span>
+<span class="lineNum">     299 </span>            : 
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         iobase = ia-&gt;ipa_io[0].base;</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         iot = sc-&gt;aps_iot = ia-&gt;ia_iot;</span>
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         if (bus_space_map(iot, iobase, APS_ADDR_SIZE, 0, &amp;sc-&gt;aps_ioh)) {</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :                 printf(&quot;: can't map i/o space\n&quot;);</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     306 </span>            :         }
+<span class="lineNum">     307 </span>            : 
+<span class="lineNum">     308 </span>            :         ioh = sc-&gt;aps_ioh;
+<span class="lineNum">     309 </span>            : 
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     311 </span>            : 
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_XACCEL].type = SENSOR_INTEGER;</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         snprintf(sc-&gt;sensors[APS_SENSOR_XACCEL].desc,</span>
+<span class="lineNum">     314 </span>            :             sizeof(sc-&gt;sensors[APS_SENSOR_XACCEL].desc), &quot;X_ACCEL&quot;);
+<span class="lineNum">     315 </span>            : 
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_YACCEL].type = SENSOR_INTEGER;</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :         snprintf(sc-&gt;sensors[APS_SENSOR_YACCEL].desc,</span>
+<span class="lineNum">     318 </span>            :             sizeof(sc-&gt;sensors[APS_SENSOR_YACCEL].desc), &quot;Y_ACCEL&quot;);
+<span class="lineNum">     319 </span>            : 
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_TEMP1].type = SENSOR_TEMP;</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_TEMP2].type = SENSOR_TEMP;</span>
+<span class="lineNum">     322 </span>            : 
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_XVAR].type = SENSOR_INTEGER;</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :         snprintf(sc-&gt;sensors[APS_SENSOR_XVAR].desc,</span>
+<span class="lineNum">     325 </span>            :             sizeof(sc-&gt;sensors[APS_SENSOR_XVAR].desc), &quot;X_VAR&quot;);
+<span class="lineNum">     326 </span>            : 
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_YVAR].type = SENSOR_INTEGER;</span>
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :         snprintf(sc-&gt;sensors[APS_SENSOR_YVAR].desc,</span>
+<span class="lineNum">     329 </span>            :             sizeof(sc-&gt;sensors[APS_SENSOR_YVAR].desc), &quot;Y_VAR&quot;);
+<span class="lineNum">     330 </span>            : 
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_KBACT].type = SENSOR_INDICATOR;</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         snprintf(sc-&gt;sensors[APS_SENSOR_KBACT].desc,</span>
+<span class="lineNum">     333 </span>            :             sizeof(sc-&gt;sensors[APS_SENSOR_KBACT].desc), &quot;Keyboard Active&quot;);
+<span class="lineNum">     334 </span>            : 
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_MSACT].type = SENSOR_INDICATOR;</span>
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         snprintf(sc-&gt;sensors[APS_SENSOR_MSACT].desc,</span>
+<span class="lineNum">     337 </span>            :             sizeof(sc-&gt;sensors[APS_SENSOR_MSACT].desc), &quot;Mouse Active&quot;);
+<span class="lineNum">     338 </span>            : 
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_LIDOPEN].type = SENSOR_INDICATOR;</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :         snprintf(sc-&gt;sensors[APS_SENSOR_LIDOPEN].desc,</span>
+<span class="lineNum">     341 </span>            :             sizeof(sc-&gt;sensors[APS_SENSOR_LIDOPEN].desc), &quot;Lid Open&quot;);
+<span class="lineNum">     342 </span>            : 
+<span class="lineNum">     343 </span>            :         /* stop hiding and report to the authorities */
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         strlcpy(sc-&gt;sensordev.xname, sc-&gt;sc_dev.dv_xname,</span>
+<span class="lineNum">     345 </span>            :             sizeof(sc-&gt;sensordev.xname));
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; APS_NUM_SENSORS ; i++) {</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :                 sensor_attach(&amp;sc-&gt;sensordev, &amp;sc-&gt;sensors[i]);</span>
+<span class="lineNum">     348 </span>            :         }
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :         sensordev_install(&amp;sc-&gt;sensordev);</span>
+<span class="lineNum">     350 </span>            : 
+<span class="lineNum">     351 </span>            :         /* Refresh sensor data every 0.5 seconds */
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :         timeout_set(&amp;aps_timeout, aps_refresh, sc);</span>
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :         timeout_add_msec(&amp;aps_timeout, 500);</span>
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 : }</span>
+<a name="355"><span class="lineNum">     355 </span>            : </a>
+<span class="lineNum">     356 </span>            : int
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 : aps_init(bus_space_tag_t iot, bus_space_handle_t ioh)</span>
+<span class="lineNum">     358 </span>            : {
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :         unsigned char iobuf[16];</span>
+<span class="lineNum">     360 </span>            : 
+<span class="lineNum">     361 </span>            : 
+<span class="lineNum">     362 </span>            :         /* command 0x17/0x81: check EC */
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :         iobuf[APS_CMD] = 0x17;</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :         iobuf[APS_ARG1] = 0x81;</span>
+<span class="lineNum">     365 </span>            : 
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         if (aps_do_io(iot, ioh, iobuf, APS_WRITE_1, APS_READ_3))</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     368 </span>            : 
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :         if (iobuf[APS_RET] != 0 ||iobuf[APS_ARG3] != 0)</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                 return (2);</span>
+<span class="lineNum">     371 </span>            : 
+<span class="lineNum">     372 </span>            :         /* Test values from the Linux driver */
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :         if ((iobuf[APS_ARG1] != 0 || iobuf[APS_ARG2] != 0x60) &amp;&amp;</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :             (iobuf[APS_ARG1] != 1 || iobuf[APS_ARG2] != 0))</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                 return (3);</span>
+<span class="lineNum">     376 </span>            : 
+<span class="lineNum">     377 </span>            :         /* command 0x14: set power */
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :         iobuf[APS_CMD] = 0x14;</span>
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :         iobuf[APS_ARG1] = 0x01;</span>
+<span class="lineNum">     380 </span>            : 
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :         if (aps_do_io(iot, ioh, iobuf, APS_WRITE_1, APS_READ_0))</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                 return (4);</span>
+<span class="lineNum">     383 </span>            : 
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :         if (iobuf[APS_RET] != 0)</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                 return (5);</span>
+<span class="lineNum">     386 </span>            : 
+<span class="lineNum">     387 </span>            :         /* command 0x10: set config (sample rate and order) */
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :         iobuf[APS_CMD] = 0x10;</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         iobuf[APS_ARG1] = 0xc8;</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         iobuf[APS_ARG2] = 0x00;</span>
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :         iobuf[APS_ARG3] = 0x02;</span>
+<span class="lineNum">     392 </span>            : 
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         if (aps_do_io(iot, ioh, iobuf, APS_WRITE_3, APS_READ_0))</span>
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :                 return (6);</span>
+<span class="lineNum">     395 </span>            : 
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         if (iobuf[APS_RET] != 0)</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 return (7);</span>
+<span class="lineNum">     398 </span>            : 
+<span class="lineNum">     399 </span>            :         /* command 0x11: refresh data */
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :         iobuf[APS_CMD] = 0x11;</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :         if (aps_do_io(iot, ioh, iobuf, APS_WRITE_0, APS_READ_1))</span>
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                 return (8);</span>
+<span class="lineNum">     403 </span>            : 
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 : }</span>
+<a name="406"><span class="lineNum">     406 </span>            : </a>
+<span class="lineNum">     407 </span>            : int
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 : aps_read_data(struct aps_softc *sc)</span>
+<span class="lineNum">     409 </span>            : {
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         bus_space_tag_t iot = sc-&gt;aps_iot;</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         bus_space_handle_t ioh = sc-&gt;aps_ioh;</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :         unsigned char iobuf[16];</span>
+<span class="lineNum">     413 </span>            : 
+<span class="lineNum">     414 </span>            :         /* command 0x11: refresh data */
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :         iobuf[APS_CMD] = 0x11;</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         if (aps_do_io(iot, ioh, iobuf, APS_WRITE_0, APS_READ_ALL))</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     418 </span>            : 
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :         sc-&gt;aps_data.state = iobuf[APS_STATE];</span>
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         sc-&gt;aps_data.x_accel = iobuf[APS_XACCEL] + 256 * iobuf[APS_XACCEL + 1];</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         sc-&gt;aps_data.y_accel = iobuf[APS_YACCEL] + 256 * iobuf[APS_YACCEL + 1];</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :         sc-&gt;aps_data.temp1 = iobuf[APS_TEMP];</span>
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         sc-&gt;aps_data.x_var = iobuf[APS_XVAR] + 256 * iobuf[APS_XVAR + 1];</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :         sc-&gt;aps_data.y_var = iobuf[APS_YVAR] + 256 * iobuf[APS_YVAR + 1];</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         sc-&gt;aps_data.temp2 = iobuf[APS_TEMP2];</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :         sc-&gt;aps_data.input = iobuf[APS_INPUT];</span>
+<span class="lineNum">     427 </span>            : 
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 : }</span>
+<a name="430"><span class="lineNum">     430 </span>            : </a>
+<span class="lineNum">     431 </span>            : void
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 : aps_refresh_sensor_data(struct aps_softc *sc)</span>
+<span class="lineNum">     433 </span>            : {
+<span class="lineNum">     434 </span>            :         int64_t temp;
+<span class="lineNum">     435 </span>            :         int i;
+<span class="lineNum">     436 </span>            : #if NAPM &gt; 0
+<span class="lineNum">     437 </span>            :         extern int lid_action;
+<span class="lineNum">     438 </span>            :         extern int apm_lidclose;
+<span class="lineNum">     439 </span>            : #endif
+<span class="lineNum">     440 </span>            : 
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :         if (aps_read_data(sc))</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; APS_NUM_SENSORS; i++) {</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                 sc-&gt;sensors[i].flags &amp;= ~SENSOR_FINVALID;</span>
+<span class="lineNum">     446 </span>            :         }
+<span class="lineNum">     447 </span>            : 
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_XACCEL].value = sc-&gt;aps_data.x_accel;</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_YACCEL].value = sc-&gt;aps_data.y_accel;</span>
+<span class="lineNum">     450 </span>            : 
+<span class="lineNum">     451 </span>            :         /* convert to micro (mu) degrees */
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :         temp = sc-&gt;aps_data.temp1 * 1000000; </span>
+<span class="lineNum">     453 </span>            :         /* convert to kelvin */
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :         temp += 273150000; </span>
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_TEMP1].value = temp;</span>
+<span class="lineNum">     456 </span>            : 
+<span class="lineNum">     457 </span>            :         /* convert to micro (mu) degrees */
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :         temp = sc-&gt;aps_data.temp2 * 1000000; </span>
+<span class="lineNum">     459 </span>            :         /* convert to kelvin */
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :         temp += 273150000; </span>
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_TEMP2].value = temp;</span>
+<span class="lineNum">     462 </span>            : 
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_XVAR].value = sc-&gt;aps_data.x_var;</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_YVAR].value = sc-&gt;aps_data.y_var;</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_KBACT].value =</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :             (sc-&gt;aps_data.input &amp;  APS_INPUT_KB) ? 1 : 0;</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_MSACT].value =</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :             (sc-&gt;aps_data.input &amp; APS_INPUT_MS) ? 1 : 0;</span>
+<span class="lineNum">     469 </span>            : #if NAPM &gt; 0
+<span class="lineNum">     470 </span>            :         if (lid_action &amp;&amp;
+<span class="lineNum">     471 </span>            :             (sc-&gt;sensors[APS_SENSOR_LIDOPEN].value == 1) &amp;&amp;
+<span class="lineNum">     472 </span>            :             (sc-&gt;aps_data.input &amp; APS_INPUT_LIDOPEN) == 0)
+<span class="lineNum">     473 </span>            :                 /* Inform APM that the lid has closed */
+<span class="lineNum">     474 </span>            :                 apm_lidclose = 1;
+<span class="lineNum">     475 </span>            : #endif
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :         sc-&gt;sensors[APS_SENSOR_LIDOPEN].value =</span>
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :             (sc-&gt;aps_data.input &amp; APS_INPUT_LIDOPEN) ? 1 : 0;</span>
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 : }</span>
+<a name="479"><span class="lineNum">     479 </span>            : </a>
+<span class="lineNum">     480 </span>            : void
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 : aps_refresh(void *arg)</span>
+<span class="lineNum">     482 </span>            : {
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :         struct aps_softc *sc = (struct aps_softc *)arg;</span>
+<span class="lineNum">     484 </span>            : 
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :         aps_refresh_sensor_data(sc);</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :         timeout_add_msec(&amp;aps_timeout, 500);</span>
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 : }</span>
+<a name="488"><span class="lineNum">     488 </span>            : </a>
+<span class="lineNum">     489 </span>            : int
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 : aps_activate(struct device *self, int act)</span>
+<span class="lineNum">     491 </span>            : {
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :         struct aps_softc *sc = (struct aps_softc *)self;</span>
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         bus_space_tag_t iot = sc-&gt;aps_iot;</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :         bus_space_handle_t ioh = sc-&gt;aps_ioh;</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :         unsigned char iobuf[16];</span>
+<span class="lineNum">     496 </span>            : 
+<span class="lineNum">     497 </span>            :         /* check if we bombed during attach */
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :         if (!timeout_initialized(&amp;aps_timeout))</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     500 </span>            : 
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         switch (act) {</span>
+<span class="lineNum">     502 </span>            :         case DVACT_SUSPEND:
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :                 timeout_del(&amp;aps_timeout);</span>
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     505 </span>            :         case DVACT_RESUME:
+<span class="lineNum">     506 </span>            :                 /*
+<span class="lineNum">     507 </span>            :                  * Redo the init sequence on resume, because APS is 
+<span class="lineNum">     508 </span>            :                  * as forgetful as it is deaf.
+<span class="lineNum">     509 </span>            :                  */
+<span class="lineNum">     510 </span>            : 
+<span class="lineNum">     511 </span>            :                 /* get APS mode */
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :                 iobuf[APS_CMD] = 0x13;</span>
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :                 aps_do_io(iot, ioh, iobuf, APS_WRITE_0, APS_READ_1);</span>
+<span class="lineNum">     514 </span>            : 
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :                 aps_init(iot, ioh);</span>
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :                 timeout_add_msec(&amp;aps_timeout, 500);</span>
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     518 </span>            :         }
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,412 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - lib/libz/inftrees.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">lib/libz</a> - inftrees.c<span style="font-size: 80%;"> (source / <a href="inftrees.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">100</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: inftrees.c,v 1.15 2011/07/07 02:57:24 deraadt Exp $   */</a>
+<span class="lineNum">       2 </span>            : /* inftrees.c -- generate Huffman trees for efficient decoding
+<span class="lineNum">       3 </span>            :  * Copyright (C) 1995-2005 Mark Adler
+<span class="lineNum">       4 </span>            :  * For conditions of distribution and use, see copyright notice in zlib.h
+<span class="lineNum">       5 </span>            :  */
+<span class="lineNum">       6 </span>            : 
+<span class="lineNum">       7 </span>            : #include &quot;zutil.h&quot;
+<span class="lineNum">       8 </span>            : #include &quot;inftrees.h&quot;
+<span class="lineNum">       9 </span>            : 
+<span class="lineNum">      10 </span>            : #define MAXBITS 15
+<span class="lineNum">      11 </span>            : 
+<span class="lineNum">      12 </span>            : /*
+<span class="lineNum">      13 </span>            :   If you use the zlib library in a product, an acknowledgment is welcome
+<span class="lineNum">      14 </span>            :   in the documentation of your product. If for some reason you cannot
+<span class="lineNum">      15 </span>            :   include such an acknowledgment, I would appreciate that you keep this
+<span class="lineNum">      16 </span>            :   copyright string in the executable of your product.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /*
+<span class="lineNum">      20 </span>            :    Build a set of tables to decode the provided canonical Huffman code.
+<span class="lineNum">      21 </span>            :    The code lengths are lens[0..codes-1].  The result starts at *table,
+<span class="lineNum">      22 </span>            :    whose indices are 0..2^bits-1.  work is a writable array of at least
+<span class="lineNum">      23 </span>            :    lens shorts, which is used as a work area.  type is the type of code
+<span class="lineNum">      24 </span>            :    to be generated, CODES, LENS, or DISTS.  On return, zero is success,
+<span class="lineNum">      25 </span>            :    -1 is an invalid code, and +1 means that ENOUGH isn't enough.  table
+<span class="lineNum">      26 </span>            :    on return points to the next available entry's address.  bits is the
+<span class="lineNum">      27 </span>            :    requested root table index bits, and on return it is the actual root
+<span class="lineNum">      28 </span>            :    table index bits.  It will differ if the request is greater than the
+<a name="29"><span class="lineNum">      29 </span>            :    longest code or if it is less than the shortest code.</a>
+<span class="lineNum">      30 </span>            :  */
+<span class="lineNum">      31 </span><span class="lineNoCov">          0 : int inflate_table(type, lens, codes, table, bits, work)</span>
+<span class="lineNum">      32 </span>            : codetype type;
+<span class="lineNum">      33 </span>            : unsigned short FAR *lens;
+<span class="lineNum">      34 </span>            : unsigned codes;
+<span class="lineNum">      35 </span>            : code FAR * FAR *table;
+<span class="lineNum">      36 </span>            : unsigned FAR *bits;
+<span class="lineNum">      37 </span>            : unsigned short FAR *work;
+<span class="lineNum">      38 </span>            : {
+<span class="lineNum">      39 </span>            :     unsigned len;               /* a code's length in bits */
+<span class="lineNum">      40 </span>            :     unsigned sym;               /* index of code symbols */
+<span class="lineNum">      41 </span>            :     unsigned min, max;          /* minimum and maximum code lengths */
+<span class="lineNum">      42 </span>            :     unsigned root;              /* number of index bits for root table */
+<span class="lineNum">      43 </span>            :     unsigned curr;              /* number of index bits for current table */
+<span class="lineNum">      44 </span>            :     unsigned drop;              /* code bits to drop for sub-table */
+<span class="lineNum">      45 </span>            :     int left;                   /* number of prefix codes available */
+<span class="lineNum">      46 </span>            :     unsigned used;              /* code entries in table used */
+<span class="lineNum">      47 </span>            :     unsigned huff;              /* Huffman code */
+<span class="lineNum">      48 </span>            :     unsigned incr;              /* for incrementing code, index */
+<span class="lineNum">      49 </span>            :     unsigned fill;              /* index for replicating entries */
+<span class="lineNum">      50 </span>            :     unsigned low;               /* low bits for current root entry */
+<span class="lineNum">      51 </span>            :     unsigned mask;              /* mask for low root bits */
+<span class="lineNum">      52 </span>            :     code this;                  /* table entry for duplication */
+<span class="lineNum">      53 </span>            :     code FAR *next;             /* next available space in table */
+<span class="lineNum">      54 </span>            :     const unsigned short FAR *base;     /* base value table to use */
+<span class="lineNum">      55 </span>            :     const unsigned short FAR *extra;    /* extra bits table to use */
+<span class="lineNum">      56 </span>            :     int end;                    /* use base and extra for symbol &gt; end */
+<span class="lineNum">      57 </span><span class="lineNoCov">          0 :     unsigned short count[MAXBITS+1];    /* number of codes of each length */</span>
+<span class="lineNum">      58 </span><span class="lineNoCov">          0 :     unsigned short offs[MAXBITS+1];     /* offsets in table for each length */</span>
+<span class="lineNum">      59 </span>            :     static const unsigned short lbase[31] = { /* Length codes 257..285 base */
+<span class="lineNum">      60 </span>            :         3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
+<span class="lineNum">      61 </span>            :         35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258, 0, 0};
+<span class="lineNum">      62 </span>            :     static const unsigned short lext[31] = { /* Length codes 257..285 extra */
+<span class="lineNum">      63 </span>            :         16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18,
+<span class="lineNum">      64 </span>            :         19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 16, 201, 196};
+<span class="lineNum">      65 </span>            :     static const unsigned short dbase[32] = { /* Distance codes 0..29 base */
+<span class="lineNum">      66 </span>            :         1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,
+<span class="lineNum">      67 </span>            :         257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145,
+<span class="lineNum">      68 </span>            :         8193, 12289, 16385, 24577, 0, 0};
+<span class="lineNum">      69 </span>            :     static const unsigned short dext[32] = { /* Distance codes 0..29 extra */
+<span class="lineNum">      70 </span>            :         16, 16, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22,
+<span class="lineNum">      71 </span>            :         23, 23, 24, 24, 25, 25, 26, 26, 27, 27,
+<span class="lineNum">      72 </span>            :         28, 28, 29, 29, 64, 64};
+<span class="lineNum">      73 </span>            : 
+<span class="lineNum">      74 </span>            :     /*
+<span class="lineNum">      75 </span>            :        Process a set of code lengths to create a canonical Huffman code.  The
+<span class="lineNum">      76 </span>            :        code lengths are lens[0..codes-1].  Each length corresponds to the
+<span class="lineNum">      77 </span>            :        symbols 0..codes-1.  The Huffman code is generated by first sorting the
+<span class="lineNum">      78 </span>            :        symbols by length from short to long, and retaining the symbol order
+<span class="lineNum">      79 </span>            :        for codes with equal lengths.  Then the code starts with all zero bits
+<span class="lineNum">      80 </span>            :        for the first code of the shortest length, and the codes are integer
+<span class="lineNum">      81 </span>            :        increments for the same length, and zeros are appended as the length
+<span class="lineNum">      82 </span>            :        increases.  For the deflate format, these bits are stored backwards
+<span class="lineNum">      83 </span>            :        from their more natural integer increment ordering, and so when the
+<span class="lineNum">      84 </span>            :        decoding tables are built in the large loop below, the integer codes
+<span class="lineNum">      85 </span>            :        are incremented backwards.
+<span class="lineNum">      86 </span>            : 
+<span class="lineNum">      87 </span>            :        This routine assumes, but does not check, that all of the entries in
+<span class="lineNum">      88 </span>            :        lens[] are in the range 0..MAXBITS.  The caller must assure this.
+<span class="lineNum">      89 </span>            :        1..MAXBITS is interpreted as that code length.  zero means that that
+<span class="lineNum">      90 </span>            :        symbol does not occur in this code.
+<span class="lineNum">      91 </span>            : 
+<span class="lineNum">      92 </span>            :        The codes are sorted by computing a count of codes for each length,
+<span class="lineNum">      93 </span>            :        creating from that a table of starting indices for each length in the
+<span class="lineNum">      94 </span>            :        sorted table, and then entering the symbols in order in the sorted
+<span class="lineNum">      95 </span>            :        table.  The sorted table is work[], with that space being provided by
+<span class="lineNum">      96 </span>            :        the caller.
+<span class="lineNum">      97 </span>            : 
+<span class="lineNum">      98 </span>            :        The length counts are used for other purposes as well, i.e. finding
+<span class="lineNum">      99 </span>            :        the minimum and maximum length codes, determining if there are any
+<span class="lineNum">     100 </span>            :        codes at all, checking for a valid set of lengths, and looking ahead
+<span class="lineNum">     101 </span>            :        at length counts to determine sub-table sizes when building the
+<span class="lineNum">     102 </span>            :        decoding tables.
+<span class="lineNum">     103 </span>            :      */
+<span class="lineNum">     104 </span>            : 
+<span class="lineNum">     105 </span>            :     /* accumulate lengths for codes (assumes lens[] all in 0..MAXBITS) */
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 :     for (len = 0; len &lt;= MAXBITS; len++)</span>
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         count[len] = 0;</span>
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :     for (sym = 0; sym &lt; codes; sym++)</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         count[lens[sym]]++;</span>
+<span class="lineNum">     110 </span>            : 
+<span class="lineNum">     111 </span>            :     /* bound code lengths, force root to be within code lengths */
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :     root = *bits;</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :     for (max = MAXBITS; max &gt;= 1; max--)</span>
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         if (count[max] != 0) break;</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :     if (root &gt; max) root = max;</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :     if (max == 0) {                     /* no symbols to code at all */</span>
+<span class="lineNum">     117 </span>            :         this.op = (unsigned char)64;    /* invalid code marker */
+<span class="lineNum">     118 </span>            :         this.bits = (unsigned char)1;
+<span class="lineNum">     119 </span>            :         this.val = (unsigned short)0;
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         *(*table)++ = this;             /* make a table to force an error */</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :         *(*table)++ = this;</span>
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :         *bits = 1;</span>
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         return 0;     /* no symbols, but wait for decoding to report error */</span>
+<span class="lineNum">     124 </span>            :     }
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :     for (min = 1; min &lt;= MAXBITS; min++)</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         if (count[min] != 0) break;</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :     if (root &lt; min) root = min;</span>
+<span class="lineNum">     128 </span>            : 
+<span class="lineNum">     129 </span>            :     /* check for an over-subscribed or incomplete set of lengths */
+<span class="lineNum">     130 </span>            :     left = 1;
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :     for (len = 1; len &lt;= MAXBITS; len++) {</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :         left &lt;&lt;= 1;</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :         left -= count[len];</span>
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         if (left &lt; 0) return -1;        /* over-subscribed */</span>
+<span class="lineNum">     135 </span>            :     }
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :     if (left &gt; 0 &amp;&amp; (type == CODES || max != 1))</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :         return -1;                      /* incomplete set */</span>
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span>            :     /* generate offsets into symbol table for each length for sorting */
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :     offs[1] = 0;</span>
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :     for (len = 1; len &lt; MAXBITS; len++)</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         offs[len + 1] = offs[len] + count[len];</span>
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span>            :     /* sort symbols by length, by symbol order within each length */
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :     for (sym = 0; sym &lt; codes; sym++)</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         if (lens[sym] != 0) work[offs[lens[sym]]++] = (unsigned short)sym;</span>
+<span class="lineNum">     147 </span>            : 
+<span class="lineNum">     148 </span>            :     /*
+<span class="lineNum">     149 </span>            :        Create and fill in decoding tables.  In this loop, the table being
+<span class="lineNum">     150 </span>            :        filled is at next and has curr index bits.  The code being used is huff
+<span class="lineNum">     151 </span>            :        with length len.  That code is converted to an index by dropping drop
+<span class="lineNum">     152 </span>            :        bits off of the bottom.  For codes where len is less than drop + curr,
+<span class="lineNum">     153 </span>            :        those top drop + curr - len bits are incremented through all values to
+<span class="lineNum">     154 </span>            :        fill the table with replicated entries.
+<span class="lineNum">     155 </span>            : 
+<span class="lineNum">     156 </span>            :        root is the number of index bits for the root table.  When len exceeds
+<span class="lineNum">     157 </span>            :        root, sub-tables are created pointed to by the root entry with an index
+<span class="lineNum">     158 </span>            :        of the low root bits of huff.  This is saved in low to check for when a
+<span class="lineNum">     159 </span>            :        new sub-table should be started.  drop is zero when the root table is
+<span class="lineNum">     160 </span>            :        being filled, and drop is root when sub-tables are being filled.
+<span class="lineNum">     161 </span>            : 
+<span class="lineNum">     162 </span>            :        When a new sub-table is needed, it is necessary to look ahead in the
+<span class="lineNum">     163 </span>            :        code lengths to determine what size sub-table is needed.  The length
+<span class="lineNum">     164 </span>            :        counts are used for this, and so count[] is decremented as codes are
+<span class="lineNum">     165 </span>            :        entered in the tables.
+<span class="lineNum">     166 </span>            : 
+<span class="lineNum">     167 </span>            :        used keeps track of how many table entries have been allocated from the
+<span class="lineNum">     168 </span>            :        provided *table space.  It is checked when a LENS table is being made
+<span class="lineNum">     169 </span>            :        against the space in *table, ENOUGH, minus the maximum space needed by
+<span class="lineNum">     170 </span>            :        the worst case distance code, MAXD.  This should never happen, but the
+<span class="lineNum">     171 </span>            :        sufficiency of ENOUGH has not been proven exhaustively, hence the check.
+<span class="lineNum">     172 </span>            :        This assumes that when type == LENS, bits == 9.
+<span class="lineNum">     173 </span>            : 
+<span class="lineNum">     174 </span>            :        sym increments through all symbols, and the loop terminates when
+<span class="lineNum">     175 </span>            :        all codes of length max, i.e. all codes, have been processed.  This
+<span class="lineNum">     176 </span>            :        routine permits incomplete codes, so another loop after this one fills
+<span class="lineNum">     177 </span>            :        in the rest of the decoding tables with invalid code markers.
+<span class="lineNum">     178 </span>            :      */
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span>            :     /* set up for code type */
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :     switch (type) {</span>
+<span class="lineNum">     182 </span>            :     case CODES:
+<span class="lineNum">     183 </span>            :         base = extra = work;    /* dummy value--not used */
+<span class="lineNum">     184 </span>            :         end = 19;
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     186 </span>            :     case LENS:
+<span class="lineNum">     187 </span>            :         base = lbase;
+<span class="lineNum">     188 </span>            :         base -= 257;
+<span class="lineNum">     189 </span>            :         extra = lext;
+<span class="lineNum">     190 </span>            :         extra -= 257;
+<span class="lineNum">     191 </span>            :         end = 256;
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :         break;</span>
+<span class="lineNum">     193 </span>            :     default:            /* DISTS */
+<span class="lineNum">     194 </span>            :         base = dbase;
+<span class="lineNum">     195 </span>            :         extra = dext;
+<span class="lineNum">     196 </span>            :         end = -1;
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span>            :     /* initialize state for loop */
+<span class="lineNum">     200 </span>            :     huff = 0;                   /* starting code */
+<span class="lineNum">     201 </span>            :     sym = 0;                    /* starting code symbol */
+<span class="lineNum">     202 </span>            :     len = min;                  /* starting code length */
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :     next = *table;              /* current table to fill in */</span>
+<span class="lineNum">     204 </span>            :     curr = root;                /* current table index bits */
+<span class="lineNum">     205 </span>            :     drop = 0;                   /* current bits to drop from code for index */
+<span class="lineNum">     206 </span>            :     low = (unsigned)(-1);       /* trigger new sub-table when len &gt; root */
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :     used = 1U &lt;&lt; root;          /* use root table entries */</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :     mask = used - 1;            /* mask for comparing low */</span>
+<span class="lineNum">     209 </span>            : 
+<span class="lineNum">     210 </span>            :     /* check available table space */
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :     if (type == LENS &amp;&amp; used &gt;= ENOUGH - MAXD)</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :         return 1;</span>
+<span class="lineNum">     213 </span>            : 
+<span class="lineNum">     214 </span>            :     /* process all codes and make table entries */
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :     for (;;) {</span>
+<span class="lineNum">     216 </span>            :         /* create table entry */
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         this.bits = (unsigned char)(len - drop);</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :         if ((int)(work[sym]) &lt; end) {</span>
+<span class="lineNum">     219 </span>            :             this.op = (unsigned char)0;
+<span class="lineNum">     220 </span>            :             this.val = work[sym];
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         else if ((int)(work[sym]) &gt; end) {</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :             this.op = (unsigned char)(extra[work[sym]]);</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :             this.val = base[work[sym]];</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     226 </span>            :         else {
+<span class="lineNum">     227 </span>            :             this.op = (unsigned char)(32 + 64);         /* end of block */
+<span class="lineNum">     228 </span>            :             this.val = 0;
+<span class="lineNum">     229 </span>            :         }
+<span class="lineNum">     230 </span>            : 
+<span class="lineNum">     231 </span>            :         /* replicate for those indices with low len bits equal to huff */
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :         incr = 1U &lt;&lt; (len - drop);</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :         fill = 1U &lt;&lt; curr;</span>
+<span class="lineNum">     234 </span>            :         min = fill;                 /* save offset to next table */
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :             fill -= incr;</span>
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :             next[(huff &gt;&gt; drop) + fill] = this;</span>
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :         } while (fill != 0);</span>
+<span class="lineNum">     239 </span>            : 
+<span class="lineNum">     240 </span>            :         /* backwards increment the len-bit code huff */
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :         incr = 1U &lt;&lt; (len - 1);</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         while (huff &amp; incr)</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :             incr &gt;&gt;= 1;</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :         if (incr != 0) {</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :             huff &amp;= incr - 1;</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :             huff += incr;</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     248 </span>            :         else
+<span class="lineNum">     249 </span>            :             huff = 0;
+<span class="lineNum">     250 </span>            : 
+<span class="lineNum">     251 </span>            :         /* go to next symbol, update count, len */
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         sym++;</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         if (--(count[len]) == 0) {</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :             if (len == max) break;</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :             len = lens[work[sym]];</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     257 </span>            : 
+<span class="lineNum">     258 </span>            :         /* create new sub-table if needed */
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         if (len &gt; root &amp;&amp; (huff &amp; mask) != low) {</span>
+<span class="lineNum">     260 </span>            :             /* if first time, transition to sub-tables */
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :             if (drop == 0)</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :                 drop = root;</span>
+<span class="lineNum">     263 </span>            : 
+<span class="lineNum">     264 </span>            :             /* increment past last table */
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :             next += min;            /* here min is 1 &lt;&lt; curr */</span>
+<span class="lineNum">     266 </span>            : 
+<span class="lineNum">     267 </span>            :             /* determine length of next table */
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :             curr = len - drop;</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :             left = (int)(1 &lt;&lt; curr);</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :             while (curr + drop &lt; max) {</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :                 left -= count[curr + drop];</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                 if (left &lt;= 0) break;</span>
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                 curr++;</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :                 left &lt;&lt;= 1;</span>
+<span class="lineNum">     275 </span>            :             }
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span>            :             /* check for enough space */
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :             used += 1U &lt;&lt; curr;</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :             if (type == LENS &amp;&amp; used &gt;= ENOUGH - MAXD)</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">     281 </span>            : 
+<span class="lineNum">     282 </span>            :             /* point entry in root table to sub-table */
+<span class="lineNum">     283 </span>            :             low = huff &amp; mask;
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :             (*table)[low].op = (unsigned char)curr;</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :             (*table)[low].bits = (unsigned char)root;</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :             (*table)[low].val = (unsigned short)(next - *table);</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     288 </span>            :     }
+<span class="lineNum">     289 </span>            : 
+<span class="lineNum">     290 </span>            :     /*
+<span class="lineNum">     291 </span>            :        Fill in rest of table for incomplete codes.  This loop is similar to the
+<span class="lineNum">     292 </span>            :        loop above in incrementing huff for table indices.  It is assumed that
+<span class="lineNum">     293 </span>            :        len is equal to curr + drop, so there is no loop needed to increment
+<span class="lineNum">     294 </span>            :        through high index bits.  When the current sub-table is filled, the loop
+<span class="lineNum">     295 </span>            :        drops back to the root table to fill in any remaining entries there.
+<span class="lineNum">     296 </span>            :      */
+<span class="lineNum">     297 </span>            :     this.op = (unsigned char)64;                /* invalid code marker */
+<span class="lineNum">     298 </span>            :     this.bits = (unsigned char)(len - drop);
+<span class="lineNum">     299 </span>            :     this.val = (unsigned short)0;
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :     while (huff != 0) {</span>
+<span class="lineNum">     301 </span>            :         /* when done with sub-table, drop back to root table */
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :         if (drop != 0 &amp;&amp; (huff &amp; mask) != low) {</span>
+<span class="lineNum">     303 </span>            :             drop = 0;
+<span class="lineNum">     304 </span>            :             len = root;
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :             next = *table;</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :             this.bits = (unsigned char)len;</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     308 </span>            : 
+<span class="lineNum">     309 </span>            :         /* put invalid code marker in table */
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         next[huff &gt;&gt; drop] = this;</span>
+<span class="lineNum">     311 </span>            : 
+<span class="lineNum">     312 </span>            :         /* backwards increment the len-bit code huff */
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         incr = 1U &lt;&lt; (len - 1);</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :         while (huff &amp; incr)</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :             incr &gt;&gt;= 1;</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         if (incr != 0) {</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :             huff &amp;= incr - 1;</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :             huff += incr;</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     320 </span>            :         else
+<span class="lineNum">     321 </span>            :             huff = 0;
+<span class="lineNum">     322 </span>            :     }
+<span class="lineNum">     323 </span>            : 
+<span class="lineNum">     324 </span>            :     /* set return parameters */
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :     *table += used;</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :     *bits = root;</span>
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :     return 0;</span>
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

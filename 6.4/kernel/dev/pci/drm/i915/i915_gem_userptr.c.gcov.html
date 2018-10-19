@@ -1,0 +1,1005 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/i915/i915_gem_userptr.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">dev/pci/drm/i915</a> - i915_gem_userptr.c<span style="font-size: 80%;"> (source / <a href="i915_gem_userptr.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * Copyright © 2012-2014 Intel Corporation
+<span class="lineNum">       3 </span>            :  *
+<span class="lineNum">       4 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       5 </span>            :  * copy of this software and associated documentation files (the &quot;Software&quot;),
+<span class="lineNum">       6 </span>            :  * to deal in the Software without restriction, including without limitation
+<span class="lineNum">       7 </span>            :  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+<span class="lineNum">       8 </span>            :  * and/or sell copies of the Software, and to permit persons to whom the
+<span class="lineNum">       9 </span>            :  * Software is furnished to do so, subject to the following conditions:
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * The above copyright notice and this permission notice (including the next
+<span class="lineNum">      12 </span>            :  * paragraph) shall be included in all copies or substantial portions of the
+<span class="lineNum">      13 </span>            :  * Software.
+<span class="lineNum">      14 </span>            :  *
+<span class="lineNum">      15 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      16 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      17 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+<span class="lineNum">      18 </span>            :  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+<span class="lineNum">      19 </span>            :  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+<span class="lineNum">      20 </span>            :  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+<span class="lineNum">      21 </span>            :  * IN THE SOFTWARE.
+<span class="lineNum">      22 </span>            :  *
+<span class="lineNum">      23 </span>            :  */
+<span class="lineNum">      24 </span>            : 
+<span class="lineNum">      25 </span>            : #include &lt;dev/pci/drm/drmP.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;dev/pci/drm/i915_drm.h&gt;
+<span class="lineNum">      27 </span>            : #include &quot;i915_drv.h&quot;
+<span class="lineNum">      28 </span>            : #include &quot;i915_trace.h&quot;
+<span class="lineNum">      29 </span>            : #include &quot;intel_drv.h&quot;
+<span class="lineNum">      30 </span>            : #ifdef __linux__
+<span class="lineNum">      31 </span>            : #include &lt;linux/mmu_context.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;linux/mmu_notifier.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;linux/mempolicy.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;linux/swap.h&gt;
+<span class="lineNum">      35 </span>            : #endif
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span>            : #ifdef __linux__
+<span class="lineNum">      38 </span>            : 
+<span class="lineNum">      39 </span>            : struct i915_mm_struct {
+<span class="lineNum">      40 </span>            :         struct mm_struct *mm;
+<span class="lineNum">      41 </span>            :         struct drm_device *dev;
+<span class="lineNum">      42 </span>            :         struct i915_mmu_notifier *mn;
+<span class="lineNum">      43 </span>            :         struct hlist_node node;
+<span class="lineNum">      44 </span>            :         struct kref kref;
+<span class="lineNum">      45 </span>            :         struct work_struct work;
+<span class="lineNum">      46 </span>            : };
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : #if defined(CONFIG_MMU_NOTIFIER)
+<span class="lineNum">      49 </span>            : #include &lt;linux/interval_tree.h&gt;
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span>            : struct i915_mmu_notifier {
+<span class="lineNum">      52 </span>            :         spinlock_t lock;
+<span class="lineNum">      53 </span>            :         struct hlist_node node;
+<span class="lineNum">      54 </span>            :         struct mmu_notifier mn;
+<span class="lineNum">      55 </span>            :         struct rb_root objects;
+<span class="lineNum">      56 </span>            :         struct list_head linear;
+<span class="lineNum">      57 </span>            :         bool has_linear;
+<span class="lineNum">      58 </span>            : };
+<span class="lineNum">      59 </span>            : 
+<span class="lineNum">      60 </span>            : struct i915_mmu_object {
+<span class="lineNum">      61 </span>            :         struct i915_mmu_notifier *mn;
+<span class="lineNum">      62 </span>            :         struct interval_tree_node it;
+<span class="lineNum">      63 </span>            :         struct list_head link;
+<span class="lineNum">      64 </span>            :         struct drm_i915_gem_object *obj;
+<span class="lineNum">      65 </span>            :         struct work_struct work;
+<span class="lineNum">      66 </span>            :         bool active;
+<span class="lineNum">      67 </span>            :         bool is_linear;
+<span class="lineNum">      68 </span>            : };
+<span class="lineNum">      69 </span>            : 
+<span class="lineNum">      70 </span>            : static void __cancel_userptr__worker(struct work_struct *work)
+<span class="lineNum">      71 </span>            : {
+<span class="lineNum">      72 </span>            :         struct i915_mmu_object *mo = container_of(work, typeof(*mo), work);
+<span class="lineNum">      73 </span>            :         struct drm_i915_gem_object *obj = mo-&gt;obj;
+<span class="lineNum">      74 </span>            :         struct drm_device *dev = obj-&gt;base.dev;
+<span class="lineNum">      75 </span>            : 
+<span class="lineNum">      76 </span>            :         mutex_lock(&amp;dev-&gt;struct_mutex);
+<span class="lineNum">      77 </span>            :         /* Cancel any active worker and force us to re-evaluate gup */
+<span class="lineNum">      78 </span>            :         obj-&gt;userptr.work = NULL;
+<span class="lineNum">      79 </span>            : 
+<span class="lineNum">      80 </span>            :         if (obj-&gt;pages != NULL) {
+<span class="lineNum">      81 </span>            :                 struct drm_i915_private *dev_priv = to_i915(dev);
+<span class="lineNum">      82 </span>            :                 struct i915_vma *vma, *tmp;
+<span class="lineNum">      83 </span>            :                 bool was_interruptible;
+<span class="lineNum">      84 </span>            : 
+<span class="lineNum">      85 </span>            :                 was_interruptible = dev_priv-&gt;mm.interruptible;
+<span class="lineNum">      86 </span>            :                 dev_priv-&gt;mm.interruptible = false;
+<span class="lineNum">      87 </span>            : 
+<span class="lineNum">      88 </span>            :                 list_for_each_entry_safe(vma, tmp, &amp;obj-&gt;vma_list, vma_link) {
+<span class="lineNum">      89 </span>            :                         int ret = i915_vma_unbind(vma);
+<span class="lineNum">      90 </span>            :                         WARN_ON(ret &amp;&amp; ret != -EIO);
+<span class="lineNum">      91 </span>            :                 }
+<span class="lineNum">      92 </span>            :                 WARN_ON(i915_gem_object_put_pages(obj));
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span>            :                 dev_priv-&gt;mm.interruptible = was_interruptible;
+<span class="lineNum">      95 </span>            :         }
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span>            :         drm_gem_object_unreference(&amp;obj-&gt;base);
+<span class="lineNum">      98 </span>            :         mutex_unlock(&amp;dev-&gt;struct_mutex);
+<span class="lineNum">      99 </span>            : }
+<span class="lineNum">     100 </span>            : 
+<span class="lineNum">     101 </span>            : static unsigned long cancel_userptr(struct i915_mmu_object *mo)
+<span class="lineNum">     102 </span>            : {
+<span class="lineNum">     103 </span>            :         unsigned long end = mo-&gt;obj-&gt;userptr.ptr + mo-&gt;obj-&gt;base.size;
+<span class="lineNum">     104 </span>            : 
+<span class="lineNum">     105 </span>            :         /* The mmu_object is released late when destroying the
+<span class="lineNum">     106 </span>            :          * GEM object so it is entirely possible to gain a
+<span class="lineNum">     107 </span>            :          * reference on an object in the process of being freed
+<span class="lineNum">     108 </span>            :          * since our serialisation is via the spinlock and not
+<span class="lineNum">     109 </span>            :          * the struct_mutex - and consequently use it after it
+<span class="lineNum">     110 </span>            :          * is freed and then double free it.
+<span class="lineNum">     111 </span>            :          */
+<span class="lineNum">     112 </span>            :         if (mo-&gt;active &amp;&amp; kref_get_unless_zero(&amp;mo-&gt;obj-&gt;base.refcount)) {
+<span class="lineNum">     113 </span>            :                 schedule_work(&amp;mo-&gt;work);
+<span class="lineNum">     114 </span>            :                 /* only schedule one work packet to avoid the refleak */
+<span class="lineNum">     115 </span>            :                 mo-&gt;active = false;
+<span class="lineNum">     116 </span>            :         }
+<span class="lineNum">     117 </span>            : 
+<span class="lineNum">     118 </span>            :         return end;
+<span class="lineNum">     119 </span>            : }
+<span class="lineNum">     120 </span>            : 
+<span class="lineNum">     121 </span>            : static void i915_gem_userptr_mn_invalidate_range_start(struct mmu_notifier *_mn,
+<span class="lineNum">     122 </span>            :                                                        struct mm_struct *mm,
+<span class="lineNum">     123 </span>            :                                                        unsigned long start,
+<span class="lineNum">     124 </span>            :                                                        unsigned long end)
+<span class="lineNum">     125 </span>            : {
+<span class="lineNum">     126 </span>            :         struct i915_mmu_notifier *mn =
+<span class="lineNum">     127 </span>            :                 container_of(_mn, struct i915_mmu_notifier, mn);
+<span class="lineNum">     128 </span>            :         struct i915_mmu_object *mo;
+<span class="lineNum">     129 </span>            : 
+<span class="lineNum">     130 </span>            :         /* interval ranges are inclusive, but invalidate range is exclusive */
+<span class="lineNum">     131 </span>            :         end--;
+<span class="lineNum">     132 </span>            : 
+<span class="lineNum">     133 </span>            :         spin_lock(&amp;mn-&gt;lock);
+<span class="lineNum">     134 </span>            :         if (mn-&gt;has_linear) {
+<span class="lineNum">     135 </span>            :                 list_for_each_entry(mo, &amp;mn-&gt;linear, link) {
+<span class="lineNum">     136 </span>            :                         if (mo-&gt;it.last &lt; start || mo-&gt;it.start &gt; end)
+<span class="lineNum">     137 </span>            :                                 continue;
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span>            :                         cancel_userptr(mo);
+<span class="lineNum">     140 </span>            :                 }
+<span class="lineNum">     141 </span>            :         } else {
+<span class="lineNum">     142 </span>            :                 struct interval_tree_node *it;
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span>            :                 it = interval_tree_iter_first(&amp;mn-&gt;objects, start, end);
+<span class="lineNum">     145 </span>            :                 while (it) {
+<span class="lineNum">     146 </span>            :                         mo = container_of(it, struct i915_mmu_object, it);
+<span class="lineNum">     147 </span>            :                         start = cancel_userptr(mo);
+<span class="lineNum">     148 </span>            :                         it = interval_tree_iter_next(it, start, end);
+<span class="lineNum">     149 </span>            :                 }
+<span class="lineNum">     150 </span>            :         }
+<span class="lineNum">     151 </span>            :         spin_unlock(&amp;mn-&gt;lock);
+<span class="lineNum">     152 </span>            : }
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span>            : static const struct mmu_notifier_ops i915_gem_userptr_notifier = {
+<span class="lineNum">     155 </span>            :         .invalidate_range_start = i915_gem_userptr_mn_invalidate_range_start,
+<span class="lineNum">     156 </span>            : };
+<span class="lineNum">     157 </span>            : 
+<span class="lineNum">     158 </span>            : static struct i915_mmu_notifier *
+<span class="lineNum">     159 </span>            : i915_mmu_notifier_create(struct mm_struct *mm)
+<span class="lineNum">     160 </span>            : {
+<span class="lineNum">     161 </span>            :         struct i915_mmu_notifier *mn;
+<span class="lineNum">     162 </span>            :         int ret;
+<span class="lineNum">     163 </span>            : 
+<span class="lineNum">     164 </span>            :         mn = kmalloc(sizeof(*mn), GFP_KERNEL);
+<span class="lineNum">     165 </span>            :         if (mn == NULL)
+<span class="lineNum">     166 </span>            :                 return ERR_PTR(-ENOMEM);
+<span class="lineNum">     167 </span>            : 
+<span class="lineNum">     168 </span>            :         spin_lock_init(&amp;mn-&gt;lock);
+<span class="lineNum">     169 </span>            :         mn-&gt;mn.ops = &amp;i915_gem_userptr_notifier;
+<span class="lineNum">     170 </span>            :         mn-&gt;objects = RB_ROOT;
+<span class="lineNum">     171 </span>            :         INIT_LIST_HEAD(&amp;mn-&gt;linear);
+<span class="lineNum">     172 </span>            :         mn-&gt;has_linear = false;
+<span class="lineNum">     173 </span>            : 
+<span class="lineNum">     174 </span>            :          /* Protected by mmap_sem (write-lock) */
+<span class="lineNum">     175 </span>            :         ret = __mmu_notifier_register(&amp;mn-&gt;mn, mm);
+<span class="lineNum">     176 </span>            :         if (ret) {
+<span class="lineNum">     177 </span>            :                 kfree(mn);
+<span class="lineNum">     178 </span>            :                 return ERR_PTR(ret);
+<span class="lineNum">     179 </span>            :         }
+<span class="lineNum">     180 </span>            : 
+<span class="lineNum">     181 </span>            :         return mn;
+<span class="lineNum">     182 </span>            : }
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span>            : static int
+<span class="lineNum">     185 </span>            : i915_mmu_notifier_add(struct drm_device *dev,
+<span class="lineNum">     186 </span>            :                       struct i915_mmu_notifier *mn,
+<span class="lineNum">     187 </span>            :                       struct i915_mmu_object *mo)
+<span class="lineNum">     188 </span>            : {
+<span class="lineNum">     189 </span>            :         struct interval_tree_node *it;
+<span class="lineNum">     190 </span>            :         int ret = 0;
+<span class="lineNum">     191 </span>            : 
+<span class="lineNum">     192 </span>            :         /* By this point we have already done a lot of expensive setup that
+<span class="lineNum">     193 </span>            :          * we do not want to repeat just because the caller (e.g. X) has a
+<span class="lineNum">     194 </span>            :          * signal pending (and partly because of that expensive setup, X
+<span class="lineNum">     195 </span>            :          * using an interrupt timer is likely to get stuck in an EINTR loop).
+<span class="lineNum">     196 </span>            :          */
+<span class="lineNum">     197 </span>            :         mutex_lock(&amp;dev-&gt;struct_mutex);
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span>            :         /* Make sure we drop the final active reference (and thereby
+<span class="lineNum">     200 </span>            :          * remove the objects from the interval tree) before we do
+<span class="lineNum">     201 </span>            :          * the check for overlapping objects.
+<span class="lineNum">     202 </span>            :          */
+<span class="lineNum">     203 </span>            :         i915_gem_retire_requests(dev);
+<span class="lineNum">     204 </span>            : 
+<span class="lineNum">     205 </span>            :         spin_lock(&amp;mn-&gt;lock);
+<span class="lineNum">     206 </span>            :         it = interval_tree_iter_first(&amp;mn-&gt;objects,
+<span class="lineNum">     207 </span>            :                                       mo-&gt;it.start, mo-&gt;it.last);
+<span class="lineNum">     208 </span>            :         if (it) {
+<span class="lineNum">     209 </span>            :                 struct drm_i915_gem_object *obj;
+<span class="lineNum">     210 </span>            : 
+<span class="lineNum">     211 </span>            :                 /* We only need to check the first object in the range as it
+<span class="lineNum">     212 </span>            :                  * either has cancelled gup work queued and we need to
+<span class="lineNum">     213 </span>            :                  * return back to the user to give time for the gup-workers
+<span class="lineNum">     214 </span>            :                  * to flush their object references upon which the object will
+<span class="lineNum">     215 </span>            :                  * be removed from the interval-tree, or the the range is
+<span class="lineNum">     216 </span>            :                  * still in use by another client and the overlap is invalid.
+<span class="lineNum">     217 </span>            :                  *
+<span class="lineNum">     218 </span>            :                  * If we do have an overlap, we cannot use the interval tree
+<span class="lineNum">     219 </span>            :                  * for fast range invalidation.
+<span class="lineNum">     220 </span>            :                  */
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span>            :                 obj = container_of(it, struct i915_mmu_object, it)-&gt;obj;
+<span class="lineNum">     223 </span>            :                 if (!obj-&gt;userptr.workers)
+<span class="lineNum">     224 </span>            :                         mn-&gt;has_linear = mo-&gt;is_linear = true;
+<span class="lineNum">     225 </span>            :                 else
+<span class="lineNum">     226 </span>            :                         ret = -EAGAIN;
+<span class="lineNum">     227 </span>            :         } else
+<span class="lineNum">     228 </span>            :                 interval_tree_insert(&amp;mo-&gt;it, &amp;mn-&gt;objects);
+<span class="lineNum">     229 </span>            : 
+<span class="lineNum">     230 </span>            :         if (ret == 0)
+<span class="lineNum">     231 </span>            :                 list_add(&amp;mo-&gt;link, &amp;mn-&gt;linear);
+<span class="lineNum">     232 </span>            : 
+<span class="lineNum">     233 </span>            :         spin_unlock(&amp;mn-&gt;lock);
+<span class="lineNum">     234 </span>            :         mutex_unlock(&amp;dev-&gt;struct_mutex);
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span>            :         return ret;
+<span class="lineNum">     237 </span>            : }
+<span class="lineNum">     238 </span>            : 
+<span class="lineNum">     239 </span>            : static bool i915_mmu_notifier_has_linear(struct i915_mmu_notifier *mn)
+<span class="lineNum">     240 </span>            : {
+<span class="lineNum">     241 </span>            :         struct i915_mmu_object *mo;
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span>            :         list_for_each_entry(mo, &amp;mn-&gt;linear, link)
+<span class="lineNum">     244 </span>            :                 if (mo-&gt;is_linear)
+<span class="lineNum">     245 </span>            :                         return true;
+<span class="lineNum">     246 </span>            : 
+<span class="lineNum">     247 </span>            :         return false;
+<span class="lineNum">     248 </span>            : }
+<span class="lineNum">     249 </span>            : 
+<span class="lineNum">     250 </span>            : static void
+<span class="lineNum">     251 </span>            : i915_mmu_notifier_del(struct i915_mmu_notifier *mn,
+<span class="lineNum">     252 </span>            :                       struct i915_mmu_object *mo)
+<span class="lineNum">     253 </span>            : {
+<span class="lineNum">     254 </span>            :         spin_lock(&amp;mn-&gt;lock);
+<span class="lineNum">     255 </span>            :         list_del(&amp;mo-&gt;link);
+<span class="lineNum">     256 </span>            :         if (mo-&gt;is_linear)
+<span class="lineNum">     257 </span>            :                 mn-&gt;has_linear = i915_mmu_notifier_has_linear(mn);
+<span class="lineNum">     258 </span>            :         else
+<span class="lineNum">     259 </span>            :                 interval_tree_remove(&amp;mo-&gt;it, &amp;mn-&gt;objects);
+<span class="lineNum">     260 </span>            :         spin_unlock(&amp;mn-&gt;lock);
+<span class="lineNum">     261 </span>            : }
+<span class="lineNum">     262 </span>            : 
+<span class="lineNum">     263 </span>            : static void
+<span class="lineNum">     264 </span>            : i915_gem_userptr_release__mmu_notifier(struct drm_i915_gem_object *obj)
+<span class="lineNum">     265 </span>            : {
+<span class="lineNum">     266 </span>            :         struct i915_mmu_object *mo;
+<span class="lineNum">     267 </span>            : 
+<span class="lineNum">     268 </span>            :         mo = obj-&gt;userptr.mmu_object;
+<span class="lineNum">     269 </span>            :         if (mo == NULL)
+<span class="lineNum">     270 </span>            :                 return;
+<span class="lineNum">     271 </span>            : 
+<span class="lineNum">     272 </span>            :         i915_mmu_notifier_del(mo-&gt;mn, mo);
+<span class="lineNum">     273 </span>            :         kfree(mo);
+<span class="lineNum">     274 </span>            : 
+<span class="lineNum">     275 </span>            :         obj-&gt;userptr.mmu_object = NULL;
+<span class="lineNum">     276 </span>            : }
+<span class="lineNum">     277 </span>            : 
+<span class="lineNum">     278 </span>            : static struct i915_mmu_notifier *
+<span class="lineNum">     279 </span>            : i915_mmu_notifier_find(struct i915_mm_struct *mm)
+<span class="lineNum">     280 </span>            : {
+<span class="lineNum">     281 </span>            :         struct i915_mmu_notifier *mn = mm-&gt;mn;
+<span class="lineNum">     282 </span>            : 
+<span class="lineNum">     283 </span>            :         mn = mm-&gt;mn;
+<span class="lineNum">     284 </span>            :         if (mn)
+<span class="lineNum">     285 </span>            :                 return mn;
+<span class="lineNum">     286 </span>            : 
+<span class="lineNum">     287 </span>            :         down_write(&amp;mm-&gt;mm-&gt;mmap_sem);
+<span class="lineNum">     288 </span>            :         mutex_lock(&amp;to_i915(mm-&gt;dev)-&gt;mm_lock);
+<span class="lineNum">     289 </span>            :         if ((mn = mm-&gt;mn) == NULL) {
+<span class="lineNum">     290 </span>            :                 mn = i915_mmu_notifier_create(mm-&gt;mm);
+<span class="lineNum">     291 </span>            :                 if (!IS_ERR(mn))
+<span class="lineNum">     292 </span>            :                         mm-&gt;mn = mn;
+<span class="lineNum">     293 </span>            :         }
+<span class="lineNum">     294 </span>            :         mutex_unlock(&amp;to_i915(mm-&gt;dev)-&gt;mm_lock);
+<span class="lineNum">     295 </span>            :         up_write(&amp;mm-&gt;mm-&gt;mmap_sem);
+<span class="lineNum">     296 </span>            : 
+<span class="lineNum">     297 </span>            :         return mn;
+<span class="lineNum">     298 </span>            : }
+<span class="lineNum">     299 </span>            : 
+<span class="lineNum">     300 </span>            : static int
+<span class="lineNum">     301 </span>            : i915_gem_userptr_init__mmu_notifier(struct drm_i915_gem_object *obj,
+<span class="lineNum">     302 </span>            :                                     unsigned flags)
+<span class="lineNum">     303 </span>            : {
+<span class="lineNum">     304 </span>            :         struct i915_mmu_notifier *mn;
+<span class="lineNum">     305 </span>            :         struct i915_mmu_object *mo;
+<span class="lineNum">     306 </span>            :         int ret;
+<span class="lineNum">     307 </span>            : 
+<span class="lineNum">     308 </span>            :         if (flags &amp; I915_USERPTR_UNSYNCHRONIZED)
+<span class="lineNum">     309 </span>            :                 return capable(CAP_SYS_ADMIN) ? 0 : -EPERM;
+<span class="lineNum">     310 </span>            : 
+<span class="lineNum">     311 </span>            :         if (WARN_ON(obj-&gt;userptr.mm == NULL))
+<span class="lineNum">     312 </span>            :                 return -EINVAL;
+<span class="lineNum">     313 </span>            : 
+<span class="lineNum">     314 </span>            :         mn = i915_mmu_notifier_find(obj-&gt;userptr.mm);
+<span class="lineNum">     315 </span>            :         if (IS_ERR(mn))
+<span class="lineNum">     316 </span>            :                 return PTR_ERR(mn);
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span>            :         mo = kzalloc(sizeof(*mo), GFP_KERNEL);
+<span class="lineNum">     319 </span>            :         if (mo == NULL)
+<span class="lineNum">     320 </span>            :                 return -ENOMEM;
+<span class="lineNum">     321 </span>            : 
+<span class="lineNum">     322 </span>            :         mo-&gt;mn = mn;
+<span class="lineNum">     323 </span>            :         mo-&gt;it.start = obj-&gt;userptr.ptr;
+<span class="lineNum">     324 </span>            :         mo-&gt;it.last = mo-&gt;it.start + obj-&gt;base.size - 1;
+<span class="lineNum">     325 </span>            :         mo-&gt;obj = obj;
+<span class="lineNum">     326 </span>            :         INIT_WORK(&amp;mo-&gt;work, __cancel_userptr__worker);
+<span class="lineNum">     327 </span>            : 
+<span class="lineNum">     328 </span>            :         ret = i915_mmu_notifier_add(obj-&gt;base.dev, mn, mo);
+<span class="lineNum">     329 </span>            :         if (ret) {
+<span class="lineNum">     330 </span>            :                 kfree(mo);
+<span class="lineNum">     331 </span>            :                 return ret;
+<span class="lineNum">     332 </span>            :         }
+<span class="lineNum">     333 </span>            : 
+<span class="lineNum">     334 </span>            :         obj-&gt;userptr.mmu_object = mo;
+<span class="lineNum">     335 </span>            :         return 0;
+<span class="lineNum">     336 </span>            : }
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span>            : static void
+<span class="lineNum">     339 </span>            : i915_mmu_notifier_free(struct i915_mmu_notifier *mn,
+<span class="lineNum">     340 </span>            :                        struct mm_struct *mm)
+<span class="lineNum">     341 </span>            : {
+<span class="lineNum">     342 </span>            :         if (mn == NULL)
+<span class="lineNum">     343 </span>            :                 return;
+<span class="lineNum">     344 </span>            : 
+<span class="lineNum">     345 </span>            :         mmu_notifier_unregister(&amp;mn-&gt;mn, mm);
+<span class="lineNum">     346 </span>            :         kfree(mn);
+<span class="lineNum">     347 </span>            : }
+<span class="lineNum">     348 </span>            : 
+<span class="lineNum">     349 </span>            : #else
+<span class="lineNum">     350 </span>            : 
+<span class="lineNum">     351 </span>            : static void
+<span class="lineNum">     352 </span>            : i915_gem_userptr_release__mmu_notifier(struct drm_i915_gem_object *obj)
+<span class="lineNum">     353 </span>            : {
+<span class="lineNum">     354 </span>            : }
+<span class="lineNum">     355 </span>            : 
+<span class="lineNum">     356 </span>            : static int
+<span class="lineNum">     357 </span>            : i915_gem_userptr_init__mmu_notifier(struct drm_i915_gem_object *obj,
+<span class="lineNum">     358 </span>            :                                     unsigned flags)
+<span class="lineNum">     359 </span>            : {
+<span class="lineNum">     360 </span>            :         if ((flags &amp; I915_USERPTR_UNSYNCHRONIZED) == 0)
+<span class="lineNum">     361 </span>            :                 return -ENODEV;
+<span class="lineNum">     362 </span>            : 
+<span class="lineNum">     363 </span>            :         if (!capable(CAP_SYS_ADMIN))
+<span class="lineNum">     364 </span>            :                 return -EPERM;
+<span class="lineNum">     365 </span>            : 
+<span class="lineNum">     366 </span>            :         return 0;
+<span class="lineNum">     367 </span>            : }
+<span class="lineNum">     368 </span>            : 
+<span class="lineNum">     369 </span>            : static void
+<span class="lineNum">     370 </span>            : i915_mmu_notifier_free(struct i915_mmu_notifier *mn,
+<span class="lineNum">     371 </span>            :                        struct mm_struct *mm)
+<span class="lineNum">     372 </span>            : {
+<span class="lineNum">     373 </span>            : }
+<span class="lineNum">     374 </span>            : 
+<span class="lineNum">     375 </span>            : #endif
+<span class="lineNum">     376 </span>            : 
+<span class="lineNum">     377 </span>            : static struct i915_mm_struct *
+<span class="lineNum">     378 </span>            : __i915_mm_struct_find(struct drm_i915_private *dev_priv, struct mm_struct *real)
+<span class="lineNum">     379 </span>            : {
+<span class="lineNum">     380 </span>            :         struct i915_mm_struct *mm;
+<span class="lineNum">     381 </span>            : 
+<span class="lineNum">     382 </span>            :         /* Protected by dev_priv-&gt;mm_lock */
+<span class="lineNum">     383 </span>            :         hash_for_each_possible(dev_priv-&gt;mm_structs, mm, node, (unsigned long)real)
+<span class="lineNum">     384 </span>            :                 if (mm-&gt;mm == real)
+<span class="lineNum">     385 </span>            :                         return mm;
+<span class="lineNum">     386 </span>            : 
+<span class="lineNum">     387 </span>            :         return NULL;
+<span class="lineNum">     388 </span>            : }
+<span class="lineNum">     389 </span>            : 
+<span class="lineNum">     390 </span>            : static int
+<span class="lineNum">     391 </span>            : i915_gem_userptr_init__mm_struct(struct drm_i915_gem_object *obj)
+<span class="lineNum">     392 </span>            : {
+<span class="lineNum">     393 </span>            :         struct drm_i915_private *dev_priv = to_i915(obj-&gt;base.dev);
+<span class="lineNum">     394 </span>            :         struct i915_mm_struct *mm;
+<span class="lineNum">     395 </span>            :         int ret = 0;
+<span class="lineNum">     396 </span>            : 
+<span class="lineNum">     397 </span>            :         /* During release of the GEM object we hold the struct_mutex. This
+<span class="lineNum">     398 </span>            :          * precludes us from calling mmput() at that time as that may be
+<span class="lineNum">     399 </span>            :          * the last reference and so call exit_mmap(). exit_mmap() will
+<span class="lineNum">     400 </span>            :          * attempt to reap the vma, and if we were holding a GTT mmap
+<span class="lineNum">     401 </span>            :          * would then call drm_gem_vm_close() and attempt to reacquire
+<span class="lineNum">     402 </span>            :          * the struct mutex. So in order to avoid that recursion, we have
+<span class="lineNum">     403 </span>            :          * to defer releasing the mm reference until after we drop the
+<span class="lineNum">     404 </span>            :          * struct_mutex, i.e. we need to schedule a worker to do the clean
+<span class="lineNum">     405 </span>            :          * up.
+<span class="lineNum">     406 </span>            :          */
+<span class="lineNum">     407 </span>            :         mutex_lock(&amp;dev_priv-&gt;mm_lock);
+<span class="lineNum">     408 </span>            :         mm = __i915_mm_struct_find(dev_priv, current-&gt;mm);
+<span class="lineNum">     409 </span>            :         if (mm == NULL) {
+<span class="lineNum">     410 </span>            :                 mm = kmalloc(sizeof(*mm), GFP_KERNEL);
+<span class="lineNum">     411 </span>            :                 if (mm == NULL) {
+<span class="lineNum">     412 </span>            :                         ret = -ENOMEM;
+<span class="lineNum">     413 </span>            :                         goto out;
+<span class="lineNum">     414 </span>            :                 }
+<span class="lineNum">     415 </span>            : 
+<span class="lineNum">     416 </span>            :                 kref_init(&amp;mm-&gt;kref);
+<span class="lineNum">     417 </span>            :                 mm-&gt;dev = obj-&gt;base.dev;
+<span class="lineNum">     418 </span>            : 
+<span class="lineNum">     419 </span>            :                 mm-&gt;mm = current-&gt;mm;
+<span class="lineNum">     420 </span>            :                 atomic_inc(&amp;current-&gt;mm-&gt;mm_count);
+<span class="lineNum">     421 </span>            : 
+<span class="lineNum">     422 </span>            :                 mm-&gt;mn = NULL;
+<span class="lineNum">     423 </span>            : 
+<span class="lineNum">     424 </span>            :                 /* Protected by dev_priv-&gt;mm_lock */
+<span class="lineNum">     425 </span>            :                 hash_add(dev_priv-&gt;mm_structs,
+<span class="lineNum">     426 </span>            :                          &amp;mm-&gt;node, (unsigned long)mm-&gt;mm);
+<span class="lineNum">     427 </span>            :         } else
+<span class="lineNum">     428 </span>            :                 kref_get(&amp;mm-&gt;kref);
+<span class="lineNum">     429 </span>            : 
+<span class="lineNum">     430 </span>            :         obj-&gt;userptr.mm = mm;
+<span class="lineNum">     431 </span>            : out:
+<span class="lineNum">     432 </span>            :         mutex_unlock(&amp;dev_priv-&gt;mm_lock);
+<span class="lineNum">     433 </span>            :         return ret;
+<span class="lineNum">     434 </span>            : }
+<span class="lineNum">     435 </span>            : 
+<span class="lineNum">     436 </span>            : static void
+<span class="lineNum">     437 </span>            : __i915_mm_struct_free__worker(struct work_struct *work)
+<span class="lineNum">     438 </span>            : {
+<span class="lineNum">     439 </span>            :         struct i915_mm_struct *mm = container_of(work, typeof(*mm), work);
+<span class="lineNum">     440 </span>            :         i915_mmu_notifier_free(mm-&gt;mn, mm-&gt;mm);
+<span class="lineNum">     441 </span>            :         mmdrop(mm-&gt;mm);
+<span class="lineNum">     442 </span>            :         kfree(mm);
+<span class="lineNum">     443 </span>            : }
+<span class="lineNum">     444 </span>            : 
+<span class="lineNum">     445 </span>            : static void
+<span class="lineNum">     446 </span>            : __i915_mm_struct_free(struct kref *kref)
+<span class="lineNum">     447 </span>            : {
+<span class="lineNum">     448 </span>            :         struct i915_mm_struct *mm = container_of(kref, typeof(*mm), kref);
+<span class="lineNum">     449 </span>            : 
+<span class="lineNum">     450 </span>            :         /* Protected by dev_priv-&gt;mm_lock */
+<span class="lineNum">     451 </span>            :         hash_del(&amp;mm-&gt;node);
+<span class="lineNum">     452 </span>            :         mutex_unlock(&amp;to_i915(mm-&gt;dev)-&gt;mm_lock);
+<span class="lineNum">     453 </span>            : 
+<span class="lineNum">     454 </span>            :         INIT_WORK(&amp;mm-&gt;work, __i915_mm_struct_free__worker);
+<span class="lineNum">     455 </span>            :         schedule_work(&amp;mm-&gt;work);
+<span class="lineNum">     456 </span>            : }
+<span class="lineNum">     457 </span>            : 
+<span class="lineNum">     458 </span>            : static void
+<span class="lineNum">     459 </span>            : i915_gem_userptr_release__mm_struct(struct drm_i915_gem_object *obj)
+<span class="lineNum">     460 </span>            : {
+<span class="lineNum">     461 </span>            :         if (obj-&gt;userptr.mm == NULL)
+<span class="lineNum">     462 </span>            :                 return;
+<span class="lineNum">     463 </span>            : 
+<span class="lineNum">     464 </span>            :         kref_put_mutex(&amp;obj-&gt;userptr.mm-&gt;kref,
+<span class="lineNum">     465 </span>            :                        __i915_mm_struct_free,
+<span class="lineNum">     466 </span>            :                        &amp;to_i915(obj-&gt;base.dev)-&gt;mm_lock);
+<span class="lineNum">     467 </span>            :         obj-&gt;userptr.mm = NULL;
+<span class="lineNum">     468 </span>            : }
+<span class="lineNum">     469 </span>            : 
+<span class="lineNum">     470 </span>            : struct get_pages_work {
+<span class="lineNum">     471 </span>            :         struct work_struct work;
+<span class="lineNum">     472 </span>            :         struct drm_i915_gem_object *obj;
+<span class="lineNum">     473 </span>            :         struct task_struct *task;
+<span class="lineNum">     474 </span>            : };
+<span class="lineNum">     475 </span>            : 
+<span class="lineNum">     476 </span>            : #if IS_ENABLED(CONFIG_SWIOTLB)
+<span class="lineNum">     477 </span>            : #define swiotlb_active() swiotlb_nr_tbl()
+<span class="lineNum">     478 </span>            : #else
+<span class="lineNum">     479 </span>            : #define swiotlb_active() 0
+<span class="lineNum">     480 </span>            : #endif
+<span class="lineNum">     481 </span>            : 
+<span class="lineNum">     482 </span>            : static int
+<span class="lineNum">     483 </span>            : st_set_pages(struct sg_table **st, struct page **pvec, int num_pages)
+<span class="lineNum">     484 </span>            : {
+<span class="lineNum">     485 </span>            :         struct scatterlist *sg;
+<span class="lineNum">     486 </span>            :         int ret, n;
+<span class="lineNum">     487 </span>            : 
+<span class="lineNum">     488 </span>            :         *st = kmalloc(sizeof(**st), GFP_KERNEL);
+<span class="lineNum">     489 </span>            :         if (*st == NULL)
+<span class="lineNum">     490 </span>            :                 return -ENOMEM;
+<span class="lineNum">     491 </span>            : 
+<span class="lineNum">     492 </span>            :         if (swiotlb_active()) {
+<span class="lineNum">     493 </span>            :                 ret = sg_alloc_table(*st, num_pages, GFP_KERNEL);
+<span class="lineNum">     494 </span>            :                 if (ret)
+<span class="lineNum">     495 </span>            :                         goto err;
+<span class="lineNum">     496 </span>            : 
+<span class="lineNum">     497 </span>            :                 for_each_sg((*st)-&gt;sgl, sg, num_pages, n)
+<span class="lineNum">     498 </span>            :                         sg_set_page(sg, pvec[n], PAGE_SIZE, 0);
+<span class="lineNum">     499 </span>            :         } else {
+<span class="lineNum">     500 </span>            :                 ret = sg_alloc_table_from_pages(*st, pvec, num_pages,
+<span class="lineNum">     501 </span>            :                                                 0, num_pages &lt;&lt; PAGE_SHIFT,
+<span class="lineNum">     502 </span>            :                                                 GFP_KERNEL);
+<span class="lineNum">     503 </span>            :                 if (ret)
+<span class="lineNum">     504 </span>            :                         goto err;
+<span class="lineNum">     505 </span>            :         }
+<span class="lineNum">     506 </span>            : 
+<span class="lineNum">     507 </span>            :         return 0;
+<span class="lineNum">     508 </span>            : 
+<span class="lineNum">     509 </span>            : err:
+<span class="lineNum">     510 </span>            :         kfree(*st);
+<span class="lineNum">     511 </span>            :         *st = NULL;
+<span class="lineNum">     512 </span>            :         return ret;
+<span class="lineNum">     513 </span>            : }
+<span class="lineNum">     514 </span>            : 
+<span class="lineNum">     515 </span>            : static int
+<span class="lineNum">     516 </span>            : __i915_gem_userptr_set_pages(struct drm_i915_gem_object *obj,
+<span class="lineNum">     517 </span>            :                              struct page **pvec, int num_pages)
+<span class="lineNum">     518 </span>            : {
+<span class="lineNum">     519 </span>            :         int ret;
+<span class="lineNum">     520 </span>            : 
+<span class="lineNum">     521 </span>            :         ret = st_set_pages(&amp;obj-&gt;pages, pvec, num_pages);
+<span class="lineNum">     522 </span>            :         if (ret)
+<span class="lineNum">     523 </span>            :                 return ret;
+<span class="lineNum">     524 </span>            : 
+<span class="lineNum">     525 </span>            :         ret = i915_gem_gtt_prepare_object(obj);
+<span class="lineNum">     526 </span>            :         if (ret) {
+<span class="lineNum">     527 </span>            :                 sg_free_table(obj-&gt;pages);
+<span class="lineNum">     528 </span>            :                 kfree(obj-&gt;pages);
+<span class="lineNum">     529 </span>            :                 obj-&gt;pages = NULL;
+<span class="lineNum">     530 </span>            :         }
+<span class="lineNum">     531 </span>            : 
+<span class="lineNum">     532 </span>            :         return ret;
+<span class="lineNum">     533 </span>            : }
+<span class="lineNum">     534 </span>            : 
+<span class="lineNum">     535 </span>            : static int
+<span class="lineNum">     536 </span>            : __i915_gem_userptr_set_active(struct drm_i915_gem_object *obj,
+<span class="lineNum">     537 </span>            :                               bool value)
+<span class="lineNum">     538 </span>            : {
+<span class="lineNum">     539 </span>            :         int ret = 0;
+<span class="lineNum">     540 </span>            : 
+<span class="lineNum">     541 </span>            :         /* During mm_invalidate_range we need to cancel any userptr that
+<span class="lineNum">     542 </span>            :          * overlaps the range being invalidated. Doing so requires the
+<span class="lineNum">     543 </span>            :          * struct_mutex, and that risks recursion. In order to cause
+<span class="lineNum">     544 </span>            :          * recursion, the user must alias the userptr address space with
+<span class="lineNum">     545 </span>            :          * a GTT mmapping (possible with a MAP_FIXED) - then when we have
+<span class="lineNum">     546 </span>            :          * to invalidate that mmaping, mm_invalidate_range is called with
+<span class="lineNum">     547 </span>            :          * the userptr address *and* the struct_mutex held.  To prevent that
+<span class="lineNum">     548 </span>            :          * we set a flag under the i915_mmu_notifier spinlock to indicate
+<span class="lineNum">     549 </span>            :          * whether this object is valid.
+<span class="lineNum">     550 </span>            :          */
+<span class="lineNum">     551 </span>            : #if defined(CONFIG_MMU_NOTIFIER)
+<span class="lineNum">     552 </span>            :         if (obj-&gt;userptr.mmu_object == NULL)
+<span class="lineNum">     553 </span>            :                 return 0;
+<span class="lineNum">     554 </span>            : 
+<span class="lineNum">     555 </span>            :         spin_lock(&amp;obj-&gt;userptr.mmu_object-&gt;mn-&gt;lock);
+<span class="lineNum">     556 </span>            :         /* In order to serialise get_pages with an outstanding
+<span class="lineNum">     557 </span>            :          * cancel_userptr, we must drop the struct_mutex and try again.
+<span class="lineNum">     558 </span>            :          */
+<span class="lineNum">     559 </span>            :         if (!value || !work_pending(&amp;obj-&gt;userptr.mmu_object-&gt;work))
+<span class="lineNum">     560 </span>            :                 obj-&gt;userptr.mmu_object-&gt;active = value;
+<span class="lineNum">     561 </span>            :         else
+<span class="lineNum">     562 </span>            :                 ret = -EAGAIN;
+<span class="lineNum">     563 </span>            :         spin_unlock(&amp;obj-&gt;userptr.mmu_object-&gt;mn-&gt;lock);
+<span class="lineNum">     564 </span>            : #endif
+<span class="lineNum">     565 </span>            : 
+<span class="lineNum">     566 </span>            :         return ret;
+<span class="lineNum">     567 </span>            : }
+<span class="lineNum">     568 </span>            : 
+<span class="lineNum">     569 </span>            : static void
+<span class="lineNum">     570 </span>            : __i915_gem_userptr_get_pages_worker(struct work_struct *_work)
+<span class="lineNum">     571 </span>            : {
+<span class="lineNum">     572 </span>            :         struct get_pages_work *work = container_of(_work, typeof(*work), work);
+<span class="lineNum">     573 </span>            :         struct drm_i915_gem_object *obj = work-&gt;obj;
+<span class="lineNum">     574 </span>            :         struct drm_device *dev = obj-&gt;base.dev;
+<span class="lineNum">     575 </span>            :         const int npages = obj-&gt;base.size &gt;&gt; PAGE_SHIFT;
+<span class="lineNum">     576 </span>            :         struct page **pvec;
+<span class="lineNum">     577 </span>            :         int pinned, ret;
+<span class="lineNum">     578 </span>            : 
+<span class="lineNum">     579 </span>            :         ret = -ENOMEM;
+<span class="lineNum">     580 </span>            :         pinned = 0;
+<span class="lineNum">     581 </span>            : 
+<span class="lineNum">     582 </span>            :         pvec = kmalloc(npages*sizeof(struct page *),
+<span class="lineNum">     583 </span>            :                        GFP_TEMPORARY | __GFP_NOWARN | __GFP_NORETRY);
+<span class="lineNum">     584 </span>            :         if (pvec == NULL)
+<span class="lineNum">     585 </span>            :                 pvec = drm_malloc_ab(npages, sizeof(struct page *));
+<span class="lineNum">     586 </span>            :         if (pvec != NULL) {
+<span class="lineNum">     587 </span>            :                 struct mm_struct *mm = obj-&gt;userptr.mm-&gt;mm;
+<span class="lineNum">     588 </span>            : 
+<span class="lineNum">     589 </span>            :                 down_read(&amp;mm-&gt;mmap_sem);
+<span class="lineNum">     590 </span>            :                 while (pinned &lt; npages) {
+<span class="lineNum">     591 </span>            :                         ret = get_user_pages(work-&gt;task, mm,
+<span class="lineNum">     592 </span>            :                                              obj-&gt;userptr.ptr + pinned * PAGE_SIZE,
+<span class="lineNum">     593 </span>            :                                              npages - pinned,
+<span class="lineNum">     594 </span>            :                                              !obj-&gt;userptr.read_only, 0,
+<span class="lineNum">     595 </span>            :                                              pvec + pinned, NULL);
+<span class="lineNum">     596 </span>            :                         if (ret &lt; 0)
+<span class="lineNum">     597 </span>            :                                 break;
+<span class="lineNum">     598 </span>            : 
+<span class="lineNum">     599 </span>            :                         pinned += ret;
+<span class="lineNum">     600 </span>            :                 }
+<span class="lineNum">     601 </span>            :                 up_read(&amp;mm-&gt;mmap_sem);
+<span class="lineNum">     602 </span>            :         }
+<span class="lineNum">     603 </span>            : 
+<span class="lineNum">     604 </span>            :         mutex_lock(&amp;dev-&gt;struct_mutex);
+<span class="lineNum">     605 </span>            :         if (obj-&gt;userptr.work == &amp;work-&gt;work) {
+<span class="lineNum">     606 </span>            :                 if (pinned == npages) {
+<span class="lineNum">     607 </span>            :                         ret = __i915_gem_userptr_set_pages(obj, pvec, npages);
+<span class="lineNum">     608 </span>            :                         if (ret == 0) {
+<span class="lineNum">     609 </span>            :                                 list_add_tail(&amp;obj-&gt;global_list,
+<span class="lineNum">     610 </span>            :                                               &amp;to_i915(dev)-&gt;mm.unbound_list);
+<span class="lineNum">     611 </span>            :                                 obj-&gt;get_page.sg = obj-&gt;pages-&gt;sgl;
+<span class="lineNum">     612 </span>            :                                 obj-&gt;get_page.last = 0;
+<span class="lineNum">     613 </span>            :                                 pinned = 0;
+<span class="lineNum">     614 </span>            :                         }
+<span class="lineNum">     615 </span>            :                 }
+<span class="lineNum">     616 </span>            :                 obj-&gt;userptr.work = ERR_PTR(ret);
+<span class="lineNum">     617 </span>            :                 if (ret)
+<span class="lineNum">     618 </span>            :                         __i915_gem_userptr_set_active(obj, false);
+<span class="lineNum">     619 </span>            :         }
+<span class="lineNum">     620 </span>            : 
+<span class="lineNum">     621 </span>            :         obj-&gt;userptr.workers--;
+<span class="lineNum">     622 </span>            :         drm_gem_object_unreference(&amp;obj-&gt;base);
+<span class="lineNum">     623 </span>            :         mutex_unlock(&amp;dev-&gt;struct_mutex);
+<span class="lineNum">     624 </span>            : 
+<span class="lineNum">     625 </span>            :         release_pages(pvec, pinned, 0);
+<span class="lineNum">     626 </span>            :         drm_free_large(pvec);
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span>            :         put_task_struct(work-&gt;task);
+<span class="lineNum">     629 </span>            :         kfree(work);
+<span class="lineNum">     630 </span>            : }
+<span class="lineNum">     631 </span>            : 
+<span class="lineNum">     632 </span>            : static int
+<span class="lineNum">     633 </span>            : __i915_gem_userptr_get_pages_schedule(struct drm_i915_gem_object *obj,
+<span class="lineNum">     634 </span>            :                                       bool *active)
+<span class="lineNum">     635 </span>            : {
+<span class="lineNum">     636 </span>            :         struct get_pages_work *work;
+<span class="lineNum">     637 </span>            : 
+<span class="lineNum">     638 </span>            :         /* Spawn a worker so that we can acquire the
+<span class="lineNum">     639 </span>            :          * user pages without holding our mutex. Access
+<span class="lineNum">     640 </span>            :          * to the user pages requires mmap_sem, and we have
+<span class="lineNum">     641 </span>            :          * a strict lock ordering of mmap_sem, struct_mutex -
+<span class="lineNum">     642 </span>            :          * we already hold struct_mutex here and so cannot
+<span class="lineNum">     643 </span>            :          * call gup without encountering a lock inversion.
+<span class="lineNum">     644 </span>            :          *
+<span class="lineNum">     645 </span>            :          * Userspace will keep on repeating the operation
+<span class="lineNum">     646 </span>            :          * (thanks to EAGAIN) until either we hit the fast
+<span class="lineNum">     647 </span>            :          * path or the worker completes. If the worker is
+<span class="lineNum">     648 </span>            :          * cancelled or superseded, the task is still run
+<span class="lineNum">     649 </span>            :          * but the results ignored. (This leads to
+<span class="lineNum">     650 </span>            :          * complications that we may have a stray object
+<span class="lineNum">     651 </span>            :          * refcount that we need to be wary of when
+<span class="lineNum">     652 </span>            :          * checking for existing objects during creation.)
+<span class="lineNum">     653 </span>            :          * If the worker encounters an error, it reports
+<span class="lineNum">     654 </span>            :          * that error back to this function through
+<span class="lineNum">     655 </span>            :          * obj-&gt;userptr.work = ERR_PTR.
+<span class="lineNum">     656 </span>            :          */
+<span class="lineNum">     657 </span>            :         if (obj-&gt;userptr.workers &gt;= I915_GEM_USERPTR_MAX_WORKERS)
+<span class="lineNum">     658 </span>            :                 return -EAGAIN;
+<span class="lineNum">     659 </span>            : 
+<span class="lineNum">     660 </span>            :         work = kmalloc(sizeof(*work), GFP_KERNEL);
+<span class="lineNum">     661 </span>            :         if (work == NULL)
+<span class="lineNum">     662 </span>            :                 return -ENOMEM;
+<span class="lineNum">     663 </span>            : 
+<span class="lineNum">     664 </span>            :         obj-&gt;userptr.work = &amp;work-&gt;work;
+<span class="lineNum">     665 </span>            :         obj-&gt;userptr.workers++;
+<span class="lineNum">     666 </span>            : 
+<span class="lineNum">     667 </span>            :         work-&gt;obj = obj;
+<span class="lineNum">     668 </span>            :         drm_gem_object_reference(&amp;obj-&gt;base);
+<span class="lineNum">     669 </span>            : 
+<span class="lineNum">     670 </span>            :         work-&gt;task = current;
+<span class="lineNum">     671 </span>            :         get_task_struct(work-&gt;task);
+<span class="lineNum">     672 </span>            : 
+<span class="lineNum">     673 </span>            :         INIT_WORK(&amp;work-&gt;work, __i915_gem_userptr_get_pages_worker);
+<span class="lineNum">     674 </span>            :         schedule_work(&amp;work-&gt;work);
+<span class="lineNum">     675 </span>            : 
+<span class="lineNum">     676 </span>            :         *active = true;
+<span class="lineNum">     677 </span>            :         return -EAGAIN;
+<span class="lineNum">     678 </span>            : }
+<span class="lineNum">     679 </span>            : 
+<span class="lineNum">     680 </span>            : static int
+<span class="lineNum">     681 </span>            : i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
+<span class="lineNum">     682 </span>            : {
+<span class="lineNum">     683 </span>            :         const int num_pages = obj-&gt;base.size &gt;&gt; PAGE_SHIFT;
+<span class="lineNum">     684 </span>            :         struct page **pvec;
+<span class="lineNum">     685 </span>            :         int pinned, ret;
+<span class="lineNum">     686 </span>            :         bool active;
+<span class="lineNum">     687 </span>            : 
+<span class="lineNum">     688 </span>            :         /* If userspace should engineer that these pages are replaced in
+<span class="lineNum">     689 </span>            :          * the vma between us binding this page into the GTT and completion
+<span class="lineNum">     690 </span>            :          * of rendering... Their loss. If they change the mapping of their
+<span class="lineNum">     691 </span>            :          * pages they need to create a new bo to point to the new vma.
+<span class="lineNum">     692 </span>            :          *
+<span class="lineNum">     693 </span>            :          * However, that still leaves open the possibility of the vma
+<span class="lineNum">     694 </span>            :          * being copied upon fork. Which falls under the same userspace
+<span class="lineNum">     695 </span>            :          * synchronisation issue as a regular bo, except that this time
+<span class="lineNum">     696 </span>            :          * the process may not be expecting that a particular piece of
+<span class="lineNum">     697 </span>            :          * memory is tied to the GPU.
+<span class="lineNum">     698 </span>            :          *
+<span class="lineNum">     699 </span>            :          * Fortunately, we can hook into the mmu_notifier in order to
+<span class="lineNum">     700 </span>            :          * discard the page references prior to anything nasty happening
+<span class="lineNum">     701 </span>            :          * to the vma (discard or cloning) which should prevent the more
+<span class="lineNum">     702 </span>            :          * egregious cases from causing harm.
+<span class="lineNum">     703 </span>            :          */
+<span class="lineNum">     704 </span>            :         if (IS_ERR(obj-&gt;userptr.work)) {
+<span class="lineNum">     705 </span>            :                 /* active flag will have been dropped already by the worker */
+<span class="lineNum">     706 </span>            :                 ret = PTR_ERR(obj-&gt;userptr.work);
+<span class="lineNum">     707 </span>            :                 obj-&gt;userptr.work = NULL;
+<span class="lineNum">     708 </span>            :                 return ret;
+<span class="lineNum">     709 </span>            :         }
+<span class="lineNum">     710 </span>            :         if (obj-&gt;userptr.work)
+<span class="lineNum">     711 </span>            :                 /* active flag should still be held for the pending work */
+<span class="lineNum">     712 </span>            :                 return -EAGAIN;
+<span class="lineNum">     713 </span>            : 
+<span class="lineNum">     714 </span>            :         /* Let the mmu-notifier know that we have begun and need cancellation */
+<span class="lineNum">     715 </span>            :         ret = __i915_gem_userptr_set_active(obj, true);
+<span class="lineNum">     716 </span>            :         if (ret)
+<span class="lineNum">     717 </span>            :                 return ret;
+<span class="lineNum">     718 </span>            : 
+<span class="lineNum">     719 </span>            :         pvec = NULL;
+<span class="lineNum">     720 </span>            :         pinned = 0;
+<span class="lineNum">     721 </span>            :         if (obj-&gt;userptr.mm-&gt;mm == current-&gt;mm) {
+<span class="lineNum">     722 </span>            :                 pvec = kmalloc(num_pages*sizeof(struct page *),
+<span class="lineNum">     723 </span>            :                                GFP_TEMPORARY | __GFP_NOWARN | __GFP_NORETRY);
+<span class="lineNum">     724 </span>            :                 if (pvec == NULL) {
+<span class="lineNum">     725 </span>            :                         pvec = drm_malloc_ab(num_pages, sizeof(struct page *));
+<span class="lineNum">     726 </span>            :                         if (pvec == NULL) {
+<span class="lineNum">     727 </span>            :                                 __i915_gem_userptr_set_active(obj, false);
+<span class="lineNum">     728 </span>            :                                 return -ENOMEM;
+<span class="lineNum">     729 </span>            :                         }
+<span class="lineNum">     730 </span>            :                 }
+<span class="lineNum">     731 </span>            : 
+<span class="lineNum">     732 </span>            :                 pinned = __get_user_pages_fast(obj-&gt;userptr.ptr, num_pages,
+<span class="lineNum">     733 </span>            :                                                !obj-&gt;userptr.read_only, pvec);
+<span class="lineNum">     734 </span>            :         }
+<span class="lineNum">     735 </span>            : 
+<span class="lineNum">     736 </span>            :         active = false;
+<span class="lineNum">     737 </span>            :         if (pinned &lt; 0)
+<span class="lineNum">     738 </span>            :                 ret = pinned, pinned = 0;
+<span class="lineNum">     739 </span>            :         else if (pinned &lt; num_pages)
+<span class="lineNum">     740 </span>            :                 ret = __i915_gem_userptr_get_pages_schedule(obj, &amp;active);
+<span class="lineNum">     741 </span>            :         else
+<span class="lineNum">     742 </span>            :                 ret = __i915_gem_userptr_set_pages(obj, pvec, num_pages);
+<span class="lineNum">     743 </span>            :         if (ret) {
+<span class="lineNum">     744 </span>            :                 __i915_gem_userptr_set_active(obj, active);
+<span class="lineNum">     745 </span>            :                 release_pages(pvec, pinned, 0);
+<span class="lineNum">     746 </span>            :         }
+<span class="lineNum">     747 </span>            :         drm_free_large(pvec);
+<span class="lineNum">     748 </span>            :         return ret;
+<span class="lineNum">     749 </span>            : }
+<span class="lineNum">     750 </span>            : 
+<span class="lineNum">     751 </span>            : static void
+<span class="lineNum">     752 </span>            : i915_gem_userptr_put_pages(struct drm_i915_gem_object *obj)
+<span class="lineNum">     753 </span>            : {
+<span class="lineNum">     754 </span>            :         struct sg_page_iter sg_iter;
+<span class="lineNum">     755 </span>            : 
+<span class="lineNum">     756 </span>            :         BUG_ON(obj-&gt;userptr.work != NULL);
+<span class="lineNum">     757 </span>            :         __i915_gem_userptr_set_active(obj, false);
+<span class="lineNum">     758 </span>            : 
+<span class="lineNum">     759 </span>            :         if (obj-&gt;madv != I915_MADV_WILLNEED)
+<span class="lineNum">     760 </span>            :                 obj-&gt;dirty = 0;
+<span class="lineNum">     761 </span>            : 
+<span class="lineNum">     762 </span>            :         i915_gem_gtt_finish_object(obj);
+<span class="lineNum">     763 </span>            : 
+<span class="lineNum">     764 </span>            :         for_each_sg_page(obj-&gt;pages-&gt;sgl, &amp;sg_iter, obj-&gt;pages-&gt;nents, 0) {
+<span class="lineNum">     765 </span>            :                 struct page *page = sg_page_iter_page(&amp;sg_iter);
+<span class="lineNum">     766 </span>            : 
+<span class="lineNum">     767 </span>            :                 if (obj-&gt;dirty)
+<span class="lineNum">     768 </span>            :                         set_page_dirty(page);
+<span class="lineNum">     769 </span>            : 
+<span class="lineNum">     770 </span>            :                 mark_page_accessed(page);
+<span class="lineNum">     771 </span>            :                 page_cache_release(page);
+<span class="lineNum">     772 </span>            :         }
+<span class="lineNum">     773 </span>            :         obj-&gt;dirty = 0;
+<span class="lineNum">     774 </span>            : 
+<span class="lineNum">     775 </span>            :         sg_free_table(obj-&gt;pages);
+<span class="lineNum">     776 </span>            :         kfree(obj-&gt;pages);
+<span class="lineNum">     777 </span>            : }
+<span class="lineNum">     778 </span>            : 
+<span class="lineNum">     779 </span>            : static void
+<span class="lineNum">     780 </span>            : i915_gem_userptr_release(struct drm_i915_gem_object *obj)
+<span class="lineNum">     781 </span>            : {
+<span class="lineNum">     782 </span>            :         i915_gem_userptr_release__mmu_notifier(obj);
+<span class="lineNum">     783 </span>            :         i915_gem_userptr_release__mm_struct(obj);
+<span class="lineNum">     784 </span>            : }
+<span class="lineNum">     785 </span>            : 
+<span class="lineNum">     786 </span>            : static int
+<span class="lineNum">     787 </span>            : i915_gem_userptr_dmabuf_export(struct drm_i915_gem_object *obj)
+<span class="lineNum">     788 </span>            : {
+<span class="lineNum">     789 </span>            :         if (obj-&gt;userptr.mmu_object)
+<span class="lineNum">     790 </span>            :                 return 0;
+<span class="lineNum">     791 </span>            : 
+<span class="lineNum">     792 </span>            :         return i915_gem_userptr_init__mmu_notifier(obj, 0);
+<span class="lineNum">     793 </span>            : }
+<span class="lineNum">     794 </span>            : 
+<span class="lineNum">     795 </span>            : static const struct drm_i915_gem_object_ops i915_gem_userptr_ops = {
+<span class="lineNum">     796 </span>            :         .dmabuf_export = i915_gem_userptr_dmabuf_export,
+<span class="lineNum">     797 </span>            :         .get_pages = i915_gem_userptr_get_pages,
+<span class="lineNum">     798 </span>            :         .put_pages = i915_gem_userptr_put_pages,
+<span class="lineNum">     799 </span>            :         .release = i915_gem_userptr_release,
+<span class="lineNum">     800 </span>            : };
+<span class="lineNum">     801 </span>            : 
+<span class="lineNum">     802 </span>            : /**
+<span class="lineNum">     803 </span>            :  * Creates a new mm object that wraps some normal memory from the process
+<span class="lineNum">     804 </span>            :  * context - user memory.
+<span class="lineNum">     805 </span>            :  *
+<span class="lineNum">     806 </span>            :  * We impose several restrictions upon the memory being mapped
+<span class="lineNum">     807 </span>            :  * into the GPU.
+<span class="lineNum">     808 </span>            :  * 1. It must be page aligned (both start/end addresses, i.e ptr and size).
+<span class="lineNum">     809 </span>            :  * 2. It must be normal system memory, not a pointer into another map of IO
+<span class="lineNum">     810 </span>            :  *    space (e.g. it must not be a GTT mmapping of another object).
+<span class="lineNum">     811 </span>            :  * 3. We only allow a bo as large as we could in theory map into the GTT,
+<span class="lineNum">     812 </span>            :  *    that is we limit the size to the total size of the GTT.
+<span class="lineNum">     813 </span>            :  * 4. The bo is marked as being snoopable. The backing pages are left
+<span class="lineNum">     814 </span>            :  *    accessible directly by the CPU, but reads and writes by the GPU may
+<span class="lineNum">     815 </span>            :  *    incur the cost of a snoop (unless you have an LLC architecture).
+<span class="lineNum">     816 </span>            :  *
+<span class="lineNum">     817 </span>            :  * Synchronisation between multiple users and the GPU is left to userspace
+<span class="lineNum">     818 </span>            :  * through the normal set-domain-ioctl. The kernel will enforce that the
+<span class="lineNum">     819 </span>            :  * GPU relinquishes the VMA before it is returned back to the system
+<span class="lineNum">     820 </span>            :  * i.e. upon free(), munmap() or process termination. However, the userspace
+<span class="lineNum">     821 </span>            :  * malloc() library may not immediately relinquish the VMA after free() and
+<span class="lineNum">     822 </span>            :  * instead reuse it whilst the GPU is still reading and writing to the VMA.
+<span class="lineNum">     823 </span>            :  * Caveat emptor.
+<span class="lineNum">     824 </span>            :  *
+<span class="lineNum">     825 </span>            :  * Also note, that the object created here is not currently a &quot;first class&quot;
+<span class="lineNum">     826 </span>            :  * object, in that several ioctls are banned. These are the CPU access
+<span class="lineNum">     827 </span>            :  * ioctls: mmap(), pwrite and pread. In practice, you are expected to use
+<span class="lineNum">     828 </span>            :  * direct access via your pointer rather than use those ioctls. Another
+<span class="lineNum">     829 </span>            :  * restriction is that we do not allow userptr surfaces to be pinned to the
+<span class="lineNum">     830 </span>            :  * hardware and so we reject any attempt to create a framebuffer out of a
+<span class="lineNum">     831 </span>            :  * userptr.
+<span class="lineNum">     832 </span>            :  *
+<span class="lineNum">     833 </span>            :  * If you think this is a good interface to use to pass GPU memory between
+<span class="lineNum">     834 </span>            :  * drivers, please use dma-buf instead. In fact, wherever possible use
+<span class="lineNum">     835 </span>            :  * dma-buf instead.
+<span class="lineNum">     836 </span>            :  */
+<span class="lineNum">     837 </span>            : int
+<span class="lineNum">     838 </span>            : i915_gem_userptr_ioctl(struct drm_device *dev, void *data, struct drm_file *file)
+<span class="lineNum">     839 </span>            : {
+<span class="lineNum">     840 </span>            :         struct drm_i915_gem_userptr *args = data;
+<span class="lineNum">     841 </span>            :         struct drm_i915_gem_object *obj;
+<span class="lineNum">     842 </span>            :         int ret;
+<span class="lineNum">     843 </span>            :         u32 handle;
+<span class="lineNum">     844 </span>            : 
+<span class="lineNum">     845 </span>            :         if (args-&gt;flags &amp; ~(I915_USERPTR_READ_ONLY |
+<span class="lineNum">     846 </span>            :                             I915_USERPTR_UNSYNCHRONIZED))
+<span class="lineNum">     847 </span>            :                 return -EINVAL;
+<span class="lineNum">     848 </span>            : 
+<span class="lineNum">     849 </span>            :         if (!args-&gt;user_size)
+<span class="lineNum">     850 </span>            :                 return -EINVAL;
+<span class="lineNum">     851 </span>            : 
+<span class="lineNum">     852 </span>            :         if (offset_in_page(args-&gt;user_ptr | args-&gt;user_size))
+<span class="lineNum">     853 </span>            :                 return -EINVAL;
+<span class="lineNum">     854 </span>            : 
+<span class="lineNum">     855 </span>            :         if (!access_ok(args-&gt;flags &amp; I915_USERPTR_READ_ONLY ? VERIFY_READ : VERIFY_WRITE,
+<span class="lineNum">     856 </span>            :                        (char __user *)(unsigned long)args-&gt;user_ptr, args-&gt;user_size))
+<span class="lineNum">     857 </span>            :                 return -EFAULT;
+<span class="lineNum">     858 </span>            : 
+<span class="lineNum">     859 </span>            :         if (args-&gt;flags &amp; I915_USERPTR_READ_ONLY) {
+<span class="lineNum">     860 </span>            :                 /* On almost all of the current hw, we cannot tell the GPU that a
+<span class="lineNum">     861 </span>            :                  * page is readonly, so this is just a placeholder in the uAPI.
+<span class="lineNum">     862 </span>            :                  */
+<span class="lineNum">     863 </span>            :                 return -ENODEV;
+<span class="lineNum">     864 </span>            :         }
+<span class="lineNum">     865 </span>            : 
+<span class="lineNum">     866 </span>            :         obj = i915_gem_object_alloc(dev);
+<span class="lineNum">     867 </span>            :         if (obj == NULL)
+<span class="lineNum">     868 </span>            :                 return -ENOMEM;
+<span class="lineNum">     869 </span>            : 
+<span class="lineNum">     870 </span>            :         drm_gem_private_object_init(dev, &amp;obj-&gt;base, args-&gt;user_size);
+<span class="lineNum">     871 </span>            :         i915_gem_object_init(obj, &amp;i915_gem_userptr_ops);
+<span class="lineNum">     872 </span>            :         obj-&gt;cache_level = I915_CACHE_LLC;
+<span class="lineNum">     873 </span>            :         obj-&gt;base.write_domain = I915_GEM_DOMAIN_CPU;
+<span class="lineNum">     874 </span>            :         obj-&gt;base.read_domains = I915_GEM_DOMAIN_CPU;
+<span class="lineNum">     875 </span>            : 
+<span class="lineNum">     876 </span>            :         obj-&gt;userptr.ptr = args-&gt;user_ptr;
+<span class="lineNum">     877 </span>            :         obj-&gt;userptr.read_only = !!(args-&gt;flags &amp; I915_USERPTR_READ_ONLY);
+<span class="lineNum">     878 </span>            : 
+<span class="lineNum">     879 </span>            :         /* And keep a pointer to the current-&gt;mm for resolving the user pages
+<span class="lineNum">     880 </span>            :          * at binding. This means that we need to hook into the mmu_notifier
+<span class="lineNum">     881 </span>            :          * in order to detect if the mmu is destroyed.
+<span class="lineNum">     882 </span>            :          */
+<span class="lineNum">     883 </span>            :         ret = i915_gem_userptr_init__mm_struct(obj);
+<span class="lineNum">     884 </span>            :         if (ret == 0)
+<span class="lineNum">     885 </span>            :                 ret = i915_gem_userptr_init__mmu_notifier(obj, args-&gt;flags);
+<span class="lineNum">     886 </span>            :         if (ret == 0)
+<span class="lineNum">     887 </span>            :                 ret = drm_gem_handle_create(file, &amp;obj-&gt;base, &amp;handle);
+<span class="lineNum">     888 </span>            : 
+<span class="lineNum">     889 </span>            :         /* drop reference from allocate - handle holds it now */
+<span class="lineNum">     890 </span>            :         drm_gem_object_unreference_unlocked(&amp;obj-&gt;base);
+<span class="lineNum">     891 </span>            :         if (ret)
+<span class="lineNum">     892 </span>            :                 return ret;
+<span class="lineNum">     893 </span>            : 
+<span class="lineNum">     894 </span>            :         args-&gt;handle = handle;
+<span class="lineNum">     895 </span>            :         return 0;
+<span class="lineNum">     896 </span>            : }
+<span class="lineNum">     897 </span>            : 
+<span class="lineNum">     898 </span>            : int
+<span class="lineNum">     899 </span>            : i915_gem_init_userptr(struct drm_device *dev)
+<span class="lineNum">     900 </span>            : {
+<span class="lineNum">     901 </span>            :         struct drm_i915_private *dev_priv = to_i915(dev);
+<span class="lineNum">     902 </span>            :         mutex_init(&amp;dev_priv-&gt;mm_lock);
+<span class="lineNum">     903 </span>            :         hash_init(dev_priv-&gt;mm_structs);
+<span class="lineNum">     904 </span>            :         return 0;
+<span class="lineNum">     905 </span>            : }
+<span class="lineNum">     906 </span>            : 
+<span class="lineNum">     907 </span>            : #else
+<a name="908"><span class="lineNum">     908 </span>            : </a>
+<span class="lineNum">     909 </span>            : int
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 : i915_gem_userptr_ioctl(struct drm_device *dev, void *data, struct drm_file *file)</span>
+<span class="lineNum">     911 </span>            : {
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :         return -ENODEV;</span>
+<span class="lineNum">     913 </span>            : }
+<a name="914"><span class="lineNum">     914 </span>            : </a>
+<span class="lineNum">     915 </span>            : int
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 : i915_gem_init_userptr(struct drm_device *dev)</span>
+<span class="lineNum">     917 </span>            : {
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     919 </span>            : }
+<span class="lineNum">     920 </span>            : 
+<span class="lineNum">     921 </span>            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

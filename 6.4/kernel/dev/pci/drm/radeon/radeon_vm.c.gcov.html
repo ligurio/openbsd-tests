@@ -1,0 +1,1349 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/radeon/radeon_vm.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">dev/pci/drm/radeon</a> - radeon_vm.c<span style="font-size: 80%;"> (source / <a href="radeon_vm.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">523</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">26</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * Copyright 2008 Advanced Micro Devices, Inc.
+<span class="lineNum">       3 </span>            :  * Copyright 2008 Red Hat Inc.
+<span class="lineNum">       4 </span>            :  * Copyright 2009 Jerome Glisse.
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       7 </span>            :  * copy of this software and associated documentation files (the &quot;Software&quot;),
+<span class="lineNum">       8 </span>            :  * to deal in the Software without restriction, including without limitation
+<span class="lineNum">       9 </span>            :  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+<span class="lineNum">      10 </span>            :  * and/or sell copies of the Software, and to permit persons to whom the
+<span class="lineNum">      11 </span>            :  * Software is furnished to do so, subject to the following conditions:
+<span class="lineNum">      12 </span>            :  *
+<span class="lineNum">      13 </span>            :  * The above copyright notice and this permission notice shall be included in
+<span class="lineNum">      14 </span>            :  * all copies or substantial portions of the Software.
+<span class="lineNum">      15 </span>            :  *
+<span class="lineNum">      16 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      17 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      18 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+<span class="lineNum">      19 </span>            :  * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+<span class="lineNum">      20 </span>            :  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+<span class="lineNum">      21 </span>            :  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+<span class="lineNum">      22 </span>            :  * OTHER DEALINGS IN THE SOFTWARE.
+<span class="lineNum">      23 </span>            :  *
+<span class="lineNum">      24 </span>            :  * Authors: Dave Airlie
+<span class="lineNum">      25 </span>            :  *          Alex Deucher
+<span class="lineNum">      26 </span>            :  *          Jerome Glisse
+<span class="lineNum">      27 </span>            :  */
+<span class="lineNum">      28 </span>            : #include &lt;dev/pci/drm/drmP.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;dev/pci/drm/radeon_drm.h&gt;
+<span class="lineNum">      30 </span>            : #include &quot;radeon.h&quot;
+<span class="lineNum">      31 </span>            : #include &quot;radeon_trace.h&quot;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : /*
+<span class="lineNum">      34 </span>            :  * GPUVM
+<span class="lineNum">      35 </span>            :  * GPUVM is similar to the legacy gart on older asics, however
+<span class="lineNum">      36 </span>            :  * rather than there being a single global gart table
+<span class="lineNum">      37 </span>            :  * for the entire GPU, there are multiple VM page tables active
+<span class="lineNum">      38 </span>            :  * at any given time.  The VM page tables can contain a mix
+<span class="lineNum">      39 </span>            :  * vram pages and system memory pages and system memory pages
+<span class="lineNum">      40 </span>            :  * can be mapped as snooped (cached system pages) or unsnooped
+<span class="lineNum">      41 </span>            :  * (uncached system pages).
+<span class="lineNum">      42 </span>            :  * Each VM has an ID associated with it and there is a page table
+<span class="lineNum">      43 </span>            :  * associated with each VMID.  When execting a command buffer,
+<span class="lineNum">      44 </span>            :  * the kernel tells the the ring what VMID to use for that command
+<span class="lineNum">      45 </span>            :  * buffer.  VMIDs are allocated dynamically as commands are submitted.
+<span class="lineNum">      46 </span>            :  * The userspace drivers maintain their own address space and the kernel
+<span class="lineNum">      47 </span>            :  * sets up their pages tables accordingly when they submit their
+<span class="lineNum">      48 </span>            :  * command buffers and a VMID is assigned.
+<span class="lineNum">      49 </span>            :  * Cayman/Trinity support up to 8 active VMs at any given time;
+<span class="lineNum">      50 </span>            :  * SI supports 16.
+<span class="lineNum">      51 </span>            :  */
+<span class="lineNum">      52 </span>            : 
+<span class="lineNum">      53 </span>            : /**
+<span class="lineNum">      54 </span>            :  * radeon_vm_num_pde - return the number of page directory entries
+<span class="lineNum">      55 </span>            :  *
+<span class="lineNum">      56 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">      57 </span>            :  *
+<a name="58"><span class="lineNum">      58 </span>            :  * Calculate the number of page directory entries (cayman+).</a>
+<span class="lineNum">      59 </span>            :  */
+<span class="lineNum">      60 </span><span class="lineNoCov">          0 : static unsigned radeon_vm_num_pdes(struct radeon_device *rdev)</span>
+<span class="lineNum">      61 </span>            : {
+<span class="lineNum">      62 </span><span class="lineNoCov">          0 :         return rdev-&gt;vm_manager.max_pfn &gt;&gt; radeon_vm_block_size;</span>
+<span class="lineNum">      63 </span>            : }
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span>            : /**
+<span class="lineNum">      66 </span>            :  * radeon_vm_directory_size - returns the size of the page directory in bytes
+<span class="lineNum">      67 </span>            :  *
+<span class="lineNum">      68 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">      69 </span>            :  *
+<a name="70"><span class="lineNum">      70 </span>            :  * Calculate the size of the page directory in bytes (cayman+).</a>
+<span class="lineNum">      71 </span>            :  */
+<span class="lineNum">      72 </span><span class="lineNoCov">          0 : static unsigned radeon_vm_directory_size(struct radeon_device *rdev)</span>
+<span class="lineNum">      73 </span>            : {
+<span class="lineNum">      74 </span><span class="lineNoCov">          0 :         return RADEON_GPU_PAGE_ALIGN(radeon_vm_num_pdes(rdev) * 8);</span>
+<span class="lineNum">      75 </span>            : }
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            : /**
+<span class="lineNum">      78 </span>            :  * radeon_vm_manager_init - init the vm manager
+<span class="lineNum">      79 </span>            :  *
+<span class="lineNum">      80 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">      81 </span>            :  *
+<span class="lineNum">      82 </span>            :  * Init the vm manager (cayman+).
+<a name="83"><span class="lineNum">      83 </span>            :  * Returns 0 for success, error for failure.</a>
+<span class="lineNum">      84 </span>            :  */
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 : int radeon_vm_manager_init(struct radeon_device *rdev)</span>
+<span class="lineNum">      86 </span>            : {
+<span class="lineNum">      87 </span>            :         int r;
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :         if (!rdev-&gt;vm_manager.enabled) {</span>
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :                 r = radeon_asic_vm_init(rdev);</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :                 if (r)</span>
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :                 rdev-&gt;vm_manager.enabled = true;</span>
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      98 </span>            : 
+<span class="lineNum">      99 </span>            : /**
+<span class="lineNum">     100 </span>            :  * radeon_vm_manager_fini - tear down the vm manager
+<span class="lineNum">     101 </span>            :  *
+<span class="lineNum">     102 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     103 </span>            :  *
+<a name="104"><span class="lineNum">     104 </span>            :  * Tear down the VM manager (cayman+).</a>
+<span class="lineNum">     105 </span>            :  */
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 : void radeon_vm_manager_fini(struct radeon_device *rdev)</span>
+<span class="lineNum">     107 </span>            : {
+<span class="lineNum">     108 </span>            :         int i;
+<span class="lineNum">     109 </span>            : 
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :         if (!rdev-&gt;vm_manager.enabled)</span>
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RADEON_NUM_VM; ++i)</span>
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :                 radeon_fence_unref(&amp;rdev-&gt;vm_manager.active[i]);</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         radeon_asic_vm_fini(rdev);</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         rdev-&gt;vm_manager.enabled = false;</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     118 </span>            : 
+<span class="lineNum">     119 </span>            : /**
+<span class="lineNum">     120 </span>            :  * radeon_vm_get_bos - add the vm BOs to a validation list
+<span class="lineNum">     121 </span>            :  *
+<span class="lineNum">     122 </span>            :  * @vm: vm providing the BOs
+<span class="lineNum">     123 </span>            :  * @head: head of validation list
+<span class="lineNum">     124 </span>            :  *
+<span class="lineNum">     125 </span>            :  * Add the page directory to the list of BOs to
+<a name="126"><span class="lineNum">     126 </span>            :  * validate for command submission (cayman+).</a>
+<span class="lineNum">     127 </span>            :  */
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 : struct radeon_bo_list *radeon_vm_get_bos(struct radeon_device *rdev,</span>
+<span class="lineNum">     129 </span>            :                                           struct radeon_vm *vm,
+<span class="lineNum">     130 </span>            :                                           struct list_head *head)
+<span class="lineNum">     131 </span>            : {
+<span class="lineNum">     132 </span>            :         struct radeon_bo_list *list;
+<span class="lineNum">     133 </span>            :         unsigned i, idx;
+<span class="lineNum">     134 </span>            : 
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :         list = drm_malloc_ab(vm-&gt;max_pde_used + 2,</span>
+<span class="lineNum">     136 </span>            :                              sizeof(struct radeon_bo_list));
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :         if (!list)</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     139 </span>            : 
+<span class="lineNum">     140 </span>            :         /* add the vm page table to the list */
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         list[0].robj = vm-&gt;page_directory;</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         list[0].prefered_domains = RADEON_GEM_DOMAIN_VRAM;</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         list[0].allowed_domains = RADEON_GEM_DOMAIN_VRAM;</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         list[0].tv.bo = &amp;vm-&gt;page_directory-&gt;tbo;</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         list[0].tv.shared = true;</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         list[0].tiling_flags = 0;</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         list_add(&amp;list[0].tv.head, head);</span>
+<span class="lineNum">     148 </span>            : 
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         for (i = 0, idx = 1; i &lt;= vm-&gt;max_pde_used; i++) {</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :                 if (!vm-&gt;page_tables[i].bo)</span>
+<span class="lineNum">     151 </span>            :                         continue;
+<span class="lineNum">     152 </span>            : 
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :                 list[idx].robj = vm-&gt;page_tables[i].bo;</span>
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :                 list[idx].prefered_domains = RADEON_GEM_DOMAIN_VRAM;</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :                 list[idx].allowed_domains = RADEON_GEM_DOMAIN_VRAM;</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :                 list[idx].tv.bo = &amp;list[idx].robj-&gt;tbo;</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :                 list[idx].tv.shared = true;</span>
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :                 list[idx].tiling_flags = 0;</span>
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :                 list_add(&amp;list[idx++].tv.head, head);</span>
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     161 </span>            : 
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :         return list;</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     164 </span>            : 
+<span class="lineNum">     165 </span>            : /**
+<span class="lineNum">     166 </span>            :  * radeon_vm_grab_id - allocate the next free VMID
+<span class="lineNum">     167 </span>            :  *
+<span class="lineNum">     168 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     169 </span>            :  * @vm: vm to allocate id for
+<span class="lineNum">     170 </span>            :  * @ring: ring we want to submit job to
+<span class="lineNum">     171 </span>            :  *
+<span class="lineNum">     172 </span>            :  * Allocate an id for the vm (cayman+).
+<span class="lineNum">     173 </span>            :  * Returns the fence we need to sync to (if any).
+<span class="lineNum">     174 </span>            :  *
+<a name="175"><span class="lineNum">     175 </span>            :  * Global and local mutex must be locked!</a>
+<span class="lineNum">     176 </span>            :  */
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 : struct radeon_fence *radeon_vm_grab_id(struct radeon_device *rdev,</span>
+<span class="lineNum">     178 </span>            :                                        struct radeon_vm *vm, int ring)
+<span class="lineNum">     179 </span>            : {
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         struct radeon_fence *best[RADEON_NUM_RINGS] = {};</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :         struct radeon_vm_id *vm_id = &amp;vm-&gt;ids[ring];</span>
+<span class="lineNum">     182 </span>            : 
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         unsigned choices[2] = {};</span>
+<span class="lineNum">     184 </span>            :         unsigned i;
+<span class="lineNum">     185 </span>            : 
+<span class="lineNum">     186 </span>            :         /* check if the id is still valid */
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         if (vm_id-&gt;id &amp;&amp; vm_id-&gt;last_id_use &amp;&amp;</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :             vm_id-&gt;last_id_use == rdev-&gt;vm_manager.active[vm_id-&gt;id])</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span>            :         /* we definately need to flush */
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :         vm_id-&gt;pd_gpu_addr = ~0ll;</span>
+<span class="lineNum">     193 </span>            : 
+<span class="lineNum">     194 </span>            :         /* skip over VMID 0, since it is the system VM */
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         for (i = 1; i &lt; rdev-&gt;vm_manager.nvm; ++i) {</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :                 struct radeon_fence *fence = rdev-&gt;vm_manager.active[i];</span>
+<span class="lineNum">     197 </span>            : 
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                 if (fence == NULL) {</span>
+<span class="lineNum">     199 </span>            :                         /* found a free one */
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                         vm_id-&gt;id = i;</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                         trace_radeon_vm_grab_id(i, ring);</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                         return NULL;</span>
+<span class="lineNum">     203 </span>            :                 }
+<span class="lineNum">     204 </span>            : 
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                 if (radeon_fence_is_earlier(fence, best[fence-&gt;ring])) {</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                         best[fence-&gt;ring] = fence;</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :                         choices[fence-&gt;ring == ring ? 0 : 1] = i;</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     210 </span>            : 
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; 2; ++i) {</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :                 if (choices[i]) {</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :                         vm_id-&gt;id = choices[i];</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                         trace_radeon_vm_grab_id(choices[i], ring);</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                         return rdev-&gt;vm_manager.active[choices[i]];</span>
+<span class="lineNum">     216 </span>            :                 }
+<span class="lineNum">     217 </span>            :         }
+<span class="lineNum">     218 </span>            : 
+<span class="lineNum">     219 </span>            :         /* should never happen */
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         BUG();</span>
+<span class="lineNum">     221 </span>            :         return NULL;
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     223 </span>            : 
+<span class="lineNum">     224 </span>            : /**
+<span class="lineNum">     225 </span>            :  * radeon_vm_flush - hardware flush the vm
+<span class="lineNum">     226 </span>            :  *
+<span class="lineNum">     227 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     228 </span>            :  * @vm: vm we want to flush
+<span class="lineNum">     229 </span>            :  * @ring: ring to use for flush
+<span class="lineNum">     230 </span>            :  * @updates: last vm update that is waited for
+<span class="lineNum">     231 </span>            :  *
+<span class="lineNum">     232 </span>            :  * Flush the vm (cayman+).
+<span class="lineNum">     233 </span>            :  *
+<a name="234"><span class="lineNum">     234 </span>            :  * Global and local mutex must be locked!</a>
+<span class="lineNum">     235 </span>            :  */
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 : void radeon_vm_flush(struct radeon_device *rdev,</span>
+<span class="lineNum">     237 </span>            :                      struct radeon_vm *vm,
+<span class="lineNum">     238 </span>            :                      int ring, struct radeon_fence *updates)
+<span class="lineNum">     239 </span>            : {
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :         uint64_t pd_addr = radeon_bo_gpu_offset(vm-&gt;page_directory);</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :         struct radeon_vm_id *vm_id = &amp;vm-&gt;ids[ring];</span>
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         if (pd_addr != vm_id-&gt;pd_gpu_addr || !vm_id-&gt;flushed_updates ||</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :             radeon_fence_is_earlier(vm_id-&gt;flushed_updates, updates)) {</span>
+<span class="lineNum">     245 </span>            : 
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :                 trace_radeon_vm_flush(pd_addr, ring, vm-&gt;ids[ring].id);</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :                 radeon_fence_unref(&amp;vm_id-&gt;flushed_updates);</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :                 vm_id-&gt;flushed_updates = radeon_fence_ref(updates);</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                 vm_id-&gt;pd_gpu_addr = pd_addr;</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :                 radeon_ring_vm_flush(rdev, &amp;rdev-&gt;ring[ring],</span>
+<span class="lineNum">     251 </span>            :                                      vm_id-&gt;id, vm_id-&gt;pd_gpu_addr);
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     255 </span>            : 
+<span class="lineNum">     256 </span>            : /**
+<span class="lineNum">     257 </span>            :  * radeon_vm_fence - remember fence for vm
+<span class="lineNum">     258 </span>            :  *
+<span class="lineNum">     259 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     260 </span>            :  * @vm: vm we want to fence
+<span class="lineNum">     261 </span>            :  * @fence: fence to remember
+<span class="lineNum">     262 </span>            :  *
+<span class="lineNum">     263 </span>            :  * Fence the vm (cayman+).
+<span class="lineNum">     264 </span>            :  * Set the fence used to protect page table and id.
+<span class="lineNum">     265 </span>            :  *
+<a name="266"><span class="lineNum">     266 </span>            :  * Global and local mutex must be locked!</a>
+<span class="lineNum">     267 </span>            :  */
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 : void radeon_vm_fence(struct radeon_device *rdev,</span>
+<span class="lineNum">     269 </span>            :                      struct radeon_vm *vm,
+<span class="lineNum">     270 </span>            :                      struct radeon_fence *fence)
+<span class="lineNum">     271 </span>            : {
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :         unsigned vm_id = vm-&gt;ids[fence-&gt;ring].id;</span>
+<span class="lineNum">     273 </span>            : 
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :         radeon_fence_unref(&amp;rdev-&gt;vm_manager.active[vm_id]);</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         rdev-&gt;vm_manager.active[vm_id] = radeon_fence_ref(fence);</span>
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         radeon_fence_unref(&amp;vm-&gt;ids[fence-&gt;ring].last_id_use);</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :         vm-&gt;ids[fence-&gt;ring].last_id_use = radeon_fence_ref(fence);</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     280 </span>            : 
+<span class="lineNum">     281 </span>            : /**
+<span class="lineNum">     282 </span>            :  * radeon_vm_bo_find - find the bo_va for a specific vm &amp; bo
+<span class="lineNum">     283 </span>            :  *
+<span class="lineNum">     284 </span>            :  * @vm: requested vm
+<span class="lineNum">     285 </span>            :  * @bo: requested buffer object
+<span class="lineNum">     286 </span>            :  *
+<span class="lineNum">     287 </span>            :  * Find @bo inside the requested vm (cayman+).
+<span class="lineNum">     288 </span>            :  * Search inside the @bos vm list for the requested vm
+<span class="lineNum">     289 </span>            :  * Returns the found bo_va or NULL if none is found
+<span class="lineNum">     290 </span>            :  *
+<a name="291"><span class="lineNum">     291 </span>            :  * Object has to be reserved!</a>
+<span class="lineNum">     292 </span>            :  */
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 : struct radeon_bo_va *radeon_vm_bo_find(struct radeon_vm *vm,</span>
+<span class="lineNum">     294 </span>            :                                        struct radeon_bo *bo)
+<span class="lineNum">     295 </span>            : {
+<span class="lineNum">     296 </span>            :         struct radeon_bo_va *bo_va;
+<span class="lineNum">     297 </span>            : 
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         list_for_each_entry(bo_va, &amp;bo-&gt;va, bo_list) {</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 if (bo_va-&gt;vm == vm) {</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                         return bo_va;</span>
+<span class="lineNum">     301 </span>            :                 }
+<span class="lineNum">     302 </span>            :         }
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     305 </span>            : 
+<span class="lineNum">     306 </span>            : /**
+<span class="lineNum">     307 </span>            :  * radeon_vm_bo_add - add a bo to a specific vm
+<span class="lineNum">     308 </span>            :  *
+<span class="lineNum">     309 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     310 </span>            :  * @vm: requested vm
+<span class="lineNum">     311 </span>            :  * @bo: radeon buffer object
+<span class="lineNum">     312 </span>            :  *
+<span class="lineNum">     313 </span>            :  * Add @bo into the requested vm (cayman+).
+<span class="lineNum">     314 </span>            :  * Add @bo to the list of bos associated with the vm
+<span class="lineNum">     315 </span>            :  * Returns newly added bo_va or NULL for failure
+<span class="lineNum">     316 </span>            :  *
+<a name="317"><span class="lineNum">     317 </span>            :  * Object has to be reserved!</a>
+<span class="lineNum">     318 </span>            :  */
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 : struct radeon_bo_va *radeon_vm_bo_add(struct radeon_device *rdev,</span>
+<span class="lineNum">     320 </span>            :                                       struct radeon_vm *vm,
+<span class="lineNum">     321 </span>            :                                       struct radeon_bo *bo)
+<span class="lineNum">     322 </span>            : {
+<span class="lineNum">     323 </span>            :         struct radeon_bo_va *bo_va;
+<span class="lineNum">     324 </span>            : 
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         bo_va = kzalloc(sizeof(struct radeon_bo_va), GFP_KERNEL);</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :         if (bo_va == NULL) {</span>
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     328 </span>            :         }
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :         bo_va-&gt;vm = vm;</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         bo_va-&gt;bo = bo;</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         bo_va-&gt;it.start = 0;</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         bo_va-&gt;it.last = 0;</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         bo_va-&gt;flags = 0;</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :         bo_va-&gt;ref_count = 1;</span>
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;bo_va-&gt;bo_list);</span>
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;bo_va-&gt;vm_status);</span>
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         list_add_tail(&amp;bo_va-&gt;bo_list, &amp;bo-&gt;va);</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">     341 </span>            : 
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :         return bo_va;</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     344 </span>            : 
+<span class="lineNum">     345 </span>            : /**
+<span class="lineNum">     346 </span>            :  * radeon_vm_set_pages - helper to call the right asic function
+<span class="lineNum">     347 </span>            :  *
+<span class="lineNum">     348 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     349 </span>            :  * @ib: indirect buffer to fill with commands
+<span class="lineNum">     350 </span>            :  * @pe: addr of the page entry
+<span class="lineNum">     351 </span>            :  * @addr: dst addr to write into pe
+<span class="lineNum">     352 </span>            :  * @count: number of page entries to update
+<span class="lineNum">     353 </span>            :  * @incr: increase next addr by incr bytes
+<span class="lineNum">     354 </span>            :  * @flags: hw access flags
+<span class="lineNum">     355 </span>            :  *
+<span class="lineNum">     356 </span>            :  * Traces the parameters and calls the right asic functions
+<a name="357"><span class="lineNum">     357 </span>            :  * to setup the page table using the DMA.</a>
+<span class="lineNum">     358 </span>            :  */
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 : static void radeon_vm_set_pages(struct radeon_device *rdev,</span>
+<span class="lineNum">     360 </span>            :                                 struct radeon_ib *ib,
+<span class="lineNum">     361 </span>            :                                 uint64_t pe,
+<span class="lineNum">     362 </span>            :                                 uint64_t addr, unsigned count,
+<span class="lineNum">     363 </span>            :                                 uint32_t incr, uint32_t flags)
+<span class="lineNum">     364 </span>            : {
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :         trace_radeon_vm_set_page(pe, addr, count, incr, flags);</span>
+<span class="lineNum">     366 </span>            : 
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :         if ((flags &amp; R600_PTE_GART_MASK) == R600_PTE_GART_MASK) {</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :                 uint64_t src = rdev-&gt;gart.table_addr + (addr &gt;&gt; 12) * 8;</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                 radeon_asic_vm_copy_pages(rdev, ib, pe, src, count);</span>
+<span class="lineNum">     370 </span>            : 
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :         } else if ((flags &amp; R600_PTE_SYSTEM) || (count &lt; 3)) {</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                 radeon_asic_vm_write_pages(rdev, ib, pe, addr,</span>
+<span class="lineNum">     373 </span>            :                                            count, incr, flags);
+<span class="lineNum">     374 </span>            : 
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                 radeon_asic_vm_set_pages(rdev, ib, pe, addr,</span>
+<span class="lineNum">     377 </span>            :                                          count, incr, flags);
+<span class="lineNum">     378 </span>            :         }
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     380 </span>            : 
+<span class="lineNum">     381 </span>            : /**
+<span class="lineNum">     382 </span>            :  * radeon_vm_clear_bo - initially clear the page dir/table
+<span class="lineNum">     383 </span>            :  *
+<span class="lineNum">     384 </span>            :  * @rdev: radeon_device pointer
+<a name="385"><span class="lineNum">     385 </span>            :  * @bo: bo to clear</a>
+<span class="lineNum">     386 </span>            :  */
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 : static int radeon_vm_clear_bo(struct radeon_device *rdev,</span>
+<span class="lineNum">     388 </span>            :                               struct radeon_bo *bo)
+<span class="lineNum">     389 </span>            : {
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         struct radeon_ib ib;</span>
+<span class="lineNum">     391 </span>            :         unsigned entries;
+<span class="lineNum">     392 </span>            :         uint64_t addr;
+<span class="lineNum">     393 </span>            :         int r;
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         r = radeon_bo_reserve(bo, false);</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         if (r)</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     398 </span>            : 
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :         r = ttm_bo_validate(&amp;bo-&gt;tbo, &amp;bo-&gt;placement, true, false);</span>
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :         if (r)</span>
+<span class="lineNum">     401 </span>            :                 goto error_unreserve;
+<span class="lineNum">     402 </span>            : 
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :         addr = radeon_bo_gpu_offset(bo);</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :         entries = radeon_bo_size(bo) / 8;</span>
+<span class="lineNum">     405 </span>            : 
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :         r = radeon_ib_get(rdev, R600_RING_TYPE_DMA_INDEX, &amp;ib, NULL, 256);</span>
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         if (r)</span>
+<span class="lineNum">     408 </span>            :                 goto error_unreserve;
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         ib.length_dw = 0;</span>
+<span class="lineNum">     411 </span>            : 
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :         radeon_vm_set_pages(rdev, &amp;ib, addr, 0, entries, 0, 0);</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         radeon_asic_vm_pad_ib(rdev, &amp;ib);</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         WARN_ON(ib.length_dw &gt; 64);</span>
+<span class="lineNum">     415 </span>            : 
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         r = radeon_ib_schedule(rdev, &amp;ib, NULL, false);</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :         if (r)</span>
+<span class="lineNum">     418 </span>            :                 goto error_free;
+<span class="lineNum">     419 </span>            : 
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         ib.fence-&gt;is_vm_update = true;</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         radeon_bo_fence(bo, ib.fence, false);</span>
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span>            : error_free:
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :         radeon_ib_free(rdev, &amp;ib);</span>
+<span class="lineNum">     425 </span>            : 
+<span class="lineNum">     426 </span>            : error_unreserve:
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :         radeon_bo_unreserve(bo);</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :         return r;</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     430 </span>            : 
+<span class="lineNum">     431 </span>            : /**
+<span class="lineNum">     432 </span>            :  * radeon_vm_bo_set_addr - set bos virtual address inside a vm
+<span class="lineNum">     433 </span>            :  *
+<span class="lineNum">     434 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     435 </span>            :  * @bo_va: bo_va to store the address
+<span class="lineNum">     436 </span>            :  * @soffset: requested offset of the buffer in the VM address space
+<span class="lineNum">     437 </span>            :  * @flags: attributes of pages (read/write/valid/etc.)
+<span class="lineNum">     438 </span>            :  *
+<span class="lineNum">     439 </span>            :  * Set offset of @bo_va (cayman+).
+<span class="lineNum">     440 </span>            :  * Validate and set the offset requested within the vm address space.
+<span class="lineNum">     441 </span>            :  * Returns 0 for success, error for failure.
+<span class="lineNum">     442 </span>            :  *
+<a name="443"><span class="lineNum">     443 </span>            :  * Object has to be reserved and gets unreserved by this function!</a>
+<span class="lineNum">     444 </span>            :  */
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 : int radeon_vm_bo_set_addr(struct radeon_device *rdev,</span>
+<span class="lineNum">     446 </span>            :                           struct radeon_bo_va *bo_va,
+<span class="lineNum">     447 </span>            :                           uint64_t soffset,
+<span class="lineNum">     448 </span>            :                           uint32_t flags)
+<span class="lineNum">     449 </span>            : {
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :         uint64_t size = radeon_bo_size(bo_va-&gt;bo);</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :         struct radeon_vm *vm = bo_va-&gt;vm;</span>
+<span class="lineNum">     452 </span>            :         unsigned last_pfn, pt_idx;
+<span class="lineNum">     453 </span>            :         uint64_t eoffset;
+<span class="lineNum">     454 </span>            :         int r;
+<span class="lineNum">     455 </span>            : 
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :         if (soffset) {</span>
+<span class="lineNum">     457 </span>            :                 /* make sure object fit at this offset */
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :                 eoffset = soffset + size - 1;</span>
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :                 if (soffset &gt;= eoffset) {</span>
+<span class="lineNum">     460 </span>            :                         r = -EINVAL;
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                         goto error_unreserve;</span>
+<span class="lineNum">     462 </span>            :                 }
+<span class="lineNum">     463 </span>            : 
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :                 last_pfn = eoffset / RADEON_GPU_PAGE_SIZE;</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                 if (last_pfn &gt;= rdev-&gt;vm_manager.max_pfn) {</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                         dev_err(rdev-&gt;dev, &quot;va above limit (0x%08X &gt;= 0x%08X)\n&quot;,</span>
+<span class="lineNum">     467 </span>            :                                 last_pfn, rdev-&gt;vm_manager.max_pfn);
+<span class="lineNum">     468 </span>            :                         r = -EINVAL;
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :                         goto error_unreserve;</span>
+<span class="lineNum">     470 </span>            :                 }
+<span class="lineNum">     471 </span>            : 
+<span class="lineNum">     472 </span>            :         } else {
+<span class="lineNum">     473 </span>            :                 eoffset = last_pfn = 0;
+<span class="lineNum">     474 </span>            :         }
+<span class="lineNum">     475 </span>            : 
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :         soffset /= RADEON_GPU_PAGE_SIZE;</span>
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         eoffset /= RADEON_GPU_PAGE_SIZE;</span>
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :         if (soffset || eoffset) {</span>
+<span class="lineNum">     480 </span>            :                 struct interval_tree_node *it;
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :                 it = interval_tree_iter_first(&amp;vm-&gt;va, soffset, eoffset);</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :                 if (it &amp;&amp; it != &amp;bo_va-&gt;it) {</span>
+<span class="lineNum">     483 </span>            :                         struct radeon_bo_va *tmp;
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :                         tmp = container_of(it, struct radeon_bo_va, it);</span>
+<span class="lineNum">     485 </span>            :                         /* bo and tmp overlap, invalid offset */
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                         dev_err(rdev-&gt;dev, &quot;bo %p va 0x%010llx conflict with &quot;</span>
+<span class="lineNum">     487 </span>            :                                 &quot;(bo %p 0x%010lx 0x%010lx)\n&quot;, bo_va-&gt;bo,
+<span class="lineNum">     488 </span>            :                                 soffset, tmp-&gt;bo, tmp-&gt;it.start, tmp-&gt;it.last);
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                         mutex_unlock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">     490 </span>            :                         r = -EINVAL;
+<span class="lineNum">     491 </span>            :                         goto error_unreserve;
+<span class="lineNum">     492 </span>            :                 }
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     494 </span>            : 
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :         if (bo_va-&gt;it.start || bo_va-&gt;it.last) {</span>
+<span class="lineNum">     496 </span>            :                 /* add a clone of the bo_va to clear the old address */
+<span class="lineNum">     497 </span>            :                 struct radeon_bo_va *tmp;
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :                 tmp = kzalloc(sizeof(struct radeon_bo_va), GFP_KERNEL);</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :                 if (!tmp) {</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :                         mutex_unlock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">     501 </span>            :                         r = -ENOMEM;
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                         goto error_unreserve;</span>
+<span class="lineNum">     503 </span>            :                 }
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :                 tmp-&gt;it.start = bo_va-&gt;it.start;</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :                 tmp-&gt;it.last = bo_va-&gt;it.last;</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :                 tmp-&gt;vm = vm;</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :                 tmp-&gt;bo = radeon_bo_ref(bo_va-&gt;bo);</span>
+<span class="lineNum">     508 </span>            : 
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :                 interval_tree_remove(&amp;bo_va-&gt;it, &amp;vm-&gt;va);</span>
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :                 spin_lock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :                 bo_va-&gt;it.start = 0;</span>
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :                 bo_va-&gt;it.last = 0;</span>
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :                 list_del_init(&amp;bo_va-&gt;vm_status);</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                 list_add(&amp;tmp-&gt;vm_status, &amp;vm-&gt;freed);</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :                 spin_unlock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     517 </span>            : 
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :         if (soffset || eoffset) {</span>
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :                 spin_lock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :                 bo_va-&gt;it.start = soffset;</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                 bo_va-&gt;it.last = eoffset;</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :                 list_add(&amp;bo_va-&gt;vm_status, &amp;vm-&gt;cleared);</span>
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :                 spin_unlock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :                 interval_tree_insert(&amp;bo_va-&gt;it, &amp;vm-&gt;va);</span>
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     526 </span>            : 
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :         bo_va-&gt;flags = flags;</span>
+<span class="lineNum">     528 </span>            : 
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :         soffset &gt;&gt;= radeon_vm_block_size;</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :         eoffset &gt;&gt;= radeon_vm_block_size;</span>
+<span class="lineNum">     531 </span>            : 
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :         BUG_ON(eoffset &gt;= radeon_vm_num_pdes(rdev));</span>
+<span class="lineNum">     533 </span>            : 
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :         if (eoffset &gt; vm-&gt;max_pde_used)</span>
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                 vm-&gt;max_pde_used = eoffset;</span>
+<span class="lineNum">     536 </span>            : 
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :         radeon_bo_unreserve(bo_va-&gt;bo);</span>
+<span class="lineNum">     538 </span>            : 
+<span class="lineNum">     539 </span>            :         /* walk over the address space and allocate the page tables */
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :         for (pt_idx = soffset; pt_idx &lt;= eoffset; ++pt_idx) {</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                 struct radeon_bo *pt;</span>
+<span class="lineNum">     542 </span>            : 
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :                 if (vm-&gt;page_tables[pt_idx].bo)</span>
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     545 </span>            : 
+<span class="lineNum">     546 </span>            :                 /* drop mutex to allocate and clear page table */
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">     548 </span>            : 
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :                 r = radeon_bo_create(rdev, RADEON_VM_PTE_COUNT * 8,</span>
+<span class="lineNum">     550 </span>            :                                      RADEON_GPU_PAGE_SIZE, true,
+<span class="lineNum">     551 </span>            :                                      RADEON_GEM_DOMAIN_VRAM, 0,
+<span class="lineNum">     552 </span>            :                                      NULL, NULL, &amp;pt);
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 :                 if (r)</span>
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">     555 </span>            : 
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :                 r = radeon_vm_clear_bo(rdev, pt);</span>
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :                 if (r) {</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :                         radeon_bo_unref(&amp;pt);</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">     560 </span>            :                 }
+<span class="lineNum">     561 </span>            : 
+<span class="lineNum">     562 </span>            :                 /* aquire mutex again */
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                 mutex_lock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :                 if (vm-&gt;page_tables[pt_idx].bo) {</span>
+<span class="lineNum">     565 </span>            :                         /* someone else allocated the pt in the meantime */
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :                         mutex_unlock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :                         radeon_bo_unref(&amp;pt);</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                         mutex_lock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     570 </span>            :                 }
+<span class="lineNum">     571 </span>            : 
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :                 vm-&gt;page_tables[pt_idx].addr = 0;</span>
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :                 vm-&gt;page_tables[pt_idx].bo = pt;</span>
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     575 </span>            : 
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     578 </span>            : 
+<span class="lineNum">     579 </span>            : error_unreserve:
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         radeon_bo_unreserve(bo_va-&gt;bo);</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :         return r;</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     583 </span>            : 
+<span class="lineNum">     584 </span>            : /**
+<span class="lineNum">     585 </span>            :  * radeon_vm_map_gart - get the physical address of a gart page
+<span class="lineNum">     586 </span>            :  *
+<span class="lineNum">     587 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     588 </span>            :  * @addr: the unmapped addr
+<span class="lineNum">     589 </span>            :  *
+<span class="lineNum">     590 </span>            :  * Look up the physical address of the page that the pte resolves
+<span class="lineNum">     591 </span>            :  * to (cayman+).
+<a name="592"><span class="lineNum">     592 </span>            :  * Returns the physical address of the page.</a>
+<span class="lineNum">     593 </span>            :  */
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 : uint64_t radeon_vm_map_gart(struct radeon_device *rdev, uint64_t addr)</span>
+<span class="lineNum">     595 </span>            : {
+<span class="lineNum">     596 </span>            :         uint64_t result;
+<span class="lineNum">     597 </span>            : 
+<span class="lineNum">     598 </span>            :         /* page table offset */
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :         result = rdev-&gt;gart.pages_entry[addr &gt;&gt; RADEON_GPU_PAGE_SHIFT];</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :         result &amp;= ~RADEON_GPU_PAGE_MASK;</span>
+<span class="lineNum">     601 </span>            : 
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :         return result;</span>
+<span class="lineNum">     603 </span>            : }
+<span class="lineNum">     604 </span>            : 
+<span class="lineNum">     605 </span>            : /**
+<span class="lineNum">     606 </span>            :  * radeon_vm_page_flags - translate page flags to what the hw uses
+<span class="lineNum">     607 </span>            :  *
+<span class="lineNum">     608 </span>            :  * @flags: flags comming from userspace
+<span class="lineNum">     609 </span>            :  *
+<a name="610"><span class="lineNum">     610 </span>            :  * Translate the flags the userspace ABI uses to hw flags.</a>
+<span class="lineNum">     611 </span>            :  */
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 : static uint32_t radeon_vm_page_flags(uint32_t flags)</span>
+<span class="lineNum">     613 </span>            : {
+<span class="lineNum">     614 </span>            :         uint32_t hw_flags = 0;
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :         hw_flags |= (flags &amp; RADEON_VM_PAGE_VALID) ? R600_PTE_VALID : 0;</span>
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :         hw_flags |= (flags &amp; RADEON_VM_PAGE_READABLE) ? R600_PTE_READABLE : 0;</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :         hw_flags |= (flags &amp; RADEON_VM_PAGE_WRITEABLE) ? R600_PTE_WRITEABLE : 0;</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :         if (flags &amp; RADEON_VM_PAGE_SYSTEM) {</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :                 hw_flags |= R600_PTE_SYSTEM;</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :                 hw_flags |= (flags &amp; RADEON_VM_PAGE_SNOOPED) ? R600_PTE_SNOOPED : 0;</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :         return hw_flags;</span>
+<span class="lineNum">     623 </span>            : }
+<span class="lineNum">     624 </span>            : 
+<span class="lineNum">     625 </span>            : /**
+<span class="lineNum">     626 </span>            :  * radeon_vm_update_pdes - make sure that page directory is valid
+<span class="lineNum">     627 </span>            :  *
+<span class="lineNum">     628 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     629 </span>            :  * @vm: requested vm
+<span class="lineNum">     630 </span>            :  * @start: start of GPU address range
+<span class="lineNum">     631 </span>            :  * @end: end of GPU address range
+<span class="lineNum">     632 </span>            :  *
+<span class="lineNum">     633 </span>            :  * Allocates new page tables if necessary
+<span class="lineNum">     634 </span>            :  * and updates the page directory (cayman+).
+<span class="lineNum">     635 </span>            :  * Returns 0 for success, error for failure.
+<span class="lineNum">     636 </span>            :  *
+<a name="637"><span class="lineNum">     637 </span>            :  * Global and local mutex must be locked!</a>
+<span class="lineNum">     638 </span>            :  */
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 : int radeon_vm_update_page_directory(struct radeon_device *rdev,</span>
+<span class="lineNum">     640 </span>            :                                     struct radeon_vm *vm)
+<span class="lineNum">     641 </span>            : {
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         struct radeon_bo *pd = vm-&gt;page_directory;</span>
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :         uint64_t pd_addr = radeon_bo_gpu_offset(pd);</span>
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :         uint32_t incr = RADEON_VM_PTE_COUNT * 8;</span>
+<span class="lineNum">     645 </span>            :         uint64_t last_pde = ~0, last_pt = ~0;
+<span class="lineNum">     646 </span>            :         unsigned count = 0, pt_idx, ndw;
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         struct radeon_ib ib;</span>
+<span class="lineNum">     648 </span>            :         int r;
+<span class="lineNum">     649 </span>            : 
+<span class="lineNum">     650 </span>            :         /* padding, etc. */
+<span class="lineNum">     651 </span>            :         ndw = 64;
+<span class="lineNum">     652 </span>            : 
+<span class="lineNum">     653 </span>            :         /* assume the worst case */
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :         ndw += vm-&gt;max_pde_used * 6;</span>
+<span class="lineNum">     655 </span>            : 
+<span class="lineNum">     656 </span>            :         /* update too big for an IB */
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :         if (ndw &gt; 0xfffff)</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                 return -ENOMEM;</span>
+<span class="lineNum">     659 </span>            : 
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         r = radeon_ib_get(rdev, R600_RING_TYPE_DMA_INDEX, &amp;ib, NULL, ndw * 4);</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :         if (r)</span>
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :         ib.length_dw = 0;</span>
+<span class="lineNum">     664 </span>            : 
+<span class="lineNum">     665 </span>            :         /* walk over the address space and update the page directory */
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :         for (pt_idx = 0; pt_idx &lt;= vm-&gt;max_pde_used; ++pt_idx) {</span>
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                 struct radeon_bo *bo = vm-&gt;page_tables[pt_idx].bo;</span>
+<span class="lineNum">     668 </span>            :                 uint64_t pde, pt;
+<span class="lineNum">     669 </span>            : 
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :                 if (bo == NULL)</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     672 </span>            : 
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :                 pt = radeon_bo_gpu_offset(bo);</span>
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :                 if (vm-&gt;page_tables[pt_idx].addr == pt)</span>
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :                 vm-&gt;page_tables[pt_idx].addr = pt;</span>
+<span class="lineNum">     677 </span>            : 
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :                 pde = pd_addr + pt_idx * 8;</span>
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :                 if (((last_pde + 8 * count) != pde) ||</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :                     ((last_pt + incr * count) != pt)) {</span>
+<span class="lineNum">     681 </span>            : 
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :                         if (count) {</span>
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :                                 radeon_vm_set_pages(rdev, &amp;ib, last_pde,</span>
+<span class="lineNum">     684 </span>            :                                                     last_pt, count, incr,
+<span class="lineNum">     685 </span>            :                                                     R600_PTE_VALID);
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     687 </span>            : 
+<span class="lineNum">     688 </span>            :                         count = 1;
+<span class="lineNum">     689 </span>            :                         last_pde = pde;
+<span class="lineNum">     690 </span>            :                         last_pt = pt;
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :                         ++count;</span>
+<span class="lineNum">     693 </span>            :                 }
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     695 </span>            : 
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :         if (count)</span>
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :                 radeon_vm_set_pages(rdev, &amp;ib, last_pde, last_pt, count,</span>
+<span class="lineNum">     698 </span>            :                                     incr, R600_PTE_VALID);
+<span class="lineNum">     699 </span>            : 
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 :         if (ib.length_dw != 0) {</span>
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :                 radeon_asic_vm_pad_ib(rdev, &amp;ib);</span>
+<span class="lineNum">     702 </span>            : 
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :                 radeon_sync_resv(rdev, &amp;ib.sync, pd-&gt;tbo.resv, true);</span>
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :                 WARN_ON(ib.length_dw &gt; ndw);</span>
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :                 r = radeon_ib_schedule(rdev, &amp;ib, NULL, false);</span>
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :                 if (r) {</span>
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :                         radeon_ib_free(rdev, &amp;ib);</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">     709 </span>            :                 }
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :                 ib.fence-&gt;is_vm_update = true;</span>
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                 radeon_bo_fence(pd, ib.fence, false);</span>
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 :         radeon_ib_free(rdev, &amp;ib);</span>
+<span class="lineNum">     714 </span>            : 
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     717 </span>            : 
+<span class="lineNum">     718 </span>            : /**
+<span class="lineNum">     719 </span>            :  * radeon_vm_frag_ptes - add fragment information to PTEs
+<span class="lineNum">     720 </span>            :  *
+<span class="lineNum">     721 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     722 </span>            :  * @ib: IB for the update
+<span class="lineNum">     723 </span>            :  * @pe_start: first PTE to handle
+<span class="lineNum">     724 </span>            :  * @pe_end: last PTE to handle
+<span class="lineNum">     725 </span>            :  * @addr: addr those PTEs should point to
+<span class="lineNum">     726 </span>            :  * @flags: hw mapping flags
+<span class="lineNum">     727 </span>            :  *
+<a name="728"><span class="lineNum">     728 </span>            :  * Global and local mutex must be locked!</a>
+<span class="lineNum">     729 </span>            :  */
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 : static void radeon_vm_frag_ptes(struct radeon_device *rdev,</span>
+<span class="lineNum">     731 </span>            :                                 struct radeon_ib *ib,
+<span class="lineNum">     732 </span>            :                                 uint64_t pe_start, uint64_t pe_end,
+<span class="lineNum">     733 </span>            :                                 uint64_t addr, uint32_t flags)
+<span class="lineNum">     734 </span>            : {
+<span class="lineNum">     735 </span>            :         /**
+<span class="lineNum">     736 </span>            :          * The MC L1 TLB supports variable sized pages, based on a fragment
+<span class="lineNum">     737 </span>            :          * field in the PTE. When this field is set to a non-zero value, page
+<span class="lineNum">     738 </span>            :          * granularity is increased from 4KB to (1 &lt;&lt; (12 + frag)). The PTE
+<span class="lineNum">     739 </span>            :          * flags are considered valid for all PTEs within the fragment range
+<span class="lineNum">     740 </span>            :          * and corresponding mappings are assumed to be physically contiguous.
+<span class="lineNum">     741 </span>            :          *
+<span class="lineNum">     742 </span>            :          * The L1 TLB can store a single PTE for the whole fragment,
+<span class="lineNum">     743 </span>            :          * significantly increasing the space available for translation
+<span class="lineNum">     744 </span>            :          * caching. This leads to large improvements in throughput when the
+<span class="lineNum">     745 </span>            :          * TLB is under pressure.
+<span class="lineNum">     746 </span>            :          *
+<span class="lineNum">     747 </span>            :          * The L2 TLB distributes small and large fragments into two
+<span class="lineNum">     748 </span>            :          * asymmetric partitions. The large fragment cache is significantly
+<span class="lineNum">     749 </span>            :          * larger. Thus, we try to use large fragments wherever possible.
+<span class="lineNum">     750 </span>            :          * Userspace can support this by aligning virtual base address and
+<span class="lineNum">     751 </span>            :          * allocation size to the fragment size.
+<span class="lineNum">     752 </span>            :          */
+<span class="lineNum">     753 </span>            : 
+<span class="lineNum">     754 </span>            :         /* NI is optimized for 256KB fragments, SI and newer for 64KB */
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :         uint64_t frag_flags = ((rdev-&gt;family == CHIP_CAYMAN) ||</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :                                (rdev-&gt;family == CHIP_ARUBA)) ?</span>
+<span class="lineNum">     757 </span>            :                         R600_PTE_FRAG_256KB : R600_PTE_FRAG_64KB;
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :         uint64_t frag_align = ((rdev-&gt;family == CHIP_CAYMAN) ||</span>
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :                                (rdev-&gt;family == CHIP_ARUBA)) ? 0x200 : 0x80;</span>
+<span class="lineNum">     760 </span>            : 
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :         uint64_t frag_start = roundup2(pe_start, frag_align);</span>
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :         uint64_t frag_end = pe_end &amp; ~(frag_align - 1);</span>
+<span class="lineNum">     763 </span>            : 
+<span class="lineNum">     764 </span>            :         unsigned count;
+<span class="lineNum">     765 </span>            : 
+<span class="lineNum">     766 </span>            :         /* system pages are non continuously */
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :         if ((flags &amp; R600_PTE_SYSTEM) || !(flags &amp; R600_PTE_VALID) ||</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :             (frag_start &gt;= frag_end)) {</span>
+<span class="lineNum">     769 </span>            : 
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :                 count = (pe_end - pe_start) / 8;</span>
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :                 radeon_vm_set_pages(rdev, ib, pe_start, addr, count,</span>
+<span class="lineNum">     772 </span>            :                                     RADEON_GPU_PAGE_SIZE, flags);
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     774 </span>            :         }
+<span class="lineNum">     775 </span>            : 
+<span class="lineNum">     776 </span>            :         /* handle the 4K area at the beginning */
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :         if (pe_start != frag_start) {</span>
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :                 count = (frag_start - pe_start) / 8;</span>
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :                 radeon_vm_set_pages(rdev, ib, pe_start, addr, count,</span>
+<span class="lineNum">     780 </span>            :                                     RADEON_GPU_PAGE_SIZE, flags);
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :                 addr += RADEON_GPU_PAGE_SIZE * count;</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     783 </span>            : 
+<span class="lineNum">     784 </span>            :         /* handle the area in the middle */
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         count = (frag_end - frag_start) / 8;</span>
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :         radeon_vm_set_pages(rdev, ib, frag_start, addr, count,</span>
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :                             RADEON_GPU_PAGE_SIZE, flags | frag_flags);</span>
+<span class="lineNum">     788 </span>            : 
+<span class="lineNum">     789 </span>            :         /* handle the 4K area at the end */
+<span class="lineNum">     790 </span><span class="lineNoCov">          0 :         if (frag_end != pe_end) {</span>
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :                 addr += RADEON_GPU_PAGE_SIZE * count;</span>
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :                 count = (pe_end - frag_end) / 8;</span>
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :                 radeon_vm_set_pages(rdev, ib, frag_end, addr, count,</span>
+<span class="lineNum">     794 </span>            :                                     RADEON_GPU_PAGE_SIZE, flags);
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     797 </span>            : 
+<span class="lineNum">     798 </span>            : /**
+<span class="lineNum">     799 </span>            :  * radeon_vm_update_ptes - make sure that page tables are valid
+<span class="lineNum">     800 </span>            :  *
+<span class="lineNum">     801 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     802 </span>            :  * @vm: requested vm
+<span class="lineNum">     803 </span>            :  * @start: start of GPU address range
+<span class="lineNum">     804 </span>            :  * @end: end of GPU address range
+<span class="lineNum">     805 </span>            :  * @dst: destination address to map to
+<span class="lineNum">     806 </span>            :  * @flags: mapping flags
+<span class="lineNum">     807 </span>            :  *
+<span class="lineNum">     808 </span>            :  * Update the page tables in the range @start - @end (cayman+).
+<span class="lineNum">     809 </span>            :  *
+<a name="810"><span class="lineNum">     810 </span>            :  * Global and local mutex must be locked!</a>
+<span class="lineNum">     811 </span>            :  */
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 : static int radeon_vm_update_ptes(struct radeon_device *rdev,</span>
+<span class="lineNum">     813 </span>            :                                  struct radeon_vm *vm,
+<span class="lineNum">     814 </span>            :                                  struct radeon_ib *ib,
+<span class="lineNum">     815 </span>            :                                  uint64_t start, uint64_t end,
+<span class="lineNum">     816 </span>            :                                  uint64_t dst, uint32_t flags)
+<span class="lineNum">     817 </span>            : {
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :         uint64_t mask = RADEON_VM_PTE_COUNT - 1;</span>
+<span class="lineNum">     819 </span>            :         uint64_t last_pte = ~0, last_dst = ~0;
+<span class="lineNum">     820 </span>            :         unsigned count = 0;
+<span class="lineNum">     821 </span>            :         uint64_t addr;
+<span class="lineNum">     822 </span>            : 
+<span class="lineNum">     823 </span>            :         /* walk over the address space and update the page tables */
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :         for (addr = start; addr &lt; end; ) {</span>
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :                 uint64_t pt_idx = addr &gt;&gt; radeon_vm_block_size;</span>
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :                 struct radeon_bo *pt = vm-&gt;page_tables[pt_idx].bo;</span>
+<span class="lineNum">     827 </span>            :                 unsigned nptes;
+<span class="lineNum">     828 </span>            :                 uint64_t pte;
+<span class="lineNum">     829 </span>            :                 int r;
+<span class="lineNum">     830 </span>            : 
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :                 radeon_sync_resv(rdev, &amp;ib-&gt;sync, pt-&gt;tbo.resv, true);</span>
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                 r = reservation_object_reserve_shared(pt-&gt;tbo.resv);</span>
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 :                 if (r)</span>
+<span class="lineNum">     834 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">     835 </span>            : 
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :                 if ((addr &amp; ~mask) == (end &amp; ~mask))</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :                         nptes = end - addr;</span>
+<span class="lineNum">     838 </span>            :                 else
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :                         nptes = RADEON_VM_PTE_COUNT - (addr &amp; mask);</span>
+<span class="lineNum">     840 </span>            : 
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :                 pte = radeon_bo_gpu_offset(pt);</span>
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :                 pte += (addr &amp; mask) * 8;</span>
+<span class="lineNum">     843 </span>            : 
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :                 if ((last_pte + 8 * count) != pte) {</span>
+<span class="lineNum">     845 </span>            : 
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :                         if (count) {</span>
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :                                 radeon_vm_frag_ptes(rdev, ib, last_pte,</span>
+<span class="lineNum">     848 </span>            :                                                     last_pte + 8 * count,
+<span class="lineNum">     849 </span>            :                                                     last_dst, flags);
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     851 </span>            : 
+<span class="lineNum">     852 </span>            :                         count = nptes;
+<span class="lineNum">     853 </span>            :                         last_pte = pte;
+<span class="lineNum">     854 </span>            :                         last_dst = dst;
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                         count += nptes;</span>
+<span class="lineNum">     857 </span>            :                 }
+<span class="lineNum">     858 </span>            : 
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                 addr += nptes;</span>
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :                 dst += nptes * RADEON_GPU_PAGE_SIZE;</span>
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     862 </span>            : 
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :         if (count) {</span>
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :                 radeon_vm_frag_ptes(rdev, ib, last_pte,</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :                                     last_pte + 8 * count,</span>
+<span class="lineNum">     866 </span>            :                                     last_dst, flags);
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     868 </span>            : 
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     871 </span>            : 
+<span class="lineNum">     872 </span>            : /**
+<span class="lineNum">     873 </span>            :  * radeon_vm_fence_pts - fence page tables after an update
+<span class="lineNum">     874 </span>            :  *
+<span class="lineNum">     875 </span>            :  * @vm: requested vm
+<span class="lineNum">     876 </span>            :  * @start: start of GPU address range
+<span class="lineNum">     877 </span>            :  * @end: end of GPU address range
+<span class="lineNum">     878 </span>            :  * @fence: fence to use
+<span class="lineNum">     879 </span>            :  *
+<span class="lineNum">     880 </span>            :  * Fence the page tables in the range @start - @end (cayman+).
+<span class="lineNum">     881 </span>            :  *
+<a name="882"><span class="lineNum">     882 </span>            :  * Global and local mutex must be locked!</a>
+<span class="lineNum">     883 </span>            :  */
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 : static void radeon_vm_fence_pts(struct radeon_vm *vm,</span>
+<span class="lineNum">     885 </span>            :                                 uint64_t start, uint64_t end,
+<span class="lineNum">     886 </span>            :                                 struct radeon_fence *fence)
+<span class="lineNum">     887 </span>            : {
+<span class="lineNum">     888 </span>            :         unsigned i;
+<span class="lineNum">     889 </span>            : 
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 :         start &gt;&gt;= radeon_vm_block_size;</span>
+<span class="lineNum">     891 </span><span class="lineNoCov">          0 :         end = (end - 1) &gt;&gt; radeon_vm_block_size;</span>
+<span class="lineNum">     892 </span>            : 
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 :         for (i = start; i &lt;= end; ++i)</span>
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :                 radeon_bo_fence(vm-&gt;page_tables[i].bo, fence, true);</span>
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     896 </span>            : 
+<span class="lineNum">     897 </span>            : /**
+<span class="lineNum">     898 </span>            :  * radeon_vm_bo_update - map a bo into the vm page table
+<span class="lineNum">     899 </span>            :  *
+<span class="lineNum">     900 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     901 </span>            :  * @vm: requested vm
+<span class="lineNum">     902 </span>            :  * @bo: radeon buffer object
+<span class="lineNum">     903 </span>            :  * @mem: ttm mem
+<span class="lineNum">     904 </span>            :  *
+<span class="lineNum">     905 </span>            :  * Fill in the page table entries for @bo (cayman+).
+<span class="lineNum">     906 </span>            :  * Returns 0 for success, -EINVAL for failure.
+<span class="lineNum">     907 </span>            :  *
+<a name="908"><span class="lineNum">     908 </span>            :  * Object have to be reserved and mutex must be locked!</a>
+<span class="lineNum">     909 </span>            :  */
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 : int radeon_vm_bo_update(struct radeon_device *rdev,</span>
+<span class="lineNum">     911 </span>            :                         struct radeon_bo_va *bo_va,
+<span class="lineNum">     912 </span>            :                         struct ttm_mem_reg *mem)
+<span class="lineNum">     913 </span>            : {
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :         struct radeon_vm *vm = bo_va-&gt;vm;</span>
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :         struct radeon_ib ib;</span>
+<span class="lineNum">     916 </span>            :         unsigned nptes, ncmds, ndw;
+<span class="lineNum">     917 </span>            :         uint64_t addr;
+<span class="lineNum">     918 </span>            :         uint32_t flags;
+<span class="lineNum">     919 </span>            :         int r;
+<span class="lineNum">     920 </span>            : 
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :         if (!bo_va-&gt;it.start) {</span>
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :                 dev_err(rdev-&gt;dev, &quot;bo %p don't has a mapping in vm %p\n&quot;,</span>
+<span class="lineNum">     923 </span>            :                         bo_va-&gt;bo, vm);
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     925 </span>            :         }
+<span class="lineNum">     926 </span>            : 
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :         spin_lock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :         if (mem) {</span>
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :                 if (list_empty(&amp;bo_va-&gt;vm_status)) {</span>
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :                         spin_unlock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">     932 </span>            :                 }
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :                 list_del_init(&amp;bo_va-&gt;vm_status);</span>
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :                 list_del(&amp;bo_va-&gt;vm_status);</span>
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :                 list_add(&amp;bo_va-&gt;vm_status, &amp;vm-&gt;cleared);</span>
+<span class="lineNum">     937 </span>            :         }
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :         spin_unlock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">     939 </span>            : 
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :         bo_va-&gt;flags &amp;= ~RADEON_VM_PAGE_VALID;</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :         bo_va-&gt;flags &amp;= ~RADEON_VM_PAGE_SYSTEM;</span>
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :         bo_va-&gt;flags &amp;= ~RADEON_VM_PAGE_SNOOPED;</span>
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :         if (bo_va-&gt;bo &amp;&amp; radeon_ttm_tt_is_readonly(bo_va-&gt;bo-&gt;tbo.ttm))</span>
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :                 bo_va-&gt;flags &amp;= ~RADEON_VM_PAGE_WRITEABLE;</span>
+<span class="lineNum">     945 </span>            : 
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :         if (mem) {</span>
+<span class="lineNum">     947 </span><span class="lineNoCov">          0 :                 addr = mem-&gt;start &lt;&lt; PAGE_SHIFT;</span>
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 :                 if (mem-&gt;mem_type != TTM_PL_SYSTEM) {</span>
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :                         bo_va-&gt;flags |= RADEON_VM_PAGE_VALID;</span>
+<span class="lineNum">     950 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     951 </span><span class="lineNoCov">          0 :                 if (mem-&gt;mem_type == TTM_PL_TT) {</span>
+<span class="lineNum">     952 </span><span class="lineNoCov">          0 :                         bo_va-&gt;flags |= RADEON_VM_PAGE_SYSTEM;</span>
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 :                         if (!(bo_va-&gt;bo-&gt;flags &amp; (RADEON_GEM_GTT_WC | RADEON_GEM_GTT_UC)))</span>
+<span class="lineNum">     954 </span><span class="lineNoCov">          0 :                                 bo_va-&gt;flags |= RADEON_VM_PAGE_SNOOPED;</span>
+<span class="lineNum">     955 </span>            : 
+<span class="lineNum">     956 </span>            :                 } else {
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :                         addr += rdev-&gt;vm_manager.vram_base_offset;</span>
+<span class="lineNum">     958 </span>            :                 }
+<span class="lineNum">     959 </span>            :         } else {
+<span class="lineNum">     960 </span>            :                 addr = 0;
+<span class="lineNum">     961 </span>            :         }
+<span class="lineNum">     962 </span>            : 
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         trace_radeon_vm_bo_update(bo_va);</span>
+<span class="lineNum">     964 </span>            : 
+<span class="lineNum">     965 </span><span class="lineNoCov">          0 :         nptes = bo_va-&gt;it.last - bo_va-&gt;it.start + 1;</span>
+<span class="lineNum">     966 </span>            : 
+<span class="lineNum">     967 </span>            :         /* reserve space for one command every (1 &lt;&lt; BLOCK_SIZE) entries
+<span class="lineNum">     968 </span>            :            or 2k dwords (whatever is smaller) */
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :         ncmds = (nptes &gt;&gt; min(radeon_vm_block_size, 11)) + 1;</span>
+<span class="lineNum">     970 </span>            : 
+<span class="lineNum">     971 </span>            :         /* padding, etc. */
+<span class="lineNum">     972 </span>            :         ndw = 64;
+<span class="lineNum">     973 </span>            : 
+<span class="lineNum">     974 </span><span class="lineNoCov">          0 :         flags = radeon_vm_page_flags(bo_va-&gt;flags);</span>
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 :         if ((flags &amp; R600_PTE_GART_MASK) == R600_PTE_GART_MASK) {</span>
+<span class="lineNum">     976 </span>            :                 /* only copy commands needed */
+<span class="lineNum">     977 </span><span class="lineNoCov">          0 :                 ndw += ncmds * 7;</span>
+<span class="lineNum">     978 </span>            : 
+<span class="lineNum">     979 </span><span class="lineNoCov">          0 :         } else if (flags &amp; R600_PTE_SYSTEM) {</span>
+<span class="lineNum">     980 </span>            :                 /* header for write data commands */
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 :                 ndw += ncmds * 4;</span>
+<span class="lineNum">     982 </span>            : 
+<span class="lineNum">     983 </span>            :                 /* body of write data command */
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 :                 ndw += nptes * 2;</span>
+<span class="lineNum">     985 </span>            : 
+<span class="lineNum">     986 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     987 </span>            :                 /* set page commands needed */
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :                 ndw += ncmds * 10;</span>
+<span class="lineNum">     989 </span>            : 
+<span class="lineNum">     990 </span>            :                 /* two extra commands for begin/end of fragment */
+<span class="lineNum">     991 </span><span class="lineNoCov">          0 :                 ndw += 2 * 10;</span>
+<span class="lineNum">     992 </span>            :         }
+<span class="lineNum">     993 </span>            : 
+<span class="lineNum">     994 </span>            :         /* update too big for an IB */
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :         if (ndw &gt; 0xfffff)</span>
+<span class="lineNum">     996 </span><span class="lineNoCov">          0 :                 return -ENOMEM;</span>
+<span class="lineNum">     997 </span>            : 
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 :         r = radeon_ib_get(rdev, R600_RING_TYPE_DMA_INDEX, &amp;ib, NULL, ndw * 4);</span>
+<span class="lineNum">     999 </span><span class="lineNoCov">          0 :         if (r)</span>
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :         ib.length_dw = 0;</span>
+<span class="lineNum">    1002 </span>            : 
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :         if (!(bo_va-&gt;flags &amp; RADEON_VM_PAGE_VALID)) {</span>
+<span class="lineNum">    1004 </span>            :                 unsigned i;
+<span class="lineNum">    1005 </span>            : 
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; RADEON_NUM_RINGS; ++i)</span>
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 :                         radeon_sync_fence(&amp;ib.sync, vm-&gt;ids[i].last_id_use);</span>
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1009 </span>            : 
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :         r = radeon_vm_update_ptes(rdev, vm, &amp;ib, bo_va-&gt;it.start,</span>
+<span class="lineNum">    1011 </span><span class="lineNoCov">          0 :                                   bo_va-&gt;it.last + 1, addr,</span>
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :                                   radeon_vm_page_flags(bo_va-&gt;flags));</span>
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">    1014 </span><span class="lineNoCov">          0 :                 radeon_ib_free(rdev, &amp;ib);</span>
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">    1016 </span>            :         }
+<span class="lineNum">    1017 </span>            : 
+<span class="lineNum">    1018 </span><span class="lineNoCov">          0 :         radeon_asic_vm_pad_ib(rdev, &amp;ib);</span>
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :         WARN_ON(ib.length_dw &gt; ndw);</span>
+<span class="lineNum">    1020 </span>            : 
+<span class="lineNum">    1021 </span><span class="lineNoCov">          0 :         r = radeon_ib_schedule(rdev, &amp;ib, NULL, false);</span>
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 :                 radeon_ib_free(rdev, &amp;ib);</span>
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">    1025 </span>            :         }
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :         ib.fence-&gt;is_vm_update = true;</span>
+<span class="lineNum">    1027 </span><span class="lineNoCov">          0 :         radeon_vm_fence_pts(vm, bo_va-&gt;it.start, bo_va-&gt;it.last + 1, ib.fence);</span>
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :         radeon_fence_unref(&amp;bo_va-&gt;last_pt_update);</span>
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :         bo_va-&gt;last_pt_update = radeon_fence_ref(ib.fence);</span>
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :         radeon_ib_free(rdev, &amp;ib);</span>
+<span class="lineNum">    1031 </span>            : 
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1034 </span>            : 
+<span class="lineNum">    1035 </span>            : /**
+<span class="lineNum">    1036 </span>            :  * radeon_vm_clear_freed - clear freed BOs in the PT
+<span class="lineNum">    1037 </span>            :  *
+<span class="lineNum">    1038 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">    1039 </span>            :  * @vm: requested vm
+<span class="lineNum">    1040 </span>            :  *
+<span class="lineNum">    1041 </span>            :  * Make sure all freed BOs are cleared in the PT.
+<span class="lineNum">    1042 </span>            :  * Returns 0 for success.
+<span class="lineNum">    1043 </span>            :  *
+<a name="1044"><span class="lineNum">    1044 </span>            :  * PTs have to be reserved and mutex must be locked!</a>
+<span class="lineNum">    1045 </span>            :  */
+<span class="lineNum">    1046 </span><span class="lineNoCov">          0 : int radeon_vm_clear_freed(struct radeon_device *rdev,</span>
+<span class="lineNum">    1047 </span>            :                           struct radeon_vm *vm)
+<span class="lineNum">    1048 </span>            : {
+<span class="lineNum">    1049 </span>            :         struct radeon_bo_va *bo_va;
+<span class="lineNum">    1050 </span>            :         int r = 0;
+<span class="lineNum">    1051 </span>            : 
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :         spin_lock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 :         while (!list_empty(&amp;vm-&gt;freed)) {</span>
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :                 bo_va = list_first_entry(&amp;vm-&gt;freed,</span>
+<span class="lineNum">    1055 </span>            :                         struct radeon_bo_va, vm_status);
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :                 spin_unlock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">    1057 </span>            : 
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :                 r = radeon_vm_bo_update(rdev, bo_va, NULL);</span>
+<span class="lineNum">    1059 </span><span class="lineNoCov">          0 :                 radeon_bo_unref(&amp;bo_va-&gt;bo);</span>
+<span class="lineNum">    1060 </span><span class="lineNoCov">          0 :                 radeon_fence_unref(&amp;bo_va-&gt;last_pt_update);</span>
+<span class="lineNum">    1061 </span><span class="lineNoCov">          0 :                 spin_lock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 :                 list_del(&amp;bo_va-&gt;vm_status);</span>
+<span class="lineNum">    1063 </span><span class="lineNoCov">          0 :                 kfree(bo_va);</span>
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :                 if (r)</span>
+<span class="lineNum">    1065 </span>            :                         break;
+<span class="lineNum">    1066 </span>            : 
+<span class="lineNum">    1067 </span>            :         }
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 :         spin_unlock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">    1069 </span><span class="lineNoCov">          0 :         return r;</span>
+<span class="lineNum">    1070 </span>            : 
+<span class="lineNum">    1071 </span>            : }
+<span class="lineNum">    1072 </span>            : 
+<span class="lineNum">    1073 </span>            : /**
+<span class="lineNum">    1074 </span>            :  * radeon_vm_clear_invalids - clear invalidated BOs in the PT
+<span class="lineNum">    1075 </span>            :  *
+<span class="lineNum">    1076 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">    1077 </span>            :  * @vm: requested vm
+<span class="lineNum">    1078 </span>            :  *
+<span class="lineNum">    1079 </span>            :  * Make sure all invalidated BOs are cleared in the PT.
+<span class="lineNum">    1080 </span>            :  * Returns 0 for success.
+<span class="lineNum">    1081 </span>            :  *
+<a name="1082"><span class="lineNum">    1082 </span>            :  * PTs have to be reserved and mutex must be locked!</a>
+<span class="lineNum">    1083 </span>            :  */
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 : int radeon_vm_clear_invalids(struct radeon_device *rdev,</span>
+<span class="lineNum">    1085 </span>            :                              struct radeon_vm *vm)
+<span class="lineNum">    1086 </span>            : {
+<span class="lineNum">    1087 </span>            :         struct radeon_bo_va *bo_va;
+<span class="lineNum">    1088 </span>            :         int r;
+<span class="lineNum">    1089 </span>            : 
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :         spin_lock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">    1091 </span><span class="lineNoCov">          0 :         while (!list_empty(&amp;vm-&gt;invalidated)) {</span>
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :                 bo_va = list_first_entry(&amp;vm-&gt;invalidated,</span>
+<span class="lineNum">    1093 </span>            :                         struct radeon_bo_va, vm_status);
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :                 spin_unlock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">    1095 </span>            : 
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 :                 r = radeon_vm_bo_update(rdev, bo_va, NULL);</span>
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :                 if (r)</span>
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">    1099 </span>            : 
+<span class="lineNum">    1100 </span><span class="lineNoCov">          0 :                 spin_lock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">    1101 </span>            :         }
+<span class="lineNum">    1102 </span><span class="lineNoCov">          0 :         spin_unlock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">    1103 </span>            : 
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1106 </span>            : 
+<span class="lineNum">    1107 </span>            : /**
+<span class="lineNum">    1108 </span>            :  * radeon_vm_bo_rmv - remove a bo to a specific vm
+<span class="lineNum">    1109 </span>            :  *
+<span class="lineNum">    1110 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">    1111 </span>            :  * @bo_va: requested bo_va
+<span class="lineNum">    1112 </span>            :  *
+<span class="lineNum">    1113 </span>            :  * Remove @bo_va-&gt;bo from the requested vm (cayman+).
+<span class="lineNum">    1114 </span>            :  *
+<a name="1115"><span class="lineNum">    1115 </span>            :  * Object have to be reserved!</a>
+<span class="lineNum">    1116 </span>            :  */
+<span class="lineNum">    1117 </span><span class="lineNoCov">          0 : void radeon_vm_bo_rmv(struct radeon_device *rdev,</span>
+<span class="lineNum">    1118 </span>            :                       struct radeon_bo_va *bo_va)
+<span class="lineNum">    1119 </span>            : {
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 :         struct radeon_vm *vm = bo_va-&gt;vm;</span>
+<span class="lineNum">    1121 </span>            : 
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :         list_del(&amp;bo_va-&gt;bo_list);</span>
+<span class="lineNum">    1123 </span>            : 
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :         if (bo_va-&gt;it.start || bo_va-&gt;it.last)</span>
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 :                 interval_tree_remove(&amp;bo_va-&gt;it, &amp;vm-&gt;va);</span>
+<span class="lineNum">    1127 </span>            : 
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 :         spin_lock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">    1129 </span><span class="lineNoCov">          0 :         list_del(&amp;bo_va-&gt;vm_status);</span>
+<span class="lineNum">    1130 </span><span class="lineNoCov">          0 :         if (bo_va-&gt;it.start || bo_va-&gt;it.last) {</span>
+<span class="lineNum">    1131 </span><span class="lineNoCov">          0 :                 bo_va-&gt;bo = radeon_bo_ref(bo_va-&gt;bo);</span>
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 :                 list_add(&amp;bo_va-&gt;vm_status, &amp;vm-&gt;freed);</span>
+<span class="lineNum">    1133 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :                 radeon_fence_unref(&amp;bo_va-&gt;last_pt_update);</span>
+<span class="lineNum">    1135 </span><span class="lineNoCov">          0 :                 kfree(bo_va);</span>
+<span class="lineNum">    1136 </span>            :         }
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :         spin_unlock(&amp;vm-&gt;status_lock);</span>
+<span class="lineNum">    1138 </span>            : 
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;vm-&gt;mutex);</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1141 </span>            : 
+<span class="lineNum">    1142 </span>            : /**
+<span class="lineNum">    1143 </span>            :  * radeon_vm_bo_invalidate - mark the bo as invalid
+<span class="lineNum">    1144 </span>            :  *
+<span class="lineNum">    1145 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">    1146 </span>            :  * @vm: requested vm
+<span class="lineNum">    1147 </span>            :  * @bo: radeon buffer object
+<span class="lineNum">    1148 </span>            :  *
+<a name="1149"><span class="lineNum">    1149 </span>            :  * Mark @bo as invalid (cayman+).</a>
+<span class="lineNum">    1150 </span>            :  */
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 : void radeon_vm_bo_invalidate(struct radeon_device *rdev,</span>
+<span class="lineNum">    1152 </span>            :                              struct radeon_bo *bo)
+<span class="lineNum">    1153 </span>            : {
+<span class="lineNum">    1154 </span>            :         struct radeon_bo_va *bo_va;
+<span class="lineNum">    1155 </span>            : 
+<span class="lineNum">    1156 </span><span class="lineNoCov">          0 :         list_for_each_entry(bo_va, &amp;bo-&gt;va, bo_list) {</span>
+<span class="lineNum">    1157 </span><span class="lineNoCov">          0 :                 spin_lock(&amp;bo_va-&gt;vm-&gt;status_lock);</span>
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 :                 if (list_empty(&amp;bo_va-&gt;vm_status) &amp;&amp;</span>
+<span class="lineNum">    1159 </span><span class="lineNoCov">          0 :                     (bo_va-&gt;it.start || bo_va-&gt;it.last))</span>
+<span class="lineNum">    1160 </span><span class="lineNoCov">          0 :                         list_add(&amp;bo_va-&gt;vm_status, &amp;bo_va-&gt;vm-&gt;invalidated);</span>
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :                 spin_unlock(&amp;bo_va-&gt;vm-&gt;status_lock);</span>
+<span class="lineNum">    1162 </span>            :         }
+<span class="lineNum">    1163 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1164 </span>            : 
+<span class="lineNum">    1165 </span>            : /**
+<span class="lineNum">    1166 </span>            :  * radeon_vm_init - initialize a vm instance
+<span class="lineNum">    1167 </span>            :  *
+<span class="lineNum">    1168 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">    1169 </span>            :  * @vm: requested vm
+<span class="lineNum">    1170 </span>            :  *
+<a name="1171"><span class="lineNum">    1171 </span>            :  * Init @vm fields (cayman+).</a>
+<span class="lineNum">    1172 </span>            :  */
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 : int radeon_vm_init(struct radeon_device *rdev, struct radeon_vm *vm)</span>
+<span class="lineNum">    1174 </span>            : {
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :         const unsigned align = min(RADEON_VM_PTB_ALIGN_SIZE,</span>
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 :                 RADEON_VM_PTE_COUNT * 8);</span>
+<span class="lineNum">    1177 </span>            :         unsigned pd_size, pd_entries, pts_size;
+<span class="lineNum">    1178 </span>            :         int i, r;
+<span class="lineNum">    1179 </span>            : 
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :         vm-&gt;ib_bo_va = NULL;</span>
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RADEON_NUM_RINGS; ++i) {</span>
+<span class="lineNum">    1182 </span><span class="lineNoCov">          0 :                 vm-&gt;ids[i].id = 0;</span>
+<span class="lineNum">    1183 </span><span class="lineNoCov">          0 :                 vm-&gt;ids[i].flushed_updates = NULL;</span>
+<span class="lineNum">    1184 </span><span class="lineNoCov">          0 :                 vm-&gt;ids[i].last_id_use = NULL;</span>
+<span class="lineNum">    1185 </span>            :         }
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :         rw_init(&amp;vm-&gt;mutex, &quot;vmlk&quot;);</span>
+<span class="lineNum">    1187 </span><span class="lineNoCov">          0 :         vm-&gt;va = RB_ROOT;</span>
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :         mtx_init(&amp;vm-&gt;status_lock, IPL_TTY);</span>
+<span class="lineNum">    1189 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;vm-&gt;invalidated);</span>
+<span class="lineNum">    1190 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;vm-&gt;freed);</span>
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;vm-&gt;cleared);</span>
+<span class="lineNum">    1192 </span>            : 
+<span class="lineNum">    1193 </span><span class="lineNoCov">          0 :         pd_size = radeon_vm_directory_size(rdev);</span>
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 :         pd_entries = radeon_vm_num_pdes(rdev);</span>
+<span class="lineNum">    1195 </span>            : 
+<span class="lineNum">    1196 </span>            :         /* allocate page table array */
+<span class="lineNum">    1197 </span><span class="lineNoCov">          0 :         pts_size = pd_entries * sizeof(struct radeon_vm_pt);</span>
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 :         vm-&gt;page_tables = kzalloc(pts_size, GFP_KERNEL);</span>
+<span class="lineNum">    1199 </span><span class="lineNoCov">          0 :         if (vm-&gt;page_tables == NULL) {</span>
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;Cannot allocate memory for page table array\n&quot;);</span>
+<span class="lineNum">    1201 </span><span class="lineNoCov">          0 :                 return -ENOMEM;</span>
+<span class="lineNum">    1202 </span>            :         }
+<span class="lineNum">    1203 </span>            : 
+<span class="lineNum">    1204 </span><span class="lineNoCov">          0 :         r = radeon_bo_create(rdev, pd_size, align, true,</span>
+<span class="lineNum">    1205 </span>            :                              RADEON_GEM_DOMAIN_VRAM, 0, NULL,
+<span class="lineNum">    1206 </span><span class="lineNoCov">          0 :                              NULL, &amp;vm-&gt;page_directory);</span>
+<span class="lineNum">    1207 </span><span class="lineNoCov">          0 :         if (r)</span>
+<span class="lineNum">    1208 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">    1209 </span>            : 
+<span class="lineNum">    1210 </span><span class="lineNoCov">          0 :         r = radeon_vm_clear_bo(rdev, vm-&gt;page_directory);</span>
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">    1212 </span><span class="lineNoCov">          0 :                 radeon_bo_unref(&amp;vm-&gt;page_directory);</span>
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :                 vm-&gt;page_directory = NULL;</span>
+<span class="lineNum">    1214 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">    1215 </span>            :         }
+<span class="lineNum">    1216 </span>            : 
+<span class="lineNum">    1217 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1218 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1219 </span>            : 
+<span class="lineNum">    1220 </span>            : /**
+<span class="lineNum">    1221 </span>            :  * radeon_vm_fini - tear down a vm instance
+<span class="lineNum">    1222 </span>            :  *
+<span class="lineNum">    1223 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">    1224 </span>            :  * @vm: requested vm
+<span class="lineNum">    1225 </span>            :  *
+<span class="lineNum">    1226 </span>            :  * Tear down @vm (cayman+).
+<a name="1227"><span class="lineNum">    1227 </span>            :  * Unbind the VM and remove all bos from the vm bo list</a>
+<span class="lineNum">    1228 </span>            :  */
+<span class="lineNum">    1229 </span><span class="lineNoCov">          0 : void radeon_vm_fini(struct radeon_device *rdev, struct radeon_vm *vm)</span>
+<span class="lineNum">    1230 </span>            : {
+<span class="lineNum">    1231 </span>            :         struct radeon_bo_va *bo_va, *tmp;
+<span class="lineNum">    1232 </span>            :         int i, r;
+<span class="lineNum">    1233 </span>            : 
+<span class="lineNum">    1234 </span><span class="lineNoCov">          0 :         if (!RB_EMPTY_ROOT(&amp;vm-&gt;va)) {</span>
+<span class="lineNum">    1235 </span><span class="lineNoCov">          0 :                 dev_err(rdev-&gt;dev, &quot;still active bo inside vm\n&quot;);</span>
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1237 </span><span class="lineNoCov">          0 :         rbtree_postorder_for_each_entry_safe(bo_va, tmp, &amp;vm-&gt;va, it.rb) {</span>
+<span class="lineNum">    1238 </span><span class="lineNoCov">          0 :                 interval_tree_remove(&amp;bo_va-&gt;it, &amp;vm-&gt;va);</span>
+<span class="lineNum">    1239 </span><span class="lineNoCov">          0 :                 r = radeon_bo_reserve(bo_va-&gt;bo, false);</span>
+<span class="lineNum">    1240 </span><span class="lineNoCov">          0 :                 if (!r) {</span>
+<span class="lineNum">    1241 </span><span class="lineNoCov">          0 :                         list_del_init(&amp;bo_va-&gt;bo_list);</span>
+<span class="lineNum">    1242 </span><span class="lineNoCov">          0 :                         radeon_bo_unreserve(bo_va-&gt;bo);</span>
+<span class="lineNum">    1243 </span><span class="lineNoCov">          0 :                         radeon_fence_unref(&amp;bo_va-&gt;last_pt_update);</span>
+<span class="lineNum">    1244 </span><span class="lineNoCov">          0 :                         kfree(bo_va);</span>
+<span class="lineNum">    1245 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1246 </span>            :         }
+<span class="lineNum">    1247 </span><span class="lineNoCov">          0 :         list_for_each_entry_safe(bo_va, tmp, &amp;vm-&gt;freed, vm_status) {</span>
+<span class="lineNum">    1248 </span><span class="lineNoCov">          0 :                 radeon_bo_unref(&amp;bo_va-&gt;bo);</span>
+<span class="lineNum">    1249 </span><span class="lineNoCov">          0 :                 radeon_fence_unref(&amp;bo_va-&gt;last_pt_update);</span>
+<span class="lineNum">    1250 </span><span class="lineNoCov">          0 :                 kfree(bo_va);</span>
+<span class="lineNum">    1251 </span>            :         }
+<span class="lineNum">    1252 </span>            : 
+<span class="lineNum">    1253 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; radeon_vm_num_pdes(rdev); i++)</span>
+<span class="lineNum">    1254 </span><span class="lineNoCov">          0 :                 radeon_bo_unref(&amp;vm-&gt;page_tables[i].bo);</span>
+<span class="lineNum">    1255 </span><span class="lineNoCov">          0 :         kfree(vm-&gt;page_tables);</span>
+<span class="lineNum">    1256 </span>            : 
+<span class="lineNum">    1257 </span><span class="lineNoCov">          0 :         radeon_bo_unref(&amp;vm-&gt;page_directory);</span>
+<span class="lineNum">    1258 </span>            : 
+<span class="lineNum">    1259 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RADEON_NUM_RINGS; ++i) {</span>
+<span class="lineNum">    1260 </span><span class="lineNoCov">          0 :                 radeon_fence_unref(&amp;vm-&gt;ids[i].flushed_updates);</span>
+<span class="lineNum">    1261 </span><span class="lineNoCov">          0 :                 radeon_fence_unref(&amp;vm-&gt;ids[i].last_id_use);</span>
+<span class="lineNum">    1262 </span>            :         }
+<span class="lineNum">    1263 </span>            : 
+<span class="lineNum">    1264 </span>            :         mutex_destroy(&amp;vm-&gt;mutex);
+<span class="lineNum">    1265 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

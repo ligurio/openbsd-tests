@@ -1,0 +1,641 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/radeon/radeon_ring.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">dev/pci/drm/radeon</a> - radeon_ring.c<span style="font-size: 80%;"> (source / <a href="radeon_ring.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">175</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">15</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * Copyright 2008 Advanced Micro Devices, Inc.
+<span class="lineNum">       3 </span>            :  * Copyright 2008 Red Hat Inc.
+<span class="lineNum">       4 </span>            :  * Copyright 2009 Jerome Glisse.
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       7 </span>            :  * copy of this software and associated documentation files (the &quot;Software&quot;),
+<span class="lineNum">       8 </span>            :  * to deal in the Software without restriction, including without limitation
+<span class="lineNum">       9 </span>            :  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+<span class="lineNum">      10 </span>            :  * and/or sell copies of the Software, and to permit persons to whom the
+<span class="lineNum">      11 </span>            :  * Software is furnished to do so, subject to the following conditions:
+<span class="lineNum">      12 </span>            :  *
+<span class="lineNum">      13 </span>            :  * The above copyright notice and this permission notice shall be included in
+<span class="lineNum">      14 </span>            :  * all copies or substantial portions of the Software.
+<span class="lineNum">      15 </span>            :  *
+<span class="lineNum">      16 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      17 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      18 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+<span class="lineNum">      19 </span>            :  * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+<span class="lineNum">      20 </span>            :  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+<span class="lineNum">      21 </span>            :  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+<span class="lineNum">      22 </span>            :  * OTHER DEALINGS IN THE SOFTWARE.
+<span class="lineNum">      23 </span>            :  *
+<span class="lineNum">      24 </span>            :  * Authors: Dave Airlie
+<span class="lineNum">      25 </span>            :  *          Alex Deucher
+<span class="lineNum">      26 </span>            :  *          Jerome Glisse
+<span class="lineNum">      27 </span>            :  *          Christian König
+<span class="lineNum">      28 </span>            :  */
+<span class="lineNum">      29 </span>            : #include &lt;dev/pci/drm/drmP.h&gt;
+<span class="lineNum">      30 </span>            : #include &quot;radeon.h&quot;
+<span class="lineNum">      31 </span>            : 
+<span class="lineNum">      32 </span>            : /*
+<span class="lineNum">      33 </span>            :  * Rings
+<span class="lineNum">      34 </span>            :  * Most engines on the GPU are fed via ring buffers.  Ring
+<span class="lineNum">      35 </span>            :  * buffers are areas of GPU accessible memory that the host
+<span class="lineNum">      36 </span>            :  * writes commands into and the GPU reads commands out of.
+<span class="lineNum">      37 </span>            :  * There is a rptr (read pointer) that determines where the
+<span class="lineNum">      38 </span>            :  * GPU is currently reading, and a wptr (write pointer)
+<span class="lineNum">      39 </span>            :  * which determines where the host has written.  When the
+<span class="lineNum">      40 </span>            :  * pointers are equal, the ring is idle.  When the host
+<span class="lineNum">      41 </span>            :  * writes commands to the ring buffer, it increments the
+<span class="lineNum">      42 </span>            :  * wptr.  The GPU then starts fetching commands and executes
+<span class="lineNum">      43 </span>            :  * them until the pointers are equal again.
+<span class="lineNum">      44 </span>            :  */
+<span class="lineNum">      45 </span>            : static int radeon_debugfs_ring_init(struct radeon_device *rdev, struct radeon_ring *ring);
+<span class="lineNum">      46 </span>            : 
+<span class="lineNum">      47 </span>            : /**
+<span class="lineNum">      48 </span>            :  * radeon_ring_supports_scratch_reg - check if the ring supports
+<span class="lineNum">      49 </span>            :  * writing to scratch registers
+<span class="lineNum">      50 </span>            :  *
+<span class="lineNum">      51 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">      52 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">      53 </span>            :  *
+<span class="lineNum">      54 </span>            :  * Check if a specific ring supports writing to scratch registers (all asics).
+<a name="55"><span class="lineNum">      55 </span>            :  * Returns true if the ring supports writing to scratch regs, false if not.</a>
+<span class="lineNum">      56 </span>            :  */
+<span class="lineNum">      57 </span><span class="lineNoCov">          0 : bool radeon_ring_supports_scratch_reg(struct radeon_device *rdev,</span>
+<span class="lineNum">      58 </span>            :                                       struct radeon_ring *ring)
+<span class="lineNum">      59 </span>            : {
+<span class="lineNum">      60 </span><span class="lineNoCov">          0 :         switch (ring-&gt;idx) {</span>
+<span class="lineNum">      61 </span>            :         case RADEON_RING_TYPE_GFX_INDEX:
+<span class="lineNum">      62 </span>            :         case CAYMAN_RING_TYPE_CP1_INDEX:
+<span class="lineNum">      63 </span>            :         case CAYMAN_RING_TYPE_CP2_INDEX:
+<span class="lineNum">      64 </span><span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">      65 </span>            :         default:
+<span class="lineNum">      66 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">      67 </span>            :         }
+<span class="lineNum">      68 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      69 </span>            : 
+<span class="lineNum">      70 </span>            : /**
+<span class="lineNum">      71 </span>            :  * radeon_ring_free_size - update the free size
+<span class="lineNum">      72 </span>            :  *
+<span class="lineNum">      73 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">      74 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">      75 </span>            :  *
+<a name="76"><span class="lineNum">      76 </span>            :  * Update the free dw slots in the ring buffer (all asics).</a>
+<span class="lineNum">      77 </span>            :  */
+<span class="lineNum">      78 </span><span class="lineNoCov">          0 : void radeon_ring_free_size(struct radeon_device *rdev, struct radeon_ring *ring)</span>
+<span class="lineNum">      79 </span>            : {
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 :         uint32_t rptr = radeon_ring_get_rptr(rdev, ring);</span>
+<span class="lineNum">      81 </span>            : 
+<span class="lineNum">      82 </span>            :         /* This works because ring_size is a power of 2 */
+<span class="lineNum">      83 </span><span class="lineNoCov">          0 :         ring-&gt;ring_free_dw = rptr + (ring-&gt;ring_size / 4);</span>
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 :         ring-&gt;ring_free_dw -= ring-&gt;wptr;</span>
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :         ring-&gt;ring_free_dw &amp;= ring-&gt;ptr_mask;</span>
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :         if (!ring-&gt;ring_free_dw) {</span>
+<span class="lineNum">      87 </span>            :                 /* this is an empty ring */
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :                 ring-&gt;ring_free_dw = ring-&gt;ring_size / 4;</span>
+<span class="lineNum">      89 </span>            :                 /*  update lockup info to avoid false positive */
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :                 radeon_ring_lockup_update(rdev, ring);</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span>            : /**
+<span class="lineNum">      95 </span>            :  * radeon_ring_alloc - allocate space on the ring buffer
+<span class="lineNum">      96 </span>            :  *
+<span class="lineNum">      97 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">      98 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">      99 </span>            :  * @ndw: number of dwords to allocate in the ring buffer
+<span class="lineNum">     100 </span>            :  *
+<span class="lineNum">     101 </span>            :  * Allocate @ndw dwords in the ring buffer (all asics).
+<a name="102"><span class="lineNum">     102 </span>            :  * Returns 0 on success, error on failure.</a>
+<span class="lineNum">     103 </span>            :  */
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 : int radeon_ring_alloc(struct radeon_device *rdev, struct radeon_ring *ring, unsigned ndw)</span>
+<span class="lineNum">     105 </span>            : {
+<span class="lineNum">     106 </span>            :         int r;
+<span class="lineNum">     107 </span>            : 
+<span class="lineNum">     108 </span>            :         /* make sure we aren't trying to allocate more space than there is on the ring */
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         if (ndw &gt; (ring-&gt;ring_size / 4))</span>
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :                 return -ENOMEM;</span>
+<span class="lineNum">     111 </span>            :         /* Align requested size with padding so unlock_commit can
+<span class="lineNum">     112 </span>            :          * pad safely */
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         radeon_ring_free_size(rdev, ring);</span>
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         ndw = (ndw + ring-&gt;align_mask) &amp; ~ring-&gt;align_mask;</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         while (ndw &gt; (ring-&gt;ring_free_dw - 1)) {</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :                 radeon_ring_free_size(rdev, ring);</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :                 if (ndw &lt; ring-&gt;ring_free_dw) {</span>
+<span class="lineNum">     118 </span>            :                         break;
+<span class="lineNum">     119 </span>            :                 }
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :                 r = radeon_fence_wait_next(rdev, ring-&gt;idx);</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :                 if (r)</span>
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">     123 </span>            :         }
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         ring-&gt;count_dw = ndw;</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         ring-&gt;wptr_old = ring-&gt;wptr;</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     128 </span>            : 
+<span class="lineNum">     129 </span>            : /**
+<span class="lineNum">     130 </span>            :  * radeon_ring_lock - lock the ring and allocate space on it
+<span class="lineNum">     131 </span>            :  *
+<span class="lineNum">     132 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     133 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">     134 </span>            :  * @ndw: number of dwords to allocate in the ring buffer
+<span class="lineNum">     135 </span>            :  *
+<span class="lineNum">     136 </span>            :  * Lock the ring and allocate @ndw dwords in the ring buffer
+<span class="lineNum">     137 </span>            :  * (all asics).
+<a name="138"><span class="lineNum">     138 </span>            :  * Returns 0 on success, error on failure.</a>
+<span class="lineNum">     139 </span>            :  */
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 : int radeon_ring_lock(struct radeon_device *rdev, struct radeon_ring *ring, unsigned ndw)</span>
+<span class="lineNum">     141 </span>            : {
+<span class="lineNum">     142 </span>            :         int r;
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         r = radeon_ring_alloc(rdev, ring, ndw);</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     149 </span>            :         }
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     152 </span>            : 
+<span class="lineNum">     153 </span>            : /**
+<span class="lineNum">     154 </span>            :  * radeon_ring_commit - tell the GPU to execute the new
+<span class="lineNum">     155 </span>            :  * commands on the ring buffer
+<span class="lineNum">     156 </span>            :  *
+<span class="lineNum">     157 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     158 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">     159 </span>            :  * @hdp_flush: Whether or not to perform an HDP cache flush
+<span class="lineNum">     160 </span>            :  *
+<span class="lineNum">     161 </span>            :  * Update the wptr (write pointer) to tell the GPU to
+<a name="162"><span class="lineNum">     162 </span>            :  * execute new commands on the ring buffer (all asics).</a>
+<span class="lineNum">     163 </span>            :  */
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 : void radeon_ring_commit(struct radeon_device *rdev, struct radeon_ring *ring,</span>
+<span class="lineNum">     165 </span>            :                         bool hdp_flush)
+<span class="lineNum">     166 </span>            : {
+<span class="lineNum">     167 </span>            :         /* If we are emitting the HDP flush via the ring buffer, we need to
+<span class="lineNum">     168 </span>            :          * do it before padding.
+<span class="lineNum">     169 </span>            :          */
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :         if (hdp_flush &amp;&amp; rdev-&gt;asic-&gt;ring[ring-&gt;idx]-&gt;hdp_flush)</span>
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :                 rdev-&gt;asic-&gt;ring[ring-&gt;idx]-&gt;hdp_flush(rdev, ring);</span>
+<span class="lineNum">     172 </span>            :         /* We pad to match fetch size */
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :         while (ring-&gt;wptr &amp; ring-&gt;align_mask) {</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :                 radeon_ring_write(ring, ring-&gt;nop);</span>
+<span class="lineNum">     175 </span>            :         }
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :         mb();</span>
+<span class="lineNum">     177 </span>            :         /* If we are emitting the HDP flush via MMIO, we need to do it after
+<span class="lineNum">     178 </span>            :          * all CPU writes to VRAM finished.
+<span class="lineNum">     179 </span>            :          */
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         if (hdp_flush &amp;&amp; rdev-&gt;asic-&gt;mmio_hdp_flush)</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                 rdev-&gt;asic-&gt;mmio_hdp_flush(rdev);</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         radeon_ring_set_wptr(rdev, ring);</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     184 </span>            : 
+<span class="lineNum">     185 </span>            : /**
+<span class="lineNum">     186 </span>            :  * radeon_ring_unlock_commit - tell the GPU to execute the new
+<span class="lineNum">     187 </span>            :  * commands on the ring buffer and unlock it
+<span class="lineNum">     188 </span>            :  *
+<span class="lineNum">     189 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     190 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">     191 </span>            :  * @hdp_flush: Whether or not to perform an HDP cache flush
+<span class="lineNum">     192 </span>            :  *
+<a name="193"><span class="lineNum">     193 </span>            :  * Call radeon_ring_commit() then unlock the ring (all asics).</a>
+<span class="lineNum">     194 </span>            :  */
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 : void radeon_ring_unlock_commit(struct radeon_device *rdev, struct radeon_ring *ring,</span>
+<span class="lineNum">     196 </span>            :                                bool hdp_flush)
+<span class="lineNum">     197 </span>            : {
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         radeon_ring_commit(rdev, ring, hdp_flush);</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     201 </span>            : 
+<span class="lineNum">     202 </span>            : /**
+<span class="lineNum">     203 </span>            :  * radeon_ring_undo - reset the wptr
+<span class="lineNum">     204 </span>            :  *
+<span class="lineNum">     205 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">     206 </span>            :  *
+<a name="207"><span class="lineNum">     207 </span>            :  * Reset the driver's copy of the wptr (all asics).</a>
+<span class="lineNum">     208 </span>            :  */
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 : void radeon_ring_undo(struct radeon_ring *ring)</span>
+<span class="lineNum">     210 </span>            : {
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :         ring-&gt;wptr = ring-&gt;wptr_old;</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     213 </span>            : 
+<span class="lineNum">     214 </span>            : /**
+<span class="lineNum">     215 </span>            :  * radeon_ring_unlock_undo - reset the wptr and unlock the ring
+<span class="lineNum">     216 </span>            :  *
+<span class="lineNum">     217 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">     218 </span>            :  *
+<a name="219"><span class="lineNum">     219 </span>            :  * Call radeon_ring_undo() then unlock the ring (all asics).</a>
+<span class="lineNum">     220 </span>            :  */
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 : void radeon_ring_unlock_undo(struct radeon_device *rdev, struct radeon_ring *ring)</span>
+<span class="lineNum">     222 </span>            : {
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :         radeon_ring_undo(ring);</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     226 </span>            : 
+<span class="lineNum">     227 </span>            : /**
+<span class="lineNum">     228 </span>            :  * radeon_ring_lockup_update - update lockup variables
+<span class="lineNum">     229 </span>            :  *
+<span class="lineNum">     230 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">     231 </span>            :  *
+<a name="232"><span class="lineNum">     232 </span>            :  * Update the last rptr value and timestamp (all asics).</a>
+<span class="lineNum">     233 </span>            :  */
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 : void radeon_ring_lockup_update(struct radeon_device *rdev,</span>
+<span class="lineNum">     235 </span>            :                                struct radeon_ring *ring)
+<span class="lineNum">     236 </span>            : {
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :         atomic_set(&amp;ring-&gt;last_rptr, radeon_ring_get_rptr(rdev, ring));</span>
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :         atomic64_set(&amp;ring-&gt;last_activity, jiffies_64);</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     240 </span>            : 
+<span class="lineNum">     241 </span>            : /**
+<span class="lineNum">     242 </span>            :  * radeon_ring_test_lockup() - check if ring is lockedup by recording information
+<span class="lineNum">     243 </span>            :  * @rdev:       radeon device structure
+<span class="lineNum">     244 </span>            :  * @ring:       radeon_ring structure holding ring information
+<a name="245"><span class="lineNum">     245 </span>            :  *</a>
+<span class="lineNum">     246 </span>            :  */
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 : bool radeon_ring_test_lockup(struct radeon_device *rdev, struct radeon_ring *ring)</span>
+<span class="lineNum">     248 </span>            : {
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :         uint32_t rptr = radeon_ring_get_rptr(rdev, ring);</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         uint64_t last = atomic64_read(&amp;ring-&gt;last_activity);</span>
+<span class="lineNum">     251 </span>            :         uint64_t elapsed;
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         if (rptr != atomic_read(&amp;ring-&gt;last_rptr)) {</span>
+<span class="lineNum">     254 </span>            :                 /* ring is still working, no lockup */
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :                 radeon_ring_lockup_update(rdev, ring);</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     257 </span>            :         }
+<span class="lineNum">     258 </span>            : 
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         elapsed = jiffies_to_msecs(jiffies_64 - last);</span>
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         if (radeon_lockup_timeout &amp;&amp; elapsed &gt;= radeon_lockup_timeout) {</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :                 dev_err(rdev-&gt;dev, &quot;ring %d stalled for more than %llumsec\n&quot;,</span>
+<span class="lineNum">     262 </span>            :                         ring-&gt;idx, elapsed);
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">     264 </span>            :         }
+<span class="lineNum">     265 </span>            :         /* give a chance to the GPU ... */
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     268 </span>            : 
+<span class="lineNum">     269 </span>            : /**
+<span class="lineNum">     270 </span>            :  * radeon_ring_backup - Back up the content of a ring
+<span class="lineNum">     271 </span>            :  *
+<span class="lineNum">     272 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     273 </span>            :  * @ring: the ring we want to back up
+<span class="lineNum">     274 </span>            :  *
+<a name="275"><span class="lineNum">     275 </span>            :  * Saves all unprocessed commits from a ring, returns the number of dwords saved.</a>
+<span class="lineNum">     276 </span>            :  */
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 : unsigned radeon_ring_backup(struct radeon_device *rdev, struct radeon_ring *ring,</span>
+<span class="lineNum">     278 </span>            :                             uint32_t **data)
+<span class="lineNum">     279 </span>            : {
+<span class="lineNum">     280 </span>            :         unsigned size, ptr, i;
+<span class="lineNum">     281 </span>            : 
+<span class="lineNum">     282 </span>            :         /* just in case lock the ring */
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         *data = NULL;</span>
+<span class="lineNum">     285 </span>            : 
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :         if (ring-&gt;ring_obj == NULL) {</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     289 </span>            :         }
+<span class="lineNum">     290 </span>            : 
+<span class="lineNum">     291 </span>            :         /* it doesn't make sense to save anything if all fences are signaled */
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :         if (!radeon_fence_count_emitted(rdev, ring-&gt;idx)) {</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     295 </span>            :         }
+<span class="lineNum">     296 </span>            : 
+<span class="lineNum">     297 </span>            :         /* calculate the number of dw on the ring */
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         if (ring-&gt;rptr_save_reg)</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 ptr = RREG32(ring-&gt;rptr_save_reg);</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         else if (rdev-&gt;wb.enabled)</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :                 ptr = le32_to_cpu(*ring-&gt;next_rptr_cpu_addr);</span>
+<span class="lineNum">     302 </span>            :         else {
+<span class="lineNum">     303 </span>            :                 /* no way to read back the next rptr */
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     306 </span>            :         }
+<span class="lineNum">     307 </span>            : 
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         size = ring-&gt;wptr + (ring-&gt;ring_size / 4);</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         size -= ptr;</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         size &amp;= ring-&gt;ptr_mask;</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :         if (size == 0) {</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     314 </span>            :         }
+<span class="lineNum">     315 </span>            : 
+<span class="lineNum">     316 </span>            :         /* and then save the content of the ring */
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :         *data = drm_malloc_ab(size, sizeof(uint32_t));</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :         if (!*data) {</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     321 </span>            :         }
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; size; ++i) {</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :                 (*data)[i] = ring-&gt;ring[ptr++];</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :                 ptr &amp;= ring-&gt;ptr_mask;</span>
+<span class="lineNum">     325 </span>            :         }
+<span class="lineNum">     326 </span>            : 
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :         return size;</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     330 </span>            : 
+<span class="lineNum">     331 </span>            : /**
+<span class="lineNum">     332 </span>            :  * radeon_ring_restore - append saved commands to the ring again
+<span class="lineNum">     333 </span>            :  *
+<span class="lineNum">     334 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     335 </span>            :  * @ring: ring to append commands to
+<span class="lineNum">     336 </span>            :  * @size: number of dwords we want to write
+<span class="lineNum">     337 </span>            :  * @data: saved commands
+<span class="lineNum">     338 </span>            :  *
+<a name="339"><span class="lineNum">     339 </span>            :  * Allocates space on the ring and restore the previously saved commands.</a>
+<span class="lineNum">     340 </span>            :  */
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 : int radeon_ring_restore(struct radeon_device *rdev, struct radeon_ring *ring,</span>
+<span class="lineNum">     342 </span>            :                         unsigned size, uint32_t *data)
+<span class="lineNum">     343 </span>            : {
+<span class="lineNum">     344 </span>            :         int i, r;
+<span class="lineNum">     345 </span>            : 
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         if (!size || !data)</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     348 </span>            : 
+<span class="lineNum">     349 </span>            :         /* restore the saved ring content */
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         r = radeon_ring_lock(rdev, ring, size);</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         if (r)</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     353 </span>            : 
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; size; ++i) {</span>
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :                 radeon_ring_write(ring, data[i]);</span>
+<span class="lineNum">     356 </span>            :         }
+<span class="lineNum">     357 </span>            : 
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :         radeon_ring_unlock_commit(rdev, ring, false);</span>
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :         drm_free_large(data);</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     362 </span>            : 
+<span class="lineNum">     363 </span>            : /**
+<span class="lineNum">     364 </span>            :  * radeon_ring_init - init driver ring struct.
+<span class="lineNum">     365 </span>            :  *
+<span class="lineNum">     366 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     367 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">     368 </span>            :  * @ring_size: size of the ring
+<span class="lineNum">     369 </span>            :  * @rptr_offs: offset of the rptr writeback location in the WB buffer
+<span class="lineNum">     370 </span>            :  * @nop: nop packet for this ring
+<span class="lineNum">     371 </span>            :  *
+<span class="lineNum">     372 </span>            :  * Initialize the driver information for the selected ring (all asics).
+<a name="373"><span class="lineNum">     373 </span>            :  * Returns 0 on success, error on failure.</a>
+<span class="lineNum">     374 </span>            :  */
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 : int radeon_ring_init(struct radeon_device *rdev, struct radeon_ring *ring, unsigned ring_size,</span>
+<span class="lineNum">     376 </span>            :                      unsigned rptr_offs, u32 nop)
+<span class="lineNum">     377 </span>            : {
+<span class="lineNum">     378 </span>            :         int r;
+<span class="lineNum">     379 </span>            : 
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :         ring-&gt;ring_size = ring_size;</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :         ring-&gt;rptr_offs = rptr_offs;</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :         ring-&gt;nop = nop;</span>
+<span class="lineNum">     383 </span>            :         /* Allocate ring buffer */
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :         if (ring-&gt;ring_obj == NULL) {</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                 r = radeon_bo_create(rdev, ring-&gt;ring_size, PAGE_SIZE, true,</span>
+<span class="lineNum">     386 </span>            :                                      RADEON_GEM_DOMAIN_GTT, 0, NULL,
+<span class="lineNum">     387 </span>            :                                      NULL, &amp;ring-&gt;ring_obj);
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                 if (r) {</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :                         dev_err(rdev-&gt;dev, &quot;(%d) ring create failed\n&quot;, r);</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">     391 </span>            :                 }
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                 r = radeon_bo_reserve(ring-&gt;ring_obj, false);</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :                 if (unlikely(r != 0))</span>
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                 r = radeon_bo_pin(ring-&gt;ring_obj, RADEON_GEM_DOMAIN_GTT,</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :                                         &amp;ring-&gt;gpu_addr);</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 if (r) {</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                         radeon_bo_unreserve(ring-&gt;ring_obj);</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                         dev_err(rdev-&gt;dev, &quot;(%d) ring pin failed\n&quot;, r);</span>
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">     401 </span>            :                 }
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                 r = radeon_bo_kmap(ring-&gt;ring_obj,</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                                        (void **)&amp;ring-&gt;ring);</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                 radeon_bo_unreserve(ring-&gt;ring_obj);</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                 if (r) {</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :                         dev_err(rdev-&gt;dev, &quot;(%d) ring map failed\n&quot;, r);</span>
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :                         return r;</span>
+<span class="lineNum">     408 </span>            :                 }
+<span class="lineNum">     409 </span>            :         }
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         ring-&gt;ptr_mask = (ring-&gt;ring_size / 4) - 1;</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         ring-&gt;ring_free_dw = ring-&gt;ring_size / 4;</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :         if (rdev-&gt;wb.enabled) {</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :                 u32 index = RADEON_WB_RING0_NEXT_RPTR + (ring-&gt;idx * 4);</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :                 ring-&gt;next_rptr_gpu_addr = rdev-&gt;wb.gpu_addr + index;</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :                 ring-&gt;next_rptr_cpu_addr = &amp;rdev-&gt;wb.wb[index/4];</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :         if (radeon_debugfs_ring_init(rdev, ring)) {</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;Failed to register debugfs file for rings !\n&quot;);</span>
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         radeon_ring_lockup_update(rdev, ring);</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     423 </span>            : 
+<span class="lineNum">     424 </span>            : /**
+<span class="lineNum">     425 </span>            :  * radeon_ring_fini - tear down the driver ring struct.
+<span class="lineNum">     426 </span>            :  *
+<span class="lineNum">     427 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     428 </span>            :  * @ring: radeon_ring structure holding ring information
+<span class="lineNum">     429 </span>            :  *
+<a name="430"><span class="lineNum">     430 </span>            :  * Tear down the driver information for the selected ring (all asics).</a>
+<span class="lineNum">     431 </span>            :  */
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 : void radeon_ring_fini(struct radeon_device *rdev, struct radeon_ring *ring)</span>
+<span class="lineNum">     433 </span>            : {
+<span class="lineNum">     434 </span>            :         int r;
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :         struct radeon_bo *ring_obj;</span>
+<span class="lineNum">     436 </span>            : 
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :         ring_obj = ring-&gt;ring_obj;</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         ring-&gt;ready = false;</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :         ring-&gt;ring = NULL;</span>
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :         ring-&gt;ring_obj = NULL;</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;rdev-&gt;ring_lock);</span>
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :         if (ring_obj) {</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                 r = radeon_bo_reserve(ring_obj, false);</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                 if (likely(r == 0)) {</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                         radeon_bo_kunmap(ring_obj);</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                         radeon_bo_unpin(ring_obj);</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                         radeon_bo_unreserve(ring_obj);</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                 radeon_bo_unref(&amp;ring_obj);</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     454 </span>            : 
+<span class="lineNum">     455 </span>            : /*
+<span class="lineNum">     456 </span>            :  * Debugfs info
+<span class="lineNum">     457 </span>            :  */
+<span class="lineNum">     458 </span>            : #if defined(CONFIG_DEBUG_FS)
+<span class="lineNum">     459 </span>            : 
+<span class="lineNum">     460 </span>            : static int radeon_debugfs_ring_info(struct seq_file *m, void *data)
+<span class="lineNum">     461 </span>            : {
+<span class="lineNum">     462 </span>            :         struct drm_info_node *node = (struct drm_info_node *) m-&gt;private;
+<span class="lineNum">     463 </span>            :         struct drm_device *dev = node-&gt;minor-&gt;dev;
+<span class="lineNum">     464 </span>            :         struct radeon_device *rdev = dev-&gt;dev_private;
+<span class="lineNum">     465 </span>            :         int ridx = *(int*)node-&gt;info_ent-&gt;data;
+<span class="lineNum">     466 </span>            :         struct radeon_ring *ring = &amp;rdev-&gt;ring[ridx];
+<span class="lineNum">     467 </span>            : 
+<span class="lineNum">     468 </span>            :         uint32_t rptr, wptr, rptr_next;
+<span class="lineNum">     469 </span>            :         unsigned count, i, j;
+<span class="lineNum">     470 </span>            : 
+<span class="lineNum">     471 </span>            :         radeon_ring_free_size(rdev, ring);
+<span class="lineNum">     472 </span>            :         count = (ring-&gt;ring_size / 4) - ring-&gt;ring_free_dw;
+<span class="lineNum">     473 </span>            : 
+<span class="lineNum">     474 </span>            :         wptr = radeon_ring_get_wptr(rdev, ring);
+<span class="lineNum">     475 </span>            :         seq_printf(m, &quot;wptr: 0x%08x [%5d]\n&quot;,
+<span class="lineNum">     476 </span>            :                    wptr, wptr);
+<span class="lineNum">     477 </span>            : 
+<span class="lineNum">     478 </span>            :         rptr = radeon_ring_get_rptr(rdev, ring);
+<span class="lineNum">     479 </span>            :         seq_printf(m, &quot;rptr: 0x%08x [%5d]\n&quot;,
+<span class="lineNum">     480 </span>            :                    rptr, rptr);
+<span class="lineNum">     481 </span>            : 
+<span class="lineNum">     482 </span>            :         if (ring-&gt;rptr_save_reg) {
+<span class="lineNum">     483 </span>            :                 rptr_next = RREG32(ring-&gt;rptr_save_reg);
+<span class="lineNum">     484 </span>            :                 seq_printf(m, &quot;rptr next(0x%04x): 0x%08x [%5d]\n&quot;,
+<span class="lineNum">     485 </span>            :                            ring-&gt;rptr_save_reg, rptr_next, rptr_next);
+<span class="lineNum">     486 </span>            :         } else
+<span class="lineNum">     487 </span>            :                 rptr_next = ~0;
+<span class="lineNum">     488 </span>            : 
+<span class="lineNum">     489 </span>            :         seq_printf(m, &quot;driver's copy of the wptr: 0x%08x [%5d]\n&quot;,
+<span class="lineNum">     490 </span>            :                    ring-&gt;wptr, ring-&gt;wptr);
+<span class="lineNum">     491 </span>            :         seq_printf(m, &quot;last semaphore signal addr : 0x%016llx\n&quot;,
+<span class="lineNum">     492 </span>            :                    ring-&gt;last_semaphore_signal_addr);
+<span class="lineNum">     493 </span>            :         seq_printf(m, &quot;last semaphore wait addr   : 0x%016llx\n&quot;,
+<span class="lineNum">     494 </span>            :                    ring-&gt;last_semaphore_wait_addr);
+<span class="lineNum">     495 </span>            :         seq_printf(m, &quot;%u free dwords in ring\n&quot;, ring-&gt;ring_free_dw);
+<span class="lineNum">     496 </span>            :         seq_printf(m, &quot;%u dwords in ring\n&quot;, count);
+<span class="lineNum">     497 </span>            : 
+<span class="lineNum">     498 </span>            :         if (!ring-&gt;ring)
+<span class="lineNum">     499 </span>            :                 return 0;
+<span class="lineNum">     500 </span>            : 
+<span class="lineNum">     501 </span>            :         /* print 8 dw before current rptr as often it's the last executed
+<span class="lineNum">     502 </span>            :          * packet that is the root issue
+<span class="lineNum">     503 </span>            :          */
+<span class="lineNum">     504 </span>            :         i = (rptr + ring-&gt;ptr_mask + 1 - 32) &amp; ring-&gt;ptr_mask;
+<span class="lineNum">     505 </span>            :         for (j = 0; j &lt;= (count + 32); j++) {
+<span class="lineNum">     506 </span>            :                 seq_printf(m, &quot;r[%5d]=0x%08x&quot;, i, ring-&gt;ring[i]);
+<span class="lineNum">     507 </span>            :                 if (rptr == i)
+<span class="lineNum">     508 </span>            :                         seq_puts(m, &quot; *&quot;);
+<span class="lineNum">     509 </span>            :                 if (rptr_next == i)
+<span class="lineNum">     510 </span>            :                         seq_puts(m, &quot; #&quot;);
+<span class="lineNum">     511 </span>            :                 seq_puts(m, &quot;\n&quot;);
+<span class="lineNum">     512 </span>            :                 i = (i + 1) &amp; ring-&gt;ptr_mask;
+<span class="lineNum">     513 </span>            :         }
+<span class="lineNum">     514 </span>            :         return 0;
+<span class="lineNum">     515 </span>            : }
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span>            : static int radeon_gfx_index = RADEON_RING_TYPE_GFX_INDEX;
+<span class="lineNum">     518 </span>            : static int cayman_cp1_index = CAYMAN_RING_TYPE_CP1_INDEX;
+<span class="lineNum">     519 </span>            : static int cayman_cp2_index = CAYMAN_RING_TYPE_CP2_INDEX;
+<span class="lineNum">     520 </span>            : static int radeon_dma1_index = R600_RING_TYPE_DMA_INDEX;
+<span class="lineNum">     521 </span>            : static int radeon_dma2_index = CAYMAN_RING_TYPE_DMA1_INDEX;
+<span class="lineNum">     522 </span>            : static int r600_uvd_index = R600_RING_TYPE_UVD_INDEX;
+<span class="lineNum">     523 </span>            : static int si_vce1_index = TN_RING_TYPE_VCE1_INDEX;
+<span class="lineNum">     524 </span>            : static int si_vce2_index = TN_RING_TYPE_VCE2_INDEX;
+<span class="lineNum">     525 </span>            : 
+<span class="lineNum">     526 </span>            : static struct drm_info_list radeon_debugfs_ring_info_list[] = {
+<span class="lineNum">     527 </span>            :         {&quot;radeon_ring_gfx&quot;, radeon_debugfs_ring_info, 0, &amp;radeon_gfx_index},
+<span class="lineNum">     528 </span>            :         {&quot;radeon_ring_cp1&quot;, radeon_debugfs_ring_info, 0, &amp;cayman_cp1_index},
+<span class="lineNum">     529 </span>            :         {&quot;radeon_ring_cp2&quot;, radeon_debugfs_ring_info, 0, &amp;cayman_cp2_index},
+<span class="lineNum">     530 </span>            :         {&quot;radeon_ring_dma1&quot;, radeon_debugfs_ring_info, 0, &amp;radeon_dma1_index},
+<span class="lineNum">     531 </span>            :         {&quot;radeon_ring_dma2&quot;, radeon_debugfs_ring_info, 0, &amp;radeon_dma2_index},
+<span class="lineNum">     532 </span>            :         {&quot;radeon_ring_uvd&quot;, radeon_debugfs_ring_info, 0, &amp;r600_uvd_index},
+<span class="lineNum">     533 </span>            :         {&quot;radeon_ring_vce1&quot;, radeon_debugfs_ring_info, 0, &amp;si_vce1_index},
+<span class="lineNum">     534 </span>            :         {&quot;radeon_ring_vce2&quot;, radeon_debugfs_ring_info, 0, &amp;si_vce2_index},
+<span class="lineNum">     535 </span>            : };
+<span class="lineNum">     536 </span>            : 
+<a name="537"><span class="lineNum">     537 </span>            : #endif</a>
+<span class="lineNum">     538 </span>            : 
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 : static int radeon_debugfs_ring_init(struct radeon_device *rdev, struct radeon_ring *ring)</span>
+<span class="lineNum">     540 </span>            : {
+<span class="lineNum">     541 </span>            : #if defined(CONFIG_DEBUG_FS)
+<span class="lineNum">     542 </span>            :         unsigned i;
+<span class="lineNum">     543 </span>            :         for (i = 0; i &lt; ARRAY_SIZE(radeon_debugfs_ring_info_list); ++i) {
+<span class="lineNum">     544 </span>            :                 struct drm_info_list *info = &amp;radeon_debugfs_ring_info_list[i];
+<span class="lineNum">     545 </span>            :                 int ridx = *(int*)radeon_debugfs_ring_info_list[i].data;
+<span class="lineNum">     546 </span>            :                 unsigned r;
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span>            :                 if (&amp;rdev-&gt;ring[ridx] != ring)
+<span class="lineNum">     549 </span>            :                         continue;
+<span class="lineNum">     550 </span>            : 
+<span class="lineNum">     551 </span>            :                 r = radeon_debugfs_add_files(rdev, info, 1);
+<span class="lineNum">     552 </span>            :                 if (r)
+<span class="lineNum">     553 </span>            :                         return r;
+<span class="lineNum">     554 </span>            :         }
+<span class="lineNum">     555 </span>            : #endif
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     557 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

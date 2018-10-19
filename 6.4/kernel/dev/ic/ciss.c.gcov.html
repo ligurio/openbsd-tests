@@ -1,0 +1,1458 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/ic/ciss.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/ic</a> - ciss.c<span style="font-size: 80%;"> (source / <a href="ciss.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">739</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: ciss.c,v 1.75 2016/08/14 04:08:03 dlg Exp $   */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2005,2006 Michael Shalayeff
+<span class="lineNum">       5 </span>            :  * All rights reserved.
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       8 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       9 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      12 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      13 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      14 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      15 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF MIND, USE, DATA OR PROFITS, WHETHER IN
+<span class="lineNum">      16 </span>            :  * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+<span class="lineNum">      17 </span>            :  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      18 </span>            :  */
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : #include &quot;bio.h&quot;
+<span class="lineNum">      21 </span>            : 
+<span class="lineNum">      22 </span>            : /* #define CISS_DEBUG */
+<span class="lineNum">      23 </span>            : 
+<span class="lineNum">      24 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/buf.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      31 </span>            : 
+<span class="lineNum">      32 </span>            : #include &lt;machine/bus.h&gt;
+<span class="lineNum">      33 </span>            : 
+<span class="lineNum">      34 </span>            : #include &lt;scsi/scsi_all.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;scsi/scsiconf.h&gt;
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span>            : #include &lt;dev/ic/cissreg.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;dev/ic/cissvar.h&gt;
+<span class="lineNum">      39 </span>            : 
+<span class="lineNum">      40 </span>            : #if NBIO &gt; 0
+<span class="lineNum">      41 </span>            : #include &lt;dev/biovar.h&gt;
+<span class="lineNum">      42 </span>            : #endif
+<span class="lineNum">      43 </span>            : #include &lt;sys/sensors.h&gt;
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : #ifdef CISS_DEBUG
+<span class="lineNum">      46 </span>            : #define CISS_DPRINTF(m,a)       if (ciss_debug &amp; (m)) printf a
+<span class="lineNum">      47 </span>            : #define CISS_D_CMD      0x0001
+<span class="lineNum">      48 </span>            : #define CISS_D_INTR     0x0002
+<span class="lineNum">      49 </span>            : #define CISS_D_MISC     0x0004
+<span class="lineNum">      50 </span>            : #define CISS_D_DMA      0x0008
+<span class="lineNum">      51 </span>            : #define CISS_D_IOCTL    0x0010
+<span class="lineNum">      52 </span>            : #define CISS_D_ERR      0x0020
+<span class="lineNum">      53 </span>            : int ciss_debug = 0
+<span class="lineNum">      54 </span>            : /*      | CISS_D_CMD */
+<span class="lineNum">      55 </span>            : /*      | CISS_D_INTR */
+<span class="lineNum">      56 </span>            : /*      | CISS_D_MISC */
+<span class="lineNum">      57 </span>            : /*      | CISS_D_DMA */
+<span class="lineNum">      58 </span>            : /*      | CISS_D_IOCTL */
+<span class="lineNum">      59 </span>            : /*      | CISS_D_ERR */
+<span class="lineNum">      60 </span>            :         ;
+<span class="lineNum">      61 </span>            : #else
+<span class="lineNum">      62 </span>            : #define CISS_DPRINTF(m,a)       /* m, a */
+<span class="lineNum">      63 </span>            : #endif
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span>            : struct cfdriver ciss_cd = {
+<span class="lineNum">      66 </span>            :         NULL, &quot;ciss&quot;, DV_DULL
+<span class="lineNum">      67 </span>            : };
+<span class="lineNum">      68 </span>            : 
+<span class="lineNum">      69 </span>            : void    ciss_scsi_cmd(struct scsi_xfer *xs);
+<span class="lineNum">      70 </span>            : int     ciss_scsi_ioctl(struct scsi_link *, u_long, caddr_t, int);
+<span class="lineNum">      71 </span>            : void    cissminphys(struct buf *bp, struct scsi_link *sl);
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span>            : struct scsi_adapter ciss_switch = {
+<span class="lineNum">      74 </span>            :         ciss_scsi_cmd, cissminphys, NULL, NULL, ciss_scsi_ioctl
+<span class="lineNum">      75 </span>            : };
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            : #if NBIO &gt; 0
+<span class="lineNum">      78 </span>            : int     ciss_ioctl(struct device *, u_long, caddr_t);
+<span class="lineNum">      79 </span>            : #endif
+<span class="lineNum">      80 </span>            : int     ciss_sync(struct ciss_softc *sc);
+<span class="lineNum">      81 </span>            : void    ciss_heartbeat(void *v);
+<span class="lineNum">      82 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">      83 </span>            : void    ciss_sensors(void *);
+<span class="lineNum">      84 </span>            : #endif
+<span class="lineNum">      85 </span>            : 
+<span class="lineNum">      86 </span>            : void *  ciss_get_ccb(void *);
+<span class="lineNum">      87 </span>            : void    ciss_put_ccb(void *, void *);
+<span class="lineNum">      88 </span>            : int     ciss_cmd(struct ciss_ccb *ccb, int flags, int wait);
+<span class="lineNum">      89 </span>            : int     ciss_done(struct ciss_ccb *ccb);
+<span class="lineNum">      90 </span>            : int     ciss_error(struct ciss_ccb *ccb);
+<span class="lineNum">      91 </span>            : 
+<span class="lineNum">      92 </span>            : struct ciss_ld *ciss_pdscan(struct ciss_softc *sc, int ld);
+<span class="lineNum">      93 </span>            : int     ciss_inq(struct ciss_softc *sc, struct ciss_inquiry *inq);
+<span class="lineNum">      94 </span>            : int     ciss_ldmap(struct ciss_softc *sc);
+<span class="lineNum">      95 </span>            : int     ciss_ldid(struct ciss_softc *, int, struct ciss_ldid *);
+<span class="lineNum">      96 </span>            : int     ciss_ldstat(struct ciss_softc *, int, struct ciss_ldstat *);
+<span class="lineNum">      97 </span>            : int     ciss_pdid(struct ciss_softc *, u_int8_t, struct ciss_pdid *, int);
+<span class="lineNum">      98 </span>            : int     ciss_blink(struct ciss_softc *, int, int, int, struct ciss_blink *);
+<a name="99"><span class="lineNum">      99 </span>            : </a>
+<span class="lineNum">     100 </span>            : void *
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 : ciss_get_ccb(void *xsc)</span>
+<span class="lineNum">     102 </span>            : {
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :         struct ciss_softc *sc = xsc;</span>
+<span class="lineNum">     104 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_free_ccb_mtx);</span>
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         ccb = SLIST_FIRST(&amp;sc-&gt;sc_free_ccb);</span>
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :         if (ccb != NULL) {</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :                 SLIST_REMOVE_HEAD(&amp;sc-&gt;sc_free_ccb, ccb_link);</span>
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_state = CISS_CCB_READY;</span>
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_xs = NULL;</span>
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_free_ccb_mtx);</span>
+<span class="lineNum">     114 </span>            : 
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         return (ccb);</span>
+<span class="lineNum">     116 </span>            : }
+<a name="117"><span class="lineNum">     117 </span>            : </a>
+<span class="lineNum">     118 </span>            : void
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 : ciss_put_ccb(void *xsc, void *xccb)</span>
+<span class="lineNum">     120 </span>            : {
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :         struct ciss_softc *sc = xsc;</span>
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :         struct ciss_ccb *ccb = xccb;</span>
+<span class="lineNum">     123 </span>            : 
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_state = CISS_CCB_FREE;</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_xs = NULL;</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_data = NULL;</span>
+<span class="lineNum">     127 </span>            : 
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_free_ccb_mtx);</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :         SLIST_INSERT_HEAD(&amp;sc-&gt;sc_free_ccb, ccb, ccb_link);</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_free_ccb_mtx);</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 : }</span>
+<a name="132"><span class="lineNum">     132 </span>            : </a>
+<span class="lineNum">     133 </span>            : int
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 : ciss_attach(struct ciss_softc *sc)</span>
+<span class="lineNum">     135 </span>            : {
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         struct scsibus_attach_args saa;</span>
+<span class="lineNum">     137 </span>            :         struct scsibus_softc *scsibus;
+<span class="lineNum">     138 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">     139 </span>            :         struct ciss_cmd *cmd;
+<span class="lineNum">     140 </span>            :         struct ciss_inquiry *inq;
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         bus_dma_segment_t seg[1];</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         int error, i, total, rseg, maxfer;</span>
+<span class="lineNum">     143 </span>            :         ciss_lock_t lock;
+<span class="lineNum">     144 </span>            :         paddr_t pa;
+<span class="lineNum">     145 </span>            : 
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         bus_space_read_region_4(sc-&gt;iot, sc-&gt;cfg_ioh, sc-&gt;cfgoff,</span>
+<span class="lineNum">     147 </span>            :             (u_int32_t *)&amp;sc-&gt;cfg, sizeof(sc-&gt;cfg) / 4);
+<span class="lineNum">     148 </span>            : 
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         if (sc-&gt;cfg.signature != CISS_SIGNATURE) {</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :                 printf(&quot;: bad sign 0x%08x\n&quot;, sc-&gt;cfg.signature);</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     152 </span>            :         }
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         if (!(sc-&gt;cfg.methods &amp; CISS_METH_SIMPL)) {</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :                 printf(&quot;: not simple 0x%08x\n&quot;, sc-&gt;cfg.methods);</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     157 </span>            :         }
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         sc-&gt;cfg.rmethod = CISS_METH_SIMPL;</span>
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         sc-&gt;cfg.paddr_lim = 0;                       /* 32bit addrs */</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         sc-&gt;cfg.int_delay = 0;                       /* disable coalescing */</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :         sc-&gt;cfg.int_count = 0;</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         strlcpy(sc-&gt;cfg.hostname, &quot;HUMPPA&quot;, sizeof(sc-&gt;cfg.hostname));</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :         sc-&gt;cfg.driverf |= CISS_DRV_PRF;     /* enable prefetch */</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         if (!sc-&gt;cfg.maxsg)</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 sc-&gt;cfg.maxsg = MAXPHYS / PAGE_SIZE;</span>
+<span class="lineNum">     167 </span>            : 
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :         bus_space_write_region_4(sc-&gt;iot, sc-&gt;cfg_ioh, sc-&gt;cfgoff,</span>
+<span class="lineNum">     169 </span>            :             (u_int32_t *)&amp;sc-&gt;cfg, sizeof(sc-&gt;cfg) / 4);
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :         bus_space_barrier(sc-&gt;iot, sc-&gt;cfg_ioh, sc-&gt;cfgoff, sizeof(sc-&gt;cfg),</span>
+<span class="lineNum">     171 </span>            :             BUS_SPACE_BARRIER_READ|BUS_SPACE_BARRIER_WRITE);
+<span class="lineNum">     172 </span>            : 
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :         bus_space_write_4(sc-&gt;iot, sc-&gt;ioh, CISS_IDB, CISS_IDB_CFG);</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         bus_space_barrier(sc-&gt;iot, sc-&gt;ioh, CISS_IDB, 4,</span>
+<span class="lineNum">     175 </span>            :             BUS_SPACE_BARRIER_WRITE);
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :         for (i = 1000; i--; DELAY(1000)) {</span>
+<span class="lineNum">     177 </span>            :                 /* XXX maybe IDB is really 64bit? - hp dl380 needs this */
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                 (void)bus_space_read_4(sc-&gt;iot, sc-&gt;ioh, CISS_IDB + 4);</span>
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                 if (!(bus_space_read_4(sc-&gt;iot, sc-&gt;ioh, CISS_IDB) &amp; CISS_IDB_CFG))</span>
+<span class="lineNum">     180 </span>            :                         break;
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                 bus_space_barrier(sc-&gt;iot, sc-&gt;ioh, CISS_IDB, 4,</span>
+<span class="lineNum">     182 </span>            :                     BUS_SPACE_BARRIER_READ);
+<span class="lineNum">     183 </span>            :         }
+<span class="lineNum">     184 </span>            : 
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         if (bus_space_read_4(sc-&gt;iot, sc-&gt;ioh, CISS_IDB) &amp; CISS_IDB_CFG) {</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                 printf(&quot;: cannot set config\n&quot;);</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     188 </span>            :         }
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         bus_space_read_region_4(sc-&gt;iot, sc-&gt;cfg_ioh, sc-&gt;cfgoff,</span>
+<span class="lineNum">     191 </span>            :             (u_int32_t *)&amp;sc-&gt;cfg, sizeof(sc-&gt;cfg) / 4);
+<span class="lineNum">     192 </span>            : 
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         if (!(sc-&gt;cfg.amethod &amp; CISS_METH_SIMPL)) {</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                 printf(&quot;: cannot simplify 0x%08x\n&quot;, sc-&gt;cfg.amethod);</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     196 </span>            :         }
+<span class="lineNum">     197 </span>            : 
+<span class="lineNum">     198 </span>            :         /* i'm ready for you and i hope you're ready for me */
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         for (i = 30000; i--; DELAY(1000)) {</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                 if (bus_space_read_4(sc-&gt;iot, sc-&gt;cfg_ioh, sc-&gt;cfgoff +</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                     offsetof(struct ciss_config, amethod)) &amp; CISS_METH_READY)</span>
+<span class="lineNum">     202 </span>            :                         break;
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :                 bus_space_barrier(sc-&gt;iot, sc-&gt;cfg_ioh, sc-&gt;cfgoff +</span>
+<span class="lineNum">     204 </span>            :                     offsetof(struct ciss_config, amethod), 4,
+<span class="lineNum">     205 </span>            :                     BUS_SPACE_BARRIER_READ);
+<span class="lineNum">     206 </span>            :         }
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         if (!(bus_space_read_4(sc-&gt;iot, sc-&gt;cfg_ioh, sc-&gt;cfgoff +</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :             offsetof(struct ciss_config, amethod)) &amp; CISS_METH_READY)) {</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                 printf(&quot;: she never came ready for me 0x%08x\n&quot;,</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                     sc-&gt;cfg.amethod);</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     213 </span>            :         }
+<span class="lineNum">     214 </span>            : 
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         sc-&gt;maxcmd = sc-&gt;cfg.maxcmd;</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :         sc-&gt;maxsg = sc-&gt;cfg.maxsg;</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         if (sc-&gt;maxsg &gt; MAXPHYS / PAGE_SIZE)</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                 sc-&gt;maxsg = MAXPHYS / PAGE_SIZE;</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         i = sizeof(struct ciss_ccb) +</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :             sizeof(ccb-&gt;ccb_cmd.sgl[0]) * (sc-&gt;maxsg - 1);</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :         for (sc-&gt;ccblen = 0x10; sc-&gt;ccblen &lt; i; sc-&gt;ccblen &lt;&lt;= 1);</span>
+<span class="lineNum">     222 </span>            : 
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :         total = sc-&gt;ccblen * sc-&gt;maxcmd;</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :         if ((error = bus_dmamem_alloc(sc-&gt;dmat, total, PAGE_SIZE, 0,</span>
+<span class="lineNum">     225 </span>            :             sc-&gt;cmdseg, 1, &amp;rseg, BUS_DMA_NOWAIT | BUS_DMA_ZERO))) {
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                 printf(&quot;: cannot allocate CCBs (%d)\n&quot;, error);</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     228 </span>            :         }
+<span class="lineNum">     229 </span>            : 
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         if ((error = bus_dmamem_map(sc-&gt;dmat, sc-&gt;cmdseg, rseg, total,</span>
+<span class="lineNum">     231 </span>            :             (caddr_t *)&amp;sc-&gt;ccbs, BUS_DMA_NOWAIT))) {
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                 printf(&quot;: cannot map CCBs (%d)\n&quot;, error);</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     234 </span>            :         }
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         if ((error = bus_dmamap_create(sc-&gt;dmat, total, 1,</span>
+<span class="lineNum">     237 </span>            :             total, 0, BUS_DMA_NOWAIT | BUS_DMA_ALLOCNOW, &amp;sc-&gt;cmdmap))) {
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :                 printf(&quot;: cannot create CCBs dmamap (%d)\n&quot;, error);</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :                 bus_dmamem_free(sc-&gt;dmat, sc-&gt;cmdseg, 1);</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     241 </span>            :         }
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         if ((error = bus_dmamap_load(sc-&gt;dmat, sc-&gt;cmdmap, sc-&gt;ccbs, total,</span>
+<span class="lineNum">     244 </span>            :             NULL, BUS_DMA_NOWAIT))) {
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                 printf(&quot;: cannot load CCBs dmamap (%d)\n&quot;, error);</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :                 bus_dmamem_free(sc-&gt;dmat, sc-&gt;cmdseg, 1);</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;dmat, sc-&gt;cmdmap);</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     249 </span>            :         }
+<span class="lineNum">     250 </span>            : 
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :         SLIST_INIT(&amp;sc-&gt;sc_free_ccb);</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         mtx_init(&amp;sc-&gt;sc_free_ccb_mtx, IPL_BIO);</span>
+<span class="lineNum">     253 </span>            : 
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         maxfer = sc-&gt;maxsg * PAGE_SIZE;</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         for (i = 0; total; i++, total -= sc-&gt;ccblen) {</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :                 ccb = sc-&gt;ccbs + i * sc-&gt;ccblen;</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :                 cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :                 pa = sc-&gt;cmdseg[0].ds_addr + i * sc-&gt;ccblen;</span>
+<span class="lineNum">     259 </span>            : 
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_sc = sc;</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_cmdpa = pa + offsetof(struct ciss_ccb, ccb_cmd);</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_state = CISS_CCB_FREE;</span>
+<span class="lineNum">     263 </span>            : 
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :                 cmd-&gt;id = htole32(i &lt;&lt; 2);</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :                 cmd-&gt;id_hi = htole32(0);</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :                 cmd-&gt;sgin = sc-&gt;maxsg;</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :                 cmd-&gt;sglen = htole16((u_int16_t)cmd-&gt;sgin);</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :                 cmd-&gt;err_len = htole32(sizeof(ccb-&gt;ccb_err));</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :                 pa += offsetof(struct ciss_ccb, ccb_err);</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :                 cmd-&gt;err_pa = htole64((u_int64_t)pa);</span>
+<span class="lineNum">     271 </span>            : 
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                 if ((error = bus_dmamap_create(sc-&gt;dmat, maxfer, sc-&gt;maxsg,</span>
+<span class="lineNum">     273 </span>            :                     maxfer, 0, BUS_DMA_NOWAIT | BUS_DMA_ALLOCNOW,
+<span class="lineNum">     274 </span>            :                     &amp;ccb-&gt;ccb_dmamap)))
+<span class="lineNum">     275 </span>            :                         break;
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :                 SLIST_INSERT_HEAD(&amp;sc-&gt;sc_free_ccb, ccb, ccb_link);</span>
+<span class="lineNum">     278 </span>            :         }
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         scsi_iopool_init(&amp;sc-&gt;sc_iopool, sc, ciss_get_ccb, ciss_put_ccb);</span>
+<span class="lineNum">     281 </span>            : 
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :         if (i &lt; sc-&gt;maxcmd) {</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :                 printf(&quot;: cannot create ccb#%d dmamap (%d)\n&quot;, i, error);</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :                 if (i == 0) {</span>
+<span class="lineNum">     285 </span>            :                         /* TODO leaking cmd's dmamaps and shitz */
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                         bus_dmamem_free(sc-&gt;dmat, sc-&gt;cmdseg, 1);</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                         bus_dmamap_destroy(sc-&gt;dmat, sc-&gt;cmdmap);</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                         return -1;</span>
+<span class="lineNum">     289 </span>            :                 }
+<span class="lineNum">     290 </span>            :         }
+<span class="lineNum">     291 </span>            : 
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :         if ((error = bus_dmamem_alloc(sc-&gt;dmat, PAGE_SIZE, PAGE_SIZE, 0,</span>
+<span class="lineNum">     293 </span>            :             seg, 1, &amp;rseg, BUS_DMA_NOWAIT | BUS_DMA_ZERO))) {
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :                 printf(&quot;: cannot allocate scratch buffer (%d)\n&quot;, error);</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     296 </span>            :         }
+<span class="lineNum">     297 </span>            : 
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         if ((error = bus_dmamem_map(sc-&gt;dmat, seg, rseg, PAGE_SIZE,</span>
+<span class="lineNum">     299 </span>            :             (caddr_t *)&amp;sc-&gt;scratch, BUS_DMA_NOWAIT))) {
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                 printf(&quot;: cannot map scratch buffer (%d)\n&quot;, error);</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     302 </span>            :         }
+<span class="lineNum">     303 </span>            : 
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         lock = CISS_LOCK_SCRATCH(sc);</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         inq = sc-&gt;scratch;</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :         if (ciss_inq(sc, inq)) {</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :                 printf(&quot;: adapter inquiry failed\n&quot;);</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :                 CISS_UNLOCK_SCRATCH(sc, lock);</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :                 bus_dmamem_free(sc-&gt;dmat, sc-&gt;cmdseg, 1);</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;dmat, sc-&gt;cmdmap);</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     312 </span>            :         }
+<span class="lineNum">     313 </span>            : 
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :         if (!(inq-&gt;flags &amp; CISS_INQ_BIGMAP)) {</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :                 printf(&quot;: big map is not supported, flags=%b\n&quot;,</span>
+<span class="lineNum">     316 </span>            :                     inq-&gt;flags, CISS_INQ_BITS);
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :                 CISS_UNLOCK_SCRATCH(sc, lock);</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :                 bus_dmamem_free(sc-&gt;dmat, sc-&gt;cmdseg, 1);</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;dmat, sc-&gt;cmdmap);</span>
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     321 </span>            :         }
+<span class="lineNum">     322 </span>            : 
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         sc-&gt;maxunits = inq-&gt;numld;</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :         sc-&gt;nbus = inq-&gt;nscsi_bus;</span>
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         sc-&gt;ndrives = inq-&gt;buswidth? inq-&gt;buswidth : 256;</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :         printf(&quot;: %d LD%s, HW rev %d, FW %4.4s/%4.4s&quot;,</span>
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :             inq-&gt;numld, inq-&gt;numld == 1? &quot;&quot; : &quot;s&quot;,</span>
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :             inq-&gt;hw_rev, inq-&gt;fw_running, inq-&gt;fw_stored);</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :         if (sc-&gt;cfg.methods &amp; CISS_METH_FIFO64)</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                 printf(&quot;, 64bit fifo&quot;);</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         else if (sc-&gt;cfg.methods &amp; CISS_METH_FIFO64_RRO)</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                 printf(&quot;, 64bit fifo rro&quot;);</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     334 </span>            : 
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         CISS_UNLOCK_SCRATCH(sc, lock);</span>
+<span class="lineNum">     336 </span>            : 
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :         timeout_set(&amp;sc-&gt;sc_hb, ciss_heartbeat, sc);</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         timeout_add_sec(&amp;sc-&gt;sc_hb, 3);</span>
+<span class="lineNum">     339 </span>            : 
+<span class="lineNum">     340 </span>            :         /* map LDs */
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         if (ciss_ldmap(sc)) {</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: adapter LD map failed\n&quot;, sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :                 bus_dmamem_free(sc-&gt;dmat, sc-&gt;cmdseg, 1);</span>
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;dmat, sc-&gt;cmdmap);</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     346 </span>            :         }
+<span class="lineNum">     347 </span>            : 
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         if (!(sc-&gt;sc_lds = mallocarray(sc-&gt;maxunits, sizeof(*sc-&gt;sc_lds),</span>
+<span class="lineNum">     349 </span>            :             M_DEVBUF, M_NOWAIT | M_ZERO))) {
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                 bus_dmamem_free(sc-&gt;dmat, sc-&gt;cmdseg, 1);</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;dmat, sc-&gt;cmdmap);</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     353 </span>            :         }
+<span class="lineNum">     354 </span>            : 
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :         sc-&gt;sc_flush = CISS_FLUSH_ENABLE;</span>
+<span class="lineNum">     356 </span>            : 
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.adapter_softc = sc;</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.openings = sc-&gt;maxcmd;</span>
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.adapter = &amp;ciss_switch;</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.luns = 1;</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.adapter_target = sc-&gt;maxunits;</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.adapter_buswidth = sc-&gt;maxunits;</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.pool = &amp;sc-&gt;sc_iopool;</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :         bzero(&amp;saa, sizeof(saa));</span>
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :         saa.saa_sc_link = &amp;sc-&gt;sc_link;</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         scsibus = (struct scsibus_softc *)config_found_sm(&amp;sc-&gt;sc_dev,</span>
+<span class="lineNum">     367 </span>            :             &amp;saa, scsiprint, NULL);
+<span class="lineNum">     368 </span>            : 
+<span class="lineNum">     369 </span>            : #if NBIO &gt; 0
+<span class="lineNum">     370 </span>            :         /* XXX for now we can only deal w/ one volume. */
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :         if (!scsibus || sc-&gt;maxunits &gt; 1)</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     373 </span>            : 
+<span class="lineNum">     374 </span>            :         /* now map all the physdevs into their lds */
+<span class="lineNum">     375 </span>            :         /* XXX currently we assign all pf 'em into ld#0 */
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sc-&gt;maxunits; i++)</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                 if (!(sc-&gt;sc_lds[i] = ciss_pdscan(sc, i)))</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">     379 </span>            : 
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :         if (bio_register(&amp;sc-&gt;sc_dev, ciss_ioctl) != 0)</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: controller registration failed&quot;,</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     383 </span>            : 
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :         sc-&gt;sc_flags |= CISS_BIO;</span>
+<span class="lineNum">     385 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :         sc-&gt;sensors = mallocarray(sc-&gt;maxunits, sizeof(struct ksensor),</span>
+<span class="lineNum">     387 </span>            :             M_DEVBUF, M_NOWAIT | M_ZERO);
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :         if (sc-&gt;sensors) {</span>
+<span class="lineNum">     389 </span>            :                 struct device *dev;
+<span class="lineNum">     390 </span>            : 
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :                 strlcpy(sc-&gt;sensordev.xname, sc-&gt;sc_dev.dv_xname,</span>
+<span class="lineNum">     392 </span>            :                     sizeof(sc-&gt;sensordev.xname));
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; sc-&gt;maxunits; i++) {</span>
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].type = SENSOR_DRIVE;</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].status = SENSOR_S_UNKNOWN;</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :                         dev = scsi_get_link(scsibus, i, 0)-&gt;device_softc;</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                         strlcpy(sc-&gt;sensors[i].desc, dev-&gt;dv_xname,</span>
+<span class="lineNum">     398 </span>            :                             sizeof(sc-&gt;sensors[i].desc));
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                         strlcpy(sc-&gt;sc_lds[i]-&gt;xname, dev-&gt;dv_xname,</span>
+<span class="lineNum">     400 </span>            :                             sizeof(sc-&gt;sc_lds[i]-&gt;xname));
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :                         sensor_attach(&amp;sc-&gt;sensordev, &amp;sc-&gt;sensors[i]);</span>
+<span class="lineNum">     402 </span>            :                 }
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                 if (sensor_task_register(sc, ciss_sensors, 10) == NULL)</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                         free(sc-&gt;sensors, M_DEVBUF,</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                             sc-&gt;maxunits * sizeof(struct ksensor));</span>
+<span class="lineNum">     406 </span>            :                 else
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :                         sensordev_install(&amp;sc-&gt;sensordev);</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     409 </span>            : #endif /* SMALL_KERNEL */
+<span class="lineNum">     410 </span>            : #endif /* BIO &gt; 0 */
+<span class="lineNum">     411 </span>            : 
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 : }</span>
+<a name="414"><span class="lineNum">     414 </span>            : </a>
+<span class="lineNum">     415 </span>            : void
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 : ciss_shutdown(void *v)</span>
+<span class="lineNum">     417 </span>            : {
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :         struct ciss_softc *sc = v;</span>
+<span class="lineNum">     419 </span>            : 
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         sc-&gt;sc_flush = CISS_FLUSH_DISABLE;</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         timeout_del(&amp;sc-&gt;sc_hb);</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :         ciss_sync(sc);</span>
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 : }</span>
+<a name="424"><span class="lineNum">     424 </span>            : </a>
+<span class="lineNum">     425 </span>            : void
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 : cissminphys(struct buf *bp, struct scsi_link *sl)</span>
+<span class="lineNum">     427 </span>            : {
+<span class="lineNum">     428 </span>            : #if 0   /* TODO */
+<span class="lineNum">     429 </span>            : #define CISS_MAXFER     (PAGE_SIZE * (sc-&gt;maxsg + 1))
+<span class="lineNum">     430 </span>            :         if (bp-&gt;b_bcount &gt; CISS_MAXFER)
+<span class="lineNum">     431 </span>            :                 bp-&gt;b_bcount = CISS_MAXFER;
+<span class="lineNum">     432 </span>            : #endif
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         minphys(bp);</span>
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     435 </span>            : 
+<span class="lineNum">     436 </span>            : /*
+<span class="lineNum">     437 </span>            :  * submit a command and optionally wait for completition.
+<span class="lineNum">     438 </span>            :  * wait arg abuses SCSI_POLL|SCSI_NOSLEEP flags to request
+<span class="lineNum">     439 </span>            :  * to wait (SCSI_POLL) and to allow tsleep() (!SCSI_NOSLEEP)
+<span class="lineNum">     440 </span>            :  * instead of busy loop waiting
+<a name="441"><span class="lineNum">     441 </span>            :  */</a>
+<span class="lineNum">     442 </span>            : int
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 : ciss_cmd(struct ciss_ccb *ccb, int flags, int wait)</span>
+<span class="lineNum">     444 </span>            : {
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :         struct ciss_softc *sc = ccb-&gt;ccb_sc;</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :         struct ciss_cmd *cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">     447 </span>            :         struct ciss_ccb *ccb1;
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :         bus_dmamap_t dmap = ccb-&gt;ccb_dmamap;</span>
+<span class="lineNum">     449 </span>            :         u_int64_t addr;
+<span class="lineNum">     450 </span>            :         u_int32_t id;
+<span class="lineNum">     451 </span>            :         int i, tohz, error = 0;
+<span class="lineNum">     452 </span>            : 
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :         splassert(IPL_BIO);</span>
+<span class="lineNum">     454 </span>            : 
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :         if (ccb-&gt;ccb_state != CISS_CCB_READY) {</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: ccb %d not ready state=%b\n&quot;, sc-&gt;sc_dev.dv_xname,</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                     cmd-&gt;id, ccb-&gt;ccb_state, CISS_CCB_BITS);</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     459 </span>            :         }
+<span class="lineNum">     460 </span>            : 
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :         if (ccb-&gt;ccb_data) {</span>
+<span class="lineNum">     462 </span>            :                 bus_dma_segment_t *sgd;
+<span class="lineNum">     463 </span>            : 
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :                 if ((error = bus_dmamap_load(sc-&gt;dmat, dmap, ccb-&gt;ccb_data,</span>
+<span class="lineNum">     465 </span>            :                     ccb-&gt;ccb_len, NULL, flags))) {
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                         if (error == EFBIG)</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :                                 printf(&quot;more than %d dma segs\n&quot;, sc-&gt;maxsg);</span>
+<span class="lineNum">     468 </span>            :                         else
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :                                 printf(&quot;error %d loading dma map\n&quot;, error);</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :                         if (ccb-&gt;ccb_xs) {</span>
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                                 ccb-&gt;ccb_xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :                                 scsi_done(ccb-&gt;ccb_xs);</span>
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :                                 ccb-&gt;ccb_xs = NULL;</span>
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     476 </span>            :                 }
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :                 cmd-&gt;sgin = dmap-&gt;dm_nsegs;</span>
+<span class="lineNum">     478 </span>            : 
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :                 sgd = dmap-&gt;dm_segs;</span>
+<span class="lineNum">     480 </span>            :                 CISS_DPRINTF(CISS_D_DMA, (&quot;data=%p/%u&lt;0x%lx/%u&quot;,
+<span class="lineNum">     481 </span>            :                     ccb-&gt;ccb_data, ccb-&gt;ccb_len, sgd-&gt;ds_addr, sgd-&gt;ds_len));
+<span class="lineNum">     482 </span>            : 
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; dmap-&gt;dm_nsegs; sgd++, i++) {</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :                         cmd-&gt;sgl[i].addr_lo = htole32(sgd-&gt;ds_addr);</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :                         cmd-&gt;sgl[i].addr_hi =</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                             htole32((u_int64_t)sgd-&gt;ds_addr &gt;&gt; 32);</span>
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :                         cmd-&gt;sgl[i].len = htole32(sgd-&gt;ds_len);</span>
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :                         cmd-&gt;sgl[i].flags = htole32(0);</span>
+<span class="lineNum">     489 </span>            :                         if (i)
+<span class="lineNum">     490 </span>            :                                 CISS_DPRINTF(CISS_D_DMA,
+<span class="lineNum">     491 </span>            :                                     (&quot;,0x%lx/%u&quot;, sgd-&gt;ds_addr, sgd-&gt;ds_len));
+<span class="lineNum">     492 </span>            :                 }
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span>            :                 CISS_DPRINTF(CISS_D_DMA, (&quot;&gt; &quot;));
+<span class="lineNum">     495 </span>            : 
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;dmat, dmap, 0, dmap-&gt;dm_mapsize,</span>
+<span class="lineNum">     497 </span>            :                     BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :                 cmd-&gt;sgin = 0;</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :         cmd-&gt;sglen = htole16((u_int16_t)cmd-&gt;sgin);</span>
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         bzero(&amp;ccb-&gt;ccb_err, sizeof(ccb-&gt;ccb_err));</span>
+<span class="lineNum">     502 </span>            : 
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;dmat, sc-&gt;cmdmap, 0, sc-&gt;cmdmap-&gt;dm_mapsize,</span>
+<span class="lineNum">     504 </span>            :             BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     505 </span>            : 
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_state = CISS_CCB_ONQ;</span>
+<span class="lineNum">     507 </span>            :         CISS_DPRINTF(CISS_D_CMD, (&quot;submit=0x%x &quot;, cmd-&gt;id));
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :         if (sc-&gt;cfg.methods &amp; (CISS_METH_FIFO64|CISS_METH_FIFO64_RRO)) {</span>
+<span class="lineNum">     509 </span>            :                 /*
+<span class="lineNum">     510 </span>            :                  * Write the upper 32bits immediately before the lower
+<span class="lineNum">     511 </span>            :                  * 32bits and set bit 63 to indicate 64bit FIFO mode.
+<span class="lineNum">     512 </span>            :                  */
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :                 addr = (u_int64_t)ccb-&gt;ccb_cmdpa;</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                 bus_space_write_4(sc-&gt;iot, sc-&gt;ioh, CISS_INQ64_HI,</span>
+<span class="lineNum">     515 </span>            :                     (addr &gt;&gt; 32) | 0x80000000);
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :                 bus_space_write_4(sc-&gt;iot, sc-&gt;ioh, CISS_INQ64_LO,</span>
+<span class="lineNum">     517 </span>            :                     addr &amp; 0x00000000ffffffffULL);
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :                 bus_space_write_4(sc-&gt;iot, sc-&gt;ioh, CISS_INQ, ccb-&gt;ccb_cmdpa);</span>
+<span class="lineNum">     520 </span>            : 
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :         if (wait &amp; SCSI_POLL) {</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :                 struct timeval tv;</span>
+<span class="lineNum">     523 </span>            :                 int etick;
+<span class="lineNum">     524 </span>            :                 CISS_DPRINTF(CISS_D_CMD, (&quot;waiting &quot;));
+<span class="lineNum">     525 </span>            : 
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :                 i = ccb-&gt;ccb_xs? ccb-&gt;ccb_xs-&gt;timeout : 60000;</span>
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                 tv.tv_sec = i / 1000;</span>
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :                 tv.tv_usec = (i % 1000) * 1000;</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                 tohz = tvtohz(&amp;tv);</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :                 if (tohz == 0)</span>
+<span class="lineNum">     531 </span>            :                         tohz = 1;
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :                 for (i *= 100, etick = tick + tohz; i--; ) {</span>
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :                         if (!(wait &amp; SCSI_NOSLEEP)) {</span>
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :                                 ccb-&gt;ccb_state = CISS_CCB_POLL;</span>
+<span class="lineNum">     535 </span>            :                                 CISS_DPRINTF(CISS_D_CMD, (&quot;tsleep(%d) &quot;, tohz));
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :                                 if (tsleep(ccb, PRIBIO + 1, &quot;ciss_cmd&quot;,</span>
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                                     tohz) == EWOULDBLOCK) {</span>
+<span class="lineNum">     538 </span>            :                                         break;
+<span class="lineNum">     539 </span>            :                                 }
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                                 if (ccb-&gt;ccb_state != CISS_CCB_ONQ) {</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                                         tohz = etick - tick;</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                                         if (tohz &lt;= 0)</span>
+<span class="lineNum">     543 </span>            :                                                 break;
+<span class="lineNum">     544 </span>            :                                         CISS_DPRINTF(CISS_D_CMD, (&quot;T&quot;));
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :                                         continue;</span>
+<span class="lineNum">     546 </span>            :                                 }
+<span class="lineNum">     547 </span>            :                                 ccb1 = ccb;
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :                         } else {</span>
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :                                 DELAY(10);</span>
+<span class="lineNum">     550 </span>            : 
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :                                 if (!(bus_space_read_4(sc-&gt;iot, sc-&gt;ioh,</span>
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :                                     CISS_ISR) &amp; sc-&gt;iem)) {</span>
+<span class="lineNum">     553 </span>            :                                         CISS_DPRINTF(CISS_D_CMD, (&quot;N&quot;));
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :                                         continue;</span>
+<span class="lineNum">     555 </span>            :                                 }
+<span class="lineNum">     556 </span>            : 
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :                                 if (sc-&gt;cfg.methods &amp; CISS_METH_FIFO64) {</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :                                         if (bus_space_read_4(sc-&gt;iot, sc-&gt;ioh,</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :                                             CISS_OUTQ64_HI) == 0xffffffff) {</span>
+<span class="lineNum">     560 </span>            :                                                 CISS_DPRINTF(CISS_D_CMD, (&quot;Q&quot;));
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                                                 continue;</span>
+<span class="lineNum">     562 </span>            :                                         }
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                                         id = bus_space_read_4(sc-&gt;iot, sc-&gt;ioh,</span>
+<span class="lineNum">     564 </span>            :                                             CISS_OUTQ64_LO);
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :                                 } else if (sc-&gt;cfg.methods &amp;</span>
+<span class="lineNum">     566 </span>            :                                     CISS_METH_FIFO64_RRO) {
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :                                         id = bus_space_read_4(sc-&gt;iot, sc-&gt;ioh,</span>
+<span class="lineNum">     568 </span>            :                                             CISS_OUTQ64_LO);
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :                                         if (id == 0xffffffff) {</span>
+<span class="lineNum">     570 </span>            :                                                 CISS_DPRINTF(CISS_D_CMD, (&quot;Q&quot;));
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :                                                 continue;</span>
+<span class="lineNum">     572 </span>            :                                         }
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :                                         (void)bus_space_read_4(sc-&gt;iot,</span>
+<span class="lineNum">     574 </span>            :                                             sc-&gt;ioh, CISS_OUTQ64_HI);
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 :                                 } else {</span>
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :                                         id = bus_space_read_4(sc-&gt;iot, sc-&gt;ioh,</span>
+<span class="lineNum">     577 </span>            :                                             CISS_OUTQ);
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :                                         if (id == 0xffffffff) {</span>
+<span class="lineNum">     579 </span>            :                                                 CISS_DPRINTF(CISS_D_CMD, (&quot;Q&quot;));
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :                                                 continue;</span>
+<span class="lineNum">     581 </span>            :                                         }
+<span class="lineNum">     582 </span>            :                                 }
+<span class="lineNum">     583 </span>            : 
+<span class="lineNum">     584 </span>            :                                 CISS_DPRINTF(CISS_D_CMD, (&quot;got=0x%x &quot;, id));
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :                                 ccb1 = sc-&gt;ccbs + (id &gt;&gt; 2) * sc-&gt;ccblen;</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                                 ccb1-&gt;ccb_cmd.id = htole32(id);</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :                                 ccb1-&gt;ccb_cmd.id_hi = htole32(0);</span>
+<span class="lineNum">     588 </span>            :                         }
+<span class="lineNum">     589 </span>            : 
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :                         error = ciss_done(ccb1);</span>
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :                         if (ccb1 == ccb)</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :                                 return (error);</span>
+<span class="lineNum">     593 </span>            :                 }
+<span class="lineNum">     594 </span>            : 
+<span class="lineNum">     595 </span>            :                 /* if never got a chance to be done above... */
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_err.cmd_stat = CISS_ERR_TMO;</span>
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :                 error = ciss_done(ccb);</span>
+<span class="lineNum">     598 </span>            : 
+<span class="lineNum">     599 </span>            :                 CISS_DPRINTF(CISS_D_CMD, (&quot;done %d:%d&quot;,
+<span class="lineNum">     600 </span>            :                     ccb-&gt;ccb_err.cmd_stat, ccb-&gt;ccb_err.scsi_stat));
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     602 </span>            : 
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 : }</span>
+<a name="605"><span class="lineNum">     605 </span>            : </a>
+<span class="lineNum">     606 </span>            : int
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 : ciss_done(struct ciss_ccb *ccb)</span>
+<span class="lineNum">     608 </span>            : {
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         struct ciss_softc *sc = ccb-&gt;ccb_sc;</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :         struct scsi_xfer *xs = ccb-&gt;ccb_xs;</span>
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :         struct ciss_cmd *cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">     612 </span>            :         ciss_lock_t lock;
+<span class="lineNum">     613 </span>            :         int error = 0;
+<span class="lineNum">     614 </span>            : 
+<span class="lineNum">     615 </span>            :         CISS_DPRINTF(CISS_D_CMD, (&quot;ciss_done(%p) &quot;, ccb));
+<span class="lineNum">     616 </span>            : 
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :         if (ccb-&gt;ccb_state != CISS_CCB_ONQ) {</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unqueued ccb %p ready, state=%b\n&quot;,</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname, ccb, ccb-&gt;ccb_state, CISS_CCB_BITS);</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :                 return 1;</span>
+<span class="lineNum">     621 </span>            :         }
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :         lock = CISS_LOCK(sc);</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_state = CISS_CCB_READY;</span>
+<span class="lineNum">     624 </span>            : 
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :         if (ccb-&gt;ccb_cmd.id &amp; CISS_CMD_ERR)</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                 error = ciss_error(ccb);</span>
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :         if (ccb-&gt;ccb_data) {</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;dmat, ccb-&gt;ccb_dmamap, 0,</span>
+<span class="lineNum">     630 </span>            :                     ccb-&gt;ccb_dmamap-&gt;dm_mapsize, (cmd-&gt;flags &amp; CISS_CDB_IN) ?
+<span class="lineNum">     631 </span>            :                     BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :                 bus_dmamap_unload(sc-&gt;dmat, ccb-&gt;ccb_dmamap);</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     634 </span>            : 
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :         if (xs) {</span>
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :                 xs-&gt;resid = 0;</span>
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :                 scsi_done(xs);</span>
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     639 </span>            : 
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :         CISS_UNLOCK(sc, lock);</span>
+<span class="lineNum">     641 </span>            : 
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 : }</span>
+<a name="644"><span class="lineNum">     644 </span>            : </a>
+<span class="lineNum">     645 </span>            : int
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 : ciss_error(struct ciss_ccb *ccb)</span>
+<span class="lineNum">     647 </span>            : {
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :         struct ciss_softc *sc = ccb-&gt;ccb_sc;</span>
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :         struct ciss_error *err = &amp;ccb-&gt;ccb_err;</span>
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :         struct scsi_xfer *xs = ccb-&gt;ccb_xs;</span>
+<span class="lineNum">     651 </span>            :         int rv;
+<span class="lineNum">     652 </span>            : 
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :         switch ((rv = letoh16(err-&gt;cmd_stat))) {</span>
+<span class="lineNum">     654 </span>            :         case CISS_ERR_OK:
+<span class="lineNum">     655 </span>            :                 rv = 0;
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     657 </span>            : 
+<span class="lineNum">     658 </span>            :         case CISS_ERR_INVCMD:
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: invalid cmd 0x%x: 0x%x is not valid @ 0x%x[%d]\n&quot;,</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname, ccb-&gt;ccb_cmd.id,</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                     err-&gt;err_info, err-&gt;err_type[3], err-&gt;err_type[2]);</span>
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :                 if (xs) {</span>
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                         bzero(&amp;xs-&gt;sense, sizeof(xs-&gt;sense));</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                         xs-&gt;sense.error_code = SSD_ERRCODE_VALID |</span>
+<span class="lineNum">     665 </span>            :                             SSD_ERRCODE_CURRENT;
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :                         xs-&gt;sense.flags = SKEY_ILLEGAL_REQUEST;</span>
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                         xs-&gt;sense.add_sense_code = 0x24; /* ill field */</span>
+<span class="lineNum">     668 </span><span class="lineNoCov">          0 :                         xs-&gt;error = XS_SENSE;</span>
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     670 </span>            :                 rv = EIO;
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     672 </span>            : 
+<span class="lineNum">     673 </span>            :         case CISS_ERR_TMO:
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :                 xs-&gt;error = XS_TIMEOUT;</span>
+<span class="lineNum">     675 </span>            :                 rv = ETIMEDOUT;
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     677 </span>            : 
+<span class="lineNum">     678 </span>            :         default:
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :                 if (xs) {</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :                         switch (err-&gt;scsi_stat) {</span>
+<span class="lineNum">     681 </span>            :                         case SCSI_CHECK:
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :                                 xs-&gt;error = XS_SENSE;</span>
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :                                 bcopy(&amp;err-&gt;sense[0], &amp;xs-&gt;sense,</span>
+<span class="lineNum">     684 </span>            :                                     sizeof(xs-&gt;sense));
+<span class="lineNum">     685 </span>            :                                 rv = EIO;
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     687 </span>            : 
+<span class="lineNum">     688 </span>            :                         case SCSI_BUSY:
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :                                 xs-&gt;error = XS_BUSY;</span>
+<span class="lineNum">     690 </span>            :                                 rv = EBUSY;
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     692 </span>            : 
+<span class="lineNum">     693 </span>            :                         default:
+<span class="lineNum">     694 </span>            :                                 CISS_DPRINTF(CISS_D_ERR, (&quot;%s: &quot;
+<span class="lineNum">     695 </span>            :                                     &quot;cmd_stat %x scsi_stat 0x%x\n&quot;,
+<span class="lineNum">     696 </span>            :                                     sc-&gt;sc_dev.dv_xname, rv, err-&gt;scsi_stat));
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :                                 xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">     698 </span>            :                                 rv = EIO;
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     700 </span>            :                         }
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :                         xs-&gt;resid = letoh32(err-&gt;resid);</span>
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">     703 </span>            :                         rv = EIO;
+<span class="lineNum">     704 </span>            :         }
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_cmd.id &amp;= htole32(~3);</span>
+<span class="lineNum">     706 </span>            : 
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :         return rv;</span>
+<span class="lineNum">     708 </span>            : }
+<a name="709"><span class="lineNum">     709 </span>            : </a>
+<span class="lineNum">     710 </span>            : int
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 : ciss_inq(struct ciss_softc *sc, struct ciss_inquiry *inq)</span>
+<span class="lineNum">     712 </span>            : {
+<span class="lineNum">     713 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">     714 </span>            :         struct ciss_cmd *cmd;
+<span class="lineNum">     715 </span>            :         int rv;
+<span class="lineNum">     716 </span>            :         int s;
+<span class="lineNum">     717 </span>            : 
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :         ccb = scsi_io_get(&amp;sc-&gt;sc_iopool, SCSI_POLL|SCSI_NOSLEEP);</span>
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :         if (ccb == NULL)</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     721 </span>            : 
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_len = sizeof(*inq);</span>
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_data = inq;</span>
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :         cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt = htole32(CISS_CMD_MODE_PERIPH);</span>
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt2 = 0;</span>
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :         cmd-&gt;cdblen = 10;</span>
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :         cmd-&gt;flags = CISS_CDB_CMD | CISS_CDB_SIMPL | CISS_CDB_IN;</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :         cmd-&gt;tmo = htole16(0);</span>
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd-&gt;cdb[0], sizeof(cmd-&gt;cdb));</span>
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[0] = CISS_CMD_CTRL_GET;</span>
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[6] = CISS_CMS_CTRL_CTRL;</span>
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[7] = sizeof(*inq) &gt;&gt; 8;       /* biiiig endian */</span>
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[8] = sizeof(*inq) &amp; 0xff;</span>
+<span class="lineNum">     735 </span>            : 
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :         s = splbio();</span>
+<span class="lineNum">     737 </span><span class="lineNoCov">          0 :         rv = ciss_cmd(ccb, BUS_DMA_NOWAIT, SCSI_POLL|SCSI_NOSLEEP);</span>
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">     739 </span>            : 
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :         scsi_io_put(&amp;sc-&gt;sc_iopool, ccb);</span>
+<span class="lineNum">     741 </span>            : 
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 : }</span>
+<a name="744"><span class="lineNum">     744 </span>            : </a>
+<span class="lineNum">     745 </span>            : int
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 : ciss_ldmap(struct ciss_softc *sc)</span>
+<span class="lineNum">     747 </span>            : {
+<span class="lineNum">     748 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">     749 </span>            :         struct ciss_cmd *cmd;
+<span class="lineNum">     750 </span>            :         struct ciss_ldmap *lmap;
+<span class="lineNum">     751 </span>            :         ciss_lock_t lock;
+<span class="lineNum">     752 </span>            :         int total, rv;
+<span class="lineNum">     753 </span>            : 
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :         lock = CISS_LOCK_SCRATCH(sc);</span>
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :         lmap = sc-&gt;scratch;</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         lmap-&gt;size = htobe32(sc-&gt;maxunits * sizeof(lmap-&gt;map));</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :         total = sizeof(*lmap) + (sc-&gt;maxunits - 1) * sizeof(lmap-&gt;map);</span>
+<span class="lineNum">     758 </span>            : 
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :         ccb = scsi_io_get(&amp;sc-&gt;sc_iopool, SCSI_POLL|SCSI_NOSLEEP);</span>
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         if (ccb == NULL) {</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :                 CISS_UNLOCK_SCRATCH(sc, lock);</span>
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     763 </span>            :         }
+<span class="lineNum">     764 </span>            : 
+<span class="lineNum">     765 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_len = total;</span>
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_data = lmap;</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :         cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt = CISS_CMD_MODE_PERIPH;</span>
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt2 = 0;</span>
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :         cmd-&gt;cdblen = 12;</span>
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :         cmd-&gt;flags = CISS_CDB_CMD | CISS_CDB_SIMPL | CISS_CDB_IN;</span>
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :         cmd-&gt;tmo = htole16(30);</span>
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd-&gt;cdb[0], sizeof(cmd-&gt;cdb));</span>
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[0] = CISS_CMD_LDMAP;</span>
+<span class="lineNum">     775 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[8] = total &gt;&gt; 8;      /* biiiig endian */</span>
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[9] = total &amp; 0xff;</span>
+<span class="lineNum">     777 </span>            : 
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :         rv = ciss_cmd(ccb, BUS_DMA_NOWAIT, SCSI_POLL|SCSI_NOSLEEP);</span>
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :         scsi_io_put(&amp;sc-&gt;sc_iopool, ccb);</span>
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :         CISS_UNLOCK_SCRATCH(sc, lock);</span>
+<span class="lineNum">     781 </span>            : 
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :         if (rv)</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :                 return rv;</span>
+<span class="lineNum">     784 </span>            : 
+<span class="lineNum">     785 </span>            :         CISS_DPRINTF(CISS_D_MISC, (&quot;lmap %x:%x\n&quot;,
+<span class="lineNum">     786 </span>            :             lmap-&gt;map[0].tgt, lmap-&gt;map[0].tgt2));
+<span class="lineNum">     787 </span>            : 
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 : }</span>
+<a name="790"><span class="lineNum">     790 </span>            : </a>
+<span class="lineNum">     791 </span>            : int
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 : ciss_sync(struct ciss_softc *sc)</span>
+<span class="lineNum">     793 </span>            : {
+<span class="lineNum">     794 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">     795 </span>            :         struct ciss_cmd *cmd;
+<span class="lineNum">     796 </span>            :         struct ciss_flush *flush;
+<span class="lineNum">     797 </span>            :         ciss_lock_t lock;
+<span class="lineNum">     798 </span>            :         int rv;
+<span class="lineNum">     799 </span>            : 
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :         lock = CISS_LOCK_SCRATCH(sc);</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :         flush = sc-&gt;scratch;</span>
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :         bzero(flush, sizeof(*flush));</span>
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :         flush-&gt;flush = sc-&gt;sc_flush;</span>
+<span class="lineNum">     804 </span>            : 
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :         ccb = scsi_io_get(&amp;sc-&gt;sc_iopool, SCSI_POLL|SCSI_NOSLEEP);</span>
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         if (ccb == NULL) {</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :                 CISS_UNLOCK_SCRATCH(sc, lock);</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     809 </span>            :         }
+<span class="lineNum">     810 </span>            : 
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_len = sizeof(*flush);</span>
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_data = flush;</span>
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :         cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt = CISS_CMD_MODE_PERIPH;</span>
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt2 = 0;</span>
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 :         cmd-&gt;cdblen = 10;</span>
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 :         cmd-&gt;flags = CISS_CDB_CMD | CISS_CDB_SIMPL | CISS_CDB_OUT;</span>
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :         cmd-&gt;tmo = htole16(0);</span>
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd-&gt;cdb[0], sizeof(cmd-&gt;cdb));</span>
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[0] = CISS_CMD_CTRL_SET;</span>
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[6] = CISS_CMS_CTRL_FLUSH;</span>
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[7] = sizeof(*flush) &gt;&gt; 8;     /* biiiig endian */</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[8] = sizeof(*flush) &amp; 0xff;</span>
+<span class="lineNum">     824 </span>            : 
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :         rv = ciss_cmd(ccb, BUS_DMA_NOWAIT, SCSI_POLL|SCSI_NOSLEEP);</span>
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         scsi_io_put(&amp;sc-&gt;sc_iopool, ccb);</span>
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :         CISS_UNLOCK_SCRATCH(sc, lock);</span>
+<span class="lineNum">     828 </span>            : 
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :         return rv;</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 : }</span>
+<a name="831"><span class="lineNum">     831 </span>            : </a>
+<span class="lineNum">     832 </span>            : void
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 : ciss_scsi_cmd(struct scsi_xfer *xs)</span>
+<span class="lineNum">     834 </span>            : {
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         struct scsi_link *link = xs-&gt;sc_link;</span>
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :         u_int8_t target = link-&gt;target;</span>
+<span class="lineNum">     837 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">     838 </span>            :         struct ciss_cmd *cmd;
+<span class="lineNum">     839 </span>            :         ciss_lock_t lock;
+<span class="lineNum">     840 </span>            : 
+<span class="lineNum">     841 </span>            :         CISS_DPRINTF(CISS_D_CMD, (&quot;ciss_scsi_cmd &quot;));
+<span class="lineNum">     842 </span>            : 
+<span class="lineNum">     843 </span><span class="lineNoCov">          0 :         if (xs-&gt;cmdlen &gt; CISS_MAX_CDB) {</span>
+<span class="lineNum">     844 </span>            :                 CISS_DPRINTF(CISS_D_CMD, (&quot;CDB too big %p &quot;, xs));
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                 bzero(&amp;xs-&gt;sense, sizeof(xs-&gt;sense));</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :                 xs-&gt;sense.error_code = SSD_ERRCODE_VALID | SSD_ERRCODE_CURRENT;</span>
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :                 xs-&gt;sense.flags = SKEY_ILLEGAL_REQUEST;</span>
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :                 xs-&gt;sense.add_sense_code = 0x20; /* illcmd, 0x24 illfield */</span>
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :                 xs-&gt;error = XS_SENSE;</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :                 scsi_done(xs);</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     852 </span>            :         }
+<span class="lineNum">     853 </span>            : 
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :         xs-&gt;error = XS_NOERROR;</span>
+<span class="lineNum">     855 </span>            : 
+<span class="lineNum">     856 </span>            :         /* XXX emulate SYNCHRONIZE_CACHE ??? */
+<span class="lineNum">     857 </span>            : 
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :         ccb = xs-&gt;io;</span>
+<span class="lineNum">     859 </span>            : 
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :         cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_len = xs-&gt;datalen;</span>
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_data = xs-&gt;data;</span>
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_xs = xs;</span>
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt = CISS_CMD_MODE_LD | target;</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt2 = 0;</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :         cmd-&gt;cdblen = xs-&gt;cmdlen;</span>
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :         cmd-&gt;flags = CISS_CDB_CMD | CISS_CDB_SIMPL;</span>
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 :         if (xs-&gt;flags &amp; SCSI_DATA_IN)</span>
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :                 cmd-&gt;flags |= CISS_CDB_IN;</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         else if (xs-&gt;flags &amp; SCSI_DATA_OUT)</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :                 cmd-&gt;flags |= CISS_CDB_OUT;</span>
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :         cmd-&gt;tmo = htole16(xs-&gt;timeout &lt; 1000? 1 : xs-&gt;timeout / 1000);</span>
+<span class="lineNum">     873 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd-&gt;cdb[0], sizeof(cmd-&gt;cdb));</span>
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :         bcopy(xs-&gt;cmd, &amp;cmd-&gt;cdb[0], CISS_MAX_CDB);</span>
+<span class="lineNum">     875 </span>            : 
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :         lock = CISS_LOCK(sc);</span>
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :         ciss_cmd(ccb, BUS_DMA_WAITOK, xs-&gt;flags &amp; (SCSI_POLL|SCSI_NOSLEEP));</span>
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :         CISS_UNLOCK(sc, lock);</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 : }</span>
+<a name="880"><span class="lineNum">     880 </span>            : </a>
+<span class="lineNum">     881 </span>            : int
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 : ciss_intr(void *v)</span>
+<span class="lineNum">     883 </span>            : {
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :         struct ciss_softc *sc = v;</span>
+<span class="lineNum">     885 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">     886 </span>            :         bus_size_t reg;
+<span class="lineNum">     887 </span>            :         u_int32_t id;
+<span class="lineNum">     888 </span>            :         int hit = 0;
+<span class="lineNum">     889 </span>            : 
+<span class="lineNum">     890 </span>            :         CISS_DPRINTF(CISS_D_INTR, (&quot;intr &quot;));
+<span class="lineNum">     891 </span>            : 
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :         if (!(bus_space_read_4(sc-&gt;iot, sc-&gt;ioh, CISS_ISR) &amp; sc-&gt;iem))</span>
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     894 </span>            : 
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :         if (sc-&gt;cfg.methods &amp; CISS_METH_FIFO64)</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :                 reg = CISS_OUTQ64_HI;</span>
+<span class="lineNum">     897 </span><span class="lineNoCov">          0 :         else if (sc-&gt;cfg.methods &amp; CISS_METH_FIFO64_RRO)</span>
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :                 reg = CISS_OUTQ64_LO;</span>
+<span class="lineNum">     899 </span>            :         else
+<span class="lineNum">     900 </span>            :                 reg = CISS_OUTQ;
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :         while ((id = bus_space_read_4(sc-&gt;iot, sc-&gt;ioh, reg)) != 0xffffffff) {</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :                 if (reg == CISS_OUTQ64_HI)</span>
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :                         id = bus_space_read_4(sc-&gt;iot, sc-&gt;ioh,</span>
+<span class="lineNum">     904 </span>            :                             CISS_OUTQ64_LO);
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :                 else if (reg == CISS_OUTQ64_LO)</span>
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :                         (void)bus_space_read_4(sc-&gt;iot, sc-&gt;ioh,</span>
+<span class="lineNum">     907 </span>            :                             CISS_OUTQ64_HI);
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :                 ccb = sc-&gt;ccbs + (id &gt;&gt; 2) * sc-&gt;ccblen;</span>
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_cmd.id = htole32(id);</span>
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_cmd.id_hi = htole32(0); /* ignore the upper 32bits */</span>
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :                 if (ccb-&gt;ccb_state == CISS_CCB_POLL) {</span>
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :                         ccb-&gt;ccb_state = CISS_CCB_ONQ;</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :                         wakeup(ccb);</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :                         ciss_done(ccb);</span>
+<span class="lineNum">     916 </span>            : 
+<span class="lineNum">     917 </span>            :                 hit = 1;
+<span class="lineNum">     918 </span>            :         }
+<span class="lineNum">     919 </span>            :         CISS_DPRINTF(CISS_D_INTR, (&quot;exit &quot;));
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :         return hit;</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 : }</span>
+<a name="922"><span class="lineNum">     922 </span>            : </a>
+<span class="lineNum">     923 </span>            : void
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 : ciss_heartbeat(void *v)</span>
+<span class="lineNum">     925 </span>            : {
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :         struct ciss_softc *sc = v;</span>
+<span class="lineNum">     927 </span>            :         u_int32_t hb;
+<span class="lineNum">     928 </span>            : 
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :         hb = bus_space_read_4(sc-&gt;iot, sc-&gt;cfg_ioh,</span>
+<span class="lineNum">     930 </span>            :             sc-&gt;cfgoff + offsetof(struct ciss_config, heartbeat));
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :         if (hb == sc-&gt;heartbeat) {</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :                 sc-&gt;fibrillation++;</span>
+<span class="lineNum">     933 </span>            :                 CISS_DPRINTF(CISS_D_ERR, (&quot;%s: fibrillation #%d (value=%d)\n&quot;,
+<span class="lineNum">     934 </span>            :                     sc-&gt;sc_dev.dv_xname, sc-&gt;fibrillation, hb));
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :                 if (sc-&gt;fibrillation &gt;= 11) {</span>
+<span class="lineNum">     936 </span>            :                         /* No heartbeat for 33 seconds */
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :                         panic(&quot;%s: dead&quot;, sc-&gt;sc_dev.dv_xname);    /* XXX reset! */</span>
+<span class="lineNum">     938 </span>            :                 }
+<span class="lineNum">     939 </span>            :         } else {
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :                 sc-&gt;heartbeat = hb;</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :                 if (sc-&gt;fibrillation) {</span>
+<span class="lineNum">     942 </span>            :                         CISS_DPRINTF(CISS_D_ERR, (&quot;%s: &quot;
+<span class="lineNum">     943 </span>            :                             &quot;fibrillation ended (value=%d)\n&quot;,
+<span class="lineNum">     944 </span>            :                             sc-&gt;sc_dev.dv_xname, hb));
+<span class="lineNum">     945 </span>            :                 }
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :                 sc-&gt;fibrillation = 0;</span>
+<span class="lineNum">     947 </span>            :         }
+<span class="lineNum">     948 </span>            : 
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :         timeout_add_sec(&amp;sc-&gt;sc_hb, 3);</span>
+<span class="lineNum">     950 </span><span class="lineNoCov">          0 : }</span>
+<a name="951"><span class="lineNum">     951 </span>            : </a>
+<span class="lineNum">     952 </span>            : int
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 : ciss_scsi_ioctl(struct scsi_link *link, u_long cmd, caddr_t addr, int flag)</span>
+<span class="lineNum">     954 </span>            : {
+<span class="lineNum">     955 </span>            : #if NBIO &gt; 0
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :         return ciss_ioctl(link-&gt;adapter_softc, cmd, addr);</span>
+<span class="lineNum">     957 </span>            : #else
+<span class="lineNum">     958 </span>            :         return ENOTTY;
+<span class="lineNum">     959 </span>            : #endif
+<span class="lineNum">     960 </span>            : }
+<span class="lineNum">     961 </span>            : 
+<span class="lineNum">     962 </span>            : #if NBIO &gt; 0
+<span class="lineNum">     963 </span>            : const int ciss_level[] = { 0, 4, 1, 5, 51, 7 };
+<span class="lineNum">     964 </span>            : const int ciss_stat[] = { BIOC_SVONLINE, BIOC_SVOFFLINE, BIOC_SVOFFLINE,
+<span class="lineNum">     965 </span>            :     BIOC_SVDEGRADED, BIOC_SVREBUILD, BIOC_SVREBUILD, BIOC_SVDEGRADED,
+<span class="lineNum">     966 </span>            :     BIOC_SVDEGRADED, BIOC_SVINVALID, BIOC_SVINVALID, BIOC_SVBUILDING,
+<span class="lineNum">     967 </span>            :     BIOC_SVOFFLINE, BIOC_SVBUILDING };
+<a name="968"><span class="lineNum">     968 </span>            : </a>
+<span class="lineNum">     969 </span>            : int
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 : ciss_ioctl(struct device *dev, u_long cmd, caddr_t addr)</span>
+<span class="lineNum">     971 </span>            : {
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :         struct ciss_softc *sc = (struct ciss_softc *)dev;</span>
+<span class="lineNum">     973 </span>            :         struct bioc_inq *bi;
+<span class="lineNum">     974 </span>            :         struct bioc_vol *bv;
+<span class="lineNum">     975 </span>            :         struct bioc_disk *bd;
+<span class="lineNum">     976 </span>            :         struct bioc_blink *bb;
+<span class="lineNum">     977 </span>            :         /* struct bioc_alarm *ba; */
+<span class="lineNum">     978 </span>            :         /* struct bioc_setstate *bss; */
+<span class="lineNum">     979 </span>            :         struct ciss_ldid *ldid;
+<span class="lineNum">     980 </span>            :         struct ciss_ldstat *ldstat;
+<span class="lineNum">     981 </span>            :         struct ciss_pdid *pdid;
+<span class="lineNum">     982 </span>            :         struct ciss_blink *blink;
+<span class="lineNum">     983 </span>            :         struct ciss_ld *ldp;
+<span class="lineNum">     984 </span>            :         ciss_lock_t lock;
+<span class="lineNum">     985 </span>            :         u_int8_t drv;
+<span class="lineNum">     986 </span>            :         int ld, pd, error = 0;
+<span class="lineNum">     987 </span>            :         u_int blks;
+<span class="lineNum">     988 </span>            : 
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 :         if (!(sc-&gt;sc_flags &amp; CISS_BIO))</span>
+<span class="lineNum">     990 </span><span class="lineNoCov">          0 :                 return ENOTTY;</span>
+<span class="lineNum">     991 </span>            : 
+<span class="lineNum">     992 </span><span class="lineNoCov">          0 :         lock = CISS_LOCK(sc);</span>
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     994 </span>            :         case BIOCINQ:
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :                 bi = (struct bioc_inq *)addr;</span>
+<span class="lineNum">     996 </span><span class="lineNoCov">          0 :                 strlcpy(bi-&gt;bi_dev, sc-&gt;sc_dev.dv_xname, sizeof(bi-&gt;bi_dev));</span>
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :                 bi-&gt;bi_novol = sc-&gt;maxunits;</span>
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 :                 bi-&gt;bi_nodisk = sc-&gt;ndrives;</span>
+<span class="lineNum">     999 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1000 </span>            : 
+<span class="lineNum">    1001 </span>            :         case BIOCVOL:
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 :                 bv = (struct bioc_vol *)addr;</span>
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :                 if (bv-&gt;bv_volid &gt; sc-&gt;maxunits) {</span>
+<span class="lineNum">    1004 </span>            :                         error = EINVAL;
+<span class="lineNum">    1005 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1006 </span>            :                 }
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 :                 ldp = sc-&gt;sc_lds[bv-&gt;bv_volid];</span>
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :                 if (!ldp) {</span>
+<span class="lineNum">    1009 </span>            :                         error = EINVAL;
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1011 </span>            :                 }
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :                 ldid = sc-&gt;scratch;</span>
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                 if ((error = ciss_ldid(sc, bv-&gt;bv_volid, ldid)))</span>
+<span class="lineNum">    1014 </span>            :                         break;
+<span class="lineNum">    1015 </span>            :                 /* params 30:88:ff:00:00:00:00:00:00:00:00:00:00:00:20:00 */
+<span class="lineNum">    1016 </span><span class="lineNoCov">          0 :                 bv-&gt;bv_status = BIOC_SVINVALID;</span>
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :                 blks = (u_int)letoh16(ldid-&gt;nblocks[1]) &lt;&lt; 16 |</span>
+<span class="lineNum">    1018 </span><span class="lineNoCov">          0 :                     letoh16(ldid-&gt;nblocks[0]);</span>
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :                 bv-&gt;bv_size = blks * (uint64_t)letoh16(ldid-&gt;blksize);</span>
+<span class="lineNum">    1020 </span><span class="lineNoCov">          0 :                 bv-&gt;bv_level = ciss_level[ldid-&gt;type];</span>
+<span class="lineNum">    1021 </span><span class="lineNoCov">          0 :                 bv-&gt;bv_nodisk = ldp-&gt;ndrives;</span>
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :                 strlcpy(bv-&gt;bv_dev, ldp-&gt;xname, sizeof(bv-&gt;bv_dev));</span>
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 :                 strlcpy(bv-&gt;bv_vendor, &quot;CISS&quot;, sizeof(bv-&gt;bv_vendor));</span>
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :                 ldstat = sc-&gt;scratch;</span>
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 :                 bzero(ldstat, sizeof(*ldstat));</span>
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :                 if ((error = ciss_ldstat(sc, bv-&gt;bv_volid, ldstat)))</span>
+<span class="lineNum">    1027 </span>            :                         break;
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :                 bv-&gt;bv_percent = -1;</span>
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :                 bv-&gt;bv_seconds = 0;</span>
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :                 if (ldstat-&gt;stat &lt; nitems(ciss_stat))</span>
+<span class="lineNum">    1031 </span><span class="lineNoCov">          0 :                         bv-&gt;bv_status = ciss_stat[ldstat-&gt;stat];</span>
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :                 if (bv-&gt;bv_status == BIOC_SVREBUILD ||</span>
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :                     bv-&gt;bv_status == BIOC_SVBUILDING)</span>
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :                         bv-&gt;bv_percent = (blks -</span>
+<span class="lineNum">    1035 </span><span class="lineNoCov">          0 :                             (((u_int)ldstat-&gt;prog[3] &lt;&lt; 24) |</span>
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 :                             ((u_int)ldstat-&gt;prog[2] &lt;&lt; 16) |</span>
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :                             ((u_int)ldstat-&gt;prog[1] &lt;&lt; 8) |</span>
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 :                             (u_int)ldstat-&gt;prog[0])) * 100ULL / blks;</span>
+<span class="lineNum">    1039 </span>            :                 break;
+<span class="lineNum">    1040 </span>            : 
+<span class="lineNum">    1041 </span>            :         case BIOCDISK:
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :                 bd = (struct bioc_disk *)addr;</span>
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :                 if (bd-&gt;bd_volid &gt; sc-&gt;maxunits) {</span>
+<span class="lineNum">    1044 </span>            :                         error = EINVAL;
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1046 </span>            :                 }
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :                 ldp = sc-&gt;sc_lds[bd-&gt;bd_volid];</span>
+<span class="lineNum">    1048 </span><span class="lineNoCov">          0 :                 if (!ldp || (pd = bd-&gt;bd_diskid) &gt; ldp-&gt;ndrives) {</span>
+<span class="lineNum">    1049 </span>            :                         error = EINVAL;
+<span class="lineNum">    1050 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1051 </span>            :                 }
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :                 ldstat = sc-&gt;scratch;</span>
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 :                 if ((error = ciss_ldstat(sc, bd-&gt;bd_volid, ldstat)))</span>
+<span class="lineNum">    1054 </span>            :                         break;
+<span class="lineNum">    1055 </span><span class="lineNoCov">          0 :                 bd-&gt;bd_status = -1;</span>
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :                 if (ldstat-&gt;stat == CISS_LD_REBLD &amp;&amp;</span>
+<span class="lineNum">    1057 </span><span class="lineNoCov">          0 :                     ldstat-&gt;bigrebuild == ldp-&gt;tgts[pd])</span>
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_status = BIOC_SDREBUILD;</span>
+<span class="lineNum">    1059 </span><span class="lineNoCov">          0 :                 if (ciss_bitset(ldp-&gt;tgts[pd] &amp; (~CISS_BIGBIT),</span>
+<span class="lineNum">    1060 </span>            :                     ldstat-&gt;bigfailed)) {
+<span class="lineNum">    1061 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_status = BIOC_SDFAILED;</span>
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_size = 0;</span>
+<span class="lineNum">    1063 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_channel = (ldp-&gt;tgts[pd] &amp; (~CISS_BIGBIT)) /</span>
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :                             sc-&gt;ndrives;</span>
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_target = ldp-&gt;tgts[pd] % sc-&gt;ndrives;</span>
+<span class="lineNum">    1066 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_lun = 0;</span>
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_vendor[0] = '\0';</span>
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_serial[0] = '\0';</span>
+<span class="lineNum">    1069 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_procdev[0] = '\0';</span>
+<span class="lineNum">    1070 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :                         pdid = sc-&gt;scratch;</span>
+<span class="lineNum">    1072 </span><span class="lineNoCov">          0 :                         if ((error = ciss_pdid(sc, ldp-&gt;tgts[pd], pdid,</span>
+<span class="lineNum">    1073 </span>            :                             SCSI_POLL)))
+<span class="lineNum">    1074 </span>            :                                 break;
+<span class="lineNum">    1075 </span><span class="lineNoCov">          0 :                         if (bd-&gt;bd_status &lt; 0) {</span>
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :                                 if (pdid-&gt;config &amp; CISS_PD_SPARE)</span>
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :                                         bd-&gt;bd_status = BIOC_SDHOTSPARE;</span>
+<span class="lineNum">    1078 </span><span class="lineNoCov">          0 :                                 else if (pdid-&gt;present &amp; CISS_PD_PRESENT)</span>
+<span class="lineNum">    1079 </span><span class="lineNoCov">          0 :                                         bd-&gt;bd_status = BIOC_SDONLINE;</span>
+<span class="lineNum">    1080 </span>            :                                 else
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :                                         bd-&gt;bd_status = BIOC_SDINVALID;</span>
+<span class="lineNum">    1082 </span>            :                         }
+<span class="lineNum">    1083 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_size = (u_int64_t)letoh32(pdid-&gt;nblocks) *</span>
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 :                             letoh16(pdid-&gt;blksz);</span>
+<span class="lineNum">    1085 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_channel = pdid-&gt;bus;</span>
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_target = pdid-&gt;target;</span>
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_lun = 0;</span>
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :                         strlcpy(bd-&gt;bd_vendor, pdid-&gt;model,</span>
+<span class="lineNum">    1089 </span>            :                             sizeof(bd-&gt;bd_vendor));
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :                         strlcpy(bd-&gt;bd_serial, pdid-&gt;serial,</span>
+<span class="lineNum">    1091 </span>            :                             sizeof(bd-&gt;bd_serial));
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :                         bd-&gt;bd_procdev[0] = '\0';</span>
+<span class="lineNum">    1093 </span>            :                 }
+<span class="lineNum">    1094 </span>            :                 break;
+<span class="lineNum">    1095 </span>            : 
+<span class="lineNum">    1096 </span>            :         case BIOCBLINK:
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :                 bb = (struct bioc_blink *)addr;</span>
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 :                 blink = sc-&gt;scratch;</span>
+<span class="lineNum">    1099 </span>            :                 error = EINVAL;
+<span class="lineNum">    1100 </span>            :                 /* XXX workaround completely dumb scsi addressing */
+<span class="lineNum">    1101 </span><span class="lineNoCov">          0 :                 for (ld = 0; ld &lt; sc-&gt;maxunits; ld++) {</span>
+<span class="lineNum">    1102 </span><span class="lineNoCov">          0 :                         ldp = sc-&gt;sc_lds[ld];</span>
+<span class="lineNum">    1103 </span><span class="lineNoCov">          0 :                         if (!ldp)</span>
+<span class="lineNum">    1104 </span>            :                                 continue;
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :                         if (sc-&gt;ndrives == 256)</span>
+<span class="lineNum">    1106 </span><span class="lineNoCov">          0 :                                 drv = bb-&gt;bb_target;</span>
+<span class="lineNum">    1107 </span>            :                         else
+<span class="lineNum">    1108 </span><span class="lineNoCov">          0 :                                 drv = CISS_BIGBIT +</span>
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 :                                     bb-&gt;bb_channel * sc-&gt;ndrives +</span>
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :                                     bb-&gt;bb_target;</span>
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 :                         for (pd = 0; pd &lt; ldp-&gt;ndrives; pd++)</span>
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 :                                 if (ldp-&gt;tgts[pd] == drv)</span>
+<span class="lineNum">    1113 </span><span class="lineNoCov">          0 :                                         error = ciss_blink(sc, ld, pd,</span>
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :                                             bb-&gt;bb_status, blink);</span>
+<span class="lineNum">    1115 </span>            :                 }
+<span class="lineNum">    1116 </span>            :                 break;
+<span class="lineNum">    1117 </span>            : 
+<span class="lineNum">    1118 </span>            :         case BIOCALARM:
+<span class="lineNum">    1119 </span>            :         case BIOCSETSTATE:
+<span class="lineNum">    1120 </span>            :         default:
+<span class="lineNum">    1121 </span>            :                 CISS_DPRINTF(CISS_D_IOCTL, (&quot;%s: invalid ioctl\n&quot;,
+<span class="lineNum">    1122 </span>            :                     sc-&gt;sc_dev.dv_xname));
+<span class="lineNum">    1123 </span>            :                 error = ENOTTY;
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :         CISS_UNLOCK(sc, lock);</span>
+<span class="lineNum">    1126 </span>            : 
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1129 </span>            : 
+<a name="1130"><span class="lineNum">    1130 </span>            : #ifndef SMALL_KERNEL</a>
+<span class="lineNum">    1131 </span>            : void
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 : ciss_sensors(void *v)</span>
+<span class="lineNum">    1133 </span>            : {
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :         struct ciss_softc *sc = v;</span>
+<span class="lineNum">    1135 </span>            :         struct ciss_ldstat *ldstat;
+<span class="lineNum">    1136 </span>            :         int i, error;
+<span class="lineNum">    1137 </span>            : 
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sc-&gt;maxunits; i++) {</span>
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :                 ldstat = sc-&gt;scratch;</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :                 if ((error = ciss_ldstat(sc, i, ldstat))) {</span>
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].value = 0;</span>
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].status = SENSOR_S_UNKNOWN;</span>
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">    1144 </span>            :                 }
+<span class="lineNum">    1145 </span>            : 
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :                 switch (ldstat-&gt;stat) {</span>
+<span class="lineNum">    1147 </span>            :                 case CISS_LD_OK:
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].value = SENSOR_DRIVE_ONLINE;</span>
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].status = SENSOR_S_OK;</span>
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1151 </span>            : 
+<span class="lineNum">    1152 </span>            :                 case CISS_LD_DEGRAD:
+<span class="lineNum">    1153 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].value = SENSOR_DRIVE_PFAIL;</span>
+<span class="lineNum">    1154 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].status = SENSOR_S_WARN;</span>
+<span class="lineNum">    1155 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1156 </span>            : 
+<span class="lineNum">    1157 </span>            :                 case CISS_LD_EXPND:
+<span class="lineNum">    1158 </span>            :                 case CISS_LD_QEXPND:
+<span class="lineNum">    1159 </span>            :                 case CISS_LD_RBLDRD:
+<span class="lineNum">    1160 </span>            :                 case CISS_LD_REBLD:
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].value = SENSOR_DRIVE_REBUILD;</span>
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].status = SENSOR_S_WARN;</span>
+<span class="lineNum">    1163 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1164 </span>            : 
+<span class="lineNum">    1165 </span>            :                 case CISS_LD_NORDY:
+<span class="lineNum">    1166 </span>            :                 case CISS_LD_PDINV:
+<span class="lineNum">    1167 </span>            :                 case CISS_LD_PDUNC:
+<span class="lineNum">    1168 </span>            :                 case CISS_LD_FAILED:
+<span class="lineNum">    1169 </span>            :                 case CISS_LD_UNCONF:
+<span class="lineNum">    1170 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].value = SENSOR_DRIVE_FAIL;</span>
+<span class="lineNum">    1171 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].status = SENSOR_S_CRIT;</span>
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1173 </span>            : 
+<span class="lineNum">    1174 </span>            :                 default:
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].value = 0;</span>
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 :                         sc-&gt;sensors[i].status = SENSOR_S_UNKNOWN;</span>
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1178 </span>            :         }
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1180 </span>            : #endif /* SMALL_KERNEL */
+<a name="1181"><span class="lineNum">    1181 </span>            : </a>
+<span class="lineNum">    1182 </span>            : int
+<span class="lineNum">    1183 </span><span class="lineNoCov">          0 : ciss_ldid(struct ciss_softc *sc, int target, struct ciss_ldid *id)</span>
+<span class="lineNum">    1184 </span>            : {
+<span class="lineNum">    1185 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">    1186 </span>            :         struct ciss_cmd *cmd;
+<span class="lineNum">    1187 </span>            :         int rv;
+<span class="lineNum">    1188 </span>            :         int s;
+<span class="lineNum">    1189 </span>            : 
+<span class="lineNum">    1190 </span><span class="lineNoCov">          0 :         ccb = scsi_io_get(&amp;sc-&gt;sc_iopool, SCSI_POLL);</span>
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :         if (ccb == NULL)</span>
+<span class="lineNum">    1192 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">    1193 </span>            : 
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_len = sizeof(*id);</span>
+<span class="lineNum">    1195 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_data = id;</span>
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :         cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">    1197 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt = htole32(CISS_CMD_MODE_PERIPH);</span>
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt2 = 0;</span>
+<span class="lineNum">    1199 </span><span class="lineNoCov">          0 :         cmd-&gt;cdblen = 10;</span>
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 :         cmd-&gt;flags = CISS_CDB_CMD | CISS_CDB_SIMPL | CISS_CDB_IN;</span>
+<span class="lineNum">    1201 </span><span class="lineNoCov">          0 :         cmd-&gt;tmo = htole16(0);</span>
+<span class="lineNum">    1202 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd-&gt;cdb[0], sizeof(cmd-&gt;cdb));</span>
+<span class="lineNum">    1203 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[0] = CISS_CMD_CTRL_GET;</span>
+<span class="lineNum">    1204 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[5] = target;</span>
+<span class="lineNum">    1205 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[6] = CISS_CMS_CTRL_LDIDEXT;</span>
+<span class="lineNum">    1206 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[7] = sizeof(*id) &gt;&gt; 8;        /* biiiig endian */</span>
+<span class="lineNum">    1207 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[8] = sizeof(*id) &amp; 0xff;</span>
+<span class="lineNum">    1208 </span>            : 
+<span class="lineNum">    1209 </span><span class="lineNoCov">          0 :         s = splbio();</span>
+<span class="lineNum">    1210 </span><span class="lineNoCov">          0 :         rv = ciss_cmd(ccb, BUS_DMA_NOWAIT, SCSI_POLL);</span>
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1212 </span>            : 
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :         scsi_io_put(&amp;sc-&gt;sc_iopool, ccb);</span>
+<span class="lineNum">    1214 </span>            : 
+<span class="lineNum">    1215 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">    1216 </span><span class="lineNoCov">          0 : }</span>
+<a name="1217"><span class="lineNum">    1217 </span>            : </a>
+<span class="lineNum">    1218 </span>            : int
+<span class="lineNum">    1219 </span><span class="lineNoCov">          0 : ciss_ldstat(struct ciss_softc *sc, int target, struct ciss_ldstat *stat)</span>
+<span class="lineNum">    1220 </span>            : {
+<span class="lineNum">    1221 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">    1222 </span>            :         struct ciss_cmd *cmd;
+<span class="lineNum">    1223 </span>            :         int rv;
+<span class="lineNum">    1224 </span>            :         int s;
+<span class="lineNum">    1225 </span>            : 
+<span class="lineNum">    1226 </span><span class="lineNoCov">          0 :         ccb = scsi_io_get(&amp;sc-&gt;sc_iopool, SCSI_POLL);</span>
+<span class="lineNum">    1227 </span><span class="lineNoCov">          0 :         if (ccb == NULL)</span>
+<span class="lineNum">    1228 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">    1229 </span>            : 
+<span class="lineNum">    1230 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_len = sizeof(*stat);</span>
+<span class="lineNum">    1231 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_data = stat;</span>
+<span class="lineNum">    1232 </span><span class="lineNoCov">          0 :         cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">    1233 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt = htole32(CISS_CMD_MODE_PERIPH);</span>
+<span class="lineNum">    1234 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt2 = 0;</span>
+<span class="lineNum">    1235 </span><span class="lineNoCov">          0 :         cmd-&gt;cdblen = 10;</span>
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :         cmd-&gt;flags = CISS_CDB_CMD | CISS_CDB_SIMPL | CISS_CDB_IN;</span>
+<span class="lineNum">    1237 </span><span class="lineNoCov">          0 :         cmd-&gt;tmo = htole16(0);</span>
+<span class="lineNum">    1238 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd-&gt;cdb[0], sizeof(cmd-&gt;cdb));</span>
+<span class="lineNum">    1239 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[0] = CISS_CMD_CTRL_GET;</span>
+<span class="lineNum">    1240 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[5] = target;</span>
+<span class="lineNum">    1241 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[6] = CISS_CMS_CTRL_LDSTAT;</span>
+<span class="lineNum">    1242 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[7] = sizeof(*stat) &gt;&gt; 8;      /* biiiig endian */</span>
+<span class="lineNum">    1243 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[8] = sizeof(*stat) &amp; 0xff;</span>
+<span class="lineNum">    1244 </span>            : 
+<span class="lineNum">    1245 </span><span class="lineNoCov">          0 :         s = splbio();</span>
+<span class="lineNum">    1246 </span><span class="lineNoCov">          0 :         rv = ciss_cmd(ccb, BUS_DMA_NOWAIT, SCSI_POLL);</span>
+<span class="lineNum">    1247 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1248 </span>            : 
+<span class="lineNum">    1249 </span><span class="lineNoCov">          0 :         scsi_io_put(&amp;sc-&gt;sc_iopool, ccb);</span>
+<span class="lineNum">    1250 </span>            : 
+<span class="lineNum">    1251 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">    1252 </span><span class="lineNoCov">          0 : }</span>
+<a name="1253"><span class="lineNum">    1253 </span>            : </a>
+<span class="lineNum">    1254 </span>            : int
+<span class="lineNum">    1255 </span><span class="lineNoCov">          0 : ciss_pdid(struct ciss_softc *sc, u_int8_t drv, struct ciss_pdid *id, int wait)</span>
+<span class="lineNum">    1256 </span>            : {
+<span class="lineNum">    1257 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">    1258 </span>            :         struct ciss_cmd *cmd;
+<span class="lineNum">    1259 </span>            :         int rv;
+<span class="lineNum">    1260 </span>            :         int s;
+<span class="lineNum">    1261 </span>            : 
+<span class="lineNum">    1262 </span><span class="lineNoCov">          0 :         ccb = scsi_io_get(&amp;sc-&gt;sc_iopool, SCSI_POLL);</span>
+<span class="lineNum">    1263 </span><span class="lineNoCov">          0 :         if (ccb == NULL)</span>
+<span class="lineNum">    1264 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">    1265 </span>            : 
+<span class="lineNum">    1266 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_len = sizeof(*id);</span>
+<span class="lineNum">    1267 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_data = id;</span>
+<span class="lineNum">    1268 </span><span class="lineNoCov">          0 :         cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">    1269 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt = htole32(CISS_CMD_MODE_PERIPH);</span>
+<span class="lineNum">    1270 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt2 = 0;</span>
+<span class="lineNum">    1271 </span><span class="lineNoCov">          0 :         cmd-&gt;cdblen = 10;</span>
+<span class="lineNum">    1272 </span><span class="lineNoCov">          0 :         cmd-&gt;flags = CISS_CDB_CMD | CISS_CDB_SIMPL | CISS_CDB_IN;</span>
+<span class="lineNum">    1273 </span><span class="lineNoCov">          0 :         cmd-&gt;tmo = htole16(0);</span>
+<span class="lineNum">    1274 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd-&gt;cdb[0], sizeof(cmd-&gt;cdb));</span>
+<span class="lineNum">    1275 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[0] = CISS_CMD_CTRL_GET;</span>
+<span class="lineNum">    1276 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[2] = drv;</span>
+<span class="lineNum">    1277 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[6] = CISS_CMS_CTRL_PDID;</span>
+<span class="lineNum">    1278 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[7] = sizeof(*id) &gt;&gt; 8;        /* biiiig endian */</span>
+<span class="lineNum">    1279 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[8] = sizeof(*id) &amp; 0xff;</span>
+<span class="lineNum">    1280 </span>            : 
+<span class="lineNum">    1281 </span><span class="lineNoCov">          0 :         s = splbio();</span>
+<span class="lineNum">    1282 </span><span class="lineNoCov">          0 :         rv = ciss_cmd(ccb, BUS_DMA_NOWAIT, wait);</span>
+<span class="lineNum">    1283 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1284 </span>            : 
+<span class="lineNum">    1285 </span><span class="lineNoCov">          0 :         scsi_io_put(&amp;sc-&gt;sc_iopool, ccb);</span>
+<span class="lineNum">    1286 </span>            : 
+<span class="lineNum">    1287 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">    1288 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1289 </span>            : 
+<a name="1290"><span class="lineNum">    1290 </span>            : </a>
+<span class="lineNum">    1291 </span>            : struct ciss_ld *
+<span class="lineNum">    1292 </span><span class="lineNoCov">          0 : ciss_pdscan(struct ciss_softc *sc, int ld)</span>
+<span class="lineNum">    1293 </span>            : {
+<span class="lineNum">    1294 </span>            :         struct ciss_pdid *pdid;
+<span class="lineNum">    1295 </span>            :         struct ciss_ld *ldp;
+<span class="lineNum">    1296 </span><span class="lineNoCov">          0 :         u_int8_t drv, buf[128];</span>
+<span class="lineNum">    1297 </span>            :         int i, j, k = 0;
+<span class="lineNum">    1298 </span>            : 
+<span class="lineNum">    1299 </span><span class="lineNoCov">          0 :         pdid = sc-&gt;scratch;</span>
+<span class="lineNum">    1300 </span><span class="lineNoCov">          0 :         if (sc-&gt;ndrives == 256) {</span>
+<span class="lineNum">    1301 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; CISS_BIGBIT; i++)</span>
+<span class="lineNum">    1302 </span><span class="lineNoCov">          0 :                         if (!ciss_pdid(sc, i, pdid, SCSI_NOSLEEP|SCSI_POLL) &amp;&amp;</span>
+<span class="lineNum">    1303 </span><span class="lineNoCov">          0 :                             (pdid-&gt;present &amp; CISS_PD_PRESENT))</span>
+<span class="lineNum">    1304 </span><span class="lineNoCov">          0 :                                 buf[k++] = i;</span>
+<span class="lineNum">    1305 </span>            :         } else
+<span class="lineNum">    1306 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; sc-&gt;nbus; i++)</span>
+<span class="lineNum">    1307 </span><span class="lineNoCov">          0 :                         for (j = 0; j &lt; sc-&gt;ndrives; j++) {</span>
+<span class="lineNum">    1308 </span><span class="lineNoCov">          0 :                                 drv = CISS_BIGBIT + i * sc-&gt;ndrives + j;</span>
+<span class="lineNum">    1309 </span><span class="lineNoCov">          0 :                                 if (!ciss_pdid(sc, drv, pdid,</span>
+<span class="lineNum">    1310 </span>            :                                     SCSI_NOSLEEP|SCSI_POLL))
+<span class="lineNum">    1311 </span><span class="lineNoCov">          0 :                                         buf[k++] = drv;</span>
+<span class="lineNum">    1312 </span>            :                         }
+<span class="lineNum">    1313 </span>            : 
+<span class="lineNum">    1314 </span><span class="lineNoCov">          0 :         if (!k)</span>
+<span class="lineNum">    1315 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">    1316 </span>            : 
+<span class="lineNum">    1317 </span><span class="lineNoCov">          0 :         ldp = malloc(sizeof(*ldp) + (k-1), M_DEVBUF, M_NOWAIT);</span>
+<span class="lineNum">    1318 </span><span class="lineNoCov">          0 :         if (!ldp)</span>
+<span class="lineNum">    1319 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">    1320 </span>            : 
+<span class="lineNum">    1321 </span><span class="lineNoCov">          0 :         bzero(&amp;ldp-&gt;bling, sizeof(ldp-&gt;bling));</span>
+<span class="lineNum">    1322 </span><span class="lineNoCov">          0 :         ldp-&gt;ndrives = k;</span>
+<span class="lineNum">    1323 </span><span class="lineNoCov">          0 :         bcopy(buf, ldp-&gt;tgts, k);</span>
+<span class="lineNum">    1324 </span><span class="lineNoCov">          0 :         return ldp;</span>
+<span class="lineNum">    1325 </span><span class="lineNoCov">          0 : }</span>
+<a name="1326"><span class="lineNum">    1326 </span>            : </a>
+<span class="lineNum">    1327 </span>            : int
+<span class="lineNum">    1328 </span><span class="lineNoCov">          0 : ciss_blink(struct ciss_softc *sc, int ld, int pd, int stat,</span>
+<span class="lineNum">    1329 </span>            :     struct ciss_blink *blink)
+<span class="lineNum">    1330 </span>            : {
+<span class="lineNum">    1331 </span>            :         struct ciss_ccb *ccb;
+<span class="lineNum">    1332 </span>            :         struct ciss_cmd *cmd;
+<span class="lineNum">    1333 </span>            :         struct ciss_ld *ldp;
+<span class="lineNum">    1334 </span>            :         int rv;
+<span class="lineNum">    1335 </span>            :         int s;
+<span class="lineNum">    1336 </span>            : 
+<span class="lineNum">    1337 </span><span class="lineNoCov">          0 :         if (ld &gt; sc-&gt;maxunits)</span>
+<span class="lineNum">    1338 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">    1339 </span>            : 
+<span class="lineNum">    1340 </span><span class="lineNoCov">          0 :         ldp = sc-&gt;sc_lds[ld];</span>
+<span class="lineNum">    1341 </span><span class="lineNoCov">          0 :         if (!ldp || pd &gt; ldp-&gt;ndrives)</span>
+<span class="lineNum">    1342 </span><span class="lineNoCov">          0 :                 return EINVAL;</span>
+<span class="lineNum">    1343 </span>            : 
+<span class="lineNum">    1344 </span><span class="lineNoCov">          0 :         ldp-&gt;bling.pdtab[ldp-&gt;tgts[pd]] = stat == BIOC_SBUNBLINK? 0 :</span>
+<span class="lineNum">    1345 </span>            :             CISS_BLINK_ALL;
+<span class="lineNum">    1346 </span><span class="lineNoCov">          0 :         bcopy(&amp;ldp-&gt;bling, blink, sizeof(*blink));</span>
+<span class="lineNum">    1347 </span>            : 
+<span class="lineNum">    1348 </span><span class="lineNoCov">          0 :         ccb = scsi_io_get(&amp;sc-&gt;sc_iopool, SCSI_POLL);</span>
+<span class="lineNum">    1349 </span><span class="lineNoCov">          0 :         if (ccb == NULL)</span>
+<span class="lineNum">    1350 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">    1351 </span>            : 
+<span class="lineNum">    1352 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_len = sizeof(*blink);</span>
+<span class="lineNum">    1353 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_data = blink;</span>
+<span class="lineNum">    1354 </span><span class="lineNoCov">          0 :         cmd = &amp;ccb-&gt;ccb_cmd;</span>
+<span class="lineNum">    1355 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt = htole32(CISS_CMD_MODE_PERIPH);</span>
+<span class="lineNum">    1356 </span><span class="lineNoCov">          0 :         cmd-&gt;tgt2 = 0;</span>
+<span class="lineNum">    1357 </span><span class="lineNoCov">          0 :         cmd-&gt;cdblen = 10;</span>
+<span class="lineNum">    1358 </span><span class="lineNoCov">          0 :         cmd-&gt;flags = CISS_CDB_CMD | CISS_CDB_SIMPL | CISS_CDB_OUT;</span>
+<span class="lineNum">    1359 </span><span class="lineNoCov">          0 :         cmd-&gt;tmo = htole16(0);</span>
+<span class="lineNum">    1360 </span><span class="lineNoCov">          0 :         bzero(&amp;cmd-&gt;cdb[0], sizeof(cmd-&gt;cdb));</span>
+<span class="lineNum">    1361 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[0] = CISS_CMD_CTRL_SET;</span>
+<span class="lineNum">    1362 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[6] = CISS_CMS_CTRL_PDBLINK;</span>
+<span class="lineNum">    1363 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[7] = sizeof(*blink) &gt;&gt; 8;     /* biiiig endian */</span>
+<span class="lineNum">    1364 </span><span class="lineNoCov">          0 :         cmd-&gt;cdb[8] = sizeof(*blink) &amp; 0xff;</span>
+<span class="lineNum">    1365 </span>            : 
+<span class="lineNum">    1366 </span><span class="lineNoCov">          0 :         s = splbio();</span>
+<span class="lineNum">    1367 </span><span class="lineNoCov">          0 :         rv = ciss_cmd(ccb, BUS_DMA_NOWAIT, SCSI_POLL);</span>
+<span class="lineNum">    1368 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1369 </span>            : 
+<span class="lineNum">    1370 </span><span class="lineNoCov">          0 :         scsi_io_put(&amp;sc-&gt;sc_iopool, ccb);</span>
+<span class="lineNum">    1371 </span>            : 
+<span class="lineNum">    1372 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">    1373 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1374 </span>            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,1864 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/i915/i915_gem_execbuffer.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">dev/pci/drm/i915</a> - i915_gem_execbuffer.c<span style="font-size: 80%;"> (source / <a href="i915_gem_execbuffer.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">783</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">34</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * Copyright © 2008,2010 Intel Corporation
+<span class="lineNum">       3 </span>            :  *
+<span class="lineNum">       4 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       5 </span>            :  * copy of this software and associated documentation files (the &quot;Software&quot;),
+<span class="lineNum">       6 </span>            :  * to deal in the Software without restriction, including without limitation
+<span class="lineNum">       7 </span>            :  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+<span class="lineNum">       8 </span>            :  * and/or sell copies of the Software, and to permit persons to whom the
+<span class="lineNum">       9 </span>            :  * Software is furnished to do so, subject to the following conditions:
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * The above copyright notice and this permission notice (including the next
+<span class="lineNum">      12 </span>            :  * paragraph) shall be included in all copies or substantial portions of the
+<span class="lineNum">      13 </span>            :  * Software.
+<span class="lineNum">      14 </span>            :  *
+<span class="lineNum">      15 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      16 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      17 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+<span class="lineNum">      18 </span>            :  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+<span class="lineNum">      19 </span>            :  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+<span class="lineNum">      20 </span>            :  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+<span class="lineNum">      21 </span>            :  * IN THE SOFTWARE.
+<span class="lineNum">      22 </span>            :  *
+<span class="lineNum">      23 </span>            :  * Authors:
+<span class="lineNum">      24 </span>            :  *    Eric Anholt &lt;eric@anholt.net&gt;
+<span class="lineNum">      25 </span>            :  *    Chris Wilson &lt;chris@chris-wilson.co.uk&gt;
+<span class="lineNum">      26 </span>            :  *
+<span class="lineNum">      27 </span>            :  */
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span>            : #include &lt;dev/pci/drm/drmP.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;dev/pci/drm/i915_drm.h&gt;
+<span class="lineNum">      31 </span>            : #include &quot;i915_drv.h&quot;
+<span class="lineNum">      32 </span>            : #include &quot;i915_trace.h&quot;
+<span class="lineNum">      33 </span>            : #include &quot;intel_drv.h&quot;
+<span class="lineNum">      34 </span>            : #ifdef __linux__
+<span class="lineNum">      35 </span>            : #include &lt;linux/dma_remapping.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;linux/uaccess.h&gt;
+<span class="lineNum">      37 </span>            : #endif
+<span class="lineNum">      38 </span>            : 
+<span class="lineNum">      39 </span>            : #define  __EXEC_OBJECT_HAS_PIN (1&lt;&lt;31)
+<span class="lineNum">      40 </span>            : #define  __EXEC_OBJECT_HAS_FENCE (1&lt;&lt;30)
+<span class="lineNum">      41 </span>            : #define  __EXEC_OBJECT_NEEDS_MAP (1&lt;&lt;29)
+<span class="lineNum">      42 </span>            : #define  __EXEC_OBJECT_NEEDS_BIAS (1&lt;&lt;28)
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : #define BATCH_OFFSET_BIAS (256*1024)
+<span class="lineNum">      45 </span>            : 
+<span class="lineNum">      46 </span>            : struct eb_vmas {
+<span class="lineNum">      47 </span>            :         struct list_head vmas;
+<span class="lineNum">      48 </span>            :         int and;
+<span class="lineNum">      49 </span>            :         union {
+<span class="lineNum">      50 </span>            :                 struct i915_vma *lut[0];
+<span class="lineNum">      51 </span>            :                 struct hlist_head buckets[0];
+<span class="lineNum">      52 </span>            :         };
+<span class="lineNum">      53 </span>            : };
+<a name="54"><span class="lineNum">      54 </span>            : </a>
+<span class="lineNum">      55 </span>            : static struct eb_vmas *
+<span class="lineNum">      56 </span><span class="lineNoCov">          0 : eb_create(struct drm_i915_gem_execbuffer2 *args)</span>
+<span class="lineNum">      57 </span>            : {
+<span class="lineNum">      58 </span>            :         struct eb_vmas *eb = NULL;
+<span class="lineNum">      59 </span>            : 
+<span class="lineNum">      60 </span><span class="lineNoCov">          0 :         if (args-&gt;flags &amp; I915_EXEC_HANDLE_LUT) {</span>
+<span class="lineNum">      61 </span><span class="lineNoCov">          0 :                 unsigned size = args-&gt;buffer_count;</span>
+<span class="lineNum">      62 </span><span class="lineNoCov">          0 :                 size *= sizeof(struct i915_vma *);</span>
+<span class="lineNum">      63 </span><span class="lineNoCov">          0 :                 size += sizeof(struct eb_vmas);</span>
+<span class="lineNum">      64 </span><span class="lineNoCov">          0 :                 eb = kmalloc(size, GFP_TEMPORARY | __GFP_NOWARN | __GFP_NORETRY);</span>
+<span class="lineNum">      65 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span><span class="lineNoCov">          0 :         if (eb == NULL) {</span>
+<span class="lineNum">      68 </span><span class="lineNoCov">          0 :                 unsigned size = args-&gt;buffer_count;</span>
+<span class="lineNum">      69 </span>            :                 unsigned count = PAGE_SIZE / sizeof(struct hlist_head) / 2;
+<span class="lineNum">      70 </span>            :                 BUILD_BUG_ON_NOT_POWER_OF_2(PAGE_SIZE / sizeof(struct hlist_head));
+<span class="lineNum">      71 </span><span class="lineNoCov">          0 :                 while (count &gt; 2*size)</span>
+<span class="lineNum">      72 </span><span class="lineNoCov">          0 :                         count &gt;&gt;= 1;</span>
+<span class="lineNum">      73 </span><span class="lineNoCov">          0 :                 eb = kzalloc(count*sizeof(struct hlist_head) +</span>
+<span class="lineNum">      74 </span>            :                              sizeof(struct eb_vmas),
+<span class="lineNum">      75 </span>            :                              GFP_TEMPORARY);
+<span class="lineNum">      76 </span><span class="lineNoCov">          0 :                 if (eb == NULL)</span>
+<span class="lineNum">      77 </span><span class="lineNoCov">          0 :                         return eb;</span>
+<span class="lineNum">      78 </span>            : 
+<span class="lineNum">      79 </span><span class="lineNoCov">          0 :                 eb-&gt;and = count - 1;</span>
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">      81 </span><span class="lineNoCov">          0 :                 eb-&gt;and = -args-&gt;buffer_count;</span>
+<span class="lineNum">      82 </span>            : 
+<span class="lineNum">      83 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;eb-&gt;vmas);</span>
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 :         return eb;</span>
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 : }</span>
+<a name="86"><span class="lineNum">      86 </span>            : </a>
+<span class="lineNum">      87 </span>            : static void
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 : eb_reset(struct eb_vmas *eb)</span>
+<span class="lineNum">      89 </span>            : {
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :         if (eb-&gt;and &gt;= 0)</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :                 memset(eb-&gt;buckets, 0, (eb-&gt;and+1)*sizeof(struct hlist_head));</span>
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 : }</span>
+<a name="93"><span class="lineNum">      93 </span>            : </a>
+<span class="lineNum">      94 </span>            : static int
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 : eb_lookup_vmas(struct eb_vmas *eb,</span>
+<span class="lineNum">      96 </span>            :                struct drm_i915_gem_exec_object2 *exec,
+<span class="lineNum">      97 </span>            :                const struct drm_i915_gem_execbuffer2 *args,
+<span class="lineNum">      98 </span>            :                struct i915_address_space *vm,
+<span class="lineNum">      99 </span>            :                struct drm_file *file)
+<span class="lineNum">     100 </span>            : {
+<span class="lineNum">     101 </span>            :         struct drm_i915_gem_object *obj;
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :         struct list_head objects;</span>
+<span class="lineNum">     103 </span>            :         int i, ret;
+<span class="lineNum">     104 </span>            : 
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;objects);</span>
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 :         spin_lock(&amp;file-&gt;table_lock);</span>
+<span class="lineNum">     107 </span>            :         /* Grab a reference to the object and release the lock so we can lookup
+<span class="lineNum">     108 </span>            :          * or create the VMA without using GFP_ATOMIC */
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; args-&gt;buffer_count; i++) {</span>
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :                 obj = to_intel_bo(idr_find(&amp;file-&gt;object_idr, exec[i].handle));</span>
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :                 if (obj == NULL) {</span>
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :                         spin_unlock(&amp;file-&gt;table_lock);</span>
+<span class="lineNum">     113 </span>            :                         DRM_DEBUG(&quot;Invalid object handle %d at index %d\n&quot;,
+<span class="lineNum">     114 </span>            :                                    exec[i].handle, i);
+<span class="lineNum">     115 </span>            :                         ret = -ENOENT;
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :                         goto err;</span>
+<span class="lineNum">     117 </span>            :                 }
+<span class="lineNum">     118 </span>            : 
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :                 if (!list_empty(&amp;obj-&gt;obj_exec_link)) {</span>
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :                         spin_unlock(&amp;file-&gt;table_lock);</span>
+<span class="lineNum">     121 </span>            :                         DRM_DEBUG(&quot;Object %p [handle %d, index %d] appears more than once in object list\n&quot;,
+<span class="lineNum">     122 </span>            :                                    obj, exec[i].handle, i);
+<span class="lineNum">     123 </span>            :                         ret = -EINVAL;
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :                         goto err;</span>
+<span class="lineNum">     125 </span>            :                 }
+<span class="lineNum">     126 </span>            : 
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :                 drm_gem_object_reference(&amp;obj-&gt;base);</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :                 list_add_tail(&amp;obj-&gt;obj_exec_link, &amp;objects);</span>
+<span class="lineNum">     129 </span>            :         }
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         spin_unlock(&amp;file-&gt;table_lock);</span>
+<span class="lineNum">     131 </span>            : 
+<span class="lineNum">     132 </span>            :         i = 0;
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :         while (!list_empty(&amp;objects)) {</span>
+<span class="lineNum">     134 </span>            :                 struct i915_vma *vma;
+<span class="lineNum">     135 </span>            : 
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :                 obj = list_first_entry(&amp;objects,</span>
+<span class="lineNum">     137 </span>            :                                        struct drm_i915_gem_object,
+<span class="lineNum">     138 </span>            :                                        obj_exec_link);
+<span class="lineNum">     139 </span>            : 
+<span class="lineNum">     140 </span>            :                 /*
+<span class="lineNum">     141 </span>            :                  * NOTE: We can leak any vmas created here when something fails
+<span class="lineNum">     142 </span>            :                  * later on. But that's no issue since vma_unbind can deal with
+<span class="lineNum">     143 </span>            :                  * vmas which are not actually bound. And since only
+<span class="lineNum">     144 </span>            :                  * lookup_or_create exists as an interface to get at the vma
+<span class="lineNum">     145 </span>            :                  * from the (obj, vm) we don't run the risk of creating
+<span class="lineNum">     146 </span>            :                  * duplicated vmas for the same vm.
+<span class="lineNum">     147 </span>            :                  */
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :                 vma = i915_gem_obj_lookup_or_create_vma(obj, vm);</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :                 if (IS_ERR(vma)) {</span>
+<span class="lineNum">     150 </span>            :                         DRM_DEBUG(&quot;Failed to lookup VMA\n&quot;);
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :                         ret = PTR_ERR(vma);</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :                         goto err;</span>
+<span class="lineNum">     153 </span>            :                 }
+<span class="lineNum">     154 </span>            : 
+<span class="lineNum">     155 </span>            :                 /* Transfer ownership from the objects list to the vmas list. */
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :                 list_add_tail(&amp;vma-&gt;exec_list, &amp;eb-&gt;vmas);</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :                 list_del_init(&amp;obj-&gt;obj_exec_link);</span>
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :                 vma-&gt;exec_entry = &amp;exec[i];</span>
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :                 if (eb-&gt;and &lt; 0) {</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :                         eb-&gt;lut[i] = vma;</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                         uint32_t handle = args-&gt;flags &amp; I915_EXEC_HANDLE_LUT ? i : exec[i].handle;</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                         vma-&gt;exec_handle = handle;</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :                         hlist_add_head(&amp;vma-&gt;exec_node,</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                                        &amp;eb-&gt;buckets[handle &amp; eb-&gt;and]);</span>
+<span class="lineNum">     167 </span>            :                 }
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                 ++i;</span>
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     172 </span>            : 
+<span class="lineNum">     173 </span>            : 
+<span class="lineNum">     174 </span>            : err:
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :         while (!list_empty(&amp;objects)) {</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                 obj = list_first_entry(&amp;objects,</span>
+<span class="lineNum">     177 </span>            :                                        struct drm_i915_gem_object,
+<span class="lineNum">     178 </span>            :                                        obj_exec_link);
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                 list_del_init(&amp;obj-&gt;obj_exec_link);</span>
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :                 drm_gem_object_unreference(&amp;obj-&gt;base);</span>
+<span class="lineNum">     181 </span>            :         }
+<span class="lineNum">     182 </span>            :         /*
+<span class="lineNum">     183 </span>            :          * Objects already transfered to the vmas list will be unreferenced by
+<span class="lineNum">     184 </span>            :          * eb_destroy.
+<span class="lineNum">     185 </span>            :          */
+<span class="lineNum">     186 </span>            : 
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         return ret;</span>
+<a name="188"><span class="lineNum">     188 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 : static struct i915_vma *eb_get_vma(struct eb_vmas *eb, unsigned long handle)</span>
+<span class="lineNum">     191 </span>            : {
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :         if (eb-&gt;and &lt; 0) {</span>
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :                 if (handle &gt;= -eb-&gt;and)</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                         return NULL;</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                 return eb-&gt;lut[handle];</span>
+<span class="lineNum">     196 </span>            :         } else {
+<span class="lineNum">     197 </span>            :                 struct hlist_head *head;
+<span class="lineNum">     198 </span>            :                 struct hlist_node *node;
+<span class="lineNum">     199 </span>            : 
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                 head = &amp;eb-&gt;buckets[handle &amp; eb-&gt;and];</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                 hlist_for_each(node, head) {</span>
+<span class="lineNum">     202 </span>            :                         struct i915_vma *vma;
+<span class="lineNum">     203 </span>            : 
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                         vma = hlist_entry(node, struct i915_vma, exec_node);</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                         if (vma-&gt;exec_handle == handle)</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                                 return vma;</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     209 </span>            :         }
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 : }</span>
+<a name="211"><span class="lineNum">     211 </span>            : </a>
+<span class="lineNum">     212 </span>            : static void
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_unreserve_vma(struct i915_vma *vma)</span>
+<span class="lineNum">     214 </span>            : {
+<span class="lineNum">     215 </span>            :         struct drm_i915_gem_exec_object2 *entry;
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_object *obj = vma-&gt;obj;</span>
+<span class="lineNum">     217 </span>            : 
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :         if (!drm_mm_node_allocated(&amp;vma-&gt;node))</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     220 </span>            : 
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :         entry = vma-&gt;exec_entry;</span>
+<span class="lineNum">     222 </span>            : 
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :         if (entry-&gt;flags &amp; __EXEC_OBJECT_HAS_FENCE)</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :                 i915_gem_object_unpin_fence(obj);</span>
+<span class="lineNum">     225 </span>            : 
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :         if (entry-&gt;flags &amp; __EXEC_OBJECT_HAS_PIN)</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                 vma-&gt;pin_count--;</span>
+<span class="lineNum">     228 </span>            : 
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         entry-&gt;flags &amp;= ~(__EXEC_OBJECT_HAS_FENCE | __EXEC_OBJECT_HAS_PIN);</span>
+<a name="230"><span class="lineNum">     230 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     231 </span>            : 
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 : static void eb_destroy(struct eb_vmas *eb)</span>
+<span class="lineNum">     233 </span>            : {
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :         while (!list_empty(&amp;eb-&gt;vmas)) {</span>
+<span class="lineNum">     235 </span>            :                 struct i915_vma *vma;
+<span class="lineNum">     236 </span>            : 
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :                 vma = list_first_entry(&amp;eb-&gt;vmas,</span>
+<span class="lineNum">     238 </span>            :                                        struct i915_vma,
+<span class="lineNum">     239 </span>            :                                        exec_list);
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                 list_del_init(&amp;vma-&gt;exec_list);</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                 i915_gem_execbuffer_unreserve_vma(vma);</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :                 drm_gem_object_unreference(&amp;vma-&gt;obj-&gt;base);</span>
+<span class="lineNum">     243 </span>            :         }
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :         kfree(eb);</span>
+<a name="245"><span class="lineNum">     245 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     246 </span>            : 
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 : static inline int use_cpu_reloc(struct drm_i915_gem_object *obj)</span>
+<span class="lineNum">     248 </span>            : {
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :         return (HAS_LLC(obj-&gt;base.dev) ||</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :                 obj-&gt;base.write_domain == I915_GEM_DOMAIN_CPU ||</span>
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :                 obj-&gt;cache_level != I915_CACHE_NONE);</span>
+<span class="lineNum">     252 </span>            : }
+<a name="253"><span class="lineNum">     253 </span>            : </a>
+<span class="lineNum">     254 </span>            : static int
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 : relocate_entry_cpu(struct drm_i915_gem_object *obj,</span>
+<span class="lineNum">     256 </span>            :                    struct drm_i915_gem_relocation_entry *reloc,
+<span class="lineNum">     257 </span>            :                    uint64_t target_offset)
+<span class="lineNum">     258 </span>            : {
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         struct drm_device *dev = obj-&gt;base.dev;</span>
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         uint32_t page_offset = offset_in_page(reloc-&gt;offset);</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         uint64_t delta = reloc-&gt;delta + target_offset;</span>
+<span class="lineNum">     262 </span>            :         char *vaddr;
+<span class="lineNum">     263 </span>            :         int ret;
+<span class="lineNum">     264 </span>            : 
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         ret = i915_gem_object_set_to_cpu_domain(obj, true);</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     268 </span>            : 
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         vaddr = kmap_atomic(i915_gem_object_get_page(obj,</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :                                 reloc-&gt;offset &gt;&gt; PAGE_SHIFT));</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         *(uint32_t *)(vaddr + page_offset) = lower_32_bits(delta);</span>
+<span class="lineNum">     272 </span>            : 
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev)-&gt;gen &gt;= 8) {</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :                 page_offset = offset_in_page(page_offset + sizeof(uint32_t));</span>
+<span class="lineNum">     275 </span>            : 
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :                 if (page_offset == 0) {</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :                         kunmap_atomic(vaddr);</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :                         vaddr = kmap_atomic(i915_gem_object_get_page(obj,</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                             (reloc-&gt;offset + sizeof(uint32_t)) &gt;&gt; PAGE_SHIFT));</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     281 </span>            : 
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :                 *(uint32_t *)(vaddr + page_offset) = upper_32_bits(delta);</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     284 </span>            : 
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         kunmap_atomic(vaddr);</span>
+<span class="lineNum">     286 </span>            : 
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 : }</span>
+<a name="289"><span class="lineNum">     289 </span>            : </a>
+<span class="lineNum">     290 </span>            : static int
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 : relocate_entry_gtt(struct drm_i915_gem_object *obj,</span>
+<span class="lineNum">     292 </span>            :                    struct drm_i915_gem_relocation_entry *reloc,
+<span class="lineNum">     293 </span>            :                    uint64_t target_offset)
+<span class="lineNum">     294 </span>            : {
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :         struct drm_device *dev = obj-&gt;base.dev;</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         uint64_t delta = reloc-&gt;delta + target_offset;</span>
+<span class="lineNum">     298 </span>            :         uint64_t offset;
+<span class="lineNum">     299 </span>            :         void __iomem *reloc_page;
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         bus_space_handle_t bsh;</span>
+<span class="lineNum">     301 </span>            :         int ret;
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         ret = i915_gem_object_set_to_gtt_domain(obj, true);</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     306 </span>            : 
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :         ret = i915_gem_object_put_fence(obj);</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     310 </span>            : 
+<span class="lineNum">     311 </span>            :         /* Map the page containing the relocation we're going to perform.  */
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :         offset = i915_gem_obj_ggtt_offset(obj);</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         offset += reloc-&gt;offset;</span>
+<span class="lineNum">     314 </span>            : #ifdef __linux__
+<span class="lineNum">     315 </span>            :         reloc_page = io_mapping_map_atomic_wc(dev_priv-&gt;gtt.mappable,
+<span class="lineNum">     316 </span>            :                                               offset &amp; PAGE_MASK);
+<span class="lineNum">     317 </span>            : #else
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :         agp_map_atomic(dev_priv-&gt;agph, trunc_page(offset), &amp;bsh);</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :         reloc_page = bus_space_vaddr(dev_priv-&gt;bst, bsh);</span>
+<span class="lineNum">     320 </span>            : #endif
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :         iowrite32(lower_32_bits(delta), reloc_page + offset_in_page(offset));</span>
+<span class="lineNum">     322 </span>            : 
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev)-&gt;gen &gt;= 8) {</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :                 offset += sizeof(uint32_t);</span>
+<span class="lineNum">     325 </span>            : 
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :                 if (offset_in_page(offset) == 0) {</span>
+<span class="lineNum">     327 </span>            : #ifdef __linux__
+<span class="lineNum">     328 </span>            :                         io_mapping_unmap_atomic(reloc_page);
+<span class="lineNum">     329 </span>            :                         reloc_page =
+<span class="lineNum">     330 </span>            :                                 io_mapping_map_atomic_wc(dev_priv-&gt;gtt.mappable,
+<span class="lineNum">     331 </span>            :                                                          offset);
+<span class="lineNum">     332 </span>            : #else
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :                         agp_unmap_atomic(dev_priv-&gt;agph, bsh);</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :                         agp_map_atomic(dev_priv-&gt;agph, offset, &amp;bsh);</span>
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                         reloc_page = bus_space_vaddr(dev_priv-&gt;bst, bsh);</span>
+<span class="lineNum">     336 </span>            : #endif
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     338 </span>            : 
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :                 iowrite32(upper_32_bits(delta),</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :                           reloc_page + offset_in_page(offset));</span>
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     342 </span>            : 
+<span class="lineNum">     343 </span>            : #ifdef __linux__
+<span class="lineNum">     344 </span>            :         io_mapping_unmap_atomic(reloc_page);
+<span class="lineNum">     345 </span>            : #else
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         agp_unmap_atomic(dev_priv-&gt;agph, bsh);</span>
+<span class="lineNum">     347 </span>            : #endif
+<span class="lineNum">     348 </span>            : 
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 : }</span>
+<a name="351"><span class="lineNum">     351 </span>            : </a>
+<span class="lineNum">     352 </span>            : static void
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 : clflush_write32(void *addr, uint32_t value)</span>
+<span class="lineNum">     354 </span>            : {
+<span class="lineNum">     355 </span>            :         /* This is not a fast path, so KISS. */
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :         drm_clflush_virt_range(addr, sizeof(uint32_t));</span>
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :         *(uint32_t *)addr = value;</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :         drm_clflush_virt_range(addr, sizeof(uint32_t));</span>
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 : }</span>
+<a name="360"><span class="lineNum">     360 </span>            : </a>
+<span class="lineNum">     361 </span>            : static int
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 : relocate_entry_clflush(struct drm_i915_gem_object *obj,</span>
+<span class="lineNum">     363 </span>            :                        struct drm_i915_gem_relocation_entry *reloc,
+<span class="lineNum">     364 </span>            :                        uint64_t target_offset)
+<span class="lineNum">     365 </span>            : {
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         struct drm_device *dev = obj-&gt;base.dev;</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :         uint32_t page_offset = offset_in_page(reloc-&gt;offset);</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         uint64_t delta = (int)reloc-&gt;delta + target_offset;</span>
+<span class="lineNum">     369 </span>            :         char *vaddr;
+<span class="lineNum">     370 </span>            :         int ret;
+<span class="lineNum">     371 </span>            : 
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :         ret = i915_gem_object_set_to_gtt_domain(obj, true);</span>
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     375 </span>            : 
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :         vaddr = kmap_atomic(i915_gem_object_get_page(obj,</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                                 reloc-&gt;offset &gt;&gt; PAGE_SHIFT));</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :         clflush_write32(vaddr + page_offset, lower_32_bits(delta));</span>
+<span class="lineNum">     379 </span>            : 
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev)-&gt;gen &gt;= 8) {</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                 page_offset = offset_in_page(page_offset + sizeof(uint32_t));</span>
+<span class="lineNum">     382 </span>            : 
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :                 if (page_offset == 0) {</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :                         kunmap_atomic(vaddr);</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                         vaddr = kmap_atomic(i915_gem_object_get_page(obj,</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                             (reloc-&gt;offset + sizeof(uint32_t)) &gt;&gt; PAGE_SHIFT));</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     388 </span>            : 
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :                 clflush_write32(vaddr + page_offset, upper_32_bits(delta));</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     391 </span>            : 
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         kunmap_atomic(vaddr);</span>
+<span class="lineNum">     393 </span>            : 
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 : }</span>
+<a name="396"><span class="lineNum">     396 </span>            : </a>
+<span class="lineNum">     397 </span>            : static int
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_relocate_entry(struct drm_i915_gem_object *obj,</span>
+<span class="lineNum">     399 </span>            :                                    struct eb_vmas *eb,
+<span class="lineNum">     400 </span>            :                                    struct drm_i915_gem_relocation_entry *reloc)
+<span class="lineNum">     401 </span>            : {
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :         struct drm_device *dev = obj-&gt;base.dev;</span>
+<span class="lineNum">     403 </span>            :         struct drm_gem_object *target_obj;
+<span class="lineNum">     404 </span>            :         struct drm_i915_gem_object *target_i915_obj;
+<span class="lineNum">     405 </span>            :         struct i915_vma *target_vma;
+<span class="lineNum">     406 </span>            :         uint64_t target_offset;
+<span class="lineNum">     407 </span>            :         int ret;
+<span class="lineNum">     408 </span>            : 
+<span class="lineNum">     409 </span>            :         /* we've already hold a reference to all valid objects */
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         target_vma = eb_get_vma(eb, reloc-&gt;target_handle);</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         if (unlikely(target_vma == NULL))</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :                 return -ENOENT;</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         target_i915_obj = target_vma-&gt;obj;</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         target_obj = &amp;target_vma-&gt;obj-&gt;base;</span>
+<span class="lineNum">     415 </span>            : 
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         target_offset = target_vma-&gt;node.start;</span>
+<span class="lineNum">     417 </span>            : 
+<span class="lineNum">     418 </span>            :         /* Sandybridge PPGTT errata: We need a global gtt mapping for MI and
+<span class="lineNum">     419 </span>            :          * pipe_control writes because the gpu doesn't properly redirect them
+<span class="lineNum">     420 </span>            :          * through the ppgtt for non_secure batchbuffers. */
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         if (unlikely(IS_GEN6(dev) &amp;&amp;</span>
+<span class="lineNum">     422 </span>            :             reloc-&gt;write_domain == I915_GEM_DOMAIN_INSTRUCTION)) {
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :                 ret = i915_vma_bind(target_vma, target_i915_obj-&gt;cache_level,</span>
+<span class="lineNum">     424 </span>            :                                     PIN_GLOBAL);
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :                 if (WARN_ONCE(ret, &quot;Unexpected failure to bind target VMA!&quot;))</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">     427 </span>            :         }
+<span class="lineNum">     428 </span>            : 
+<span class="lineNum">     429 </span>            :         /* Validate that the target is in a valid r/w GPU domain */
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :         if (unlikely(reloc-&gt;write_domain &amp; (reloc-&gt;write_domain - 1))) {</span>
+<span class="lineNum">     431 </span>            :                 DRM_DEBUG(&quot;reloc with multiple write domains: &quot;
+<span class="lineNum">     432 </span>            :                           &quot;obj %p target %d offset %d &quot;
+<span class="lineNum">     433 </span>            :                           &quot;read %08x write %08x&quot;,
+<span class="lineNum">     434 </span>            :                           obj, reloc-&gt;target_handle,
+<span class="lineNum">     435 </span>            :                           (int) reloc-&gt;offset,
+<span class="lineNum">     436 </span>            :                           reloc-&gt;read_domains,
+<span class="lineNum">     437 </span>            :                           reloc-&gt;write_domain);
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     439 </span>            :         }
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :         if (unlikely((reloc-&gt;write_domain | reloc-&gt;read_domains)</span>
+<span class="lineNum">     441 </span>            :                      &amp; ~I915_GEM_GPU_DOMAINS)) {
+<span class="lineNum">     442 </span>            :                 DRM_DEBUG(&quot;reloc with read/write non-GPU domains: &quot;
+<span class="lineNum">     443 </span>            :                           &quot;obj %p target %d offset %d &quot;
+<span class="lineNum">     444 </span>            :                           &quot;read %08x write %08x&quot;,
+<span class="lineNum">     445 </span>            :                           obj, reloc-&gt;target_handle,
+<span class="lineNum">     446 </span>            :                           (int) reloc-&gt;offset,
+<span class="lineNum">     447 </span>            :                           reloc-&gt;read_domains,
+<span class="lineNum">     448 </span>            :                           reloc-&gt;write_domain);
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     450 </span>            :         }
+<span class="lineNum">     451 </span>            : 
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :         target_obj-&gt;pending_read_domains |= reloc-&gt;read_domains;</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :         target_obj-&gt;pending_write_domain |= reloc-&gt;write_domain;</span>
+<span class="lineNum">     454 </span>            : 
+<span class="lineNum">     455 </span>            :         /* If the relocation already has the right value in it, no
+<span class="lineNum">     456 </span>            :          * more work needs to be done.
+<span class="lineNum">     457 </span>            :          */
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :         if (target_offset == reloc-&gt;presumed_offset)</span>
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     460 </span>            : 
+<span class="lineNum">     461 </span>            :         /* Check that the relocation address is valid... */
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :         if (unlikely(reloc-&gt;offset &gt;</span>
+<span class="lineNum">     463 </span>            :                 obj-&gt;base.size - (INTEL_INFO(dev)-&gt;gen &gt;= 8 ? 8 : 4))) {
+<span class="lineNum">     464 </span>            :                 DRM_DEBUG(&quot;Relocation beyond object bounds: &quot;
+<span class="lineNum">     465 </span>            :                           &quot;obj %p target %d offset %d size %d.\n&quot;,
+<span class="lineNum">     466 </span>            :                           obj, reloc-&gt;target_handle,
+<span class="lineNum">     467 </span>            :                           (int) reloc-&gt;offset,
+<span class="lineNum">     468 </span>            :                           (int) obj-&gt;base.size);
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     470 </span>            :         }
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :         if (unlikely(reloc-&gt;offset &amp; 3)) {</span>
+<span class="lineNum">     472 </span>            :                 DRM_DEBUG(&quot;Relocation not 4-byte aligned: &quot;
+<span class="lineNum">     473 </span>            :                           &quot;obj %p target %d offset %d.\n&quot;,
+<span class="lineNum">     474 </span>            :                           obj, reloc-&gt;target_handle,
+<span class="lineNum">     475 </span>            :                           (int) reloc-&gt;offset);
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     477 </span>            :         }
+<span class="lineNum">     478 </span>            : 
+<span class="lineNum">     479 </span>            :         /* We can't wait for rendering with pagefaults disabled */
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :         if (obj-&gt;active &amp;&amp; pagefault_disabled())</span>
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :                 return -EFAULT;</span>
+<span class="lineNum">     482 </span>            : 
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :         if (use_cpu_reloc(obj))</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :                 ret = relocate_entry_cpu(obj, reloc, target_offset);</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :         else if (obj-&gt;map_and_fenceable)</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                 ret = relocate_entry_gtt(obj, reloc, target_offset);</span>
+<span class="lineNum">     487 </span>            :         else if (cpu_has_clflush)
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :                 ret = relocate_entry_clflush(obj, reloc, target_offset);</span>
+<span class="lineNum">     489 </span>            :         else {
+<span class="lineNum">     490 </span>            :                 WARN_ONCE(1, &quot;Impossible case in relocation handling\n&quot;);
+<span class="lineNum">     491 </span>            :                 ret = -ENODEV;
+<span class="lineNum">     492 </span>            :         }
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     496 </span>            : 
+<span class="lineNum">     497 </span>            :         /* and update the user's relocation entry */
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :         reloc-&gt;presumed_offset = target_offset;</span>
+<span class="lineNum">     499 </span>            : 
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 : }</span>
+<a name="502"><span class="lineNum">     502 </span>            : </a>
+<span class="lineNum">     503 </span>            : static int
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_relocate_vma(struct i915_vma *vma,</span>
+<span class="lineNum">     505 </span>            :                                  struct eb_vmas *eb)
+<span class="lineNum">     506 </span>            : {
+<span class="lineNum">     507 </span>            : #define N_RELOC(x) ((x) / sizeof(struct drm_i915_gem_relocation_entry))
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_relocation_entry stack_reloc[N_RELOC(512)];</span>
+<span class="lineNum">     509 </span>            :         struct drm_i915_gem_relocation_entry __user *user_relocs;
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_exec_object2 *entry = vma-&gt;exec_entry;</span>
+<span class="lineNum">     511 </span>            :         int remain, ret;
+<span class="lineNum">     512 </span>            : 
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :         user_relocs = to_user_ptr(entry-&gt;relocs_ptr);</span>
+<span class="lineNum">     514 </span>            : 
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :         remain = entry-&gt;relocation_count;</span>
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :         while (remain) {</span>
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :                 struct drm_i915_gem_relocation_entry *r = stack_reloc;</span>
+<span class="lineNum">     518 </span>            :                 int count = remain;
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :                 if (count &gt; ARRAY_SIZE(stack_reloc))</span>
+<span class="lineNum">     520 </span>            :                         count = ARRAY_SIZE(stack_reloc);
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                 remain -= count;</span>
+<span class="lineNum">     522 </span>            : 
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :                 if (__copy_from_user_inatomic(r, user_relocs, count*sizeof(r[0])))</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :                         return -EFAULT;</span>
+<span class="lineNum">     525 </span>            : 
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :                 do {</span>
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                         u64 offset = r-&gt;presumed_offset;</span>
+<span class="lineNum">     528 </span>            : 
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                         ret = i915_gem_execbuffer_relocate_entry(vma-&gt;obj, eb, r);</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :                         if (ret)</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :                                 return ret;</span>
+<span class="lineNum">     532 </span>            : 
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :                         if (r-&gt;presumed_offset != offset &amp;&amp;</span>
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :                             __copy_to_user_inatomic(&amp;user_relocs-&gt;presumed_offset,</span>
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                                                     &amp;r-&gt;presumed_offset,</span>
+<span class="lineNum">     536 </span>            :                                                     sizeof(r-&gt;presumed_offset))) {
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                                 return -EFAULT;</span>
+<span class="lineNum">     538 </span>            :                         }
+<span class="lineNum">     539 </span>            : 
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                         user_relocs++;</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                         r++;</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                 } while (--count);</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     544 </span>            : 
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     546 </span>            : #undef N_RELOC
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 : }</span>
+<a name="548"><span class="lineNum">     548 </span>            : </a>
+<span class="lineNum">     549 </span>            : static int
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_relocate_vma_slow(struct i915_vma *vma,</span>
+<span class="lineNum">     551 </span>            :                                       struct eb_vmas *eb,
+<span class="lineNum">     552 </span>            :                                       struct drm_i915_gem_relocation_entry *relocs)
+<span class="lineNum">     553 </span>            : {
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :         const struct drm_i915_gem_exec_object2 *entry = vma-&gt;exec_entry;</span>
+<span class="lineNum">     555 </span>            :         int i, ret;
+<span class="lineNum">     556 </span>            : 
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; entry-&gt;relocation_count; i++) {</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :                 ret = i915_gem_execbuffer_relocate_entry(vma-&gt;obj, eb, &amp;relocs[i]);</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">     561 </span>            :         }
+<span class="lineNum">     562 </span>            : 
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 : }</span>
+<a name="565"><span class="lineNum">     565 </span>            : </a>
+<span class="lineNum">     566 </span>            : static int
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_relocate(struct eb_vmas *eb)</span>
+<span class="lineNum">     568 </span>            : {
+<span class="lineNum">     569 </span>            :         struct i915_vma *vma;
+<span class="lineNum">     570 </span>            :         int ret = 0;
+<span class="lineNum">     571 </span>            : 
+<span class="lineNum">     572 </span>            :         /* This is the fast path and we cannot handle a pagefault whilst
+<span class="lineNum">     573 </span>            :          * holding the struct mutex lest the user pass in the relocations
+<span class="lineNum">     574 </span>            :          * contained within a mmaped bo. For in such a case we, the page
+<span class="lineNum">     575 </span>            :          * fault handler would call i915_gem_fault() and we would try to
+<span class="lineNum">     576 </span>            :          * acquire the struct mutex again. Obviously this is bad and so
+<span class="lineNum">     577 </span>            :          * lockdep complains vehemently.
+<span class="lineNum">     578 </span>            :          */
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :         pagefault_disable();</span>
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         list_for_each_entry(vma, &amp;eb-&gt;vmas, exec_list) {</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :                 ret = i915_gem_execbuffer_relocate_vma(vma, eb);</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">     583 </span>            :                         break;
+<span class="lineNum">     584 </span>            :         }
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :         pagefault_enable();</span>
+<span class="lineNum">     586 </span>            : 
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :         return ret;</span>
+<a name="588"><span class="lineNum">     588 </span>            : }</a>
+<span class="lineNum">     589 </span>            : 
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 : static bool only_mappable_for_reloc(unsigned int flags)</span>
+<span class="lineNum">     591 </span>            : {
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :         return (flags &amp; (EXEC_OBJECT_NEEDS_FENCE | __EXEC_OBJECT_NEEDS_MAP)) ==</span>
+<span class="lineNum">     593 </span>            :                 __EXEC_OBJECT_NEEDS_MAP;
+<span class="lineNum">     594 </span>            : }
+<a name="595"><span class="lineNum">     595 </span>            : </a>
+<span class="lineNum">     596 </span>            : static int
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_reserve_vma(struct i915_vma *vma,</span>
+<span class="lineNum">     598 </span>            :                                 struct intel_engine_cs *ring,
+<span class="lineNum">     599 </span>            :                                 bool *need_reloc)
+<span class="lineNum">     600 </span>            : {
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_object *obj = vma-&gt;obj;</span>
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_exec_object2 *entry = vma-&gt;exec_entry;</span>
+<span class="lineNum">     603 </span>            :         uint64_t flags;
+<span class="lineNum">     604 </span>            :         int ret;
+<span class="lineNum">     605 </span>            : 
+<span class="lineNum">     606 </span>            :         flags = PIN_USER;
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :         if (entry-&gt;flags &amp; EXEC_OBJECT_NEEDS_GTT)</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                 flags |= PIN_GLOBAL;</span>
+<span class="lineNum">     609 </span>            : 
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :         if (!drm_mm_node_allocated(&amp;vma-&gt;node)) {</span>
+<span class="lineNum">     611 </span>            :                 /* Wa32bitGeneralStateOffset &amp; Wa32bitInstructionBaseOffset,
+<span class="lineNum">     612 </span>            :                  * limit address to the first 4GBs for unflagged objects.
+<span class="lineNum">     613 </span>            :                  */
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                 if ((entry-&gt;flags &amp; EXEC_OBJECT_SUPPORTS_48B_ADDRESS) == 0)</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :                         flags |= PIN_ZONE_4G;</span>
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :                 if (entry-&gt;flags &amp; __EXEC_OBJECT_NEEDS_MAP)</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                         flags |= PIN_GLOBAL | PIN_MAPPABLE;</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                 if (entry-&gt;flags &amp; __EXEC_OBJECT_NEEDS_BIAS)</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :                         flags |= BATCH_OFFSET_BIAS | PIN_OFFSET_BIAS;</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :                 if ((flags &amp; PIN_MAPPABLE) == 0)</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :                         flags |= PIN_HIGH;</span>
+<span class="lineNum">     622 </span>            :         }
+<span class="lineNum">     623 </span>            : 
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :         ret = i915_gem_object_pin(obj, vma-&gt;vm, entry-&gt;alignment, flags);</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :         if ((ret == -ENOSPC  || ret == -E2BIG) &amp;&amp;</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :             only_mappable_for_reloc(entry-&gt;flags))</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :                 ret = i915_gem_object_pin(obj, vma-&gt;vm,</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                                           entry-&gt;alignment,</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                                           flags &amp; ~PIN_MAPPABLE);</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">     632 </span>            : 
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :         entry-&gt;flags |= __EXEC_OBJECT_HAS_PIN;</span>
+<span class="lineNum">     634 </span>            : 
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :         if (entry-&gt;flags &amp; EXEC_OBJECT_NEEDS_FENCE) {</span>
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :                 ret = i915_gem_object_get_fence(obj);</span>
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">     639 </span>            : 
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :                 if (i915_gem_object_pin_fence(obj))</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :                         entry-&gt;flags |= __EXEC_OBJECT_HAS_FENCE;</span>
+<span class="lineNum">     642 </span>            :         }
+<span class="lineNum">     643 </span>            : 
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :         if (entry-&gt;offset != vma-&gt;node.start) {</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :                 entry-&gt;offset = vma-&gt;node.start;</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :                 *need_reloc = true;</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     648 </span>            : 
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :         if (entry-&gt;flags &amp; EXEC_OBJECT_WRITE) {</span>
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :                 obj-&gt;base.pending_read_domains = I915_GEM_DOMAIN_RENDER;</span>
+<span class="lineNum">     651 </span><span class="lineNoCov">          0 :                 obj-&gt;base.pending_write_domain = I915_GEM_DOMAIN_RENDER;</span>
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     653 </span>            : 
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 : }</span>
+<a name="656"><span class="lineNum">     656 </span>            : </a>
+<span class="lineNum">     657 </span>            : static bool
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 : need_reloc_mappable(struct i915_vma *vma)</span>
+<span class="lineNum">     659 </span>            : {
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_exec_object2 *entry = vma-&gt;exec_entry;</span>
+<span class="lineNum">     661 </span>            : 
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :         if (entry-&gt;relocation_count == 0)</span>
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     664 </span>            : 
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :         if (!i915_is_ggtt(vma-&gt;vm))</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     667 </span>            : 
+<span class="lineNum">     668 </span>            :         /* See also use_cpu_reloc() */
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :         if (HAS_LLC(vma-&gt;obj-&gt;base.dev))</span>
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     671 </span>            : 
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :         if (vma-&gt;obj-&gt;base.write_domain == I915_GEM_DOMAIN_CPU)</span>
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     674 </span>            : 
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 : }</span>
+<a name="677"><span class="lineNum">     677 </span>            : </a>
+<span class="lineNum">     678 </span>            : static bool
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 : eb_vma_misplaced(struct i915_vma *vma)</span>
+<span class="lineNum">     680 </span>            : {
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_exec_object2 *entry = vma-&gt;exec_entry;</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_object *obj = vma-&gt;obj;</span>
+<span class="lineNum">     683 </span>            : 
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :         WARN_ON(entry-&gt;flags &amp; __EXEC_OBJECT_NEEDS_MAP &amp;&amp;</span>
+<span class="lineNum">     685 </span>            :                !i915_is_ggtt(vma-&gt;vm));
+<span class="lineNum">     686 </span>            : 
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :         if (entry-&gt;alignment &amp;&amp;</span>
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :             vma-&gt;node.start &amp; (entry-&gt;alignment - 1))</span>
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">     690 </span>            : 
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :         if (entry-&gt;flags &amp; __EXEC_OBJECT_NEEDS_BIAS &amp;&amp;</span>
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :             vma-&gt;node.start &lt; BATCH_OFFSET_BIAS)</span>
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">     694 </span>            : 
+<span class="lineNum">     695 </span>            :         /* avoid costly ping-pong once a batch bo ended up non-mappable */
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :         if (entry-&gt;flags &amp; __EXEC_OBJECT_NEEDS_MAP &amp;&amp; !obj-&gt;map_and_fenceable)</span>
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :                 return !only_mappable_for_reloc(entry-&gt;flags);</span>
+<span class="lineNum">     698 </span>            : 
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :         if ((entry-&gt;flags &amp; EXEC_OBJECT_SUPPORTS_48B_ADDRESS) == 0 &amp;&amp;</span>
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 :             (vma-&gt;node.start + vma-&gt;node.size - 1) &gt;&gt; 32)</span>
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">     702 </span>            : 
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 : }</span>
+<a name="705"><span class="lineNum">     705 </span>            : </a>
+<span class="lineNum">     706 </span>            : static int
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_reserve(struct intel_engine_cs *ring,</span>
+<span class="lineNum">     708 </span>            :                             struct list_head *vmas,
+<span class="lineNum">     709 </span>            :                             struct intel_context *ctx,
+<span class="lineNum">     710 </span>            :                             bool *need_relocs)
+<span class="lineNum">     711 </span>            : {
+<span class="lineNum">     712 </span>            :         struct drm_i915_gem_object *obj;
+<span class="lineNum">     713 </span>            :         struct i915_vma *vma;
+<span class="lineNum">     714 </span>            :         struct i915_address_space *vm;
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :         struct list_head ordered_vmas;</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :         bool has_fenced_gpu_access = INTEL_INFO(ring-&gt;dev)-&gt;gen &lt; 4;</span>
+<span class="lineNum">     717 </span>            :         int retry;
+<span class="lineNum">     718 </span>            : 
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :         i915_gem_retire_requests_ring(ring);</span>
+<span class="lineNum">     720 </span>            : 
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :         vm = list_first_entry(vmas, struct i915_vma, exec_list)-&gt;vm;</span>
+<span class="lineNum">     722 </span>            : 
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;ordered_vmas);</span>
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :         while (!list_empty(vmas)) {</span>
+<span class="lineNum">     725 </span>            :                 struct drm_i915_gem_exec_object2 *entry;
+<span class="lineNum">     726 </span>            :                 bool need_fence, need_mappable;
+<span class="lineNum">     727 </span>            : 
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :                 vma = list_first_entry(vmas, struct i915_vma, exec_list);</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :                 obj = vma-&gt;obj;</span>
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :                 entry = vma-&gt;exec_entry;</span>
+<span class="lineNum">     731 </span>            : 
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :                 if (ctx-&gt;flags &amp; CONTEXT_NO_ZEROMAP)</span>
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :                         entry-&gt;flags |= __EXEC_OBJECT_NEEDS_BIAS;</span>
+<span class="lineNum">     734 </span>            : 
+<span class="lineNum">     735 </span><span class="lineNoCov">          0 :                 if (!has_fenced_gpu_access)</span>
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :                         entry-&gt;flags &amp;= ~EXEC_OBJECT_NEEDS_FENCE;</span>
+<span class="lineNum">     737 </span><span class="lineNoCov">          0 :                 need_fence =</span>
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :                         entry-&gt;flags &amp; EXEC_OBJECT_NEEDS_FENCE &amp;&amp;</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :                         obj-&gt;tiling_mode != I915_TILING_NONE;</span>
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :                 need_mappable = need_fence || need_reloc_mappable(vma);</span>
+<span class="lineNum">     741 </span>            : 
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :                 if (need_mappable) {</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :                         entry-&gt;flags |= __EXEC_OBJECT_NEEDS_MAP;</span>
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :                         list_move(&amp;vma-&gt;exec_list, &amp;ordered_vmas);</span>
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :                         list_move_tail(&amp;vma-&gt;exec_list, &amp;ordered_vmas);</span>
+<span class="lineNum">     747 </span>            : 
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :                 obj-&gt;base.pending_read_domains = I915_GEM_GPU_DOMAINS &amp; ~I915_GEM_DOMAIN_COMMAND;</span>
+<span class="lineNum">     749 </span><span class="lineNoCov">          0 :                 obj-&gt;base.pending_write_domain = 0;</span>
+<span class="lineNum">     750 </span>            :         }
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :         list_splice(&amp;ordered_vmas, vmas);</span>
+<span class="lineNum">     752 </span>            : 
+<span class="lineNum">     753 </span>            :         /* Attempt to pin all of the buffers into the GTT.
+<span class="lineNum">     754 </span>            :          * This is done in 3 phases:
+<span class="lineNum">     755 </span>            :          *
+<span class="lineNum">     756 </span>            :          * 1a. Unbind all objects that do not match the GTT constraints for
+<span class="lineNum">     757 </span>            :          *     the execbuffer (fenceable, mappable, alignment etc).
+<span class="lineNum">     758 </span>            :          * 1b. Increment pin count for already bound objects.
+<span class="lineNum">     759 </span>            :          * 2.  Bind new objects.
+<span class="lineNum">     760 </span>            :          * 3.  Decrement pin count.
+<span class="lineNum">     761 </span>            :          *
+<span class="lineNum">     762 </span>            :          * This avoid unnecessary unbinding of later objects in order to make
+<span class="lineNum">     763 </span>            :          * room for the earlier objects *unless* we need to defragment.
+<span class="lineNum">     764 </span>            :          */
+<span class="lineNum">     765 </span>            :         retry = 0;
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     767 </span>            :                 int ret = 0;
+<span class="lineNum">     768 </span>            : 
+<span class="lineNum">     769 </span>            :                 /* Unbind any ill-fitting objects or pin. */
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :                 list_for_each_entry(vma, vmas, exec_list) {</span>
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :                         if (!drm_mm_node_allocated(&amp;vma-&gt;node))</span>
+<span class="lineNum">     772 </span>            :                                 continue;
+<span class="lineNum">     773 </span>            : 
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :                         if (eb_vma_misplaced(vma))</span>
+<span class="lineNum">     775 </span><span class="lineNoCov">          0 :                                 ret = i915_vma_unbind(vma);</span>
+<span class="lineNum">     776 </span>            :                         else
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :                                 ret = i915_gem_execbuffer_reserve_vma(vma, ring, need_relocs);</span>
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :                         if (ret)</span>
+<span class="lineNum">     779 </span>            :                                 goto err;
+<span class="lineNum">     780 </span>            :                 }
+<span class="lineNum">     781 </span>            : 
+<span class="lineNum">     782 </span>            :                 /* Bind fresh objects */
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :                 list_for_each_entry(vma, vmas, exec_list) {</span>
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :                         if (drm_mm_node_allocated(&amp;vma-&gt;node))</span>
+<span class="lineNum">     785 </span>            :                                 continue;
+<span class="lineNum">     786 </span>            : 
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :                         ret = i915_gem_execbuffer_reserve_vma(vma, ring, need_relocs);</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :                         if (ret)</span>
+<span class="lineNum">     789 </span>            :                                 goto err;
+<span class="lineNum">     790 </span>            :                 }
+<span class="lineNum">     791 </span>            : 
+<span class="lineNum">     792 </span>            : err:
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :                 if (ret != -ENOSPC || retry++)</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">     795 </span>            : 
+<span class="lineNum">     796 </span>            :                 /* Decrement pin count for bound objects */
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :                 list_for_each_entry(vma, vmas, exec_list)</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :                         i915_gem_execbuffer_unreserve_vma(vma);</span>
+<span class="lineNum">     799 </span>            : 
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :                 ret = i915_gem_evict_vm(vm, true);</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :         } while (1);</span>
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 : }</span>
+<a name="805"><span class="lineNum">     805 </span>            : </a>
+<span class="lineNum">     806 </span>            : static int
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_relocate_slow(struct drm_device *dev,</span>
+<span class="lineNum">     808 </span>            :                                   struct drm_i915_gem_execbuffer2 *args,
+<span class="lineNum">     809 </span>            :                                   struct drm_file *file,
+<span class="lineNum">     810 </span>            :                                   struct intel_engine_cs *ring,
+<span class="lineNum">     811 </span>            :                                   struct eb_vmas *eb,
+<span class="lineNum">     812 </span>            :                                   struct drm_i915_gem_exec_object2 *exec,
+<span class="lineNum">     813 </span>            :                                   struct intel_context *ctx)
+<span class="lineNum">     814 </span>            : {
+<span class="lineNum">     815 </span>            :         struct drm_i915_gem_relocation_entry *reloc;
+<span class="lineNum">     816 </span>            :         struct i915_address_space *vm;
+<span class="lineNum">     817 </span>            :         struct i915_vma *vma;
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :         bool need_relocs;</span>
+<span class="lineNum">     819 </span>            :         int *reloc_offset;
+<span class="lineNum">     820 </span>            :         int i, total, ret;
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :         unsigned count = args-&gt;buffer_count;</span>
+<span class="lineNum">     822 </span>            : 
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :         vm = list_first_entry(&amp;eb-&gt;vmas, struct i915_vma, exec_list)-&gt;vm;</span>
+<span class="lineNum">     824 </span>            : 
+<span class="lineNum">     825 </span>            :         /* We may process another execbuffer during the unlock... */
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         while (!list_empty(&amp;eb-&gt;vmas)) {</span>
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :                 vma = list_first_entry(&amp;eb-&gt;vmas, struct i915_vma, exec_list);</span>
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :                 list_del_init(&amp;vma-&gt;exec_list);</span>
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :                 i915_gem_execbuffer_unreserve_vma(vma);</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :                 drm_gem_object_unreference(&amp;vma-&gt;obj-&gt;base);</span>
+<span class="lineNum">     831 </span>            :         }
+<span class="lineNum">     832 </span>            : 
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">     834 </span>            : 
+<span class="lineNum">     835 </span>            :         total = 0;
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; count; i++)</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :                 total += exec[i].relocation_count;</span>
+<span class="lineNum">     838 </span>            : 
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :         reloc_offset = drm_malloc_ab(count, sizeof(*reloc_offset));</span>
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 :         reloc = drm_malloc_ab(total, sizeof(*reloc));</span>
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :         if (reloc == NULL || reloc_offset == NULL) {</span>
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :                 drm_free_large(reloc);</span>
+<span class="lineNum">     843 </span><span class="lineNoCov">          0 :                 drm_free_large(reloc_offset);</span>
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :                 mutex_lock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                 return -ENOMEM;</span>
+<span class="lineNum">     846 </span>            :         }
+<span class="lineNum">     847 </span>            : 
+<span class="lineNum">     848 </span>            :         total = 0;
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; count; i++) {</span>
+<span class="lineNum">     850 </span>            :                 struct drm_i915_gem_relocation_entry __user *user_relocs;
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                 u64 invalid_offset = (u64)-1;</span>
+<span class="lineNum">     852 </span>            :                 int j;
+<span class="lineNum">     853 </span>            : 
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :                 user_relocs = to_user_ptr(exec[i].relocs_ptr);</span>
+<span class="lineNum">     855 </span>            : 
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                 if (copy_from_user(reloc+total, user_relocs,</span>
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :                                    exec[i].relocation_count * sizeof(*reloc))) {</span>
+<span class="lineNum">     858 </span>            :                         ret = -EFAULT;
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                         mutex_lock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :                         goto err;</span>
+<span class="lineNum">     861 </span>            :                 }
+<span class="lineNum">     862 </span>            : 
+<span class="lineNum">     863 </span>            :                 /* As we do not update the known relocation offsets after
+<span class="lineNum">     864 </span>            :                  * relocating (due to the complexities in lock handling),
+<span class="lineNum">     865 </span>            :                  * we need to mark them as invalid now so that we force the
+<span class="lineNum">     866 </span>            :                  * relocation processing next time. Just in case the target
+<span class="lineNum">     867 </span>            :                  * object is evicted and then rebound into its old
+<span class="lineNum">     868 </span>            :                  * presumed_offset before the next execbuffer - if that
+<span class="lineNum">     869 </span>            :                  * happened we would make the mistake of assuming that the
+<span class="lineNum">     870 </span>            :                  * relocations were valid.
+<span class="lineNum">     871 </span>            :                  */
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                 for (j = 0; j &lt; exec[i].relocation_count; j++) {</span>
+<span class="lineNum">     873 </span><span class="lineNoCov">          0 :                         if (__copy_to_user(&amp;user_relocs[j].presumed_offset,</span>
+<span class="lineNum">     874 </span>            :                                            &amp;invalid_offset,
+<span class="lineNum">     875 </span>            :                                            sizeof(invalid_offset))) {
+<span class="lineNum">     876 </span>            :                                 ret = -EFAULT;
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :                                 mutex_lock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :                                 goto err;</span>
+<span class="lineNum">     879 </span>            :                         }
+<span class="lineNum">     880 </span>            :                 }
+<span class="lineNum">     881 </span>            : 
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :                 reloc_offset[i] = total;</span>
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :                 total += exec[i].relocation_count;</span>
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     885 </span>            : 
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :         ret = i915_mutex_lock_interruptible(dev);</span>
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :         if (ret) {</span>
+<span class="lineNum">     888 </span><span class="lineNoCov">          0 :                 mutex_lock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     890 </span>            :         }
+<span class="lineNum">     891 </span>            : 
+<span class="lineNum">     892 </span>            :         /* reacquire the objects */
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 :         eb_reset(eb);</span>
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :         ret = eb_lookup_vmas(eb, exec, args, vm, file);</span>
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     896 </span>            :                 goto err;
+<span class="lineNum">     897 </span>            : 
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :         need_relocs = (args-&gt;flags &amp; I915_EXEC_NO_RELOC) == 0;</span>
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 :         ret = i915_gem_execbuffer_reserve(ring, &amp;eb-&gt;vmas, ctx, &amp;need_relocs);</span>
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">     901 </span>            :                 goto err;
+<span class="lineNum">     902 </span>            : 
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :         list_for_each_entry(vma, &amp;eb-&gt;vmas, exec_list) {</span>
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :                 int offset = vma-&gt;exec_entry - exec;</span>
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :                 ret = i915_gem_execbuffer_relocate_vma_slow(vma, eb,</span>
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :                                                             reloc + reloc_offset[offset]);</span>
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :                         goto err;</span>
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     910 </span>            : 
+<span class="lineNum">     911 </span>            :         /* Leave the user relocations as are, this is the painfully slow path,
+<span class="lineNum">     912 </span>            :          * and we want to avoid the complication of dropping the lock whilst
+<span class="lineNum">     913 </span>            :          * having buffers reserved in the aperture and so causing spurious
+<span class="lineNum">     914 </span>            :          * ENOSPC for random operations.
+<span class="lineNum">     915 </span>            :          */
+<span class="lineNum">     916 </span>            : 
+<span class="lineNum">     917 </span>            : err:
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :         drm_free_large(reloc);</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :         drm_free_large(reloc_offset);</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :         return ret;</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 : }</span>
+<a name="922"><span class="lineNum">     922 </span>            : </a>
+<span class="lineNum">     923 </span>            : static int
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_move_to_gpu(struct drm_i915_gem_request *req,</span>
+<span class="lineNum">     925 </span>            :                                 struct list_head *vmas)
+<span class="lineNum">     926 </span>            : {
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :         const unsigned other_rings = ~intel_ring_flag(req-&gt;ring);</span>
+<span class="lineNum">     928 </span>            :         struct i915_vma *vma;
+<span class="lineNum">     929 </span>            :         uint32_t flush_domains = 0;
+<span class="lineNum">     930 </span>            :         bool flush_chipset = false;
+<span class="lineNum">     931 </span>            :         int ret;
+<span class="lineNum">     932 </span>            : 
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :         list_for_each_entry(vma, vmas, exec_list) {</span>
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :                 struct drm_i915_gem_object *obj = vma-&gt;obj;</span>
+<span class="lineNum">     935 </span>            : 
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :                 if (obj-&gt;active &amp; other_rings) {</span>
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :                         ret = i915_gem_object_sync(obj, req-&gt;ring, &amp;req);</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :                         if (ret)</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :                                 return ret;</span>
+<span class="lineNum">     940 </span>            :                 }
+<span class="lineNum">     941 </span>            : 
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :                 if (obj-&gt;base.write_domain &amp; I915_GEM_DOMAIN_CPU)</span>
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :                         flush_chipset |= i915_gem_clflush_object(obj, false);</span>
+<span class="lineNum">     944 </span>            : 
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 :                 flush_domains |= obj-&gt;base.write_domain;</span>
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     947 </span>            : 
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 :         if (flush_chipset)</span>
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :                 i915_gem_chipset_flush(req-&gt;ring-&gt;dev);</span>
+<span class="lineNum">     950 </span>            : 
+<span class="lineNum">     951 </span><span class="lineNoCov">          0 :         if (flush_domains &amp; I915_GEM_DOMAIN_GTT)</span>
+<span class="lineNum">     952 </span><span class="lineNoCov">          0 :                 wmb();</span>
+<span class="lineNum">     953 </span>            : 
+<span class="lineNum">     954 </span>            :         /* Unconditionally invalidate gpu caches and ensure that we do flush
+<span class="lineNum">     955 </span>            :          * any residual writes from the previous batch.
+<span class="lineNum">     956 </span>            :          */
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :         return intel_ring_invalidate_all_caches(req);</span>
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 : }</span>
+<a name="959"><span class="lineNum">     959 </span>            : </a>
+<span class="lineNum">     960 </span>            : static bool
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 : i915_gem_check_execbuffer(struct drm_i915_gem_execbuffer2 *exec)</span>
+<span class="lineNum">     962 </span>            : {
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         if (exec-&gt;flags &amp; __I915_EXEC_UNKNOWN_FLAGS)</span>
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     965 </span>            : 
+<span class="lineNum">     966 </span>            :         /* Kernel clipping was a DRI1 misfeature */
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :         if (exec-&gt;num_cliprects || exec-&gt;cliprects_ptr)</span>
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     969 </span>            : 
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :         if (exec-&gt;DR4 == 0xffffffff) {</span>
+<span class="lineNum">     971 </span>            :                 DRM_DEBUG(&quot;UXA submitting garbage DR4, fixing up\n&quot;);
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :                 exec-&gt;DR4 = 0;</span>
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     974 </span><span class="lineNoCov">          0 :         if (exec-&gt;DR1 || exec-&gt;DR4)</span>
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     976 </span>            : 
+<span class="lineNum">     977 </span><span class="lineNoCov">          0 :         if ((exec-&gt;batch_start_offset | exec-&gt;batch_len) &amp; 0x7)</span>
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     979 </span>            : 
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 : }</span>
+<a name="982"><span class="lineNum">     982 </span>            : </a>
+<span class="lineNum">     983 </span>            : static int
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 : validate_exec_list(struct drm_device *dev,</span>
+<span class="lineNum">     985 </span>            :                    struct drm_i915_gem_exec_object2 *exec,
+<span class="lineNum">     986 </span>            :                    int count)
+<span class="lineNum">     987 </span>            : {
+<span class="lineNum">     988 </span>            :         unsigned relocs_total = 0;
+<span class="lineNum">     989 </span>            :         unsigned relocs_max = UINT_MAX / sizeof(struct drm_i915_gem_relocation_entry);
+<span class="lineNum">     990 </span>            :         unsigned invalid_flags;
+<span class="lineNum">     991 </span>            :         int i;
+<span class="lineNum">     992 </span>            : 
+<span class="lineNum">     993 </span>            :         invalid_flags = __EXEC_OBJECT_UNKNOWN_FLAGS;
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :         if (USES_FULL_PPGTT(dev))</span>
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :                 invalid_flags |= EXEC_OBJECT_NEEDS_GTT;</span>
+<span class="lineNum">     996 </span>            : 
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; count; i++) {</span>
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 :                 char __user *ptr = to_user_ptr(exec[i].relocs_ptr);</span>
+<span class="lineNum">     999 </span>            :                 int length; /* limited by fault_in_pages_readable() */
+<span class="lineNum">    1000 </span>            : 
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :                 if (exec[i].flags &amp; invalid_flags)</span>
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1003 </span>            : 
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :                 if (exec[i].alignment &amp;&amp; !is_power_of_2(exec[i].alignment))</span>
+<span class="lineNum">    1005 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1006 </span>            : 
+<span class="lineNum">    1007 </span>            :                 /* First check for malicious input causing overflow in
+<span class="lineNum">    1008 </span>            :                  * the worst case where we need to allocate the entire
+<span class="lineNum">    1009 </span>            :                  * relocation tree as a single array.
+<span class="lineNum">    1010 </span>            :                  */
+<span class="lineNum">    1011 </span><span class="lineNoCov">          0 :                 if (exec[i].relocation_count &gt; relocs_max - relocs_total)</span>
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                 relocs_total += exec[i].relocation_count;</span>
+<span class="lineNum">    1014 </span>            : 
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :                 length = exec[i].relocation_count *</span>
+<span class="lineNum">    1016 </span>            :                         sizeof(struct drm_i915_gem_relocation_entry);
+<span class="lineNum">    1017 </span>            :                 /*
+<span class="lineNum">    1018 </span>            :                  * We must check that the entire relocation array is safe
+<span class="lineNum">    1019 </span>            :                  * to read, but since we may need to update the presumed
+<span class="lineNum">    1020 </span>            :                  * offsets during execution, check for full write access.
+<span class="lineNum">    1021 </span>            :                  */
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :                 if (!access_ok(VERIFY_WRITE, ptr, length))</span>
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 :                         return -EFAULT;</span>
+<span class="lineNum">    1024 </span>            : 
+<span class="lineNum">    1025 </span>            : #ifdef __linux__
+<span class="lineNum">    1026 </span>            :                 if (likely(!i915.prefault_disable)) {
+<span class="lineNum">    1027 </span>            :                         if (fault_in_multipages_readable(ptr, length))
+<span class="lineNum">    1028 </span>            :                                 return -EFAULT;
+<span class="lineNum">    1029 </span>            :                 }
+<span class="lineNum">    1030 </span>            : #endif
+<span class="lineNum">    1031 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1032 </span>            : 
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 : }</span>
+<a name="1035"><span class="lineNum">    1035 </span>            : </a>
+<span class="lineNum">    1036 </span>            : static struct intel_context *
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 : i915_gem_validate_context(struct drm_device *dev, struct drm_file *file,</span>
+<span class="lineNum">    1038 </span>            :                           struct intel_engine_cs *ring, const u32 ctx_id)
+<span class="lineNum">    1039 </span>            : {
+<span class="lineNum">    1040 </span>            :         struct intel_context *ctx = NULL;
+<span class="lineNum">    1041 </span>            :         struct i915_ctx_hang_stats *hs;
+<span class="lineNum">    1042 </span>            : 
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :         if (ring-&gt;id != RCS &amp;&amp; ctx_id != DEFAULT_CONTEXT_HANDLE)</span>
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 :                 return ERR_PTR(-EINVAL);</span>
+<span class="lineNum">    1045 </span>            : 
+<span class="lineNum">    1046 </span><span class="lineNoCov">          0 :         ctx = i915_gem_context_get(file-&gt;driver_priv, ctx_id);</span>
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :         if (IS_ERR(ctx))</span>
+<span class="lineNum">    1048 </span><span class="lineNoCov">          0 :                 return ctx;</span>
+<span class="lineNum">    1049 </span>            : 
+<span class="lineNum">    1050 </span><span class="lineNoCov">          0 :         hs = &amp;ctx-&gt;hang_stats;</span>
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :         if (hs-&gt;banned) {</span>
+<span class="lineNum">    1052 </span>            :                 DRM_DEBUG(&quot;Context %u tried to submit while banned\n&quot;, ctx_id);
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 :                 return ERR_PTR(-EIO);</span>
+<span class="lineNum">    1054 </span>            :         }
+<span class="lineNum">    1055 </span>            : 
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :         if (i915.enable_execlists &amp;&amp; !ctx-&gt;engine[ring-&gt;id].state) {</span>
+<span class="lineNum">    1057 </span><span class="lineNoCov">          0 :                 int ret = intel_lr_context_deferred_alloc(ctx, ring);</span>
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :                 if (ret) {</span>
+<span class="lineNum">    1059 </span>            :                         DRM_DEBUG(&quot;Could not create LRC %u: %d\n&quot;, ctx_id, ret);
+<span class="lineNum">    1060 </span><span class="lineNoCov">          0 :                         return ERR_PTR(ret);</span>
+<span class="lineNum">    1061 </span>            :                 }
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1063 </span>            : 
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :         return ctx;</span>
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 : }</span>
+<a name="1066"><span class="lineNum">    1066 </span>            : </a>
+<span class="lineNum">    1067 </span>            : void
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_move_to_active(struct list_head *vmas,</span>
+<span class="lineNum">    1069 </span>            :                                    struct drm_i915_gem_request *req)
+<span class="lineNum">    1070 </span>            : {
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :         struct intel_engine_cs *ring = i915_gem_request_get_ring(req);</span>
+<span class="lineNum">    1072 </span>            :         struct i915_vma *vma;
+<span class="lineNum">    1073 </span>            : 
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :         list_for_each_entry(vma, vmas, exec_list) {</span>
+<span class="lineNum">    1075 </span><span class="lineNoCov">          0 :                 struct drm_i915_gem_exec_object2 *entry = vma-&gt;exec_entry;</span>
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :                 struct drm_i915_gem_object *obj = vma-&gt;obj;</span>
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :                 u32 old_read = obj-&gt;base.read_domains;</span>
+<span class="lineNum">    1078 </span><span class="lineNoCov">          0 :                 u32 old_write = obj-&gt;base.write_domain;</span>
+<span class="lineNum">    1079 </span>            : 
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 :                 obj-&gt;dirty = 1; /* be paranoid  */</span>
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :                 obj-&gt;base.write_domain = obj-&gt;base.pending_write_domain;</span>
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :                 if (obj-&gt;base.write_domain == 0)</span>
+<span class="lineNum">    1083 </span><span class="lineNoCov">          0 :                         obj-&gt;base.pending_read_domains |= obj-&gt;base.read_domains;</span>
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 :                 obj-&gt;base.read_domains = obj-&gt;base.pending_read_domains;</span>
+<span class="lineNum">    1085 </span>            : 
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 :                 i915_vma_move_to_active(vma, req);</span>
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :                 if (obj-&gt;base.write_domain) {</span>
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :                         i915_gem_request_assign(&amp;obj-&gt;last_write_req, req);</span>
+<span class="lineNum">    1089 </span>            : 
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :                         intel_fb_obj_invalidate(obj, ORIGIN_CS);</span>
+<span class="lineNum">    1091 </span>            : 
+<span class="lineNum">    1092 </span>            :                         /* update for the implicit flush after a batch */
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :                         obj-&gt;base.write_domain &amp;= ~I915_GEM_GPU_DOMAINS;</span>
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1095 </span><span class="lineNoCov">          0 :                 if (entry-&gt;flags &amp; EXEC_OBJECT_NEEDS_FENCE) {</span>
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 :                         i915_gem_request_assign(&amp;obj-&gt;last_fenced_req, req);</span>
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :                         if (entry-&gt;flags &amp; __EXEC_OBJECT_HAS_FENCE) {</span>
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 :                                 struct drm_i915_private *dev_priv = to_i915(ring-&gt;dev);</span>
+<span class="lineNum">    1099 </span><span class="lineNoCov">          0 :                                 list_move_tail(&amp;dev_priv-&gt;fence_regs[obj-&gt;fence_reg].lru_list,</span>
+<span class="lineNum">    1100 </span><span class="lineNoCov">          0 :                                                &amp;dev_priv-&gt;mm.fence_list);</span>
+<span class="lineNum">    1101 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">    1102 </span>            :                 }
+<span class="lineNum">    1103 </span>            : 
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 :                 trace_i915_gem_object_change_domain(obj, old_read, old_write);</span>
+<span class="lineNum">    1105 </span>            :         }
+<span class="lineNum">    1106 </span><span class="lineNoCov">          0 : }</span>
+<a name="1107"><span class="lineNum">    1107 </span>            : </a>
+<span class="lineNum">    1108 </span>            : void
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_retire_commands(struct i915_execbuffer_params *params)</span>
+<span class="lineNum">    1110 </span>            : {
+<span class="lineNum">    1111 </span>            :         /* Unconditionally force add_request to emit a full flush. */
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 :         params-&gt;ring-&gt;gpu_caches_dirty = true;</span>
+<span class="lineNum">    1113 </span>            : 
+<span class="lineNum">    1114 </span>            :         /* Add a breadcrumb for the completion of the batch buffer */
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 :         __i915_add_request(params-&gt;request, params-&gt;batch_obj, true);</span>
+<span class="lineNum">    1116 </span><span class="lineNoCov">          0 : }</span>
+<a name="1117"><span class="lineNum">    1117 </span>            : </a>
+<span class="lineNum">    1118 </span>            : static int
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 : i915_reset_gen7_sol_offsets(struct drm_device *dev,</span>
+<span class="lineNum">    1120 </span>            :                             struct drm_i915_gem_request *req)
+<span class="lineNum">    1121 </span>            : {
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :         struct intel_engine_cs *ring = req-&gt;ring;</span>
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">    1124 </span>            :         int ret, i;
+<span class="lineNum">    1125 </span>            : 
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 :         if (!IS_GEN7(dev) || ring != &amp;dev_priv-&gt;ring[RCS]) {</span>
+<span class="lineNum">    1127 </span>            :                 DRM_DEBUG(&quot;sol reset is gen7/rcs only\n&quot;);
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1129 </span>            :         }
+<span class="lineNum">    1130 </span>            : 
+<span class="lineNum">    1131 </span><span class="lineNoCov">          0 :         ret = intel_ring_begin(req, 4 * 3);</span>
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1133 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">    1134 </span>            : 
+<span class="lineNum">    1135 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; 4; i++) {</span>
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));</span>
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, GEN7_SO_WRITE_OFFSET(i));</span>
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, 0);</span>
+<span class="lineNum">    1139 </span>            :         }
+<span class="lineNum">    1140 </span>            : 
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :         intel_ring_advance(ring);</span>
+<span class="lineNum">    1142 </span>            : 
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 : }</span>
+<a name="1145"><span class="lineNum">    1145 </span>            : </a>
+<span class="lineNum">    1146 </span>            : static struct drm_i915_gem_object*
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 : i915_gem_execbuffer_parse(struct intel_engine_cs *ring,</span>
+<span class="lineNum">    1148 </span>            :                           struct drm_i915_gem_exec_object2 *shadow_exec_entry,
+<span class="lineNum">    1149 </span>            :                           struct eb_vmas *eb,
+<span class="lineNum">    1150 </span>            :                           struct drm_i915_gem_object *batch_obj,
+<span class="lineNum">    1151 </span>            :                           u32 batch_start_offset,
+<span class="lineNum">    1152 </span>            :                           u32 batch_len,
+<span class="lineNum">    1153 </span>            :                           bool is_master)
+<span class="lineNum">    1154 </span>            : {
+<span class="lineNum">    1155 </span>            :         struct drm_i915_gem_object *shadow_batch_obj;
+<span class="lineNum">    1156 </span>            :         struct i915_vma *vma;
+<span class="lineNum">    1157 </span>            :         int ret;
+<span class="lineNum">    1158 </span>            : 
+<span class="lineNum">    1159 </span><span class="lineNoCov">          0 :         shadow_batch_obj = i915_gem_batch_pool_get(&amp;ring-&gt;batch_pool,</span>
+<span class="lineNum">    1160 </span><span class="lineNoCov">          0 :                                                    PAGE_ALIGN(batch_len));</span>
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :         if (IS_ERR(shadow_batch_obj))</span>
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 :                 return shadow_batch_obj;</span>
+<span class="lineNum">    1163 </span>            : 
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :         ret = i915_parse_cmds(ring,</span>
+<span class="lineNum">    1165 </span>            :                               batch_obj,
+<span class="lineNum">    1166 </span>            :                               shadow_batch_obj,
+<span class="lineNum">    1167 </span>            :                               batch_start_offset,
+<span class="lineNum">    1168 </span>            :                               batch_len,
+<span class="lineNum">    1169 </span>            :                               is_master);
+<span class="lineNum">    1170 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1171 </span>            :                 goto err;
+<span class="lineNum">    1172 </span>            : 
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 :         ret = i915_gem_obj_ggtt_pin(shadow_batch_obj, 0, 0);</span>
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1175 </span>            :                 goto err;
+<span class="lineNum">    1176 </span>            : 
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :         i915_gem_object_unpin_pages(shadow_batch_obj);</span>
+<span class="lineNum">    1178 </span>            : 
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 :         memset(shadow_exec_entry, 0, sizeof(*shadow_exec_entry));</span>
+<span class="lineNum">    1180 </span>            : 
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 :         vma = i915_gem_obj_to_ggtt(shadow_batch_obj);</span>
+<span class="lineNum">    1182 </span><span class="lineNoCov">          0 :         vma-&gt;exec_entry = shadow_exec_entry;</span>
+<span class="lineNum">    1183 </span><span class="lineNoCov">          0 :         vma-&gt;exec_entry-&gt;flags = __EXEC_OBJECT_HAS_PIN;</span>
+<span class="lineNum">    1184 </span><span class="lineNoCov">          0 :         drm_gem_object_reference(&amp;shadow_batch_obj-&gt;base);</span>
+<span class="lineNum">    1185 </span><span class="lineNoCov">          0 :         list_add_tail(&amp;vma-&gt;exec_list, &amp;eb-&gt;vmas);</span>
+<span class="lineNum">    1186 </span>            : 
+<span class="lineNum">    1187 </span><span class="lineNoCov">          0 :         shadow_batch_obj-&gt;base.pending_read_domains = I915_GEM_DOMAIN_COMMAND;</span>
+<span class="lineNum">    1188 </span>            : 
+<span class="lineNum">    1189 </span><span class="lineNoCov">          0 :         return shadow_batch_obj;</span>
+<span class="lineNum">    1190 </span>            : 
+<span class="lineNum">    1191 </span>            : err:
+<span class="lineNum">    1192 </span><span class="lineNoCov">          0 :         i915_gem_object_unpin_pages(shadow_batch_obj);</span>
+<span class="lineNum">    1193 </span><span class="lineNoCov">          0 :         if (ret == -EACCES) /* unhandled chained batch */</span>
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 :                 return batch_obj;</span>
+<span class="lineNum">    1195 </span>            :         else
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :                 return ERR_PTR(ret);</span>
+<span class="lineNum">    1197 </span><span class="lineNoCov">          0 : }</span>
+<a name="1198"><span class="lineNum">    1198 </span>            : </a>
+<span class="lineNum">    1199 </span>            : int
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 : i915_gem_ringbuffer_submission(struct i915_execbuffer_params *params,</span>
+<span class="lineNum">    1201 </span>            :                                struct drm_i915_gem_execbuffer2 *args,
+<span class="lineNum">    1202 </span>            :                                struct list_head *vmas)
+<span class="lineNum">    1203 </span>            : {
+<span class="lineNum">    1204 </span><span class="lineNoCov">          0 :         struct drm_device *dev = params-&gt;dev;</span>
+<span class="lineNum">    1205 </span><span class="lineNoCov">          0 :         struct intel_engine_cs *ring = params-&gt;ring;</span>
+<span class="lineNum">    1206 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">    1207 </span>            :         u64 exec_start, exec_len;
+<span class="lineNum">    1208 </span>            :         int instp_mode;
+<span class="lineNum">    1209 </span>            :         u32 instp_mask;
+<span class="lineNum">    1210 </span>            :         int ret;
+<span class="lineNum">    1211 </span>            : 
+<span class="lineNum">    1212 </span><span class="lineNoCov">          0 :         ret = i915_gem_execbuffer_move_to_gpu(params-&gt;request, vmas);</span>
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1214 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">    1215 </span>            : 
+<span class="lineNum">    1216 </span><span class="lineNoCov">          0 :         ret = i915_switch_context(params-&gt;request);</span>
+<span class="lineNum">    1217 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1218 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">    1219 </span>            : 
+<span class="lineNum">    1220 </span><span class="lineNoCov">          0 :         WARN(params-&gt;ctx-&gt;ppgtt &amp;&amp; params-&gt;ctx-&gt;ppgtt-&gt;pd_dirty_rings &amp; (1&lt;&lt;ring-&gt;id),</span>
+<span class="lineNum">    1221 </span>            :              &quot;%s didn't clear reload\n&quot;, ring-&gt;name);
+<span class="lineNum">    1222 </span>            : 
+<span class="lineNum">    1223 </span><span class="lineNoCov">          0 :         instp_mode = args-&gt;flags &amp; I915_EXEC_CONSTANTS_MASK;</span>
+<span class="lineNum">    1224 </span>            :         instp_mask = I915_EXEC_CONSTANTS_MASK;
+<span class="lineNum">    1225 </span><span class="lineNoCov">          0 :         switch (instp_mode) {</span>
+<span class="lineNum">    1226 </span>            :         case I915_EXEC_CONSTANTS_REL_GENERAL:
+<span class="lineNum">    1227 </span>            :         case I915_EXEC_CONSTANTS_ABSOLUTE:
+<span class="lineNum">    1228 </span>            :         case I915_EXEC_CONSTANTS_REL_SURFACE:
+<span class="lineNum">    1229 </span><span class="lineNoCov">          0 :                 if (instp_mode != 0 &amp;&amp; ring != &amp;dev_priv-&gt;ring[RCS]) {</span>
+<span class="lineNum">    1230 </span>            :                         DRM_DEBUG(&quot;non-0 rel constants mode on non-RCS\n&quot;);
+<span class="lineNum">    1231 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1232 </span>            :                 }
+<span class="lineNum">    1233 </span>            : 
+<span class="lineNum">    1234 </span><span class="lineNoCov">          0 :                 if (instp_mode != dev_priv-&gt;relative_constants_mode) {</span>
+<span class="lineNum">    1235 </span><span class="lineNoCov">          0 :                         if (INTEL_INFO(dev)-&gt;gen &lt; 4) {</span>
+<span class="lineNum">    1236 </span>            :                                 DRM_DEBUG(&quot;no rel constants on pre-gen4\n&quot;);
+<span class="lineNum">    1237 </span><span class="lineNoCov">          0 :                                 return -EINVAL;</span>
+<span class="lineNum">    1238 </span>            :                         }
+<span class="lineNum">    1239 </span>            : 
+<span class="lineNum">    1240 </span><span class="lineNoCov">          0 :                         if (INTEL_INFO(dev)-&gt;gen &gt; 5 &amp;&amp;</span>
+<span class="lineNum">    1241 </span><span class="lineNoCov">          0 :                             instp_mode == I915_EXEC_CONSTANTS_REL_SURFACE) {</span>
+<span class="lineNum">    1242 </span>            :                                 DRM_DEBUG(&quot;rel surface constants mode invalid on gen5+\n&quot;);
+<span class="lineNum">    1243 </span><span class="lineNoCov">          0 :                                 return -EINVAL;</span>
+<span class="lineNum">    1244 </span>            :                         }
+<span class="lineNum">    1245 </span>            : 
+<span class="lineNum">    1246 </span>            :                         /* The HW changed the meaning on this bit on gen6 */
+<span class="lineNum">    1247 </span><span class="lineNoCov">          0 :                         if (INTEL_INFO(dev)-&gt;gen &gt;= 6)</span>
+<span class="lineNum">    1248 </span><span class="lineNoCov">          0 :                                 instp_mask &amp;= ~I915_EXEC_CONSTANTS_REL_SURFACE;</span>
+<span class="lineNum">    1249 </span>            :                 }
+<span class="lineNum">    1250 </span>            :                 break;
+<span class="lineNum">    1251 </span>            :         default:
+<span class="lineNum">    1252 </span>            :                 DRM_DEBUG(&quot;execbuf with unknown constants: %d\n&quot;, instp_mode);
+<span class="lineNum">    1253 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1254 </span>            :         }
+<span class="lineNum">    1255 </span>            : 
+<span class="lineNum">    1256 </span><span class="lineNoCov">          0 :         if (ring == &amp;dev_priv-&gt;ring[RCS] &amp;&amp;</span>
+<span class="lineNum">    1257 </span><span class="lineNoCov">          0 :             instp_mode != dev_priv-&gt;relative_constants_mode) {</span>
+<span class="lineNum">    1258 </span><span class="lineNoCov">          0 :                 ret = intel_ring_begin(params-&gt;request, 4);</span>
+<span class="lineNum">    1259 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">    1260 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">    1261 </span>            : 
+<span class="lineNum">    1262 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, MI_NOOP);</span>
+<span class="lineNum">    1263 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(1));</span>
+<span class="lineNum">    1264 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, INSTPM);</span>
+<span class="lineNum">    1265 </span><span class="lineNoCov">          0 :                 intel_ring_emit(ring, instp_mask &lt;&lt; 16 | instp_mode);</span>
+<span class="lineNum">    1266 </span><span class="lineNoCov">          0 :                 intel_ring_advance(ring);</span>
+<span class="lineNum">    1267 </span>            : 
+<span class="lineNum">    1268 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;relative_constants_mode = instp_mode;</span>
+<span class="lineNum">    1269 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1270 </span>            : 
+<span class="lineNum">    1271 </span><span class="lineNoCov">          0 :         if (args-&gt;flags &amp; I915_EXEC_GEN7_SOL_RESET) {</span>
+<span class="lineNum">    1272 </span><span class="lineNoCov">          0 :                 ret = i915_reset_gen7_sol_offsets(dev, params-&gt;request);</span>
+<span class="lineNum">    1273 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">    1274 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">    1275 </span>            :         }
+<span class="lineNum">    1276 </span>            : 
+<span class="lineNum">    1277 </span><span class="lineNoCov">          0 :         exec_len   = args-&gt;batch_len;</span>
+<span class="lineNum">    1278 </span><span class="lineNoCov">          0 :         exec_start = params-&gt;batch_obj_vm_offset +</span>
+<span class="lineNum">    1279 </span><span class="lineNoCov">          0 :                      params-&gt;args_batch_start_offset;</span>
+<span class="lineNum">    1280 </span>            : 
+<span class="lineNum">    1281 </span><span class="lineNoCov">          0 :         ret = ring-&gt;dispatch_execbuffer(params-&gt;request,</span>
+<span class="lineNum">    1282 </span>            :                                         exec_start, exec_len,
+<span class="lineNum">    1283 </span><span class="lineNoCov">          0 :                                         params-&gt;dispatch_flags);</span>
+<span class="lineNum">    1284 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1285 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">    1286 </span>            : 
+<span class="lineNum">    1287 </span><span class="lineNoCov">          0 :         trace_i915_gem_ring_dispatch(params-&gt;request, params-&gt;dispatch_flags);</span>
+<span class="lineNum">    1288 </span>            : 
+<span class="lineNum">    1289 </span><span class="lineNoCov">          0 :         i915_gem_execbuffer_move_to_active(vmas, params-&gt;request);</span>
+<span class="lineNum">    1290 </span><span class="lineNoCov">          0 :         i915_gem_execbuffer_retire_commands(params);</span>
+<span class="lineNum">    1291 </span>            : 
+<span class="lineNum">    1292 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1293 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1294 </span>            : 
+<span class="lineNum">    1295 </span>            : /**
+<span class="lineNum">    1296 </span>            :  * Find one BSD ring to dispatch the corresponding BSD command.
+<a name="1297"><span class="lineNum">    1297 </span>            :  * The Ring ID is returned.</a>
+<span class="lineNum">    1298 </span>            :  */
+<span class="lineNum">    1299 </span><span class="lineNoCov">          0 : static int gen8_dispatch_bsd_ring(struct drm_device *dev,</span>
+<span class="lineNum">    1300 </span>            :                                   struct drm_file *file)
+<span class="lineNum">    1301 </span>            : {
+<span class="lineNum">    1302 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">    1303 </span><span class="lineNoCov">          0 :         struct drm_i915_file_private *file_priv = file-&gt;driver_priv;</span>
+<span class="lineNum">    1304 </span>            : 
+<span class="lineNum">    1305 </span>            :         /* Check whether the file_priv is using one ring */
+<span class="lineNum">    1306 </span><span class="lineNoCov">          0 :         if (file_priv-&gt;bsd_ring)</span>
+<span class="lineNum">    1307 </span><span class="lineNoCov">          0 :                 return file_priv-&gt;bsd_ring-&gt;id;</span>
+<span class="lineNum">    1308 </span>            :         else {
+<span class="lineNum">    1309 </span>            :                 /* If no, use the ping-pong mechanism to select one ring */
+<span class="lineNum">    1310 </span>            :                 int ring_id;
+<span class="lineNum">    1311 </span>            : 
+<span class="lineNum">    1312 </span><span class="lineNoCov">          0 :                 mutex_lock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1313 </span><span class="lineNoCov">          0 :                 if (dev_priv-&gt;mm.bsd_ring_dispatch_index == 0) {</span>
+<span class="lineNum">    1314 </span>            :                         ring_id = VCS;
+<span class="lineNum">    1315 </span><span class="lineNoCov">          0 :                         dev_priv-&gt;mm.bsd_ring_dispatch_index = 1;</span>
+<span class="lineNum">    1316 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">    1317 </span>            :                         ring_id = VCS2;
+<span class="lineNum">    1318 </span><span class="lineNoCov">          0 :                         dev_priv-&gt;mm.bsd_ring_dispatch_index = 0;</span>
+<span class="lineNum">    1319 </span>            :                 }
+<span class="lineNum">    1320 </span><span class="lineNoCov">          0 :                 file_priv-&gt;bsd_ring = &amp;dev_priv-&gt;ring[ring_id];</span>
+<span class="lineNum">    1321 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1322 </span>            :                 return ring_id;
+<span class="lineNum">    1323 </span>            :         }
+<span class="lineNum">    1324 </span><span class="lineNoCov">          0 : }</span>
+<a name="1325"><span class="lineNum">    1325 </span>            : </a>
+<span class="lineNum">    1326 </span>            : static struct drm_i915_gem_object *
+<span class="lineNum">    1327 </span><span class="lineNoCov">          0 : eb_get_batch(struct eb_vmas *eb)</span>
+<span class="lineNum">    1328 </span>            : {
+<span class="lineNum">    1329 </span><span class="lineNoCov">          0 :         struct i915_vma *vma = list_entry(eb-&gt;vmas.prev, typeof(*vma), exec_list);</span>
+<span class="lineNum">    1330 </span>            : 
+<span class="lineNum">    1331 </span>            :         /*
+<span class="lineNum">    1332 </span>            :          * SNA is doing fancy tricks with compressing batch buffers, which leads
+<span class="lineNum">    1333 </span>            :          * to negative relocation deltas. Usually that works out ok since the
+<span class="lineNum">    1334 </span>            :          * relocate address is still positive, except when the batch is placed
+<span class="lineNum">    1335 </span>            :          * very low in the GTT. Ensure this doesn't happen.
+<span class="lineNum">    1336 </span>            :          *
+<span class="lineNum">    1337 </span>            :          * Note that actual hangs have only been observed on gen7, but for
+<span class="lineNum">    1338 </span>            :          * paranoia do it everywhere.
+<span class="lineNum">    1339 </span>            :          */
+<span class="lineNum">    1340 </span><span class="lineNoCov">          0 :         vma-&gt;exec_entry-&gt;flags |= __EXEC_OBJECT_NEEDS_BIAS;</span>
+<span class="lineNum">    1341 </span>            : 
+<span class="lineNum">    1342 </span><span class="lineNoCov">          0 :         return vma-&gt;obj;</span>
+<span class="lineNum">    1343 </span>            : }
+<a name="1344"><span class="lineNum">    1344 </span>            : </a>
+<span class="lineNum">    1345 </span>            : static int
+<span class="lineNum">    1346 </span><span class="lineNoCov">          0 : i915_gem_do_execbuffer(struct drm_device *dev, void *data,</span>
+<span class="lineNum">    1347 </span>            :                        struct drm_file *file,
+<span class="lineNum">    1348 </span>            :                        struct drm_i915_gem_execbuffer2 *args,
+<span class="lineNum">    1349 </span>            :                        struct drm_i915_gem_exec_object2 *exec)
+<span class="lineNum">    1350 </span>            : {
+<span class="lineNum">    1351 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">    1352 </span>            :         struct eb_vmas *eb;
+<span class="lineNum">    1353 </span>            :         struct drm_i915_gem_object *batch_obj;
+<span class="lineNum">    1354 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_exec_object2 shadow_exec_entry;</span>
+<span class="lineNum">    1355 </span>            :         struct intel_engine_cs *ring;
+<span class="lineNum">    1356 </span>            :         struct intel_context *ctx;
+<span class="lineNum">    1357 </span>            :         struct i915_address_space *vm;
+<span class="lineNum">    1358 </span><span class="lineNoCov">          0 :         struct i915_execbuffer_params params_master; /* XXX: will be removed later */</span>
+<span class="lineNum">    1359 </span>            :         struct i915_execbuffer_params *params = &amp;params_master;
+<span class="lineNum">    1360 </span><span class="lineNoCov">          0 :         const u32 ctx_id = i915_execbuffer2_get_context_id(*args);</span>
+<span class="lineNum">    1361 </span>            :         u32 dispatch_flags;
+<span class="lineNum">    1362 </span>            :         int ret;
+<span class="lineNum">    1363 </span><span class="lineNoCov">          0 :         bool need_relocs;</span>
+<span class="lineNum">    1364 </span>            : 
+<span class="lineNum">    1365 </span><span class="lineNoCov">          0 :         if (!i915_gem_check_execbuffer(args))</span>
+<span class="lineNum">    1366 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1367 </span>            : 
+<span class="lineNum">    1368 </span><span class="lineNoCov">          0 :         ret = validate_exec_list(dev, exec, args-&gt;buffer_count);</span>
+<span class="lineNum">    1369 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1370 </span><span class="lineNoCov">          0 :                 return ret;</span>
+<span class="lineNum">    1371 </span>            : 
+<span class="lineNum">    1372 </span>            :         dispatch_flags = 0;
+<span class="lineNum">    1373 </span><span class="lineNoCov">          0 :         if (args-&gt;flags &amp; I915_EXEC_SECURE) {</span>
+<span class="lineNum">    1374 </span><span class="lineNoCov">          0 :                 if (!file-&gt;is_master || !capable(CAP_SYS_ADMIN))</span>
+<span class="lineNum">    1375 </span><span class="lineNoCov">          0 :                     return -EPERM;</span>
+<span class="lineNum">    1376 </span>            : 
+<span class="lineNum">    1377 </span>            :                 dispatch_flags |= I915_DISPATCH_SECURE;
+<span class="lineNum">    1378 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1379 </span><span class="lineNoCov">          0 :         if (args-&gt;flags &amp; I915_EXEC_IS_PINNED)</span>
+<span class="lineNum">    1380 </span><span class="lineNoCov">          0 :                 dispatch_flags |= I915_DISPATCH_PINNED;</span>
+<span class="lineNum">    1381 </span>            : 
+<span class="lineNum">    1382 </span><span class="lineNoCov">          0 :         if ((args-&gt;flags &amp; I915_EXEC_RING_MASK) &gt; LAST_USER_RING) {</span>
+<span class="lineNum">    1383 </span>            :                 DRM_DEBUG(&quot;execbuf with unknown ring: %d\n&quot;,
+<span class="lineNum">    1384 </span>            :                           (int)(args-&gt;flags &amp; I915_EXEC_RING_MASK));
+<span class="lineNum">    1385 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1386 </span>            :         }
+<span class="lineNum">    1387 </span>            : 
+<span class="lineNum">    1388 </span><span class="lineNoCov">          0 :         if (((args-&gt;flags &amp; I915_EXEC_RING_MASK) != I915_EXEC_BSD) &amp;&amp;</span>
+<span class="lineNum">    1389 </span><span class="lineNoCov">          0 :             ((args-&gt;flags &amp; I915_EXEC_BSD_MASK) != 0)) {</span>
+<span class="lineNum">    1390 </span>            :                 DRM_DEBUG(&quot;execbuf with non bsd ring but with invalid &quot;
+<span class="lineNum">    1391 </span>            :                         &quot;bsd dispatch flags: %d\n&quot;, (int)(args-&gt;flags));
+<span class="lineNum">    1392 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1393 </span>            :         } 
+<span class="lineNum">    1394 </span>            : 
+<span class="lineNum">    1395 </span><span class="lineNoCov">          0 :         if ((args-&gt;flags &amp; I915_EXEC_RING_MASK) == I915_EXEC_DEFAULT)</span>
+<span class="lineNum">    1396 </span><span class="lineNoCov">          0 :                 ring = &amp;dev_priv-&gt;ring[RCS];</span>
+<span class="lineNum">    1397 </span><span class="lineNoCov">          0 :         else if ((args-&gt;flags &amp; I915_EXEC_RING_MASK) == I915_EXEC_BSD) {</span>
+<span class="lineNum">    1398 </span><span class="lineNoCov">          0 :                 if (HAS_BSD2(dev)) {</span>
+<span class="lineNum">    1399 </span>            :                         int ring_id;
+<span class="lineNum">    1400 </span>            : 
+<span class="lineNum">    1401 </span><span class="lineNoCov">          0 :                         switch (args-&gt;flags &amp; I915_EXEC_BSD_MASK) {</span>
+<span class="lineNum">    1402 </span>            :                         case I915_EXEC_BSD_DEFAULT:
+<span class="lineNum">    1403 </span><span class="lineNoCov">          0 :                                 ring_id = gen8_dispatch_bsd_ring(dev, file);</span>
+<span class="lineNum">    1404 </span><span class="lineNoCov">          0 :                                 ring = &amp;dev_priv-&gt;ring[ring_id];</span>
+<span class="lineNum">    1405 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">    1406 </span>            :                         case I915_EXEC_BSD_RING1:
+<span class="lineNum">    1407 </span><span class="lineNoCov">          0 :                                 ring = &amp;dev_priv-&gt;ring[VCS];</span>
+<span class="lineNum">    1408 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">    1409 </span>            :                         case I915_EXEC_BSD_RING2:
+<span class="lineNum">    1410 </span><span class="lineNoCov">          0 :                                 ring = &amp;dev_priv-&gt;ring[VCS2];</span>
+<span class="lineNum">    1411 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">    1412 </span>            :                         default:
+<span class="lineNum">    1413 </span>            :                                 DRM_DEBUG(&quot;execbuf with unknown bsd ring: %d\n&quot;,
+<span class="lineNum">    1414 </span>            :                                           (int)(args-&gt;flags &amp; I915_EXEC_BSD_MASK));
+<span class="lineNum">    1415 </span><span class="lineNoCov">          0 :                                 return -EINVAL;</span>
+<span class="lineNum">    1416 </span>            :                         }
+<span class="lineNum">    1417 </span><span class="lineNoCov">          0 :                 } else</span>
+<span class="lineNum">    1418 </span><span class="lineNoCov">          0 :                         ring = &amp;dev_priv-&gt;ring[VCS];</span>
+<span class="lineNum">    1419 </span>            :         } else
+<span class="lineNum">    1420 </span><span class="lineNoCov">          0 :                 ring = &amp;dev_priv-&gt;ring[(args-&gt;flags &amp; I915_EXEC_RING_MASK) - 1];</span>
+<span class="lineNum">    1421 </span>            : 
+<span class="lineNum">    1422 </span><span class="lineNoCov">          0 :         if (!intel_ring_initialized(ring)) {</span>
+<span class="lineNum">    1423 </span>            :                 DRM_DEBUG(&quot;execbuf with invalid ring: %d\n&quot;,
+<span class="lineNum">    1424 </span>            :                           (int)(args-&gt;flags &amp; I915_EXEC_RING_MASK));
+<span class="lineNum">    1425 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1426 </span>            :         }
+<span class="lineNum">    1427 </span>            : 
+<span class="lineNum">    1428 </span><span class="lineNoCov">          0 :         if (args-&gt;buffer_count &lt; 1) {</span>
+<span class="lineNum">    1429 </span>            :                 DRM_DEBUG(&quot;execbuf with %d buffers\n&quot;, args-&gt;buffer_count);
+<span class="lineNum">    1430 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1431 </span>            :         }
+<span class="lineNum">    1432 </span>            : 
+<span class="lineNum">    1433 </span><span class="lineNoCov">          0 :         if (args-&gt;flags &amp; I915_EXEC_RESOURCE_STREAMER) {</span>
+<span class="lineNum">    1434 </span><span class="lineNoCov">          0 :                 if (!HAS_RESOURCE_STREAMER(dev)) {</span>
+<span class="lineNum">    1435 </span>            :                         DRM_DEBUG(&quot;RS is only allowed for Haswell, Gen8 and above\n&quot;);
+<span class="lineNum">    1436 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1437 </span>            :                 }
+<span class="lineNum">    1438 </span><span class="lineNoCov">          0 :                 if (ring-&gt;id != RCS) {</span>
+<span class="lineNum">    1439 </span>            :                         DRM_DEBUG(&quot;RS is not available on %s\n&quot;,
+<span class="lineNum">    1440 </span>            :                                  ring-&gt;name);
+<span class="lineNum">    1441 </span><span class="lineNoCov">          0 :                         return -EINVAL;</span>
+<span class="lineNum">    1442 </span>            :                 }
+<span class="lineNum">    1443 </span>            : 
+<span class="lineNum">    1444 </span><span class="lineNoCov">          0 :                 dispatch_flags |= I915_DISPATCH_RS;</span>
+<span class="lineNum">    1445 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1446 </span>            : 
+<span class="lineNum">    1447 </span><span class="lineNoCov">          0 :         intel_runtime_pm_get(dev_priv);</span>
+<span class="lineNum">    1448 </span>            : 
+<span class="lineNum">    1449 </span><span class="lineNoCov">          0 :         ret = i915_mutex_lock_interruptible(dev);</span>
+<span class="lineNum">    1450 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1451 </span>            :                 goto pre_mutex_err;
+<span class="lineNum">    1452 </span>            : 
+<span class="lineNum">    1453 </span><span class="lineNoCov">          0 :         ctx = i915_gem_validate_context(dev, file, ring, ctx_id);</span>
+<span class="lineNum">    1454 </span><span class="lineNoCov">          0 :         if (IS_ERR(ctx)) {</span>
+<span class="lineNum">    1455 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1456 </span><span class="lineNoCov">          0 :                 ret = PTR_ERR(ctx);</span>
+<span class="lineNum">    1457 </span><span class="lineNoCov">          0 :                 goto pre_mutex_err;</span>
+<span class="lineNum">    1458 </span>            :         }
+<span class="lineNum">    1459 </span>            : 
+<span class="lineNum">    1460 </span><span class="lineNoCov">          0 :         i915_gem_context_reference(ctx);</span>
+<span class="lineNum">    1461 </span>            : 
+<span class="lineNum">    1462 </span><span class="lineNoCov">          0 :         if (ctx-&gt;ppgtt)</span>
+<span class="lineNum">    1463 </span><span class="lineNoCov">          0 :                 vm = &amp;ctx-&gt;ppgtt-&gt;base;</span>
+<span class="lineNum">    1464 </span>            :         else
+<span class="lineNum">    1465 </span><span class="lineNoCov">          0 :                 vm = &amp;dev_priv-&gt;gtt.base;</span>
+<span class="lineNum">    1466 </span>            : 
+<span class="lineNum">    1467 </span><span class="lineNoCov">          0 :         memset(&amp;params_master, 0x00, sizeof(params_master));</span>
+<span class="lineNum">    1468 </span>            : 
+<span class="lineNum">    1469 </span><span class="lineNoCov">          0 :         eb = eb_create(args);</span>
+<span class="lineNum">    1470 </span><span class="lineNoCov">          0 :         if (eb == NULL) {</span>
+<span class="lineNum">    1471 </span><span class="lineNoCov">          0 :                 i915_gem_context_unreference(ctx);</span>
+<span class="lineNum">    1472 </span><span class="lineNoCov">          0 :                 mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1473 </span>            :                 ret = -ENOMEM;
+<span class="lineNum">    1474 </span><span class="lineNoCov">          0 :                 goto pre_mutex_err;</span>
+<span class="lineNum">    1475 </span>            :         }
+<span class="lineNum">    1476 </span>            : 
+<span class="lineNum">    1477 </span>            :         /* Look up object handles */
+<span class="lineNum">    1478 </span><span class="lineNoCov">          0 :         ret = eb_lookup_vmas(eb, exec, args, vm, file);</span>
+<span class="lineNum">    1479 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1480 </span>            :                 goto err;
+<span class="lineNum">    1481 </span>            : 
+<span class="lineNum">    1482 </span>            :         /* take note of the batch buffer before we might reorder the lists */
+<span class="lineNum">    1483 </span><span class="lineNoCov">          0 :         batch_obj = eb_get_batch(eb);</span>
+<span class="lineNum">    1484 </span>            : 
+<span class="lineNum">    1485 </span>            :         /* Move the objects en-masse into the GTT, evicting if necessary. */
+<span class="lineNum">    1486 </span><span class="lineNoCov">          0 :         need_relocs = (args-&gt;flags &amp; I915_EXEC_NO_RELOC) == 0;</span>
+<span class="lineNum">    1487 </span><span class="lineNoCov">          0 :         ret = i915_gem_execbuffer_reserve(ring, &amp;eb-&gt;vmas, ctx, &amp;need_relocs);</span>
+<span class="lineNum">    1488 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1489 </span>            :                 goto err;
+<span class="lineNum">    1490 </span>            : 
+<span class="lineNum">    1491 </span>            :         /* The objects are in their final locations, apply the relocations. */
+<span class="lineNum">    1492 </span><span class="lineNoCov">          0 :         if (need_relocs)</span>
+<span class="lineNum">    1493 </span><span class="lineNoCov">          0 :                 ret = i915_gem_execbuffer_relocate(eb);</span>
+<span class="lineNum">    1494 </span><span class="lineNoCov">          0 :         if (ret) {</span>
+<span class="lineNum">    1495 </span><span class="lineNoCov">          0 :                 if (ret == -EFAULT) {</span>
+<span class="lineNum">    1496 </span><span class="lineNoCov">          0 :                         ret = i915_gem_execbuffer_relocate_slow(dev, args, file, ring,</span>
+<span class="lineNum">    1497 </span>            :                                                                 eb, exec, ctx);
+<span class="lineNum">    1498 </span><span class="lineNoCov">          0 :                         BUG_ON(!mutex_is_locked(&amp;dev-&gt;struct_mutex));</span>
+<span class="lineNum">    1499 </span>            :                 }
+<span class="lineNum">    1500 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">    1501 </span>            :                         goto err;
+<span class="lineNum">    1502 </span>            :         }
+<span class="lineNum">    1503 </span>            : 
+<span class="lineNum">    1504 </span>            :         /* Set the pending read domains for the batch buffer to COMMAND */
+<span class="lineNum">    1505 </span><span class="lineNoCov">          0 :         if (batch_obj-&gt;base.pending_write_domain) {</span>
+<span class="lineNum">    1506 </span>            :                 DRM_DEBUG(&quot;Attempting to use self-modifying batch buffer\n&quot;);
+<span class="lineNum">    1507 </span>            :                 ret = -EINVAL;
+<span class="lineNum">    1508 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">    1509 </span>            :         }
+<span class="lineNum">    1510 </span>            : 
+<span class="lineNum">    1511 </span><span class="lineNoCov">          0 :         params-&gt;args_batch_start_offset = args-&gt;batch_start_offset;</span>
+<span class="lineNum">    1512 </span><span class="lineNoCov">          0 :         if (i915_needs_cmd_parser(ring) &amp;&amp; args-&gt;batch_len) {</span>
+<span class="lineNum">    1513 </span>            :                 struct drm_i915_gem_object *parsed_batch_obj;
+<span class="lineNum">    1514 </span>            : 
+<span class="lineNum">    1515 </span><span class="lineNoCov">          0 :                 parsed_batch_obj = i915_gem_execbuffer_parse(ring,</span>
+<span class="lineNum">    1516 </span>            :                                                       &amp;shadow_exec_entry,
+<span class="lineNum">    1517 </span>            :                                                       eb,
+<span class="lineNum">    1518 </span>            :                                                       batch_obj,
+<span class="lineNum">    1519 </span><span class="lineNoCov">          0 :                                                       args-&gt;batch_start_offset,</span>
+<span class="lineNum">    1520 </span>            :                                                       args-&gt;batch_len,
+<span class="lineNum">    1521 </span><span class="lineNoCov">          0 :                                                       file-&gt;is_master);</span>
+<span class="lineNum">    1522 </span><span class="lineNoCov">          0 :                 if (IS_ERR(parsed_batch_obj)) {</span>
+<span class="lineNum">    1523 </span><span class="lineNoCov">          0 :                         ret = PTR_ERR(parsed_batch_obj);</span>
+<span class="lineNum">    1524 </span><span class="lineNoCov">          0 :                         goto err;</span>
+<span class="lineNum">    1525 </span>            :                 }
+<span class="lineNum">    1526 </span>            : 
+<span class="lineNum">    1527 </span>            :                 /*
+<span class="lineNum">    1528 </span>            :                  * parsed_batch_obj == batch_obj means batch not fully parsed:
+<span class="lineNum">    1529 </span>            :                  * Accept, but don't promote to secure.
+<span class="lineNum">    1530 </span>            :                  */
+<span class="lineNum">    1531 </span>            : 
+<span class="lineNum">    1532 </span><span class="lineNoCov">          0 :                 if (parsed_batch_obj != batch_obj) {</span>
+<span class="lineNum">    1533 </span>            :                         /*
+<span class="lineNum">    1534 </span>            :                          * Batch parsed and accepted:
+<span class="lineNum">    1535 </span>            :                          *
+<span class="lineNum">    1536 </span>            :                          * Set the DISPATCH_SECURE bit to remove the NON_SECURE
+<span class="lineNum">    1537 </span>            :                          * bit from MI_BATCH_BUFFER_START commands issued in
+<span class="lineNum">    1538 </span>            :                          * the dispatch_execbuffer implementations. We
+<span class="lineNum">    1539 </span>            :                          * specifically don't want that set on batches the
+<span class="lineNum">    1540 </span>            :                          * command parser has accepted.
+<span class="lineNum">    1541 </span>            :                          */
+<span class="lineNum">    1542 </span><span class="lineNoCov">          0 :                         dispatch_flags |= I915_DISPATCH_SECURE;</span>
+<span class="lineNum">    1543 </span><span class="lineNoCov">          0 :                         params-&gt;args_batch_start_offset = 0;</span>
+<span class="lineNum">    1544 </span>            :                         batch_obj = parsed_batch_obj;
+<span class="lineNum">    1545 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1546 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1547 </span>            : 
+<span class="lineNum">    1548 </span><span class="lineNoCov">          0 :         batch_obj-&gt;base.pending_read_domains |= I915_GEM_DOMAIN_COMMAND;</span>
+<span class="lineNum">    1549 </span>            : 
+<span class="lineNum">    1550 </span>            :         /* snb/ivb/vlv conflate the &quot;batch in ppgtt&quot; bit with the &quot;non-secure
+<span class="lineNum">    1551 </span>            :          * batch&quot; bit. Hence we need to pin secure batches into the global gtt.
+<span class="lineNum">    1552 </span>            :          * hsw should have this fixed, but bdw mucks it up again. */
+<span class="lineNum">    1553 </span><span class="lineNoCov">          0 :         if (dispatch_flags &amp; I915_DISPATCH_SECURE) {</span>
+<span class="lineNum">    1554 </span>            :                 /*
+<span class="lineNum">    1555 </span>            :                  * So on first glance it looks freaky that we pin the batch here
+<span class="lineNum">    1556 </span>            :                  * outside of the reservation loop. But:
+<span class="lineNum">    1557 </span>            :                  * - The batch is already pinned into the relevant ppgtt, so we
+<span class="lineNum">    1558 </span>            :                  *   already have the backing storage fully allocated.
+<span class="lineNum">    1559 </span>            :                  * - No other BO uses the global gtt (well contexts, but meh),
+<span class="lineNum">    1560 </span>            :                  *   so we don't really have issues with multiple objects not
+<span class="lineNum">    1561 </span>            :                  *   fitting due to fragmentation.
+<span class="lineNum">    1562 </span>            :                  * So this is actually safe.
+<span class="lineNum">    1563 </span>            :                  */
+<span class="lineNum">    1564 </span><span class="lineNoCov">          0 :                 ret = i915_gem_obj_ggtt_pin(batch_obj, 0, 0);</span>
+<span class="lineNum">    1565 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">    1566 </span>            :                         goto err;
+<span class="lineNum">    1567 </span>            : 
+<span class="lineNum">    1568 </span><span class="lineNoCov">          0 :                 params-&gt;batch_obj_vm_offset = i915_gem_obj_ggtt_offset(batch_obj);</span>
+<span class="lineNum">    1569 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">    1570 </span><span class="lineNoCov">          0 :                 params-&gt;batch_obj_vm_offset = i915_gem_obj_offset(batch_obj, vm);</span>
+<span class="lineNum">    1571 </span>            : 
+<span class="lineNum">    1572 </span>            :         /* Allocate a request for this batch buffer nice and early. */
+<span class="lineNum">    1573 </span><span class="lineNoCov">          0 :         ret = i915_gem_request_alloc(ring, ctx, &amp;params-&gt;request);</span>
+<span class="lineNum">    1574 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1575 </span>            :                 goto err_batch_unpin;
+<span class="lineNum">    1576 </span>            : 
+<span class="lineNum">    1577 </span><span class="lineNoCov">          0 :         ret = i915_gem_request_add_to_client(params-&gt;request, file);</span>
+<span class="lineNum">    1578 </span><span class="lineNoCov">          0 :         if (ret)</span>
+<span class="lineNum">    1579 </span>            :                 goto err_batch_unpin;
+<span class="lineNum">    1580 </span>            : 
+<span class="lineNum">    1581 </span>            :         /*
+<span class="lineNum">    1582 </span>            :          * Save assorted stuff away to pass through to *_submission().
+<span class="lineNum">    1583 </span>            :          * NB: This data should be 'persistent' and not local as it will
+<span class="lineNum">    1584 </span>            :          * kept around beyond the duration of the IOCTL once the GPU
+<span class="lineNum">    1585 </span>            :          * scheduler arrives.
+<span class="lineNum">    1586 </span>            :          */
+<span class="lineNum">    1587 </span><span class="lineNoCov">          0 :         params-&gt;dev                     = dev;</span>
+<span class="lineNum">    1588 </span><span class="lineNoCov">          0 :         params-&gt;file                    = file;</span>
+<span class="lineNum">    1589 </span><span class="lineNoCov">          0 :         params-&gt;ring                    = ring;</span>
+<span class="lineNum">    1590 </span><span class="lineNoCov">          0 :         params-&gt;dispatch_flags          = dispatch_flags;</span>
+<span class="lineNum">    1591 </span><span class="lineNoCov">          0 :         params-&gt;batch_obj               = batch_obj;</span>
+<span class="lineNum">    1592 </span><span class="lineNoCov">          0 :         params-&gt;ctx                     = ctx;</span>
+<span class="lineNum">    1593 </span>            : 
+<span class="lineNum">    1594 </span><span class="lineNoCov">          0 :         ret = dev_priv-&gt;gt.execbuf_submit(params, args, &amp;eb-&gt;vmas);</span>
+<span class="lineNum">    1595 </span>            : 
+<span class="lineNum">    1596 </span>            : err_batch_unpin:
+<span class="lineNum">    1597 </span>            :         /*
+<span class="lineNum">    1598 </span>            :          * FIXME: We crucially rely upon the active tracking for the (ppgtt)
+<span class="lineNum">    1599 </span>            :          * batch vma for correctness. For less ugly and less fragility this
+<span class="lineNum">    1600 </span>            :          * needs to be adjusted to also track the ggtt batch vma properly as
+<span class="lineNum">    1601 </span>            :          * active.
+<span class="lineNum">    1602 </span>            :          */
+<span class="lineNum">    1603 </span><span class="lineNoCov">          0 :         if (dispatch_flags &amp; I915_DISPATCH_SECURE)</span>
+<span class="lineNum">    1604 </span><span class="lineNoCov">          0 :                 i915_gem_object_ggtt_unpin(batch_obj);</span>
+<span class="lineNum">    1605 </span>            : 
+<span class="lineNum">    1606 </span>            : err:
+<span class="lineNum">    1607 </span>            :         /* the request owns the ref now */
+<span class="lineNum">    1608 </span><span class="lineNoCov">          0 :         i915_gem_context_unreference(ctx);</span>
+<span class="lineNum">    1609 </span><span class="lineNoCov">          0 :         eb_destroy(eb);</span>
+<span class="lineNum">    1610 </span>            : 
+<span class="lineNum">    1611 </span>            :         /*
+<span class="lineNum">    1612 </span>            :          * If the request was created but not successfully submitted then it
+<span class="lineNum">    1613 </span>            :          * must be freed again. If it was submitted then it is being tracked
+<span class="lineNum">    1614 </span>            :          * on the active request list and no clean up is required here.
+<span class="lineNum">    1615 </span>            :          */
+<span class="lineNum">    1616 </span><span class="lineNoCov">          0 :         if (ret &amp;&amp; params-&gt;request)</span>
+<span class="lineNum">    1617 </span><span class="lineNoCov">          0 :                 i915_gem_request_cancel(params-&gt;request);</span>
+<span class="lineNum">    1618 </span>            : 
+<span class="lineNum">    1619 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev-&gt;struct_mutex);</span>
+<span class="lineNum">    1620 </span>            : 
+<span class="lineNum">    1621 </span>            : pre_mutex_err:
+<span class="lineNum">    1622 </span>            :         /* intel_gpu_busy should also get a ref, so it will free when the device
+<span class="lineNum">    1623 </span>            :          * is really idle. */
+<span class="lineNum">    1624 </span><span class="lineNoCov">          0 :         intel_runtime_pm_put(dev_priv);</span>
+<span class="lineNum">    1625 </span><span class="lineNoCov">          0 :         return ret;</span>
+<span class="lineNum">    1626 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1627 </span>            : 
+<span class="lineNum">    1628 </span>            : #ifdef __linux__
+<span class="lineNum">    1629 </span>            : /*
+<span class="lineNum">    1630 </span>            :  * Legacy execbuffer just creates an exec2 list from the original exec object
+<span class="lineNum">    1631 </span>            :  * list array and passes it to the real function.
+<span class="lineNum">    1632 </span>            :  */
+<span class="lineNum">    1633 </span>            : int
+<span class="lineNum">    1634 </span>            : i915_gem_execbuffer(struct drm_device *dev, void *data,
+<span class="lineNum">    1635 </span>            :                     struct drm_file *file)
+<span class="lineNum">    1636 </span>            : {
+<span class="lineNum">    1637 </span>            :         struct drm_i915_gem_execbuffer *args = data;
+<span class="lineNum">    1638 </span>            :         struct drm_i915_gem_execbuffer2 exec2;
+<span class="lineNum">    1639 </span>            :         struct drm_i915_gem_exec_object *exec_list = NULL;
+<span class="lineNum">    1640 </span>            :         struct drm_i915_gem_exec_object2 *exec2_list = NULL;
+<span class="lineNum">    1641 </span>            :         int ret, i;
+<span class="lineNum">    1642 </span>            : 
+<span class="lineNum">    1643 </span>            :         if (args-&gt;buffer_count &lt; 1) {
+<span class="lineNum">    1644 </span>            :                 DRM_DEBUG(&quot;execbuf with %d buffers\n&quot;, args-&gt;buffer_count);
+<span class="lineNum">    1645 </span>            :                 return -EINVAL;
+<span class="lineNum">    1646 </span>            :         }
+<span class="lineNum">    1647 </span>            : 
+<span class="lineNum">    1648 </span>            :         /* Copy in the exec list from userland */
+<span class="lineNum">    1649 </span>            :         exec_list = drm_malloc_ab(sizeof(*exec_list), args-&gt;buffer_count);
+<span class="lineNum">    1650 </span>            :         exec2_list = drm_malloc_ab(sizeof(*exec2_list), args-&gt;buffer_count);
+<span class="lineNum">    1651 </span>            :         if (exec_list == NULL || exec2_list == NULL) {
+<span class="lineNum">    1652 </span>            :                 DRM_DEBUG(&quot;Failed to allocate exec list for %d buffers\n&quot;,
+<span class="lineNum">    1653 </span>            :                           args-&gt;buffer_count);
+<span class="lineNum">    1654 </span>            :                 drm_free_large(exec_list);
+<span class="lineNum">    1655 </span>            :                 drm_free_large(exec2_list);
+<span class="lineNum">    1656 </span>            :                 return -ENOMEM;
+<span class="lineNum">    1657 </span>            :         }
+<span class="lineNum">    1658 </span>            :         ret = copy_from_user(exec_list,
+<span class="lineNum">    1659 </span>            :                              to_user_ptr(args-&gt;buffers_ptr),
+<span class="lineNum">    1660 </span>            :                              sizeof(*exec_list) * args-&gt;buffer_count);
+<span class="lineNum">    1661 </span>            :         if (ret != 0) {
+<span class="lineNum">    1662 </span>            :                 DRM_DEBUG(&quot;copy %d exec entries failed %d\n&quot;,
+<span class="lineNum">    1663 </span>            :                           args-&gt;buffer_count, ret);
+<span class="lineNum">    1664 </span>            :                 drm_free_large(exec_list);
+<span class="lineNum">    1665 </span>            :                 drm_free_large(exec2_list);
+<span class="lineNum">    1666 </span>            :                 return -EFAULT;
+<span class="lineNum">    1667 </span>            :         }
+<span class="lineNum">    1668 </span>            : 
+<span class="lineNum">    1669 </span>            :         for (i = 0; i &lt; args-&gt;buffer_count; i++) {
+<span class="lineNum">    1670 </span>            :                 exec2_list[i].handle = exec_list[i].handle;
+<span class="lineNum">    1671 </span>            :                 exec2_list[i].relocation_count = exec_list[i].relocation_count;
+<span class="lineNum">    1672 </span>            :                 exec2_list[i].relocs_ptr = exec_list[i].relocs_ptr;
+<span class="lineNum">    1673 </span>            :                 exec2_list[i].alignment = exec_list[i].alignment;
+<span class="lineNum">    1674 </span>            :                 exec2_list[i].offset = exec_list[i].offset;
+<span class="lineNum">    1675 </span>            :                 if (INTEL_INFO(dev)-&gt;gen &lt; 4)
+<span class="lineNum">    1676 </span>            :                         exec2_list[i].flags = EXEC_OBJECT_NEEDS_FENCE;
+<span class="lineNum">    1677 </span>            :                 else
+<span class="lineNum">    1678 </span>            :                         exec2_list[i].flags = 0;
+<span class="lineNum">    1679 </span>            :         }
+<span class="lineNum">    1680 </span>            : 
+<span class="lineNum">    1681 </span>            :         exec2.buffers_ptr = args-&gt;buffers_ptr;
+<span class="lineNum">    1682 </span>            :         exec2.buffer_count = args-&gt;buffer_count;
+<span class="lineNum">    1683 </span>            :         exec2.batch_start_offset = args-&gt;batch_start_offset;
+<span class="lineNum">    1684 </span>            :         exec2.batch_len = args-&gt;batch_len;
+<span class="lineNum">    1685 </span>            :         exec2.DR1 = args-&gt;DR1;
+<span class="lineNum">    1686 </span>            :         exec2.DR4 = args-&gt;DR4;
+<span class="lineNum">    1687 </span>            :         exec2.num_cliprects = args-&gt;num_cliprects;
+<span class="lineNum">    1688 </span>            :         exec2.cliprects_ptr = args-&gt;cliprects_ptr;
+<span class="lineNum">    1689 </span>            :         exec2.flags = I915_EXEC_RENDER;
+<span class="lineNum">    1690 </span>            :         i915_execbuffer2_set_context_id(exec2, 0);
+<span class="lineNum">    1691 </span>            : 
+<span class="lineNum">    1692 </span>            :         ret = i915_gem_do_execbuffer(dev, data, file, &amp;exec2, exec2_list);
+<span class="lineNum">    1693 </span>            :         if (!ret) {
+<span class="lineNum">    1694 </span>            :                 struct drm_i915_gem_exec_object __user *user_exec_list =
+<span class="lineNum">    1695 </span>            :                         to_user_ptr(args-&gt;buffers_ptr);
+<span class="lineNum">    1696 </span>            : 
+<span class="lineNum">    1697 </span>            :                 /* Copy the new buffer offsets back to the user's exec list. */
+<span class="lineNum">    1698 </span>            :                 for (i = 0; i &lt; args-&gt;buffer_count; i++) {
+<span class="lineNum">    1699 </span>            :                         ret = __copy_to_user(&amp;user_exec_list[i].offset,
+<span class="lineNum">    1700 </span>            :                                              &amp;exec2_list[i].offset,
+<span class="lineNum">    1701 </span>            :                                              sizeof(user_exec_list[i].offset));
+<span class="lineNum">    1702 </span>            :                         if (ret) {
+<span class="lineNum">    1703 </span>            :                                 ret = -EFAULT;
+<span class="lineNum">    1704 </span>            :                                 DRM_DEBUG(&quot;failed to copy %d exec entries &quot;
+<span class="lineNum">    1705 </span>            :                                           &quot;back to user (%d)\n&quot;,
+<span class="lineNum">    1706 </span>            :                                           args-&gt;buffer_count, ret);
+<span class="lineNum">    1707 </span>            :                                 break;
+<span class="lineNum">    1708 </span>            :                         }
+<span class="lineNum">    1709 </span>            :                 }
+<span class="lineNum">    1710 </span>            :         }
+<span class="lineNum">    1711 </span>            : 
+<span class="lineNum">    1712 </span>            :         drm_free_large(exec_list);
+<span class="lineNum">    1713 </span>            :         drm_free_large(exec2_list);
+<span class="lineNum">    1714 </span>            :         return ret;
+<span class="lineNum">    1715 </span>            : }
+<span class="lineNum">    1716 </span>            : #endif /* __linux__ */
+<a name="1717"><span class="lineNum">    1717 </span>            : </a>
+<span class="lineNum">    1718 </span>            : int
+<span class="lineNum">    1719 </span><span class="lineNoCov">          0 : i915_gem_execbuffer2(struct drm_device *dev, void *data,</span>
+<span class="lineNum">    1720 </span>            :                      struct drm_file *file)
+<span class="lineNum">    1721 </span>            : {
+<span class="lineNum">    1722 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_execbuffer2 *args = data;</span>
+<span class="lineNum">    1723 </span>            :         struct drm_i915_gem_exec_object2 *exec2_list = NULL;
+<span class="lineNum">    1724 </span>            :         int ret;
+<span class="lineNum">    1725 </span>            : 
+<span class="lineNum">    1726 </span><span class="lineNoCov">          0 :         if (args-&gt;buffer_count &lt; 1 ||</span>
+<span class="lineNum">    1727 </span><span class="lineNoCov">          0 :             args-&gt;buffer_count &gt; UINT_MAX / sizeof(*exec2_list)) {</span>
+<span class="lineNum">    1728 </span>            :                 DRM_DEBUG(&quot;execbuf2 with %d buffers\n&quot;, args-&gt;buffer_count);
+<span class="lineNum">    1729 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1730 </span>            :         }
+<span class="lineNum">    1731 </span>            : 
+<span class="lineNum">    1732 </span><span class="lineNoCov">          0 :         if (args-&gt;rsvd2 != 0) {</span>
+<span class="lineNum">    1733 </span>            :                 DRM_DEBUG(&quot;dirty rvsd2 field\n&quot;);
+<span class="lineNum">    1734 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">    1735 </span>            :         }
+<span class="lineNum">    1736 </span>            : 
+<span class="lineNum">    1737 </span><span class="lineNoCov">          0 :         exec2_list = kmalloc(sizeof(*exec2_list)*args-&gt;buffer_count,</span>
+<span class="lineNum">    1738 </span>            :                              GFP_TEMPORARY | __GFP_NOWARN | __GFP_NORETRY);
+<span class="lineNum">    1739 </span><span class="lineNoCov">          0 :         if (exec2_list == NULL)</span>
+<span class="lineNum">    1740 </span><span class="lineNoCov">          0 :                 exec2_list = drm_malloc_ab(sizeof(*exec2_list),</span>
+<span class="lineNum">    1741 </span><span class="lineNoCov">          0 :                                            args-&gt;buffer_count);</span>
+<span class="lineNum">    1742 </span><span class="lineNoCov">          0 :         if (exec2_list == NULL) {</span>
+<span class="lineNum">    1743 </span>            :                 DRM_DEBUG(&quot;Failed to allocate exec list for %d buffers\n&quot;,
+<span class="lineNum">    1744 </span>            :                           args-&gt;buffer_count);
+<span class="lineNum">    1745 </span><span class="lineNoCov">          0 :                 return -ENOMEM;</span>
+<span class="lineNum">    1746 </span>            :         }
+<span class="lineNum">    1747 </span><span class="lineNoCov">          0 :         ret = copy_from_user(exec2_list,</span>
+<span class="lineNum">    1748 </span><span class="lineNoCov">          0 :                              to_user_ptr(args-&gt;buffers_ptr),</span>
+<span class="lineNum">    1749 </span><span class="lineNoCov">          0 :                              sizeof(*exec2_list) * args-&gt;buffer_count);</span>
+<span class="lineNum">    1750 </span><span class="lineNoCov">          0 :         if (ret != 0) {</span>
+<span class="lineNum">    1751 </span>            :                 DRM_DEBUG(&quot;copy %d exec entries failed %d\n&quot;,
+<span class="lineNum">    1752 </span>            :                           args-&gt;buffer_count, ret);
+<span class="lineNum">    1753 </span><span class="lineNoCov">          0 :                 drm_free_large(exec2_list);</span>
+<span class="lineNum">    1754 </span><span class="lineNoCov">          0 :                 return -EFAULT;</span>
+<span class="lineNum">    1755 </span>            :         }
+<span class="lineNum">    1756 </span>            : 
+<span class="lineNum">    1757 </span><span class="lineNoCov">          0 :         ret = i915_gem_do_execbuffer(dev, data, file, args, exec2_list);</span>
+<span class="lineNum">    1758 </span><span class="lineNoCov">          0 :         if (!ret) {</span>
+<span class="lineNum">    1759 </span>            :                 /* Copy the new buffer offsets back to the user's exec list. */
+<span class="lineNum">    1760 </span>            :                 struct drm_i915_gem_exec_object2 __user *user_exec_list =
+<span class="lineNum">    1761 </span><span class="lineNoCov">          0 :                                    to_user_ptr(args-&gt;buffers_ptr);</span>
+<span class="lineNum">    1762 </span>            :                 int i;
+<span class="lineNum">    1763 </span>            : 
+<span class="lineNum">    1764 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; args-&gt;buffer_count; i++) {</span>
+<span class="lineNum">    1765 </span><span class="lineNoCov">          0 :                         ret = __copy_to_user(&amp;user_exec_list[i].offset,</span>
+<span class="lineNum">    1766 </span><span class="lineNoCov">          0 :                                              &amp;exec2_list[i].offset,</span>
+<span class="lineNum">    1767 </span>            :                                              sizeof(user_exec_list[i].offset));
+<span class="lineNum">    1768 </span><span class="lineNoCov">          0 :                         if (ret) {</span>
+<span class="lineNum">    1769 </span>            :                                 ret = -EFAULT;
+<span class="lineNum">    1770 </span>            :                                 DRM_DEBUG(&quot;failed to copy %d exec entries &quot;
+<span class="lineNum">    1771 </span>            :                                           &quot;back to user\n&quot;,
+<span class="lineNum">    1772 </span>            :                                           args-&gt;buffer_count);
+<span class="lineNum">    1773 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">    1774 </span>            :                         }
+<span class="lineNum">    1775 </span>            :                 }
+<span class="lineNum">    1776 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1777 </span>            : 
+<span class="lineNum">    1778 </span><span class="lineNoCov">          0 :         drm_free_large(exec2_list);</span>
+<span class="lineNum">    1779 </span><span class="lineNoCov">          0 :         return ret;</span>
+<span class="lineNum">    1780 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

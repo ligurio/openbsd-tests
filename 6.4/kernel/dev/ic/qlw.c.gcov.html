@@ -1,0 +1,1883 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/ic/qlw.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/ic</a> - qlw.c<span style="font-size: 80%;"> (source / <a href="qlw.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">920</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">51</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: qlw.c,v 1.31 2017/01/24 02:28:17 visa Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2011 David Gwynne &lt;dlg@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2013, 2014 Jonathan Matthew &lt;jmatthew@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  * Copyright (c) 2014 Mark Kettenis &lt;kettenis@openbsd.org&gt;
+<span class="lineNum">       7 </span>            :  *
+<span class="lineNum">       8 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       9 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">      10 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      11 </span>            :  *
+<span class="lineNum">      12 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      13 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      14 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      15 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      16 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      17 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      18 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      19 </span>            :  */
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/atomic.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/mutex.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/rwlock.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/sensors.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : #include &lt;machine/bus.h&gt;
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : #include &lt;scsi/scsi_all.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;scsi/scsiconf.h&gt;
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : #include &lt;dev/ic/qlwreg.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;dev/ic/qlwvar.h&gt;
+<span class="lineNum">      40 </span>            : 
+<span class="lineNum">      41 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">      42 </span>            : #define QLW_DEBUG
+<span class="lineNum">      43 </span>            : #endif
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : #ifdef QLW_DEBUG
+<span class="lineNum">      46 </span>            : #define DPRINTF(m, f...) do { if ((qlwdebug &amp; (m)) == (m)) printf(f); } \
+<span class="lineNum">      47 </span>            :     while (0)
+<span class="lineNum">      48 </span>            : #define QLW_D_MBOX              0x01
+<span class="lineNum">      49 </span>            : #define QLW_D_INTR              0x02
+<span class="lineNum">      50 </span>            : #define QLW_D_PORT              0x04
+<span class="lineNum">      51 </span>            : #define QLW_D_IO                0x08
+<span class="lineNum">      52 </span>            : #define QLW_D_IOCB              0x10
+<span class="lineNum">      53 </span>            : int qlwdebug = QLW_D_PORT | QLW_D_INTR | QLW_D_MBOX;
+<span class="lineNum">      54 </span>            : #else
+<span class="lineNum">      55 </span>            : #define DPRINTF(m, f...)
+<span class="lineNum">      56 </span>            : #endif
+<span class="lineNum">      57 </span>            : 
+<span class="lineNum">      58 </span>            : struct cfdriver qlw_cd = {
+<span class="lineNum">      59 </span>            :         NULL,
+<span class="lineNum">      60 </span>            :         &quot;qlw&quot;,
+<span class="lineNum">      61 </span>            :         DV_DULL
+<span class="lineNum">      62 </span>            : };
+<span class="lineNum">      63 </span>            : 
+<span class="lineNum">      64 </span>            : void            qlw_scsi_cmd(struct scsi_xfer *);
+<span class="lineNum">      65 </span>            : int             qlw_scsi_probe(struct scsi_link *);
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span>            : u_int16_t       qlw_read(struct qlw_softc *, bus_size_t);
+<span class="lineNum">      68 </span>            : void            qlw_write(struct qlw_softc *, bus_size_t, u_int16_t);
+<span class="lineNum">      69 </span>            : void            qlw_host_cmd(struct qlw_softc *sc, u_int16_t);
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : int             qlw_mbox(struct qlw_softc *, int, int);
+<span class="lineNum">      72 </span>            : void            qlw_mbox_putaddr(u_int16_t *, struct qlw_dmamem *);
+<span class="lineNum">      73 </span>            : u_int16_t       qlw_read_mbox(struct qlw_softc *, int);
+<span class="lineNum">      74 </span>            : void            qlw_write_mbox(struct qlw_softc *, int, u_int16_t);
+<span class="lineNum">      75 </span>            : 
+<span class="lineNum">      76 </span>            : int             qlw_config_bus(struct qlw_softc *, int);
+<span class="lineNum">      77 </span>            : int             qlw_config_target(struct qlw_softc *, int, int);
+<span class="lineNum">      78 </span>            : void            qlw_update_bus(struct qlw_softc *, int);
+<span class="lineNum">      79 </span>            : void            qlw_update_target(struct qlw_softc *, int, int);
+<span class="lineNum">      80 </span>            : void            qlw_update_task(void *);
+<span class="lineNum">      81 </span>            : 
+<span class="lineNum">      82 </span>            : void            qlw_handle_intr(struct qlw_softc *, u_int16_t, u_int16_t);
+<span class="lineNum">      83 </span>            : void            qlw_set_ints(struct qlw_softc *, int);
+<span class="lineNum">      84 </span>            : int             qlw_read_isr(struct qlw_softc *, u_int16_t *, u_int16_t *);
+<span class="lineNum">      85 </span>            : void            qlw_clear_isr(struct qlw_softc *, u_int16_t);
+<span class="lineNum">      86 </span>            : 
+<span class="lineNum">      87 </span>            : void            qlw_update(struct qlw_softc *, int);
+<span class="lineNum">      88 </span>            : void            qlw_put_marker(struct qlw_softc *, int, void *);
+<span class="lineNum">      89 </span>            : void            qlw_put_cmd(struct qlw_softc *, void *, struct scsi_xfer *,
+<span class="lineNum">      90 </span>            :                     struct qlw_ccb *);
+<span class="lineNum">      91 </span>            : void            qlw_put_cont(struct qlw_softc *, void *, struct scsi_xfer *,
+<span class="lineNum">      92 </span>            :                     struct qlw_ccb *, int);
+<span class="lineNum">      93 </span>            : struct qlw_ccb *qlw_handle_resp(struct qlw_softc *, u_int16_t);
+<span class="lineNum">      94 </span>            : void            qlw_get_header(struct qlw_softc *, struct qlw_iocb_hdr *,
+<span class="lineNum">      95 </span>            :                     int *, int *);
+<span class="lineNum">      96 </span>            : void            qlw_put_header(struct qlw_softc *, struct qlw_iocb_hdr *,
+<span class="lineNum">      97 </span>            :                     int, int);
+<span class="lineNum">      98 </span>            : void            qlw_put_data_seg(struct qlw_softc *, struct qlw_iocb_seg *,
+<span class="lineNum">      99 </span>            :                     bus_dmamap_t, int);
+<span class="lineNum">     100 </span>            : 
+<span class="lineNum">     101 </span>            : int             qlw_softreset(struct qlw_softc *);
+<span class="lineNum">     102 </span>            : void            qlw_dma_burst_enable(struct qlw_softc *);
+<span class="lineNum">     103 </span>            : 
+<span class="lineNum">     104 </span>            : int             qlw_async(struct qlw_softc *, u_int16_t);
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span>            : int             qlw_load_firmware_words(struct qlw_softc *, const u_int16_t *,
+<span class="lineNum">     107 </span>            :                     u_int16_t);
+<span class="lineNum">     108 </span>            : int             qlw_load_firmware(struct qlw_softc *);
+<span class="lineNum">     109 </span>            : int             qlw_read_nvram(struct qlw_softc *);
+<span class="lineNum">     110 </span>            : void            qlw_parse_nvram_1040(struct qlw_softc *, int);
+<span class="lineNum">     111 </span>            : void            qlw_parse_nvram_1080(struct qlw_softc *, int);
+<span class="lineNum">     112 </span>            : void            qlw_init_defaults(struct qlw_softc *, int);
+<span class="lineNum">     113 </span>            : 
+<span class="lineNum">     114 </span>            : struct qlw_dmamem *qlw_dmamem_alloc(struct qlw_softc *, size_t);
+<span class="lineNum">     115 </span>            : void            qlw_dmamem_free(struct qlw_softc *, struct qlw_dmamem *);
+<span class="lineNum">     116 </span>            : 
+<span class="lineNum">     117 </span>            : int             qlw_alloc_ccbs(struct qlw_softc *);
+<span class="lineNum">     118 </span>            : void            qlw_free_ccbs(struct qlw_softc *);
+<span class="lineNum">     119 </span>            : void            *qlw_get_ccb(void *);
+<span class="lineNum">     120 </span>            : void            qlw_put_ccb(void *, void *);
+<span class="lineNum">     121 </span>            : 
+<span class="lineNum">     122 </span>            : #ifdef QLW_DEBUG
+<span class="lineNum">     123 </span>            : void            qlw_dump_iocb(struct qlw_softc *, void *, int);
+<span class="lineNum">     124 </span>            : void            qlw_dump_iocb_segs(struct qlw_softc *, void *, int);
+<span class="lineNum">     125 </span>            : #else
+<span class="lineNum">     126 </span>            : #define qlw_dump_iocb(sc, h, fl)        do { /* nothing */ } while (0)
+<span class="lineNum">     127 </span>            : #define qlw_dump_iocb_segs(sc, h, fl)   do { /* nothing */ } while (0)
+<span class="lineNum">     128 </span>            : #endif
+<a name="129"><span class="lineNum">     129 </span>            : </a>
+<span class="lineNum">     130 </span>            : static inline int
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 : qlw_xs_bus(struct qlw_softc *sc, struct scsi_xfer *xs)</span>
+<span class="lineNum">     132 </span>            : {
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :         return ((xs-&gt;sc_link-&gt;scsibus == sc-&gt;sc_link[0].scsibus) ? 0 : 1);</span>
+<span class="lineNum">     134 </span>            : }
+<a name="135"><span class="lineNum">     135 </span>            : </a>
+<span class="lineNum">     136 </span>            : static inline u_int16_t
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 : qlw_swap16(struct qlw_softc *sc, u_int16_t value)</span>
+<span class="lineNum">     138 </span>            : {
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_isp_gen == QLW_GEN_ISP1000)</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :                 return htobe16(value);</span>
+<span class="lineNum">     141 </span>            :         else
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                 return htole16(value);</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 : }</span>
+<a name="144"><span class="lineNum">     144 </span>            : </a>
+<span class="lineNum">     145 </span>            : static inline u_int32_t
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 : qlw_swap32(struct qlw_softc *sc, u_int32_t value)</span>
+<span class="lineNum">     147 </span>            : {
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_isp_gen == QLW_GEN_ISP1000)</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :                 return htobe32(value);</span>
+<span class="lineNum">     150 </span>            :         else
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :                 return htole32(value);</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 : }</span>
+<a name="153"><span class="lineNum">     153 </span>            : </a>
+<span class="lineNum">     154 </span>            : static inline u_int16_t
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 : qlw_queue_read(struct qlw_softc *sc, bus_size_t offset)</span>
+<span class="lineNum">     156 </span>            : {
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         return qlw_read(sc, sc-&gt;sc_mbox_base + offset);</span>
+<span class="lineNum">     158 </span>            : }
+<a name="159"><span class="lineNum">     159 </span>            : </a>
+<span class="lineNum">     160 </span>            : static inline void
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 : qlw_queue_write(struct qlw_softc *sc, bus_size_t offset, u_int16_t value)</span>
+<span class="lineNum">     162 </span>            : {
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         qlw_write(sc, sc-&gt;sc_mbox_base + offset, value);</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     165 </span>            : 
+<span class="lineNum">     166 </span>            : struct scsi_adapter qlw_switch = {
+<span class="lineNum">     167 </span>            :         qlw_scsi_cmd,
+<span class="lineNum">     168 </span>            :         scsi_minphys,
+<span class="lineNum">     169 </span>            :         qlw_scsi_probe,
+<span class="lineNum">     170 </span>            :         NULL,   /* scsi_free */
+<span class="lineNum">     171 </span>            :         NULL    /* ioctl */
+<span class="lineNum">     172 </span>            : };
+<a name="173"><span class="lineNum">     173 </span>            : </a>
+<span class="lineNum">     174 </span>            : int
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 : qlw_attach(struct qlw_softc *sc)</span>
+<span class="lineNum">     176 </span>            : {
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :         struct scsibus_attach_args saa;</span>
+<span class="lineNum">     178 </span>            :         void (*parse_nvram)(struct qlw_softc *, int);
+<span class="lineNum">     179 </span>            :         int reset_delay;
+<span class="lineNum">     180 </span>            :         int bus;
+<span class="lineNum">     181 </span>            : 
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         task_set(&amp;sc-&gt;sc_update_task, qlw_update_task, sc);</span>
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :         switch (sc-&gt;sc_isp_gen) {</span>
+<span class="lineNum">     185 </span>            :         case QLW_GEN_ISP1000:
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_nvram_size = 0;</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     188 </span>            :         case QLW_GEN_ISP1040:
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_nvram_size = 128;</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_nvram_minversion = 2;</span>
+<span class="lineNum">     191 </span>            :                 parse_nvram = qlw_parse_nvram_1040;
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     193 </span>            :         case QLW_GEN_ISP1080:
+<span class="lineNum">     194 </span>            :         case QLW_GEN_ISP12160:
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_nvram_size = 256;</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_nvram_minversion = 1;</span>
+<span class="lineNum">     197 </span>            :                 parse_nvram = qlw_parse_nvram_1080;
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     199 </span>            : 
+<span class="lineNum">     200 </span>            :         default:
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                 printf(&quot;unknown isp type\n&quot;);</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     203 </span>            :         }
+<span class="lineNum">     204 </span>            : 
+<span class="lineNum">     205 </span>            :         /* after reset, mbox registers 1-3 should contain the string &quot;ISP   &quot; */
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         if (qlw_read_mbox(sc, 1) != 0x4953 ||</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :             qlw_read_mbox(sc, 2) != 0x5020 ||</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :             qlw_read_mbox(sc, 3) != 0x2020) {</span>
+<span class="lineNum">     209 </span>            :                 /* try releasing the risc processor */
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                 qlw_host_cmd(sc, QLW_HOST_CMD_RELEASE);</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     212 </span>            : 
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         qlw_host_cmd(sc, QLW_HOST_CMD_PAUSE);</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :         if (qlw_softreset(sc) != 0) {</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                 printf(&quot;softreset failed\n&quot;);</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     217 </span>            :         }
+<span class="lineNum">     218 </span>            : 
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         for (bus = 0; bus &lt; sc-&gt;sc_numbusses; bus++)</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :                 qlw_init_defaults(sc, bus);</span>
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         if (qlw_read_nvram(sc) == 0) {</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                 for (bus = 0; bus &lt; sc-&gt;sc_numbusses; bus++)</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :                         parse_nvram(sc, bus);</span>
+<span class="lineNum">     225 </span>            :         }
+<span class="lineNum">     226 </span>            : 
+<span class="lineNum">     227 </span>            : #ifndef ISP_NOFIRMWARE
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_firmware &amp;&amp; qlw_load_firmware(sc)) {</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                 printf(&quot;firmware load failed\n&quot;);</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     231 </span>            :         }
+<span class="lineNum">     232 </span>            : #endif
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span>            :         /* execute firmware */
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_EXEC_FIRMWARE;</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = QLW_CODE_ORG;</span>
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x0003, 0x0001)) {</span>
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :                 printf(&quot;ISP couldn't exec firmware: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     240 </span>            :         }
+<span class="lineNum">     241 </span>            : 
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         delay(250000);          /* from isp(4) */</span>
+<span class="lineNum">     243 </span>            : 
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_ABOUT_FIRMWARE;</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, QLW_MBOX_ABOUT_FIRMWARE_IN,</span>
+<span class="lineNum">     246 </span>            :             QLW_MBOX_ABOUT_FIRMWARE_OUT)) {
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :                 printf(&quot;ISP not talking after firmware exec: %x\n&quot;,</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     250 </span>            :         }
+<span class="lineNum">     251 </span>            :         /* The ISP1000 firmware we use doesn't return a version number. */
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_isp_gen == QLW_GEN_ISP1000 &amp;&amp; sc-&gt;sc_firmware) {</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[1] = 1;</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[2] = 37;</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[3] = 0;</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[6] = 0;</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         printf(&quot;%s: firmware rev %d.%d.%d, attrs 0x%x\n&quot;, DEVNAME(sc),</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :             sc-&gt;sc_mbox[1], sc-&gt;sc_mbox[2], sc-&gt;sc_mbox[3], sc-&gt;sc_mbox[6]);</span>
+<span class="lineNum">     260 </span>            : 
+<span class="lineNum">     261 </span>            :         /* work out how many ccbs to allocate */
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_GET_FIRMWARE_STATUS;</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x0001, 0x0007)) {</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't get firmware status: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     266 </span>            :         }
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         sc-&gt;sc_maxrequests = sc-&gt;sc_mbox[2];</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_maxrequests &gt; 512)</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_maxrequests = 512;</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :         for (bus = 0; bus &lt; sc-&gt;sc_numbusses; bus++) {</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_max_queue_depth[bus] &gt; sc-&gt;sc_maxrequests)</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_max_queue_depth[bus] = sc-&gt;sc_maxrequests;</span>
+<span class="lineNum">     273 </span>            :         }
+<span class="lineNum">     274 </span>            : 
+<span class="lineNum">     275 </span>            :         /* 
+<span class="lineNum">     276 </span>            :          * On some 1020/1040 variants the response queue is limited to
+<span class="lineNum">     277 </span>            :          * 256 entries.  We don't really need all that many anyway.
+<span class="lineNum">     278 </span>            :          */
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :         sc-&gt;sc_maxresponses = sc-&gt;sc_maxrequests / 2;</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_maxresponses &lt; 64)</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_maxresponses = 64;</span>
+<span class="lineNum">     282 </span>            : 
+<span class="lineNum">     283 </span>            :         /* We may need up to 3 request entries per SCSI command. */
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         sc-&gt;sc_maxccbs = sc-&gt;sc_maxrequests / 3;</span>
+<span class="lineNum">     285 </span>            : 
+<span class="lineNum">     286 </span>            :         /* Allegedly the FIFO is busted on the 1040A. */
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_isp_type == QLW_ISP1040A)</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_isp_config &amp;= ~QLW_PCI_FIFO_MASK;</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :         qlw_write(sc, QLW_CFG1, sc-&gt;sc_isp_config);</span>
+<span class="lineNum">     290 </span>            : 
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_isp_config &amp; QLW_BURST_ENABLE)</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :                 qlw_dma_burst_enable(sc);</span>
+<span class="lineNum">     293 </span>            : 
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_SET_FIRMWARE_FEATURES;</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = 0;</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_fw_features &amp; QLW_FW_FEATURE_LVD_NOTIFY)</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[1] |= QLW_FW_FEATURE_LVD_NOTIFY;</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_mbox[1] != 0 &amp;&amp; qlw_mbox(sc, 0x0003, 0x0001)) {</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't set firmware features: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     301 </span>            :         }
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_SET_CLOCK_RATE;</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = sc-&gt;sc_clock;</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x0003, 0x0001)) {</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't set clock rate: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     308 </span>            :         }
+<span class="lineNum">     309 </span>            :         
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_SET_RETRY_COUNT;</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = sc-&gt;sc_retry_count[0];</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] = sc-&gt;sc_retry_delay[0];</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[6] = sc-&gt;sc_retry_count[1];</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[7] = sc-&gt;sc_retry_delay[1];</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x00c7, 0x0001)) {</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't set retry count: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     318 </span>            :         }
+<span class="lineNum">     319 </span>            :         
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_SET_ASYNC_DATA_SETUP;</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = sc-&gt;sc_async_data_setup[0];</span>
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] = sc-&gt;sc_async_data_setup[1];</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x0007, 0x0001)) {</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't set async data setup: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     326 </span>            :         }
+<span class="lineNum">     327 </span>            : 
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_SET_ACTIVE_NEGATION;</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = sc-&gt;sc_req_ack_active_neg[0] &lt;&lt; 5;</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] |= sc-&gt;sc_data_line_active_neg[0] &lt;&lt; 4;</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] = sc-&gt;sc_req_ack_active_neg[1] &lt;&lt; 5;</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] |= sc-&gt;sc_data_line_active_neg[1] &lt;&lt; 4;</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x0007, 0x0001)) {</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't set active negation: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     336 </span>            :         }
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_SET_TAG_AGE_LIMIT;</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = sc-&gt;sc_tag_age_limit[0];</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] = sc-&gt;sc_tag_age_limit[1];</span>
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x0007, 0x0001)) {</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't set tag age limit: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     344 </span>            :         }
+<span class="lineNum">     345 </span>            : 
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_SET_SELECTION_TIMEOUT;</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = sc-&gt;sc_selection_timeout[0];</span>
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] = sc-&gt;sc_selection_timeout[1];</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x0007, 0x0001)) {</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't set selection timeout: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     352 </span>            :         }
+<span class="lineNum">     353 </span>            : 
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         for (bus = 0; bus &lt; sc-&gt;sc_numbusses; bus++) {</span>
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :                 if (qlw_config_bus(sc, bus))</span>
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :                         return (ENXIO);</span>
+<span class="lineNum">     357 </span>            :         }
+<span class="lineNum">     358 </span>            : 
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :         if (qlw_alloc_ccbs(sc)) {</span>
+<span class="lineNum">     360 </span>            :                 /* error already printed */
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     362 </span>            :         }
+<span class="lineNum">     363 </span>            : 
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_INIT_REQ_QUEUE;</span>
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = sc-&gt;sc_maxrequests;</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         qlw_mbox_putaddr(sc-&gt;sc_mbox, sc-&gt;sc_requests);</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[4] = 0;</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x00df, 0x0001)) {</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't init request queue: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                 goto free_ccbs;</span>
+<span class="lineNum">     371 </span>            :         }
+<span class="lineNum">     372 </span>            : 
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_INIT_RSP_QUEUE;</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = sc-&gt;sc_maxresponses;</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :         qlw_mbox_putaddr(sc-&gt;sc_mbox, sc-&gt;sc_responses);</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[5] = 0;</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x00ef, 0x0001)) {</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't init response queue: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :                 goto free_ccbs;</span>
+<span class="lineNum">     380 </span>            :         }
+<span class="lineNum">     381 </span>            : 
+<span class="lineNum">     382 </span>            :         reset_delay = 0;
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :         for (bus = 0; bus &lt; sc-&gt;sc_numbusses; bus++) {</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[0] = QLW_MBOX_BUS_RESET;</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[1] = sc-&gt;sc_reset_delay[bus];</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[2] = bus;</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :                 if (qlw_mbox(sc, 0x0007, 0x0001)) {</span>
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                         printf(&quot;couldn't reset bus: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :                         goto free_ccbs;</span>
+<span class="lineNum">     390 </span>            :                 }
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_marker_required[bus] = 1;</span>
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_update_required[bus] = 0xffff;</span>
+<span class="lineNum">     393 </span>            : 
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_reset_delay[bus] &gt; reset_delay)</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                         reset_delay = sc-&gt;sc_reset_delay[bus];</span>
+<span class="lineNum">     396 </span>            :         }
+<span class="lineNum">     397 </span>            : 
+<span class="lineNum">     398 </span>            :         /* wait for the busses to settle */
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :         delay(reset_delay * 1000000);</span>
+<span class="lineNum">     400 </span>            : 
+<span class="lineNum">     401 </span>            :         /* we should be good to go now, attach scsibus */
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :         for (bus = 0; bus &lt; sc-&gt;sc_numbusses; bus++) {</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_link[bus].adapter = &amp;qlw_switch;</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_link[bus].adapter_softc = sc;</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_link[bus].adapter_target = sc-&gt;sc_initiator[bus];</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_link[bus].adapter_buswidth = QLW_MAX_TARGETS;</span>
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_link[bus].openings = sc-&gt;sc_max_queue_depth[bus];</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_link[bus].pool = &amp;sc-&gt;sc_iopool;</span>
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :                 memset(&amp;saa, 0, sizeof(saa));</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                 saa.saa_sc_link = &amp;sc-&gt;sc_link[bus];</span>
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span>            :                 /* config_found() returns the scsibus attached to us */
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_scsibus[bus] = (struct scsibus_softc *)</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :                     config_found(&amp;sc-&gt;sc_dev, &amp;saa, scsiprint);</span>
+<span class="lineNum">     416 </span>            : 
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 qlw_update_bus(sc, bus);</span>
+<span class="lineNum">     418 </span>            :         }
+<span class="lineNum">     419 </span>            : 
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         sc-&gt;sc_running = 1;</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         return(0);</span>
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span>            : free_ccbs:
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :         qlw_free_ccbs(sc);</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         return (ENXIO);</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 : }</span>
+<a name="427"><span class="lineNum">     427 </span>            : </a>
+<span class="lineNum">     428 </span>            : int
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 : qlw_detach(struct qlw_softc *sc, int flags)</span>
+<span class="lineNum">     430 </span>            : {
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     432 </span>            : }
+<a name="433"><span class="lineNum">     433 </span>            : </a>
+<span class="lineNum">     434 </span>            : int
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 : qlw_config_bus(struct qlw_softc *sc, int bus)</span>
+<span class="lineNum">     436 </span>            : {
+<span class="lineNum">     437 </span>            :         int target, err;
+<span class="lineNum">     438 </span>            : 
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_SET_INITIATOR_ID;</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = (bus &lt;&lt; 7) | sc-&gt;sc_initiator[bus];</span>
+<span class="lineNum">     441 </span>            : 
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x0003, 0x0001)) {</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't set initiator id: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     445 </span>            :         }
+<span class="lineNum">     446 </span>            : 
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :         for (target = 0; target &lt; QLW_MAX_TARGETS; target++) {</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                 err = qlw_config_target(sc, bus, target);</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                 if (err)</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                         return (err);</span>
+<span class="lineNum">     451 </span>            :         }
+<span class="lineNum">     452 </span>            : 
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 : }</span>
+<a name="455"><span class="lineNum">     455 </span>            : </a>
+<span class="lineNum">     456 </span>            : int
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 : qlw_config_target(struct qlw_softc *sc, int bus, int target)</span>
+<span class="lineNum">     458 </span>            : {
+<span class="lineNum">     459 </span>            :         int lun;
+<span class="lineNum">     460 </span>            : 
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_SET_TARGET_PARAMETERS;</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = (((bus &lt;&lt; 7) | target) &lt;&lt; 8);</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] = sc-&gt;sc_target[bus][target].qt_params;</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] &amp;= QLW_TARGET_SAFE;</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] |= QLW_TARGET_NARROW | QLW_TARGET_ASYNC;</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[3] = 0;</span>
+<span class="lineNum">     467 </span>            : 
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x000f, 0x0001)) {</span>
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't set target parameters: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     471 </span>            :         }
+<span class="lineNum">     472 </span>            : 
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :         for (lun = 0; lun &lt; QLW_MAX_LUNS; lun++) {</span>
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[0] = QLW_MBOX_SET_DEVICE_QUEUE;</span>
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[1] = (((bus &lt;&lt; 7) | target) &lt;&lt; 8) | lun;</span>
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[2] = sc-&gt;sc_max_queue_depth[bus];</span>
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[3] = sc-&gt;sc_target[bus][target].qt_exec_throttle;</span>
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :                 if (qlw_mbox(sc, 0x000f, 0x0001)) {</span>
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :                         printf(&quot;couldn't set lun parameters: %x\n&quot;,</span>
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :                         return (ENXIO);</span>
+<span class="lineNum">     482 </span>            :                 }
+<span class="lineNum">     483 </span>            :         }
+<span class="lineNum">     484 </span>            : 
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 : }</span>
+<a name="487"><span class="lineNum">     487 </span>            : </a>
+<span class="lineNum">     488 </span>            : void
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 : qlw_update_bus(struct qlw_softc *sc, int bus)</span>
+<span class="lineNum">     490 </span>            : {
+<span class="lineNum">     491 </span>            :         int target;
+<span class="lineNum">     492 </span>            : 
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         for (target = 0; target &lt; QLW_MAX_TARGETS; target++)</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                 qlw_update_target(sc, bus, target);</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 : }</span>
+<a name="496"><span class="lineNum">     496 </span>            : </a>
+<span class="lineNum">     497 </span>            : void
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 : qlw_update_target(struct qlw_softc *sc, int bus, int target)</span>
+<span class="lineNum">     499 </span>            : {
+<span class="lineNum">     500 </span>            :         struct scsi_link *link;
+<span class="lineNum">     501 </span>            :         int lun;
+<span class="lineNum">     502 </span>            : 
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :         if ((sc-&gt;sc_update_required[bus] &amp; (1 &lt;&lt; target)) == 0)</span>
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         atomic_clearbits_int(&amp;sc-&gt;sc_update_required[bus], (1 &lt;&lt; target));</span>
+<span class="lineNum">     506 </span>            : 
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :         link = scsi_get_link(sc-&gt;sc_scsibus[bus], target, 0);</span>
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :         if (link == NULL)</span>
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     510 </span>            : 
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_SET_TARGET_PARAMETERS;</span>
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = (((bus &lt;&lt; 7) | target) &lt;&lt; 8);</span>
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] = sc-&gt;sc_target[bus][target].qt_params;</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] |= QLW_TARGET_RENEG;</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[2] &amp;= ~QLW_TARGET_QFRZ;</span>
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :         if (link-&gt;quirks &amp; SDEV_NOSYNC)</span>
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[2] &amp;= ~QLW_TARGET_SYNC;</span>
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :         if (link-&gt;quirks &amp; SDEV_NOWIDE)</span>
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[2] &amp;= ~QLW_TARGET_WIDE;</span>
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         if (link-&gt;quirks &amp; SDEV_NOTAGS)</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[2] &amp;= ~QLW_TARGET_TAGS;</span>
+<span class="lineNum">     522 </span>            : 
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[3] = sc-&gt;sc_target[bus][target].qt_sync_period;</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[3] |= (sc-&gt;sc_target[bus][target].qt_sync_offset &lt;&lt; 8);</span>
+<span class="lineNum">     525 </span>            : 
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x000f, 0x0001)) {</span>
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                 printf(&quot;couldn't set target parameters: %x\n&quot;, sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     529 </span>            :         }
+<span class="lineNum">     530 </span>            : 
+<span class="lineNum">     531 </span>            :         /* XXX do PPR detection */
+<span class="lineNum">     532 </span>            : 
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :         for (lun = 0; lun &lt; QLW_MAX_LUNS; lun++) {</span>
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[0] = QLW_MBOX_SET_DEVICE_QUEUE;</span>
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[1] = (((bus &lt;&lt; 7) | target) &lt;&lt; 8) | lun;</span>
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[2] = sc-&gt;sc_max_queue_depth[bus];</span>
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[3] = sc-&gt;sc_target[bus][target].qt_exec_throttle;</span>
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :                 if (qlw_mbox(sc, 0x000f, 0x0001)) {</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :                         printf(&quot;couldn't set lun parameters: %x\n&quot;,</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                             sc-&gt;sc_mbox[0]);</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     542 </span>            :                 }
+<span class="lineNum">     543 </span>            :         }
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 : }</span>
+<a name="545"><span class="lineNum">     545 </span>            : </a>
+<span class="lineNum">     546 </span>            : void
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 : qlw_update_task(void *xsc)</span>
+<span class="lineNum">     548 </span>            : {
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :         struct qlw_softc *sc = xsc;</span>
+<span class="lineNum">     550 </span>            :         int bus;
+<span class="lineNum">     551 </span>            : 
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :         for (bus = 0; bus &lt; sc-&gt;sc_numbusses; bus++)</span>
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 :                 qlw_update_bus(sc, bus);</span>
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 : }</span>
+<a name="555"><span class="lineNum">     555 </span>            : </a>
+<span class="lineNum">     556 </span>            : struct qlw_ccb *
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 : qlw_handle_resp(struct qlw_softc *sc, u_int16_t id)</span>
+<span class="lineNum">     558 </span>            : {
+<span class="lineNum">     559 </span>            :         struct qlw_ccb *ccb;
+<span class="lineNum">     560 </span>            :         struct qlw_iocb_hdr *hdr;
+<span class="lineNum">     561 </span>            :         struct qlw_iocb_status *status;
+<span class="lineNum">     562 </span>            :         struct scsi_xfer *xs;
+<span class="lineNum">     563 </span>            :         u_int32_t handle;
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :         int entry_type;</span>
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :         int flags;</span>
+<span class="lineNum">     566 </span>            :         int bus;
+<span class="lineNum">     567 </span>            : 
+<span class="lineNum">     568 </span>            :         ccb = NULL;
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :         hdr = QLW_DMA_KVA(sc-&gt;sc_responses) + (id * QLW_QUEUE_ENTRY_SIZE);</span>
+<span class="lineNum">     570 </span>            : 
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat,</span>
+<span class="lineNum">     572 </span>            :             QLW_DMA_MAP(sc-&gt;sc_responses), id * QLW_QUEUE_ENTRY_SIZE,
+<span class="lineNum">     573 </span>            :             QLW_QUEUE_ENTRY_SIZE, BUS_DMASYNC_POSTREAD);
+<span class="lineNum">     574 </span>            : 
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 :         qlw_get_header(sc, hdr, &amp;entry_type, &amp;flags);</span>
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :         switch (entry_type) {</span>
+<span class="lineNum">     577 </span>            :         case QLW_IOCB_STATUS:
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :                 status = (struct qlw_iocb_status *)hdr;</span>
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :                 handle = qlw_swap32(sc, status-&gt;handle);</span>
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :                 if (handle &gt; sc-&gt;sc_maxccbs) {</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :                         panic(&quot;bad completed command handle: %d (&gt; %d)&quot;,</span>
+<span class="lineNum">     582 </span>            :                             handle, sc-&gt;sc_maxccbs);
+<span class="lineNum">     583 </span>            :                 }
+<span class="lineNum">     584 </span>            : 
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :                 ccb = &amp;sc-&gt;sc_ccbs[handle];</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 xs = ccb-&gt;ccb_xs;</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :                 if (xs == NULL) {</span>
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :                         DPRINTF(QLW_D_INTR, &quot;%s: got status for inactive&quot;</span>
+<span class="lineNum">     589 </span>            :                             &quot; ccb %d\n&quot;, DEVNAME(sc), handle);
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :                         qlw_dump_iocb(sc, hdr, QLW_D_INTR);</span>
+<span class="lineNum">     591 </span>            :                         ccb = NULL;
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     593 </span>            :                 }
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :                 if (xs-&gt;io != ccb) {</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                         panic(&quot;completed command handle doesn't match xs &quot;</span>
+<span class="lineNum">     596 </span>            :                             &quot;(handle %d, ccb %p, xs-&gt;io %p)&quot;, handle, ccb,
+<span class="lineNum">     597 </span>            :                             xs-&gt;io);
+<span class="lineNum">     598 </span>            :                 }
+<span class="lineNum">     599 </span>            : 
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :                 if (xs-&gt;datalen &gt; 0) {</span>
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :                         bus_dmamap_sync(sc-&gt;sc_dmat, ccb-&gt;ccb_dmamap, 0,</span>
+<span class="lineNum">     602 </span>            :                             ccb-&gt;ccb_dmamap-&gt;dm_mapsize,
+<span class="lineNum">     603 </span>            :                             (xs-&gt;flags &amp; SCSI_DATA_IN) ? BUS_DMASYNC_POSTREAD :
+<span class="lineNum">     604 </span>            :                             BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :                         bus_dmamap_unload(sc-&gt;sc_dmat, ccb-&gt;ccb_dmamap);</span>
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     607 </span>            : 
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                 bus = qlw_xs_bus(sc, xs);</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :                 xs-&gt;status = qlw_swap16(sc, status-&gt;scsi_status);</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :                 switch (qlw_swap16(sc, status-&gt;completion)) {</span>
+<span class="lineNum">     611 </span>            :                 case QLW_IOCB_STATUS_COMPLETE:
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                         if (qlw_swap16(sc, status-&gt;scsi_status) &amp;</span>
+<span class="lineNum">     613 </span>            :                             QLW_SCSI_STATUS_SENSE_VALID) {
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                                 memcpy(&amp;xs-&gt;sense, status-&gt;sense_data,</span>
+<span class="lineNum">     615 </span>            :                                     sizeof(xs-&gt;sense));
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :                                 xs-&gt;error = XS_SENSE;</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                         } else {</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                                 xs-&gt;error = XS_NOERROR;</span>
+<span class="lineNum">     619 </span>            :                         }
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :                         xs-&gt;resid = 0;</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     622 </span>            : 
+<span class="lineNum">     623 </span>            :                 case QLW_IOCB_STATUS_INCOMPLETE:
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :                         if (flags &amp; QLW_STATE_GOT_TARGET) {</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :                                 xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                         } else {</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :                                 xs-&gt;error = XS_SELTIMEOUT;</span>
+<span class="lineNum">     628 </span>            :                         }
+<span class="lineNum">     629 </span>            :                         break;
+<span class="lineNum">     630 </span>            : 
+<span class="lineNum">     631 </span>            :                 case QLW_IOCB_STATUS_DMA_ERROR:
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :                         DPRINTF(QLW_D_INTR, &quot;%s: dma error\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     633 </span>            :                         /* set resid apparently? */
+<span class="lineNum">     634 </span>            :                         break;
+<span class="lineNum">     635 </span>            : 
+<span class="lineNum">     636 </span>            :                 case QLW_IOCB_STATUS_RESET:
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :                         DPRINTF(QLW_D_INTR, &quot;%s: reset destroyed command\n&quot;,</span>
+<span class="lineNum">     638 </span>            :                             DEVNAME(sc));
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_marker_required[bus] = 1;</span>
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :                         xs-&gt;error = XS_RESET;</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     642 </span>            : 
+<span class="lineNum">     643 </span>            :                 case QLW_IOCB_STATUS_ABORTED:
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :                         DPRINTF(QLW_D_INTR, &quot;%s: aborted\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_marker_required[bus] = 1;</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :                         xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     648 </span>            : 
+<span class="lineNum">     649 </span>            :                 case QLW_IOCB_STATUS_TIMEOUT:
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :                         DPRINTF(QLW_D_INTR, &quot;%s: command timed out\n&quot;,</span>
+<span class="lineNum">     651 </span>            :                             DEVNAME(sc));
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :                         xs-&gt;error = XS_TIMEOUT;</span>
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     654 </span>            : 
+<span class="lineNum">     655 </span>            :                 case QLW_IOCB_STATUS_DATA_OVERRUN:
+<span class="lineNum">     656 </span>            :                 case QLW_IOCB_STATUS_DATA_UNDERRUN:
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                         xs-&gt;resid = qlw_swap32(sc, status-&gt;resid);</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                         xs-&gt;error = XS_NOERROR;</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     660 </span>            : 
+<span class="lineNum">     661 </span>            :                 case QLW_IOCB_STATUS_QUEUE_FULL:
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :                         DPRINTF(QLW_D_INTR, &quot;%s: queue full\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                         xs-&gt;error = XS_BUSY;</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     665 </span>            : 
+<span class="lineNum">     666 </span>            :                 case QLW_IOCB_STATUS_WIDE_FAILED:
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                         DPRINTF(QLW_D_INTR, &quot;%s: wide failed\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     668 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_link-&gt;quirks |= SDEV_NOWIDE;</span>
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :                         atomic_setbits_int(&amp;sc-&gt;sc_update_required[bus],</span>
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :                             1 &lt;&lt; xs-&gt;sc_link-&gt;target);</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                         task_add(systq, &amp;sc-&gt;sc_update_task);</span>
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :                         xs-&gt;resid = qlw_swap32(sc, status-&gt;resid);</span>
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :                         xs-&gt;error = XS_NOERROR;</span>
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     675 </span>            : 
+<span class="lineNum">     676 </span>            :                 case QLW_IOCB_STATUS_SYNCXFER_FAILED:
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :                         DPRINTF(QLW_D_INTR, &quot;%s: sync failed\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_link-&gt;quirks |= SDEV_NOSYNC;</span>
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :                         atomic_setbits_int(&amp;sc-&gt;sc_update_required[bus],</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :                             1 &lt;&lt; xs-&gt;sc_link-&gt;target);</span>
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :                         task_add(systq, &amp;sc-&gt;sc_update_task);</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :                         xs-&gt;resid = qlw_swap32(sc, status-&gt;resid);</span>
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :                         xs-&gt;error = XS_NOERROR;</span>
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     685 </span>            : 
+<span class="lineNum">     686 </span>            :                 default:
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :                         DPRINTF(QLW_D_INTR, &quot;%s: unexpected completion&quot;</span>
+<span class="lineNum">     688 </span>            :                             &quot; status %x\n&quot;, DEVNAME(sc),
+<span class="lineNum">     689 </span>            :                             qlw_swap16(sc, status-&gt;completion));
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :                         qlw_dump_iocb(sc, hdr, QLW_D_INTR);</span>
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :                         xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     693 </span>            :                 }
+<span class="lineNum">     694 </span>            :                 break;
+<span class="lineNum">     695 </span>            : 
+<span class="lineNum">     696 </span>            :         default:
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :                 DPRINTF(QLW_D_INTR, &quot;%s: unexpected response entry type %x\n&quot;,</span>
+<span class="lineNum">     698 </span>            :                     DEVNAME(sc), entry_type);
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :                 qlw_dump_iocb(sc, hdr, QLW_D_INTR);</span>
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     701 </span>            :         }
+<span class="lineNum">     702 </span>            : 
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :         return (ccb);</span>
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 : }</span>
+<a name="705"><span class="lineNum">     705 </span>            : </a>
+<span class="lineNum">     706 </span>            : void
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 : qlw_handle_intr(struct qlw_softc *sc, u_int16_t isr, u_int16_t info)</span>
+<span class="lineNum">     708 </span>            : {
+<span class="lineNum">     709 </span>            :         int i;
+<span class="lineNum">     710 </span>            :         u_int16_t rspin;
+<span class="lineNum">     711 </span>            :         struct qlw_ccb *ccb;
+<span class="lineNum">     712 </span>            : 
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 :         switch (isr) {</span>
+<span class="lineNum">     714 </span>            :         case QLW_INT_TYPE_ASYNC:
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :                 qlw_async(sc, info);</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :                 qlw_clear_isr(sc, isr);</span>
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     718 </span>            : 
+<span class="lineNum">     719 </span>            :         case QLW_INT_TYPE_IO:
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :                 qlw_clear_isr(sc, isr);</span>
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :                 rspin = qlw_queue_read(sc, QLW_RESP_IN);</span>
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :                 if (rspin == sc-&gt;sc_last_resp_id) {</span>
+<span class="lineNum">     723 </span>            :                         /* seems to happen a lot on 2200s when mbox commands
+<span class="lineNum">     724 </span>            :                          * complete but it doesn't want to give us the register
+<span class="lineNum">     725 </span>            :                          * semaphore, or something.
+<span class="lineNum">     726 </span>            :                          *
+<span class="lineNum">     727 </span>            :                          * if we're waiting on a mailbox command, don't ack
+<span class="lineNum">     728 </span>            :                          * the interrupt yet.
+<span class="lineNum">     729 </span>            :                          */
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :                         if (sc-&gt;sc_mbox_pending) {</span>
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :                                 DPRINTF(QLW_D_MBOX, &quot;%s: ignoring premature&quot;</span>
+<span class="lineNum">     732 </span>            :                                     &quot; mbox int\n&quot;, DEVNAME(sc));
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :                                 return;</span>
+<span class="lineNum">     734 </span>            :                         }
+<span class="lineNum">     735 </span>            : 
+<span class="lineNum">     736 </span>            :                         break;
+<span class="lineNum">     737 </span>            :                 }
+<span class="lineNum">     738 </span>            : 
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_responses == NULL)</span>
+<span class="lineNum">     740 </span>            :                         break;
+<span class="lineNum">     741 </span>            : 
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :                 DPRINTF(QLW_D_IO, &quot;%s: response queue %x=&gt;%x\n&quot;,</span>
+<span class="lineNum">     743 </span>            :                     DEVNAME(sc), sc-&gt;sc_last_resp_id, rspin);
+<span class="lineNum">     744 </span>            : 
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :                 do {</span>
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :                         ccb = qlw_handle_resp(sc, sc-&gt;sc_last_resp_id);</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :                         if (ccb)</span>
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :                                 scsi_done(ccb-&gt;ccb_xs);</span>
+<span class="lineNum">     749 </span>            : 
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_last_resp_id++;</span>
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_last_resp_id %= sc-&gt;sc_maxresponses;</span>
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :                 } while (sc-&gt;sc_last_resp_id != rspin);</span>
+<span class="lineNum">     753 </span>            : 
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :                 qlw_queue_write(sc, QLW_RESP_OUT, rspin);</span>
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     756 </span>            : 
+<span class="lineNum">     757 </span>            :         case QLW_INT_TYPE_MBOX:
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_mbox_pending) {</span>
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :                         if (info == QLW_MBOX_COMPLETE) {</span>
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :                                 for (i = 1; i &lt; nitems(sc-&gt;sc_mbox); i++) {</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :                                         sc-&gt;sc_mbox[i] = qlw_read_mbox(sc, i);</span>
+<span class="lineNum">     762 </span>            :                                 }
+<span class="lineNum">     763 </span>            :                         } else {
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :                                 sc-&gt;sc_mbox[0] = info;</span>
+<span class="lineNum">     765 </span>            :                         }
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :                         wakeup(sc-&gt;sc_mbox);</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :                         DPRINTF(QLW_D_MBOX, &quot;%s: unexpected mbox interrupt:&quot;</span>
+<span class="lineNum">     769 </span>            :                             &quot; %x\n&quot;, DEVNAME(sc), info);
+<span class="lineNum">     770 </span>            :                 }
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :                 qlw_clear_isr(sc, isr);</span>
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     773 </span>            : 
+<span class="lineNum">     774 </span>            :         default:
+<span class="lineNum">     775 </span>            :                 /* maybe log something? */
+<span class="lineNum">     776 </span>            :                 break;
+<span class="lineNum">     777 </span>            :         }
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 : }</span>
+<a name="779"><span class="lineNum">     779 </span>            : </a>
+<span class="lineNum">     780 </span>            : int
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 : qlw_intr(void *xsc)</span>
+<span class="lineNum">     782 </span>            : {
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :         struct qlw_softc *sc = xsc;</span>
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :         u_int16_t isr;</span>
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         u_int16_t info;</span>
+<span class="lineNum">     786 </span>            : 
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :         if (qlw_read_isr(sc, &amp;isr, &amp;info) == 0)</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     789 </span>            : 
+<span class="lineNum">     790 </span><span class="lineNoCov">          0 :         qlw_handle_intr(sc, isr, info);</span>
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 : }</span>
+<a name="793"><span class="lineNum">     793 </span>            : </a>
+<span class="lineNum">     794 </span>            : int
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 : qlw_scsi_probe(struct scsi_link *link)</span>
+<span class="lineNum">     796 </span>            : {
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :         if (link-&gt;lun &gt;= QLW_MAX_LUNS)</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     799 </span>            : 
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 : }</span>
+<a name="802"><span class="lineNum">     802 </span>            : </a>
+<span class="lineNum">     803 </span>            : void
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 : qlw_scsi_cmd(struct scsi_xfer *xs)</span>
+<span class="lineNum">     805 </span>            : {
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         struct scsi_link        *link = xs-&gt;sc_link;</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :         struct qlw_softc        *sc = link-&gt;adapter_softc;</span>
+<span class="lineNum">     808 </span>            :         struct qlw_ccb          *ccb;
+<span class="lineNum">     809 </span>            :         struct qlw_iocb_req0    *iocb;
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :         struct qlw_ccb_list     list;</span>
+<span class="lineNum">     811 </span>            :         u_int16_t               req, rspin;
+<span class="lineNum">     812 </span>            :         int                     offset, error, done;
+<span class="lineNum">     813 </span>            :         bus_dmamap_t            dmap;
+<span class="lineNum">     814 </span>            :         int                     bus;
+<span class="lineNum">     815 </span>            :         int                     seg;
+<span class="lineNum">     816 </span>            : 
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 :         if (xs-&gt;cmdlen &gt; sizeof(iocb-&gt;cdb)) {</span>
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :                 DPRINTF(QLW_D_IO, &quot;%s: cdb too big (%d)\n&quot;, DEVNAME(sc),</span>
+<span class="lineNum">     819 </span>            :                     xs-&gt;cmdlen);
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :                 memset(&amp;xs-&gt;sense, 0, sizeof(xs-&gt;sense));</span>
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :                 xs-&gt;sense.error_code = SSD_ERRCODE_VALID | SSD_ERRCODE_CURRENT;</span>
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :                 xs-&gt;sense.flags = SKEY_ILLEGAL_REQUEST;</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :                 xs-&gt;sense.add_sense_code = 0x20;</span>
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :                 xs-&gt;error = XS_SENSE;</span>
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :                 scsi_done(xs);</span>
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     827 </span>            :         }
+<span class="lineNum">     828 </span>            : 
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :         ccb = xs-&gt;io;</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :         dmap = ccb-&gt;ccb_dmamap;</span>
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :         if (xs-&gt;datalen &gt; 0) {</span>
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                 error = bus_dmamap_load(sc-&gt;sc_dmat, dmap, xs-&gt;data,</span>
+<span class="lineNum">     833 </span>            :                     xs-&gt;datalen, NULL, (xs-&gt;flags &amp; SCSI_NOSLEEP) ?
+<span class="lineNum">     834 </span>            :                     BUS_DMA_NOWAIT : BUS_DMA_WAITOK);
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :                 if (error) {</span>
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :                         xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :                         scsi_done(xs);</span>
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     839 </span>            :                 }
+<span class="lineNum">     840 </span>            : 
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, dmap, 0,</span>
+<span class="lineNum">     842 </span>            :                     dmap-&gt;dm_mapsize,
+<span class="lineNum">     843 </span>            :                     (xs-&gt;flags &amp; SCSI_DATA_IN) ? BUS_DMASYNC_PREREAD :
+<span class="lineNum">     844 </span>            :                     BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     846 </span>            : 
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_queue_mtx);</span>
+<span class="lineNum">     848 </span>            : 
+<span class="lineNum">     849 </span>            :         /* put in a sync marker if required */
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :         bus = qlw_xs_bus(sc, xs);</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_marker_required[bus]) {</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :                 req = sc-&gt;sc_next_req_id++;</span>
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_next_req_id == sc-&gt;sc_maxrequests)</span>
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_next_req_id = 0;</span>
+<span class="lineNum">     855 </span>            : 
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                 DPRINTF(QLW_D_IO, &quot;%s: writing marker at request %d\n&quot;,</span>
+<span class="lineNum">     857 </span>            :                     DEVNAME(sc), req);
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :                 offset = (req * QLW_QUEUE_ENTRY_SIZE);</span>
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                 iocb = QLW_DMA_KVA(sc-&gt;sc_requests) + offset;</span>
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, QLW_DMA_MAP(sc-&gt;sc_requests),</span>
+<span class="lineNum">     861 </span>            :                     offset, QLW_QUEUE_ENTRY_SIZE, BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :                 qlw_put_marker(sc, bus, iocb);</span>
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, QLW_DMA_MAP(sc-&gt;sc_requests),</span>
+<span class="lineNum">     864 </span>            :                     offset, QLW_QUEUE_ENTRY_SIZE, BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :                 qlw_queue_write(sc, QLW_REQ_IN, sc-&gt;sc_next_req_id);</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_marker_required[bus] = 0;</span>
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     868 </span>            : 
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :         req = sc-&gt;sc_next_req_id++;</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_next_req_id == sc-&gt;sc_maxrequests)</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_next_req_id = 0;</span>
+<span class="lineNum">     872 </span>            : 
+<span class="lineNum">     873 </span><span class="lineNoCov">          0 :         offset = (req * QLW_QUEUE_ENTRY_SIZE);</span>
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :         iocb = QLW_DMA_KVA(sc-&gt;sc_requests) + offset;</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, QLW_DMA_MAP(sc-&gt;sc_requests), offset,</span>
+<span class="lineNum">     876 </span>            :             QLW_QUEUE_ENTRY_SIZE, BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     877 </span>            : 
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_xs = xs;</span>
+<span class="lineNum">     879 </span>            : 
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 :         DPRINTF(QLW_D_IO, &quot;%s: writing cmd at request %d\n&quot;, DEVNAME(sc), req);</span>
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :         qlw_put_cmd(sc, iocb, xs, ccb);</span>
+<span class="lineNum">     882 </span>            :         seg = QLW_IOCB_SEGS_PER_CMD;
+<span class="lineNum">     883 </span>            : 
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, QLW_DMA_MAP(sc-&gt;sc_requests), offset,</span>
+<span class="lineNum">     885 </span>            :             QLW_QUEUE_ENTRY_SIZE, BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     886 </span>            : 
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :         while (seg &lt; ccb-&gt;ccb_dmamap-&gt;dm_nsegs) {</span>
+<span class="lineNum">     888 </span><span class="lineNoCov">          0 :                 req = sc-&gt;sc_next_req_id++;</span>
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_next_req_id == sc-&gt;sc_maxrequests)</span>
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_next_req_id = 0;</span>
+<span class="lineNum">     891 </span>            : 
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :                 offset = (req * QLW_QUEUE_ENTRY_SIZE);</span>
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 :                 iocb = QLW_DMA_KVA(sc-&gt;sc_requests) + offset;</span>
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, QLW_DMA_MAP(sc-&gt;sc_requests), offset,</span>
+<span class="lineNum">     895 </span>            :                     QLW_QUEUE_ENTRY_SIZE, BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     896 </span>            : 
+<span class="lineNum">     897 </span><span class="lineNoCov">          0 :                 DPRINTF(QLW_D_IO, &quot;%s: writing cont at request %d\n&quot;, DEVNAME(sc), req);</span>
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :                 qlw_put_cont(sc, iocb, xs, ccb, seg);</span>
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 :                 seg += QLW_IOCB_SEGS_PER_CONT;</span>
+<span class="lineNum">     900 </span>            : 
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, QLW_DMA_MAP(sc-&gt;sc_requests), offset,</span>
+<span class="lineNum">     902 </span>            :                     QLW_QUEUE_ENTRY_SIZE, BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     903 </span>            :         }
+<span class="lineNum">     904 </span>            : 
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :         qlw_queue_write(sc, QLW_REQ_IN, sc-&gt;sc_next_req_id);</span>
+<span class="lineNum">     906 </span>            : 
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :         if (!ISSET(xs-&gt;flags, SCSI_POLL)) {</span>
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;sc-&gt;sc_queue_mtx);</span>
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     910 </span>            :         }
+<span class="lineNum">     911 </span>            : 
+<span class="lineNum">     912 </span>            :         done = 0;
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :         SIMPLEQ_INIT(&amp;list);</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :                 u_int16_t isr, info;</span>
+<span class="lineNum">     916 </span>            : 
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 :                 delay(100);</span>
+<span class="lineNum">     918 </span>            : 
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :                 if (qlw_read_isr(sc, &amp;isr, &amp;info) == 0) {</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     921 </span>            :                 }
+<span class="lineNum">     922 </span>            : 
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :                 if (isr != QLW_INT_TYPE_IO) {</span>
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :                         qlw_handle_intr(sc, isr, info);</span>
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     926 </span>            :                 }
+<span class="lineNum">     927 </span>            : 
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :                 qlw_clear_isr(sc, isr);</span>
+<span class="lineNum">     929 </span>            : 
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :                 rspin = qlw_queue_read(sc, QLW_RESP_IN);</span>
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :                 while (rspin != sc-&gt;sc_last_resp_id) {</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :                         ccb = qlw_handle_resp(sc, sc-&gt;sc_last_resp_id);</span>
+<span class="lineNum">     933 </span>            : 
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_last_resp_id++;</span>
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :                         if (sc-&gt;sc_last_resp_id == sc-&gt;sc_maxresponses)</span>
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :                                 sc-&gt;sc_last_resp_id = 0;</span>
+<span class="lineNum">     937 </span>            : 
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :                         if (ccb != NULL)</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :                                 SIMPLEQ_INSERT_TAIL(&amp;list, ccb, ccb_link);</span>
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :                         if (ccb == xs-&gt;io)</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :                                 done = 1;</span>
+<span class="lineNum">     942 </span>            :                 }
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :                 qlw_queue_write(sc, QLW_RESP_OUT, rspin);</span>
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         } while (done == 0);</span>
+<span class="lineNum">     945 </span>            : 
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_queue_mtx);</span>
+<span class="lineNum">     947 </span>            : 
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 :         while ((ccb = SIMPLEQ_FIRST(&amp;list)) != NULL) {</span>
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :                 SIMPLEQ_REMOVE_HEAD(&amp;list, ccb_link);</span>
+<span class="lineNum">     950 </span><span class="lineNoCov">          0 :                 scsi_done(ccb-&gt;ccb_xs);</span>
+<span class="lineNum">     951 </span>            :         }
+<span class="lineNum">     952 </span><span class="lineNoCov">          0 : }</span>
+<a name="953"><span class="lineNum">     953 </span>            : </a>
+<span class="lineNum">     954 </span>            : u_int16_t
+<span class="lineNum">     955 </span><span class="lineNoCov">          0 : qlw_read(struct qlw_softc *sc, bus_size_t offset)</span>
+<span class="lineNum">     956 </span>            : {
+<span class="lineNum">     957 </span>            :         u_int16_t v;
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :         v = bus_space_read_2(sc-&gt;sc_iot, sc-&gt;sc_ioh, offset);</span>
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :         bus_space_barrier(sc-&gt;sc_iot, sc-&gt;sc_ioh, offset, 2,</span>
+<span class="lineNum">     960 </span>            :             BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE);
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :         return (v);</span>
+<span class="lineNum">     962 </span>            : }
+<a name="963"><span class="lineNum">     963 </span>            : </a>
+<span class="lineNum">     964 </span>            : void
+<span class="lineNum">     965 </span><span class="lineNoCov">          0 : qlw_write(struct qlw_softc *sc, bus_size_t offset, u_int16_t value)</span>
+<span class="lineNum">     966 </span>            : {
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :         bus_space_write_2(sc-&gt;sc_iot, sc-&gt;sc_ioh, offset, value);</span>
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :         bus_space_barrier(sc-&gt;sc_iot, sc-&gt;sc_ioh, offset, 2,</span>
+<span class="lineNum">     969 </span>            :             BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE);
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 : }</span>
+<a name="971"><span class="lineNum">     971 </span>            : </a>
+<span class="lineNum">     972 </span>            : u_int16_t
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 : qlw_read_mbox(struct qlw_softc *sc, int mbox)</span>
+<span class="lineNum">     974 </span>            : {
+<span class="lineNum">     975 </span>            :         /* could range-check mboxes according to chip type? */
+<span class="lineNum">     976 </span><span class="lineNoCov">          0 :         return (qlw_read(sc, sc-&gt;sc_mbox_base + (mbox * 2)));</span>
+<span class="lineNum">     977 </span>            : }
+<a name="978"><span class="lineNum">     978 </span>            : </a>
+<span class="lineNum">     979 </span>            : void
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 : qlw_write_mbox(struct qlw_softc *sc, int mbox, u_int16_t value)</span>
+<span class="lineNum">     981 </span>            : {
+<span class="lineNum">     982 </span><span class="lineNoCov">          0 :         qlw_write(sc, sc-&gt;sc_mbox_base + (mbox * 2), value);</span>
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 : }</span>
+<a name="984"><span class="lineNum">     984 </span>            : </a>
+<span class="lineNum">     985 </span>            : void
+<span class="lineNum">     986 </span><span class="lineNoCov">          0 : qlw_host_cmd(struct qlw_softc *sc, u_int16_t cmd)</span>
+<span class="lineNum">     987 </span>            : {
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :         qlw_write(sc, sc-&gt;sc_host_cmd_ctrl, cmd &lt;&lt; QLW_HOST_CMD_SHIFT);</span>
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     990 </span>            : 
+<span class="lineNum">     991 </span>            : #define MBOX_COMMAND_TIMEOUT    4000
+<a name="992"><span class="lineNum">     992 </span>            : </a>
+<span class="lineNum">     993 </span>            : int
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 : qlw_mbox(struct qlw_softc *sc, int maskin, int maskout)</span>
+<span class="lineNum">     995 </span>            : {
+<span class="lineNum">     996 </span>            :         int i;
+<span class="lineNum">     997 </span>            :         int result = 0;
+<span class="lineNum">     998 </span>            :         int rv;
+<span class="lineNum">     999 </span>            : 
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox_pending = 1;</span>
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; nitems(sc-&gt;sc_mbox); i++) {</span>
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 :                 if (maskin &amp; (1 &lt;&lt; i)) {</span>
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :                         qlw_write_mbox(sc, i, sc-&gt;sc_mbox[i]);</span>
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1005 </span>            :         }
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :         qlw_host_cmd(sc, QLW_HOST_CMD_SET_HOST_INT);</span>
+<span class="lineNum">    1007 </span>            : 
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_running == 0) {</span>
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; MBOX_COMMAND_TIMEOUT &amp;&amp; result == 0; i++) {</span>
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :                         u_int16_t isr, info;</span>
+<span class="lineNum">    1011 </span>            : 
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :                         delay(100);</span>
+<span class="lineNum">    1013 </span>            : 
+<span class="lineNum">    1014 </span><span class="lineNoCov">          0 :                         if (qlw_read_isr(sc, &amp;isr, &amp;info) == 0)</span>
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :                                 continue;</span>
+<span class="lineNum">    1016 </span>            : 
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :                         switch (isr) {</span>
+<span class="lineNum">    1018 </span>            :                         case QLW_INT_TYPE_MBOX:
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :                                 result = info;</span>
+<span class="lineNum">    1020 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">    1021 </span>            : 
+<span class="lineNum">    1022 </span>            :                         default:
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 :                                 qlw_handle_intr(sc, isr, info);</span>
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">    1025 </span>            :                         }
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1027 </span>            :         } else {
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :                 tsleep(sc-&gt;sc_mbox, PRIBIO, &quot;qlw_mbox&quot;, 0);</span>
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :                 result = sc-&gt;sc_mbox[0];</span>
+<span class="lineNum">    1030 </span>            :         }
+<span class="lineNum">    1031 </span>            : 
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :         switch (result) {</span>
+<span class="lineNum">    1033 </span>            :         case QLW_MBOX_COMPLETE:
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :                 for (i = 1; i &lt; nitems(sc-&gt;sc_mbox); i++) {</span>
+<span class="lineNum">    1035 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_mbox[i] = (maskout &amp; (1 &lt;&lt; i)) ?</span>
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 :                             qlw_read_mbox(sc, i) : 0;</span>
+<span class="lineNum">    1037 </span>            :                 }
+<span class="lineNum">    1038 </span>            :                 rv = 0;
+<span class="lineNum">    1039 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1040 </span>            : 
+<span class="lineNum">    1041 </span>            :         case 0:
+<span class="lineNum">    1042 </span>            :                 /* timed out; do something? */
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :                 DPRINTF(QLW_D_MBOX, &quot;%s: mbox timed out\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1044 </span>            :                 rv = 1;
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1046 </span>            : 
+<span class="lineNum">    1047 </span>            :         default:
+<span class="lineNum">    1048 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[0] = result;</span>
+<span class="lineNum">    1049 </span>            :                 rv = result;
+<span class="lineNum">    1050 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1051 </span>            :         }
+<span class="lineNum">    1052 </span>            : 
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 :         qlw_clear_isr(sc, QLW_INT_TYPE_MBOX);</span>
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox_pending = 0;</span>
+<span class="lineNum">    1055 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">    1056 </span>            : }
+<a name="1057"><span class="lineNum">    1057 </span>            : </a>
+<span class="lineNum">    1058 </span>            : void
+<span class="lineNum">    1059 </span><span class="lineNoCov">          0 : qlw_mbox_putaddr(u_int16_t *mbox, struct qlw_dmamem *mem)</span>
+<span class="lineNum">    1060 </span>            : {
+<span class="lineNum">    1061 </span><span class="lineNoCov">          0 :         mbox[2] = (QLW_DMA_DVA(mem) &gt;&gt; 16) &amp; 0xffff;</span>
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 :         mbox[3] = (QLW_DMA_DVA(mem) &gt;&gt; 0) &amp; 0xffff;</span>
+<span class="lineNum">    1063 </span><span class="lineNoCov">          0 :         mbox[6] = (QLW_DMA_DVA(mem) &gt;&gt; 48) &amp; 0xffff;</span>
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :         mbox[7] = (QLW_DMA_DVA(mem) &gt;&gt; 32) &amp; 0xffff;</span>
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 : }</span>
+<a name="1066"><span class="lineNum">    1066 </span>            : </a>
+<span class="lineNum">    1067 </span>            : void
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 : qlw_set_ints(struct qlw_softc *sc, int enabled)</span>
+<span class="lineNum">    1069 </span>            : {
+<span class="lineNum">    1070 </span><span class="lineNoCov">          0 :         u_int16_t v = enabled ? (QLW_INT_REQ | QLW_RISC_INT_REQ) : 0;</span>
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :         qlw_write(sc, QLW_INT_CTRL, v);</span>
+<span class="lineNum">    1072 </span><span class="lineNoCov">          0 : }</span>
+<a name="1073"><span class="lineNum">    1073 </span>            : </a>
+<span class="lineNum">    1074 </span>            : int
+<span class="lineNum">    1075 </span><span class="lineNoCov">          0 : qlw_read_isr(struct qlw_softc *sc, u_int16_t *isr, u_int16_t *info)</span>
+<span class="lineNum">    1076 </span>            : {
+<span class="lineNum">    1077 </span>            :         u_int16_t int_status;
+<span class="lineNum">    1078 </span>            : 
+<span class="lineNum">    1079 </span><span class="lineNoCov">          0 :         if (qlw_read(sc, QLW_SEMA) &amp; QLW_SEMA_LOCK) {</span>
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 :                 *info = qlw_read_mbox(sc, 0);</span>
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :                 if (*info &amp; QLW_MBOX_HAS_STATUS)</span>
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :                         *isr = QLW_INT_TYPE_MBOX;</span>
+<span class="lineNum">    1083 </span>            :                 else
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 :                         *isr = QLW_INT_TYPE_ASYNC;</span>
+<span class="lineNum">    1085 </span>            :         } else {
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 :                 int_status = qlw_read(sc, QLW_INT_STATUS);</span>
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :                 if ((int_status &amp; (QLW_INT_REQ | QLW_RISC_INT_REQ)) == 0)</span>
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">    1089 </span>            : 
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :                 *isr = QLW_INT_TYPE_IO;</span>
+<span class="lineNum">    1091 </span>            :         }
+<span class="lineNum">    1092 </span>            : 
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 : }</span>
+<a name="1095"><span class="lineNum">    1095 </span>            : </a>
+<span class="lineNum">    1096 </span>            : void
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 : qlw_clear_isr(struct qlw_softc *sc, u_int16_t isr)</span>
+<span class="lineNum">    1098 </span>            : {
+<span class="lineNum">    1099 </span><span class="lineNoCov">          0 :         qlw_host_cmd(sc, QLW_HOST_CMD_CLR_RISC_INT);</span>
+<span class="lineNum">    1100 </span><span class="lineNoCov">          0 :         switch (isr) {</span>
+<span class="lineNum">    1101 </span>            :         case QLW_INT_TYPE_MBOX:
+<span class="lineNum">    1102 </span>            :         case QLW_INT_TYPE_ASYNC:
+<span class="lineNum">    1103 </span><span class="lineNoCov">          0 :                 qlw_write(sc, QLW_SEMA, 0);</span>
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1105 </span>            :         default:
+<span class="lineNum">    1106 </span>            :                 break;
+<span class="lineNum">    1107 </span>            :         }
+<span class="lineNum">    1108 </span><span class="lineNoCov">          0 : }</span>
+<a name="1109"><span class="lineNum">    1109 </span>            : </a>
+<span class="lineNum">    1110 </span>            : int
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 : qlw_softreset(struct qlw_softc *sc)</span>
+<span class="lineNum">    1112 </span>            : {
+<span class="lineNum">    1113 </span>            :         int i;
+<span class="lineNum">    1114 </span>            : 
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 :         qlw_set_ints(sc, 0);</span>
+<span class="lineNum">    1116 </span>            : 
+<span class="lineNum">    1117 </span>            :         /* reset */
+<span class="lineNum">    1118 </span><span class="lineNoCov">          0 :         qlw_write(sc, QLW_INT_CTRL, QLW_RESET);</span>
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :         delay(100);</span>
+<span class="lineNum">    1120 </span>            :         /* clear data and control dma engines? */
+<span class="lineNum">    1121 </span>            : 
+<span class="lineNum">    1122 </span>            :         /* wait for soft reset to clear */
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; 1000; i++) {</span>
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :                 if ((qlw_read(sc, QLW_INT_CTRL) &amp; QLW_RESET) == 0)</span>
+<span class="lineNum">    1125 </span>            :                         break;
+<span class="lineNum">    1126 </span>            : 
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :                 delay(100);</span>
+<span class="lineNum">    1128 </span>            :         }
+<span class="lineNum">    1129 </span>            : 
+<span class="lineNum">    1130 </span><span class="lineNoCov">          0 :         if (i == 1000) {</span>
+<span class="lineNum">    1131 </span><span class="lineNoCov">          0 :                 DPRINTF(QLW_D_INTR, &quot;%s: reset didn't clear\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 :                 qlw_set_ints(sc, 0);</span>
+<span class="lineNum">    1133 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">    1134 </span>            :         }
+<span class="lineNum">    1135 </span>            : 
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         qlw_write(sc, QLW_CFG1, 0);</span>
+<span class="lineNum">    1137 </span>            : 
+<span class="lineNum">    1138 </span>            :         /* reset risc processor */
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :         qlw_host_cmd(sc, QLW_HOST_CMD_RESET);</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :         delay(100);</span>
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :         qlw_write(sc, QLW_SEMA, 0);</span>
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :         qlw_host_cmd(sc, QLW_HOST_CMD_RELEASE);</span>
+<span class="lineNum">    1143 </span>            : 
+<span class="lineNum">    1144 </span>            :         /* reset queue pointers */
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :         qlw_queue_write(sc, QLW_REQ_IN, 0);</span>
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :         qlw_queue_write(sc, QLW_REQ_OUT, 0);</span>
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 :         qlw_queue_write(sc, QLW_RESP_IN, 0);</span>
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :         qlw_queue_write(sc, QLW_RESP_OUT, 0);</span>
+<span class="lineNum">    1149 </span>            : 
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :         qlw_set_ints(sc, 1);</span>
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 :         qlw_host_cmd(sc, QLW_HOST_CMD_BIOS);</span>
+<span class="lineNum">    1152 </span>            : 
+<span class="lineNum">    1153 </span>            :         /* do a basic mailbox operation to check we're alive */
+<span class="lineNum">    1154 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_NOP;</span>
+<span class="lineNum">    1155 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x0001, 0x0001)) {</span>
+<span class="lineNum">    1156 </span><span class="lineNoCov">          0 :                 DPRINTF(QLW_D_INTR, &quot;%s: ISP not responding after reset\n&quot;,</span>
+<span class="lineNum">    1157 </span>            :                     DEVNAME(sc));
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">    1159 </span>            :         }
+<span class="lineNum">    1160 </span>            : 
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 : }</span>
+<a name="1163"><span class="lineNum">    1163 </span>            : </a>
+<span class="lineNum">    1164 </span>            : void
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 : qlw_dma_burst_enable(struct qlw_softc *sc)</span>
+<span class="lineNum">    1166 </span>            : {
+<span class="lineNum">    1167 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_isp_gen == QLW_GEN_ISP1000 ||</span>
+<span class="lineNum">    1168 </span><span class="lineNoCov">          0 :             sc-&gt;sc_isp_gen == QLW_GEN_ISP1040) {</span>
+<span class="lineNum">    1169 </span><span class="lineNoCov">          0 :                 qlw_write(sc, QLW_CDMA_CFG,</span>
+<span class="lineNum">    1170 </span><span class="lineNoCov">          0 :                     qlw_read(sc, QLW_CDMA_CFG) | QLW_DMA_BURST_ENABLE);</span>
+<span class="lineNum">    1171 </span><span class="lineNoCov">          0 :                 qlw_write(sc, QLW_DDMA_CFG,</span>
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :                     qlw_read(sc, QLW_DDMA_CFG) | QLW_DMA_BURST_ENABLE);</span>
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :                 qlw_host_cmd(sc, QLW_HOST_CMD_PAUSE);</span>
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :                 qlw_write(sc, QLW_CFG1,</span>
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 :                     qlw_read(sc, QLW_CFG1) | QLW_DMA_BANK);</span>
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :                 qlw_write(sc, QLW_CDMA_CFG_1080,</span>
+<span class="lineNum">    1178 </span><span class="lineNoCov">          0 :                     qlw_read(sc, QLW_CDMA_CFG_1080) | QLW_DMA_BURST_ENABLE);</span>
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 :                 qlw_write(sc, QLW_DDMA_CFG_1080,</span>
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :                     qlw_read(sc, QLW_DDMA_CFG_1080) | QLW_DMA_BURST_ENABLE);</span>
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 :                 qlw_write(sc, QLW_CFG1,</span>
+<span class="lineNum">    1182 </span><span class="lineNoCov">          0 :                     qlw_read(sc, QLW_CFG1) &amp; ~QLW_DMA_BANK);</span>
+<span class="lineNum">    1183 </span><span class="lineNoCov">          0 :                 qlw_host_cmd(sc, QLW_HOST_CMD_RELEASE);</span>
+<span class="lineNum">    1184 </span>            :         }
+<span class="lineNum">    1185 </span><span class="lineNoCov">          0 : }</span>
+<a name="1186"><span class="lineNum">    1186 </span>            : </a>
+<span class="lineNum">    1187 </span>            : void
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 : qlw_update(struct qlw_softc *sc, int task)</span>
+<span class="lineNum">    1189 </span>            : {
+<span class="lineNum">    1190 </span>            :         /* do things */
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 : }</span>
+<a name="1192"><span class="lineNum">    1192 </span>            : </a>
+<span class="lineNum">    1193 </span>            : int
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 : qlw_async(struct qlw_softc *sc, u_int16_t info)</span>
+<span class="lineNum">    1195 </span>            : {
+<span class="lineNum">    1196 </span>            :         int bus;
+<span class="lineNum">    1197 </span>            : 
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 :         switch (info) {</span>
+<span class="lineNum">    1199 </span>            :         case QLW_ASYNC_BUS_RESET:
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 :                 DPRINTF(QLW_D_PORT, &quot;%s: bus reset\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1201 </span><span class="lineNoCov">          0 :                 bus = qlw_read_mbox(sc, 6);</span>
+<span class="lineNum">    1202 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_marker_required[bus] = 1;</span>
+<span class="lineNum">    1203 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1204 </span>            : 
+<span class="lineNum">    1205 </span>            : #if 0
+<span class="lineNum">    1206 </span>            :         case QLW_ASYNC_SYSTEM_ERROR:
+<span class="lineNum">    1207 </span>            :                 qla_update(sc, QLW_UPDATE_SOFTRESET);
+<span class="lineNum">    1208 </span>            :                 break;
+<span class="lineNum">    1209 </span>            : 
+<span class="lineNum">    1210 </span>            :         case QLW_ASYNC_REQ_XFER_ERROR:
+<span class="lineNum">    1211 </span>            :                 qla_update(sc, QLW_UPDATE_SOFTRESET);
+<span class="lineNum">    1212 </span>            :                 break;
+<span class="lineNum">    1213 </span>            : 
+<span class="lineNum">    1214 </span>            :         case QLW_ASYNC_RSP_XFER_ERROR:
+<span class="lineNum">    1215 </span>            :                 qla_update(sc, QLW_UPDATE_SOFTRESET);
+<span class="lineNum">    1216 </span>            :                 break;
+<span class="lineNum">    1217 </span>            : #endif
+<span class="lineNum">    1218 </span>            : 
+<span class="lineNum">    1219 </span>            :         case QLW_ASYNC_SCSI_CMD_COMPLETE:
+<span class="lineNum">    1220 </span>            :                 /* shouldn't happen, we disable fast posting */
+<span class="lineNum">    1221 </span>            :                 break;
+<span class="lineNum">    1222 </span>            : 
+<span class="lineNum">    1223 </span>            :         case QLW_ASYNC_CTIO_COMPLETE:
+<span class="lineNum">    1224 </span>            :                 /* definitely shouldn't happen, we don't do target mode */
+<span class="lineNum">    1225 </span>            :                 break;
+<span class="lineNum">    1226 </span>            : 
+<span class="lineNum">    1227 </span>            :         default:
+<span class="lineNum">    1228 </span><span class="lineNoCov">          0 :                 DPRINTF(QLW_D_INTR, &quot;%s: unknown async %x\n&quot;, DEVNAME(sc),</span>
+<span class="lineNum">    1229 </span>            :                     info);
+<span class="lineNum">    1230 </span>            :                 break;
+<span class="lineNum">    1231 </span>            :         }
+<span class="lineNum">    1232 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">    1233 </span>            : }
+<span class="lineNum">    1234 </span>            : 
+<a name="1235"><span class="lineNum">    1235 </span>            : #ifdef QLW_DEBUG</a>
+<span class="lineNum">    1236 </span>            : void
+<span class="lineNum">    1237 </span><span class="lineNoCov">          0 : qlw_dump_iocb(struct qlw_softc *sc, void *buf, int flags)</span>
+<span class="lineNum">    1238 </span>            : {
+<span class="lineNum">    1239 </span>            :         u_int8_t *iocb = buf;
+<span class="lineNum">    1240 </span>            :         int l;
+<span class="lineNum">    1241 </span>            :         int b;
+<span class="lineNum">    1242 </span>            : 
+<span class="lineNum">    1243 </span><span class="lineNoCov">          0 :         if ((qlwdebug &amp; flags) == 0)</span>
+<span class="lineNum">    1244 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1245 </span>            : 
+<span class="lineNum">    1246 </span><span class="lineNoCov">          0 :         printf(&quot;%s: iocb:\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1247 </span><span class="lineNoCov">          0 :         for (l = 0; l &lt; 4; l++) {</span>
+<span class="lineNum">    1248 </span><span class="lineNoCov">          0 :                 for (b = 0; b &lt; 16; b++) {</span>
+<span class="lineNum">    1249 </span><span class="lineNoCov">          0 :                         printf(&quot; %2.2x&quot;, iocb[(l*16)+b]);</span>
+<span class="lineNum">    1250 </span>            :                 }
+<span class="lineNum">    1251 </span><span class="lineNoCov">          0 :                 printf(&quot;\n&quot;);</span>
+<span class="lineNum">    1252 </span>            :         }
+<span class="lineNum">    1253 </span><span class="lineNoCov">          0 : }</span>
+<a name="1254"><span class="lineNum">    1254 </span>            : </a>
+<span class="lineNum">    1255 </span>            : void
+<span class="lineNum">    1256 </span><span class="lineNoCov">          0 : qlw_dump_iocb_segs(struct qlw_softc *sc, void *segs, int n)</span>
+<span class="lineNum">    1257 </span>            : {
+<span class="lineNum">    1258 </span>            :         u_int8_t *buf = segs;
+<span class="lineNum">    1259 </span>            :         int s, b;
+<span class="lineNum">    1260 </span><span class="lineNoCov">          0 :         if ((qlwdebug &amp; QLW_D_IOCB) == 0)</span>
+<span class="lineNum">    1261 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1262 </span>            : 
+<span class="lineNum">    1263 </span><span class="lineNoCov">          0 :         printf(&quot;%s: iocb segs:\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1264 </span><span class="lineNoCov">          0 :         for (s = 0; s &lt; n; s++) {</span>
+<span class="lineNum">    1265 </span><span class="lineNoCov">          0 :                 for (b = 0; b &lt; sizeof(struct qlw_iocb_seg); b++) {</span>
+<span class="lineNum">    1266 </span><span class="lineNoCov">          0 :                         printf(&quot; %2.2x&quot;, buf[(s*(sizeof(struct qlw_iocb_seg)))</span>
+<span class="lineNum">    1267 </span><span class="lineNoCov">          0 :                             + b]);</span>
+<span class="lineNum">    1268 </span>            :                 }
+<span class="lineNum">    1269 </span><span class="lineNoCov">          0 :                 printf(&quot;\n&quot;);</span>
+<span class="lineNum">    1270 </span>            :         }
+<span class="lineNum">    1271 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1272 </span>            : #endif
+<span class="lineNum">    1273 </span>            : 
+<span class="lineNum">    1274 </span>            : /*
+<span class="lineNum">    1275 </span>            :  * The PCI bus is little-endian whereas SBus is big-endian.  This
+<span class="lineNum">    1276 </span>            :  * leads to some differences in byte twisting of DMA transfers of
+<span class="lineNum">    1277 </span>            :  * request and response queue entries.  Most fields can be treated as
+<span class="lineNum">    1278 </span>            :  * 16-bit or 32-bit with the endianness of the bus, but the header
+<span class="lineNum">    1279 </span>            :  * fields end up being swapped by the ISP1000's SBus interface.
+<span class="lineNum">    1280 </span>            :  */
+<a name="1281"><span class="lineNum">    1281 </span>            : </a>
+<span class="lineNum">    1282 </span>            : void
+<span class="lineNum">    1283 </span><span class="lineNoCov">          0 : qlw_get_header(struct qlw_softc *sc, struct qlw_iocb_hdr *hdr,</span>
+<span class="lineNum">    1284 </span>            :     int *type, int *flags)
+<span class="lineNum">    1285 </span>            : {
+<span class="lineNum">    1286 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_isp_gen == QLW_GEN_ISP1000) {</span>
+<span class="lineNum">    1287 </span><span class="lineNoCov">          0 :                 *type = hdr-&gt;entry_count;</span>
+<span class="lineNum">    1288 </span><span class="lineNoCov">          0 :                 *flags = hdr-&gt;seqno;</span>
+<span class="lineNum">    1289 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1290 </span><span class="lineNoCov">          0 :                 *type = hdr-&gt;entry_type;</span>
+<span class="lineNum">    1291 </span><span class="lineNoCov">          0 :                 *flags = hdr-&gt;flags;</span>
+<span class="lineNum">    1292 </span>            :         }
+<span class="lineNum">    1293 </span><span class="lineNoCov">          0 : }</span>
+<a name="1294"><span class="lineNum">    1294 </span>            : </a>
+<span class="lineNum">    1295 </span>            : void
+<span class="lineNum">    1296 </span><span class="lineNoCov">          0 : qlw_put_header(struct qlw_softc *sc, struct qlw_iocb_hdr *hdr,</span>
+<span class="lineNum">    1297 </span>            :     int type, int count)
+<span class="lineNum">    1298 </span>            : {
+<span class="lineNum">    1299 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_isp_gen == QLW_GEN_ISP1000) {</span>
+<span class="lineNum">    1300 </span><span class="lineNoCov">          0 :                 hdr-&gt;entry_type = count;</span>
+<span class="lineNum">    1301 </span><span class="lineNoCov">          0 :                 hdr-&gt;entry_count = type;</span>
+<span class="lineNum">    1302 </span><span class="lineNoCov">          0 :                 hdr-&gt;seqno = 0;</span>
+<span class="lineNum">    1303 </span><span class="lineNoCov">          0 :                 hdr-&gt;flags = 0;</span>
+<span class="lineNum">    1304 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1305 </span><span class="lineNoCov">          0 :                 hdr-&gt;entry_type = type;</span>
+<span class="lineNum">    1306 </span><span class="lineNoCov">          0 :                 hdr-&gt;entry_count = count;</span>
+<span class="lineNum">    1307 </span><span class="lineNoCov">          0 :                 hdr-&gt;seqno = 0;</span>
+<span class="lineNum">    1308 </span><span class="lineNoCov">          0 :                 hdr-&gt;flags = 0;</span>
+<span class="lineNum">    1309 </span>            :         }
+<span class="lineNum">    1310 </span><span class="lineNoCov">          0 : }</span>
+<a name="1311"><span class="lineNum">    1311 </span>            : </a>
+<span class="lineNum">    1312 </span>            : void
+<span class="lineNum">    1313 </span><span class="lineNoCov">          0 : qlw_put_data_seg(struct qlw_softc *sc, struct qlw_iocb_seg *seg,</span>
+<span class="lineNum">    1314 </span>            :     bus_dmamap_t dmap, int num)
+<span class="lineNum">    1315 </span>            : {
+<span class="lineNum">    1316 </span><span class="lineNoCov">          0 :         seg-&gt;seg_addr = qlw_swap32(sc, dmap-&gt;dm_segs[num].ds_addr);</span>
+<span class="lineNum">    1317 </span><span class="lineNoCov">          0 :         seg-&gt;seg_len = qlw_swap32(sc, dmap-&gt;dm_segs[num].ds_len);</span>
+<span class="lineNum">    1318 </span><span class="lineNoCov">          0 : }</span>
+<a name="1319"><span class="lineNum">    1319 </span>            : </a>
+<span class="lineNum">    1320 </span>            : void
+<span class="lineNum">    1321 </span><span class="lineNoCov">          0 : qlw_put_marker(struct qlw_softc *sc, int bus, void *buf)</span>
+<span class="lineNum">    1322 </span>            : {
+<span class="lineNum">    1323 </span><span class="lineNoCov">          0 :         struct qlw_iocb_marker *marker = buf;</span>
+<span class="lineNum">    1324 </span>            : 
+<span class="lineNum">    1325 </span><span class="lineNoCov">          0 :         qlw_put_header(sc, &amp;marker-&gt;hdr, QLW_IOCB_MARKER, 1);</span>
+<span class="lineNum">    1326 </span>            : 
+<span class="lineNum">    1327 </span>            :         /* could be more specific here; isp(4) isn't */
+<span class="lineNum">    1328 </span><span class="lineNoCov">          0 :         marker-&gt;device = qlw_swap16(sc, (bus &lt;&lt; 7) &lt;&lt; 8);</span>
+<span class="lineNum">    1329 </span><span class="lineNoCov">          0 :         marker-&gt;modifier = qlw_swap16(sc, QLW_IOCB_MARKER_SYNC_ALL);</span>
+<span class="lineNum">    1330 </span><span class="lineNoCov">          0 :         qlw_dump_iocb(sc, buf, QLW_D_IOCB);</span>
+<span class="lineNum">    1331 </span><span class="lineNoCov">          0 : }</span>
+<a name="1332"><span class="lineNum">    1332 </span>            : </a>
+<span class="lineNum">    1333 </span>            : void
+<span class="lineNum">    1334 </span><span class="lineNoCov">          0 : qlw_put_cmd(struct qlw_softc *sc, void *buf, struct scsi_xfer *xs,</span>
+<span class="lineNum">    1335 </span>            :     struct qlw_ccb *ccb)
+<span class="lineNum">    1336 </span>            : {
+<span class="lineNum">    1337 </span><span class="lineNoCov">          0 :         struct qlw_iocb_req0 *req = buf;</span>
+<span class="lineNum">    1338 </span>            :         int entry_count = 1;
+<span class="lineNum">    1339 </span>            :         u_int16_t dir;
+<span class="lineNum">    1340 </span>            :         int seg, nsegs;
+<span class="lineNum">    1341 </span>            :         int seg_count;
+<span class="lineNum">    1342 </span>            :         int timeout = 0;
+<span class="lineNum">    1343 </span>            :         int bus, target, lun;
+<span class="lineNum">    1344 </span>            : 
+<span class="lineNum">    1345 </span><span class="lineNoCov">          0 :         if (xs-&gt;datalen == 0) {</span>
+<span class="lineNum">    1346 </span>            :                 dir = QLW_IOCB_CMD_NO_DATA;
+<span class="lineNum">    1347 </span>            :                 seg_count = 1;
+<span class="lineNum">    1348 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1349 </span><span class="lineNoCov">          0 :                 dir = xs-&gt;flags &amp; SCSI_DATA_IN ? QLW_IOCB_CMD_READ_DATA :</span>
+<span class="lineNum">    1350 </span>            :                     QLW_IOCB_CMD_WRITE_DATA;
+<span class="lineNum">    1351 </span><span class="lineNoCov">          0 :                 seg_count = ccb-&gt;ccb_dmamap-&gt;dm_nsegs;</span>
+<span class="lineNum">    1352 </span><span class="lineNoCov">          0 :                 nsegs = ccb-&gt;ccb_dmamap-&gt;dm_nsegs - QLW_IOCB_SEGS_PER_CMD;</span>
+<span class="lineNum">    1353 </span><span class="lineNoCov">          0 :                 while (nsegs &gt; 0) {</span>
+<span class="lineNum">    1354 </span><span class="lineNoCov">          0 :                         entry_count++;</span>
+<span class="lineNum">    1355 </span><span class="lineNoCov">          0 :                         nsegs -= QLW_IOCB_SEGS_PER_CONT;</span>
+<span class="lineNum">    1356 </span>            :                 }
+<span class="lineNum">    1357 </span><span class="lineNoCov">          0 :                 for (seg = 0; seg &lt; ccb-&gt;ccb_dmamap-&gt;dm_nsegs; seg++) {</span>
+<span class="lineNum">    1358 </span><span class="lineNoCov">          0 :                         if (seg &gt;= QLW_IOCB_SEGS_PER_CMD)</span>
+<span class="lineNum">    1359 </span>            :                                 break;
+<span class="lineNum">    1360 </span><span class="lineNoCov">          0 :                         qlw_put_data_seg(sc, &amp;req-&gt;segs[seg],</span>
+<span class="lineNum">    1361 </span>            :                             ccb-&gt;ccb_dmamap, seg);
+<span class="lineNum">    1362 </span>            :                 }
+<span class="lineNum">    1363 </span>            :         }
+<span class="lineNum">    1364 </span>            : 
+<span class="lineNum">    1365 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_running &amp;&amp; (xs-&gt;sc_link-&gt;quirks &amp; SDEV_NOTAGS) == 0)</span>
+<span class="lineNum">    1366 </span><span class="lineNoCov">          0 :                 dir |= QLW_IOCB_CMD_SIMPLE_QUEUE;</span>
+<span class="lineNum">    1367 </span>            : 
+<span class="lineNum">    1368 </span><span class="lineNoCov">          0 :         qlw_put_header(sc, &amp;req-&gt;hdr, QLW_IOCB_CMD_TYPE_0, entry_count);</span>
+<span class="lineNum">    1369 </span>            : 
+<span class="lineNum">    1370 </span>            :         /*
+<span class="lineNum">    1371 </span>            :          * timeout is in seconds.  make sure it's at least 1 if a timeout
+<span class="lineNum">    1372 </span>            :          * was specified in xs
+<span class="lineNum">    1373 </span>            :          */
+<span class="lineNum">    1374 </span><span class="lineNoCov">          0 :         if (xs-&gt;timeout != 0)</span>
+<span class="lineNum">    1375 </span><span class="lineNoCov">          0 :                 timeout = MAX(1, xs-&gt;timeout/1000);</span>
+<span class="lineNum">    1376 </span>            : 
+<span class="lineNum">    1377 </span><span class="lineNoCov">          0 :         req-&gt;flags = qlw_swap16(sc, dir);</span>
+<span class="lineNum">    1378 </span><span class="lineNoCov">          0 :         req-&gt;seg_count = qlw_swap16(sc, seg_count);</span>
+<span class="lineNum">    1379 </span><span class="lineNoCov">          0 :         req-&gt;timeout = qlw_swap16(sc, timeout);</span>
+<span class="lineNum">    1380 </span>            : 
+<span class="lineNum">    1381 </span><span class="lineNoCov">          0 :         bus = qlw_xs_bus(sc, xs);</span>
+<span class="lineNum">    1382 </span><span class="lineNoCov">          0 :         target = xs-&gt;sc_link-&gt;target;</span>
+<span class="lineNum">    1383 </span><span class="lineNoCov">          0 :         lun = xs-&gt;sc_link-&gt;lun;</span>
+<span class="lineNum">    1384 </span><span class="lineNoCov">          0 :         req-&gt;device = qlw_swap16(sc, (((bus &lt;&lt; 7) | target) &lt;&lt; 8) | lun);</span>
+<span class="lineNum">    1385 </span>            : 
+<span class="lineNum">    1386 </span><span class="lineNoCov">          0 :         memcpy(req-&gt;cdb, xs-&gt;cmd, xs-&gt;cmdlen);</span>
+<span class="lineNum">    1387 </span><span class="lineNoCov">          0 :         req-&gt;ccblen = qlw_swap16(sc, xs-&gt;cmdlen);</span>
+<span class="lineNum">    1388 </span>            : 
+<span class="lineNum">    1389 </span><span class="lineNoCov">          0 :         req-&gt;handle = qlw_swap32(sc, ccb-&gt;ccb_id);</span>
+<span class="lineNum">    1390 </span>            : 
+<span class="lineNum">    1391 </span><span class="lineNoCov">          0 :         qlw_dump_iocb(sc, buf, QLW_D_IOCB);</span>
+<span class="lineNum">    1392 </span><span class="lineNoCov">          0 : }</span>
+<a name="1393"><span class="lineNum">    1393 </span>            : </a>
+<span class="lineNum">    1394 </span>            : void
+<span class="lineNum">    1395 </span><span class="lineNoCov">          0 : qlw_put_cont(struct qlw_softc *sc, void *buf, struct scsi_xfer *xs,</span>
+<span class="lineNum">    1396 </span>            :     struct qlw_ccb *ccb, int seg0)
+<span class="lineNum">    1397 </span>            : {
+<span class="lineNum">    1398 </span><span class="lineNoCov">          0 :         struct qlw_iocb_cont0 *cont = buf;</span>
+<span class="lineNum">    1399 </span>            :         int seg;
+<span class="lineNum">    1400 </span>            : 
+<span class="lineNum">    1401 </span><span class="lineNoCov">          0 :         qlw_put_header(sc, &amp;cont-&gt;hdr, QLW_IOCB_CONT_TYPE_0, 1);</span>
+<span class="lineNum">    1402 </span>            : 
+<span class="lineNum">    1403 </span><span class="lineNoCov">          0 :         for (seg = seg0; seg &lt; ccb-&gt;ccb_dmamap-&gt;dm_nsegs; seg++) {</span>
+<span class="lineNum">    1404 </span><span class="lineNoCov">          0 :                 if ((seg - seg0) &gt;= QLW_IOCB_SEGS_PER_CONT)</span>
+<span class="lineNum">    1405 </span>            :                         break;
+<span class="lineNum">    1406 </span><span class="lineNoCov">          0 :                 qlw_put_data_seg(sc, &amp;cont-&gt;segs[seg - seg0],</span>
+<span class="lineNum">    1407 </span>            :                     ccb-&gt;ccb_dmamap, seg);
+<span class="lineNum">    1408 </span>            :         }
+<span class="lineNum">    1409 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1410 </span>            : 
+<a name="1411"><span class="lineNum">    1411 </span>            : #ifndef ISP_NOFIRMWARE</a>
+<span class="lineNum">    1412 </span>            : int
+<span class="lineNum">    1413 </span><span class="lineNoCov">          0 : qlw_load_firmware_words(struct qlw_softc *sc, const u_int16_t *src,</span>
+<span class="lineNum">    1414 </span>            :     u_int16_t dest)
+<span class="lineNum">    1415 </span>            : {
+<span class="lineNum">    1416 </span>            :         u_int16_t i;
+<span class="lineNum">    1417 </span>            : 
+<span class="lineNum">    1418 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; src[3]; i++) {</span>
+<span class="lineNum">    1419 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[0] = QLW_MBOX_WRITE_RAM_WORD;</span>
+<span class="lineNum">    1420 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[1] = i + dest;</span>
+<span class="lineNum">    1421 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_mbox[2] = src[i];</span>
+<span class="lineNum">    1422 </span><span class="lineNoCov">          0 :                 if (qlw_mbox(sc, 0x07, 0x01)) {</span>
+<span class="lineNum">    1423 </span><span class="lineNoCov">          0 :                         printf(&quot;firmware load failed\n&quot;);</span>
+<span class="lineNum">    1424 </span><span class="lineNoCov">          0 :                         return (1);</span>
+<span class="lineNum">    1425 </span>            :                 }
+<span class="lineNum">    1426 </span>            :         }
+<span class="lineNum">    1427 </span>            : 
+<span class="lineNum">    1428 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[0] = QLW_MBOX_VERIFY_CSUM;</span>
+<span class="lineNum">    1429 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mbox[1] = dest;</span>
+<span class="lineNum">    1430 </span><span class="lineNoCov">          0 :         if (qlw_mbox(sc, 0x0003, 0x0003)) {</span>
+<span class="lineNum">    1431 </span><span class="lineNoCov">          0 :                 printf(&quot;verification of chunk at %x failed: %x\n&quot;,</span>
+<span class="lineNum">    1432 </span><span class="lineNoCov">          0 :                     dest, sc-&gt;sc_mbox[1]);</span>
+<span class="lineNum">    1433 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1434 </span>            :         }
+<span class="lineNum">    1435 </span>            : 
+<span class="lineNum">    1436 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1437 </span><span class="lineNoCov">          0 : }</span>
+<a name="1438"><span class="lineNum">    1438 </span>            : </a>
+<span class="lineNum">    1439 </span>            : int
+<span class="lineNum">    1440 </span><span class="lineNoCov">          0 : qlw_load_firmware(struct qlw_softc *sc)</span>
+<span class="lineNum">    1441 </span>            : {
+<span class="lineNum">    1442 </span><span class="lineNoCov">          0 :         return qlw_load_firmware_words(sc, sc-&gt;sc_firmware, QLW_CODE_ORG);</span>
+<span class="lineNum">    1443 </span>            : }
+<span class="lineNum">    1444 </span>            : 
+<span class="lineNum">    1445 </span>            : #endif  /* !ISP_NOFIRMWARE */
+<a name="1446"><span class="lineNum">    1446 </span>            : </a>
+<span class="lineNum">    1447 </span>            : int
+<span class="lineNum">    1448 </span><span class="lineNoCov">          0 : qlw_read_nvram(struct qlw_softc *sc)</span>
+<span class="lineNum">    1449 </span>            : {
+<span class="lineNum">    1450 </span><span class="lineNoCov">          0 :         u_int16_t data[sizeof(sc-&gt;sc_nvram) &gt;&gt; 1];</span>
+<span class="lineNum">    1451 </span>            :         u_int16_t req, cmd, val;
+<span class="lineNum">    1452 </span>            :         u_int8_t csum;
+<span class="lineNum">    1453 </span>            :         int i, bit;
+<span class="lineNum">    1454 </span>            :         int reqcmd;
+<span class="lineNum">    1455 </span>            :         int nbits;
+<span class="lineNum">    1456 </span>            : 
+<span class="lineNum">    1457 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_nvram_size == 0)</span>
+<span class="lineNum">    1458 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1459 </span>            : 
+<span class="lineNum">    1460 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_nvram_size == 128) {</span>
+<span class="lineNum">    1461 </span>            :                 reqcmd = (QLW_NVRAM_CMD_READ &lt;&lt; 6);
+<span class="lineNum">    1462 </span>            :                 nbits = 8;
+<span class="lineNum">    1463 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1464 </span>            :                 reqcmd = (QLW_NVRAM_CMD_READ &lt;&lt; 8);
+<span class="lineNum">    1465 </span>            :                 nbits = 10;
+<span class="lineNum">    1466 </span>            :         }
+<span class="lineNum">    1467 </span>            : 
+<span class="lineNum">    1468 </span><span class="lineNoCov">          0 :         qlw_write(sc, QLW_NVRAM, QLW_NVRAM_CHIP_SEL);</span>
+<span class="lineNum">    1469 </span><span class="lineNoCov">          0 :         delay(10);</span>
+<span class="lineNum">    1470 </span><span class="lineNoCov">          0 :         qlw_write(sc, QLW_NVRAM, QLW_NVRAM_CHIP_SEL | QLW_NVRAM_CLOCK);</span>
+<span class="lineNum">    1471 </span><span class="lineNoCov">          0 :         delay(10);</span>
+<span class="lineNum">    1472 </span>            : 
+<span class="lineNum">    1473 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; (sc-&gt;sc_nvram_size &gt;&gt; 1); i++) {</span>
+<span class="lineNum">    1474 </span><span class="lineNoCov">          0 :                 req = i | reqcmd;</span>
+<span class="lineNum">    1475 </span>            : 
+<span class="lineNum">    1476 </span>            :                 /* write each bit out through the nvram register */
+<span class="lineNum">    1477 </span><span class="lineNoCov">          0 :                 for (bit = nbits; bit &gt;= 0; bit--) {</span>
+<span class="lineNum">    1478 </span>            :                         cmd = QLW_NVRAM_CHIP_SEL;
+<span class="lineNum">    1479 </span><span class="lineNoCov">          0 :                         if ((req &gt;&gt; bit) &amp; 1) {</span>
+<span class="lineNum">    1480 </span>            :                                 cmd |= QLW_NVRAM_DATA_OUT;
+<span class="lineNum">    1481 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">    1482 </span><span class="lineNoCov">          0 :                         qlw_write(sc, QLW_NVRAM, cmd);</span>
+<span class="lineNum">    1483 </span><span class="lineNoCov">          0 :                         delay(10);</span>
+<span class="lineNum">    1484 </span><span class="lineNoCov">          0 :                         qlw_read(sc, QLW_NVRAM);</span>
+<span class="lineNum">    1485 </span>            : 
+<span class="lineNum">    1486 </span><span class="lineNoCov">          0 :                         qlw_write(sc, QLW_NVRAM, cmd | QLW_NVRAM_CLOCK);</span>
+<span class="lineNum">    1487 </span><span class="lineNoCov">          0 :                         delay(10);</span>
+<span class="lineNum">    1488 </span><span class="lineNoCov">          0 :                         qlw_read(sc, QLW_NVRAM);</span>
+<span class="lineNum">    1489 </span>            : 
+<span class="lineNum">    1490 </span><span class="lineNoCov">          0 :                         qlw_write(sc, QLW_NVRAM, cmd);</span>
+<span class="lineNum">    1491 </span><span class="lineNoCov">          0 :                         delay(10);</span>
+<span class="lineNum">    1492 </span><span class="lineNoCov">          0 :                         qlw_read(sc, QLW_NVRAM);</span>
+<span class="lineNum">    1493 </span>            :                 }
+<span class="lineNum">    1494 </span>            : 
+<span class="lineNum">    1495 </span>            :                 /* read the result back */
+<span class="lineNum">    1496 </span>            :                 val = 0;
+<span class="lineNum">    1497 </span><span class="lineNoCov">          0 :                 for (bit = 0; bit &lt; 16; bit++) {</span>
+<span class="lineNum">    1498 </span><span class="lineNoCov">          0 :                         val &lt;&lt;= 1;</span>
+<span class="lineNum">    1499 </span><span class="lineNoCov">          0 :                         qlw_write(sc, QLW_NVRAM, QLW_NVRAM_CHIP_SEL |</span>
+<span class="lineNum">    1500 </span>            :                             QLW_NVRAM_CLOCK);
+<span class="lineNum">    1501 </span><span class="lineNoCov">          0 :                         delay(10);</span>
+<span class="lineNum">    1502 </span><span class="lineNoCov">          0 :                         if (qlw_read(sc, QLW_NVRAM) &amp; QLW_NVRAM_DATA_IN)</span>
+<span class="lineNum">    1503 </span><span class="lineNoCov">          0 :                                 val |= 1;</span>
+<span class="lineNum">    1504 </span><span class="lineNoCov">          0 :                         delay(10);</span>
+<span class="lineNum">    1505 </span>            : 
+<span class="lineNum">    1506 </span><span class="lineNoCov">          0 :                         qlw_write(sc, QLW_NVRAM, QLW_NVRAM_CHIP_SEL);</span>
+<span class="lineNum">    1507 </span><span class="lineNoCov">          0 :                         delay(10);</span>
+<span class="lineNum">    1508 </span><span class="lineNoCov">          0 :                         qlw_read(sc, QLW_NVRAM);</span>
+<span class="lineNum">    1509 </span>            :                 }
+<span class="lineNum">    1510 </span>            : 
+<span class="lineNum">    1511 </span><span class="lineNoCov">          0 :                 qlw_write(sc, QLW_NVRAM, 0);</span>
+<span class="lineNum">    1512 </span><span class="lineNoCov">          0 :                 delay(10);</span>
+<span class="lineNum">    1513 </span><span class="lineNoCov">          0 :                 qlw_read(sc, QLW_NVRAM);</span>
+<span class="lineNum">    1514 </span>            : 
+<span class="lineNum">    1515 </span><span class="lineNoCov">          0 :                 data[i] = letoh16(val);</span>
+<span class="lineNum">    1516 </span>            :         }
+<span class="lineNum">    1517 </span>            : 
+<span class="lineNum">    1518 </span>            :         csum = 0;
+<span class="lineNum">    1519 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; (sc-&gt;sc_nvram_size &gt;&gt; 1); i++) {</span>
+<span class="lineNum">    1520 </span><span class="lineNoCov">          0 :                 csum += data[i] &amp; 0xff;</span>
+<span class="lineNum">    1521 </span><span class="lineNoCov">          0 :                 csum += data[i] &gt;&gt; 8;</span>
+<span class="lineNum">    1522 </span>            :         }
+<span class="lineNum">    1523 </span>            : 
+<span class="lineNum">    1524 </span><span class="lineNoCov">          0 :         memcpy(&amp;sc-&gt;sc_nvram, data, sizeof(sc-&gt;sc_nvram));</span>
+<span class="lineNum">    1525 </span>            :         /* id field should be 'ISP ', version should high enough */
+<span class="lineNum">    1526 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_nvram.id[0] != 'I' || sc-&gt;sc_nvram.id[1] != 'S' ||</span>
+<span class="lineNum">    1527 </span><span class="lineNoCov">          0 :             sc-&gt;sc_nvram.id[2] != 'P' || sc-&gt;sc_nvram.id[3] != ' ' ||</span>
+<span class="lineNum">    1528 </span><span class="lineNoCov">          0 :             sc-&gt;sc_nvram.nvram_version &lt; sc-&gt;sc_nvram_minversion ||</span>
+<span class="lineNum">    1529 </span><span class="lineNoCov">          0 :             (csum != 0)) {</span>
+<span class="lineNum">    1530 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: nvram corrupt\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1531 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1532 </span>            :         }
+<span class="lineNum">    1533 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1534 </span><span class="lineNoCov">          0 : }</span>
+<a name="1535"><span class="lineNum">    1535 </span>            : </a>
+<span class="lineNum">    1536 </span>            : void
+<span class="lineNum">    1537 </span><span class="lineNoCov">          0 : qlw_parse_nvram_1040(struct qlw_softc *sc, int bus)</span>
+<span class="lineNum">    1538 </span>            : {
+<span class="lineNum">    1539 </span><span class="lineNoCov">          0 :         struct qlw_nvram_1040 *nv = (struct qlw_nvram_1040 *)&amp;sc-&gt;sc_nvram;</span>
+<span class="lineNum">    1540 </span>            :         int target;
+<span class="lineNum">    1541 </span>            : 
+<span class="lineNum">    1542 </span><span class="lineNoCov">          0 :         KASSERT(bus == 0);</span>
+<span class="lineNum">    1543 </span>            : 
+<span class="lineNum">    1544 </span><span class="lineNoCov">          0 :         if (!ISSET(sc-&gt;sc_flags, QLW_FLAG_INITIATOR))</span>
+<span class="lineNum">    1545 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_initiator[0] = (nv-&gt;config1 &gt;&gt; 4);</span>
+<span class="lineNum">    1546 </span>            : 
+<span class="lineNum">    1547 </span><span class="lineNoCov">          0 :         sc-&gt;sc_retry_count[0] = nv-&gt;retry_count;</span>
+<span class="lineNum">    1548 </span><span class="lineNoCov">          0 :         sc-&gt;sc_retry_delay[0] = nv-&gt;retry_delay;</span>
+<span class="lineNum">    1549 </span><span class="lineNoCov">          0 :         sc-&gt;sc_reset_delay[0] = nv-&gt;reset_delay;</span>
+<span class="lineNum">    1550 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tag_age_limit[0] = nv-&gt;tag_age_limit;</span>
+<span class="lineNum">    1551 </span><span class="lineNoCov">          0 :         sc-&gt;sc_selection_timeout[0] = letoh16(nv-&gt;selection_timeout);</span>
+<span class="lineNum">    1552 </span><span class="lineNoCov">          0 :         sc-&gt;sc_max_queue_depth[0] = letoh16(nv-&gt;max_queue_depth);</span>
+<span class="lineNum">    1553 </span><span class="lineNoCov">          0 :         sc-&gt;sc_async_data_setup[0] = (nv-&gt;config2 &amp; 0x0f);</span>
+<span class="lineNum">    1554 </span><span class="lineNoCov">          0 :         sc-&gt;sc_req_ack_active_neg[0] = ((nv-&gt;config2 &amp; 0x10) &gt;&gt; 4);</span>
+<span class="lineNum">    1555 </span><span class="lineNoCov">          0 :         sc-&gt;sc_data_line_active_neg[0] = ((nv-&gt;config2 &amp; 0x20) &gt;&gt; 5);</span>
+<span class="lineNum">    1556 </span>            : 
+<span class="lineNum">    1557 </span><span class="lineNoCov">          0 :         for (target = 0; target &lt; QLW_MAX_TARGETS; target++) {</span>
+<span class="lineNum">    1558 </span><span class="lineNoCov">          0 :                 struct qlw_target *qt = &amp;sc-&gt;sc_target[0][target];</span>
+<span class="lineNum">    1559 </span>            : 
+<span class="lineNum">    1560 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_params = (nv-&gt;target[target].parameter &lt;&lt; 8);</span>
+<span class="lineNum">    1561 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_exec_throttle = nv-&gt;target[target].execution_throttle;</span>
+<span class="lineNum">    1562 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_sync_period = nv-&gt;target[target].sync_period;</span>
+<span class="lineNum">    1563 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_sync_offset = nv-&gt;target[target].flags &amp; 0x0f;</span>
+<span class="lineNum">    1564 </span>            :         }
+<span class="lineNum">    1565 </span><span class="lineNoCov">          0 : }</span>
+<a name="1566"><span class="lineNum">    1566 </span>            : </a>
+<span class="lineNum">    1567 </span>            : void
+<span class="lineNum">    1568 </span><span class="lineNoCov">          0 : qlw_parse_nvram_1080(struct qlw_softc *sc, int bus)</span>
+<span class="lineNum">    1569 </span>            : {
+<span class="lineNum">    1570 </span><span class="lineNoCov">          0 :         struct qlw_nvram_1080 *nvram = (struct qlw_nvram_1080 *)&amp;sc-&gt;sc_nvram;</span>
+<span class="lineNum">    1571 </span><span class="lineNoCov">          0 :         struct qlw_nvram_bus *nv = &amp;nvram-&gt;bus[bus];</span>
+<span class="lineNum">    1572 </span>            :         int target;
+<span class="lineNum">    1573 </span>            : 
+<span class="lineNum">    1574 </span><span class="lineNoCov">          0 :         sc-&gt;sc_isp_config = nvram-&gt;isp_config;</span>
+<span class="lineNum">    1575 </span><span class="lineNoCov">          0 :         sc-&gt;sc_fw_features = nvram-&gt;fw_features;</span>
+<span class="lineNum">    1576 </span>            : 
+<span class="lineNum">    1577 </span><span class="lineNoCov">          0 :         if (!ISSET(sc-&gt;sc_flags, QLW_FLAG_INITIATOR))</span>
+<span class="lineNum">    1578 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_initiator[bus] = (nv-&gt;config1 &amp; 0x0f);</span>
+<span class="lineNum">    1579 </span>            : 
+<span class="lineNum">    1580 </span><span class="lineNoCov">          0 :         sc-&gt;sc_retry_count[bus] = nv-&gt;retry_count;</span>
+<span class="lineNum">    1581 </span><span class="lineNoCov">          0 :         sc-&gt;sc_retry_delay[bus] = nv-&gt;retry_delay;</span>
+<span class="lineNum">    1582 </span><span class="lineNoCov">          0 :         sc-&gt;sc_reset_delay[bus] = nv-&gt;reset_delay;</span>
+<span class="lineNum">    1583 </span><span class="lineNoCov">          0 :         sc-&gt;sc_selection_timeout[bus] = letoh16(nv-&gt;selection_timeout);</span>
+<span class="lineNum">    1584 </span><span class="lineNoCov">          0 :         sc-&gt;sc_max_queue_depth[bus] = letoh16(nv-&gt;max_queue_depth);</span>
+<span class="lineNum">    1585 </span><span class="lineNoCov">          0 :         sc-&gt;sc_async_data_setup[bus] = (nv-&gt;config2 &amp; 0x0f);</span>
+<span class="lineNum">    1586 </span><span class="lineNoCov">          0 :         sc-&gt;sc_req_ack_active_neg[bus] = ((nv-&gt;config2 &amp; 0x10) &gt;&gt; 4);</span>
+<span class="lineNum">    1587 </span><span class="lineNoCov">          0 :         sc-&gt;sc_data_line_active_neg[bus] = ((nv-&gt;config2 &amp; 0x20) &gt;&gt; 5);</span>
+<span class="lineNum">    1588 </span>            : 
+<span class="lineNum">    1589 </span><span class="lineNoCov">          0 :         for (target = 0; target &lt; QLW_MAX_TARGETS; target++) {</span>
+<span class="lineNum">    1590 </span><span class="lineNoCov">          0 :                 struct qlw_target *qt = &amp;sc-&gt;sc_target[bus][target];</span>
+<span class="lineNum">    1591 </span>            : 
+<span class="lineNum">    1592 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_params = (nv-&gt;target[target].parameter &lt;&lt; 8);</span>
+<span class="lineNum">    1593 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_exec_throttle = nv-&gt;target[target].execution_throttle;</span>
+<span class="lineNum">    1594 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_sync_period = nv-&gt;target[target].sync_period;</span>
+<span class="lineNum">    1595 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_isp_gen == QLW_GEN_ISP12160)</span>
+<span class="lineNum">    1596 </span><span class="lineNoCov">          0 :                         qt-&gt;qt_sync_offset = nv-&gt;target[target].flags &amp; 0x1f;</span>
+<span class="lineNum">    1597 </span>            :                 else
+<span class="lineNum">    1598 </span><span class="lineNoCov">          0 :                         qt-&gt;qt_sync_offset = nv-&gt;target[target].flags &amp; 0x0f;</span>
+<span class="lineNum">    1599 </span>            :         }
+<span class="lineNum">    1600 </span><span class="lineNoCov">          0 : }</span>
+<a name="1601"><span class="lineNum">    1601 </span>            : </a>
+<span class="lineNum">    1602 </span>            : void
+<span class="lineNum">    1603 </span><span class="lineNoCov">          0 : qlw_init_defaults(struct qlw_softc *sc, int bus)</span>
+<span class="lineNum">    1604 </span>            : {
+<span class="lineNum">    1605 </span>            :         int target;
+<span class="lineNum">    1606 </span>            : 
+<span class="lineNum">    1607 </span><span class="lineNoCov">          0 :         switch (sc-&gt;sc_isp_gen) {</span>
+<span class="lineNum">    1608 </span>            :         case QLW_GEN_ISP1000:
+<span class="lineNum">    1609 </span>            :                 break;
+<span class="lineNum">    1610 </span>            :         case QLW_GEN_ISP1040:
+<span class="lineNum">    1611 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_isp_config = QLW_BURST_ENABLE | QLW_PCI_FIFO_64;</span>
+<span class="lineNum">    1612 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1613 </span>            :         case QLW_GEN_ISP1080:
+<span class="lineNum">    1614 </span>            :         case QLW_GEN_ISP12160:
+<span class="lineNum">    1615 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_isp_config = QLW_BURST_ENABLE | QLW_PCI_FIFO_128;</span>
+<span class="lineNum">    1616 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_fw_features = QLW_FW_FEATURE_LVD_NOTIFY;</span>
+<span class="lineNum">    1617 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1618 </span>            :         }
+<span class="lineNum">    1619 </span>            : 
+<span class="lineNum">    1620 </span><span class="lineNoCov">          0 :         sc-&gt;sc_retry_count[bus] = 0;</span>
+<span class="lineNum">    1621 </span><span class="lineNoCov">          0 :         sc-&gt;sc_retry_delay[bus] = 0;</span>
+<span class="lineNum">    1622 </span><span class="lineNoCov">          0 :         sc-&gt;sc_reset_delay[bus] = 3;</span>
+<span class="lineNum">    1623 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tag_age_limit[bus] = 8;</span>
+<span class="lineNum">    1624 </span><span class="lineNoCov">          0 :         sc-&gt;sc_selection_timeout[bus] = 250;</span>
+<span class="lineNum">    1625 </span><span class="lineNoCov">          0 :         sc-&gt;sc_max_queue_depth[bus] = 32;</span>
+<span class="lineNum">    1626 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_clock &gt; 40)</span>
+<span class="lineNum">    1627 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_async_data_setup[bus] = 9;</span>
+<span class="lineNum">    1628 </span>            :         else
+<span class="lineNum">    1629 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_async_data_setup[bus] = 6;</span>
+<span class="lineNum">    1630 </span><span class="lineNoCov">          0 :         sc-&gt;sc_req_ack_active_neg[bus] = 1;</span>
+<span class="lineNum">    1631 </span><span class="lineNoCov">          0 :         sc-&gt;sc_data_line_active_neg[bus] = 1;</span>
+<span class="lineNum">    1632 </span>            : 
+<span class="lineNum">    1633 </span><span class="lineNoCov">          0 :         for (target = 0; target &lt; QLW_MAX_TARGETS; target++) {</span>
+<span class="lineNum">    1634 </span><span class="lineNoCov">          0 :                 struct qlw_target *qt = &amp;sc-&gt;sc_target[bus][target];</span>
+<span class="lineNum">    1635 </span>            : 
+<span class="lineNum">    1636 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_params = QLW_TARGET_DEFAULT;</span>
+<span class="lineNum">    1637 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_exec_throttle = 16;</span>
+<span class="lineNum">    1638 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_sync_period = 10;</span>
+<span class="lineNum">    1639 </span><span class="lineNoCov">          0 :                 qt-&gt;qt_sync_offset = 12;</span>
+<span class="lineNum">    1640 </span>            :         }
+<span class="lineNum">    1641 </span><span class="lineNoCov">          0 : }</span>
+<a name="1642"><span class="lineNum">    1642 </span>            : </a>
+<span class="lineNum">    1643 </span>            : struct qlw_dmamem *
+<span class="lineNum">    1644 </span><span class="lineNoCov">          0 : qlw_dmamem_alloc(struct qlw_softc *sc, size_t size)</span>
+<span class="lineNum">    1645 </span>            : {
+<span class="lineNum">    1646 </span>            :         struct qlw_dmamem *m;
+<span class="lineNum">    1647 </span><span class="lineNoCov">          0 :         int nsegs;</span>
+<span class="lineNum">    1648 </span>            : 
+<span class="lineNum">    1649 </span><span class="lineNoCov">          0 :         m = malloc(sizeof(*m), M_DEVBUF, M_NOWAIT | M_ZERO);</span>
+<span class="lineNum">    1650 </span><span class="lineNoCov">          0 :         if (m == NULL)</span>
+<span class="lineNum">    1651 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">    1652 </span>            : 
+<span class="lineNum">    1653 </span><span class="lineNoCov">          0 :         m-&gt;qdm_size = size;</span>
+<span class="lineNum">    1654 </span>            : 
+<span class="lineNum">    1655 </span><span class="lineNoCov">          0 :         if (bus_dmamap_create(sc-&gt;sc_dmat, size, 1, size, 0,</span>
+<span class="lineNum">    1656 </span><span class="lineNoCov">          0 :             BUS_DMA_NOWAIT | BUS_DMA_ALLOCNOW, &amp;m-&gt;qdm_map) != 0)</span>
+<span class="lineNum">    1657 </span>            :                 goto qdmfree;
+<span class="lineNum">    1658 </span>            : 
+<span class="lineNum">    1659 </span><span class="lineNoCov">          0 :         if (bus_dmamem_alloc(sc-&gt;sc_dmat, size, PAGE_SIZE, 0, &amp;m-&gt;qdm_seg, 1,</span>
+<span class="lineNum">    1660 </span><span class="lineNoCov">          0 :             &amp;nsegs, BUS_DMA_NOWAIT | BUS_DMA_ZERO) != 0)</span>
+<span class="lineNum">    1661 </span>            :                 goto destroy;
+<span class="lineNum">    1662 </span>            : 
+<span class="lineNum">    1663 </span><span class="lineNoCov">          0 :         if (bus_dmamem_map(sc-&gt;sc_dmat, &amp;m-&gt;qdm_seg, nsegs, size, &amp;m-&gt;qdm_kva,</span>
+<span class="lineNum">    1664 </span><span class="lineNoCov">          0 :             BUS_DMA_NOWAIT) != 0)</span>
+<span class="lineNum">    1665 </span>            :                 goto free;
+<span class="lineNum">    1666 </span>            : 
+<span class="lineNum">    1667 </span><span class="lineNoCov">          0 :         if (bus_dmamap_load(sc-&gt;sc_dmat, m-&gt;qdm_map, m-&gt;qdm_kva, size, NULL,</span>
+<span class="lineNum">    1668 </span><span class="lineNoCov">          0 :             BUS_DMA_NOWAIT) != 0)</span>
+<span class="lineNum">    1669 </span>            :                 goto unmap;
+<span class="lineNum">    1670 </span>            : 
+<span class="lineNum">    1671 </span><span class="lineNoCov">          0 :         return (m);</span>
+<span class="lineNum">    1672 </span>            : 
+<span class="lineNum">    1673 </span>            : unmap:
+<span class="lineNum">    1674 </span><span class="lineNoCov">          0 :         bus_dmamem_unmap(sc-&gt;sc_dmat, m-&gt;qdm_kva, m-&gt;qdm_size);</span>
+<span class="lineNum">    1675 </span>            : free:
+<span class="lineNum">    1676 </span><span class="lineNoCov">          0 :         bus_dmamem_free(sc-&gt;sc_dmat, &amp;m-&gt;qdm_seg, 1);</span>
+<span class="lineNum">    1677 </span>            : destroy:
+<span class="lineNum">    1678 </span><span class="lineNoCov">          0 :         bus_dmamap_destroy(sc-&gt;sc_dmat, m-&gt;qdm_map);</span>
+<span class="lineNum">    1679 </span>            : qdmfree:
+<span class="lineNum">    1680 </span><span class="lineNoCov">          0 :         free(m, M_DEVBUF, sizeof(*m));</span>
+<span class="lineNum">    1681 </span>            : 
+<span class="lineNum">    1682 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">    1683 </span><span class="lineNoCov">          0 : }</span>
+<a name="1684"><span class="lineNum">    1684 </span>            : </a>
+<span class="lineNum">    1685 </span>            : void
+<span class="lineNum">    1686 </span><span class="lineNoCov">          0 : qlw_dmamem_free(struct qlw_softc *sc, struct qlw_dmamem *m)</span>
+<span class="lineNum">    1687 </span>            : {
+<span class="lineNum">    1688 </span><span class="lineNoCov">          0 :         bus_dmamap_unload(sc-&gt;sc_dmat, m-&gt;qdm_map);</span>
+<span class="lineNum">    1689 </span><span class="lineNoCov">          0 :         bus_dmamem_unmap(sc-&gt;sc_dmat, m-&gt;qdm_kva, m-&gt;qdm_size);</span>
+<span class="lineNum">    1690 </span><span class="lineNoCov">          0 :         bus_dmamem_free(sc-&gt;sc_dmat, &amp;m-&gt;qdm_seg, 1);</span>
+<span class="lineNum">    1691 </span><span class="lineNoCov">          0 :         bus_dmamap_destroy(sc-&gt;sc_dmat, m-&gt;qdm_map);</span>
+<span class="lineNum">    1692 </span><span class="lineNoCov">          0 :         free(m, M_DEVBUF, sizeof(*m));</span>
+<span class="lineNum">    1693 </span><span class="lineNoCov">          0 : }</span>
+<a name="1694"><span class="lineNum">    1694 </span>            : </a>
+<span class="lineNum">    1695 </span>            : int
+<span class="lineNum">    1696 </span><span class="lineNoCov">          0 : qlw_alloc_ccbs(struct qlw_softc *sc)</span>
+<span class="lineNum">    1697 </span>            : {
+<span class="lineNum">    1698 </span>            :         struct qlw_ccb          *ccb;
+<span class="lineNum">    1699 </span>            :         u_int8_t                *cmd;
+<span class="lineNum">    1700 </span>            :         int                     i;
+<span class="lineNum">    1701 </span>            : 
+<span class="lineNum">    1702 </span><span class="lineNoCov">          0 :         SIMPLEQ_INIT(&amp;sc-&gt;sc_ccb_free);</span>
+<span class="lineNum">    1703 </span><span class="lineNoCov">          0 :         mtx_init(&amp;sc-&gt;sc_ccb_mtx, IPL_BIO);</span>
+<span class="lineNum">    1704 </span><span class="lineNoCov">          0 :         mtx_init(&amp;sc-&gt;sc_queue_mtx, IPL_BIO);</span>
+<span class="lineNum">    1705 </span>            : 
+<span class="lineNum">    1706 </span><span class="lineNoCov">          0 :         sc-&gt;sc_ccbs = mallocarray(sc-&gt;sc_maxccbs, sizeof(struct qlw_ccb),</span>
+<span class="lineNum">    1707 </span>            :             M_DEVBUF, M_WAITOK | M_CANFAIL | M_ZERO);
+<span class="lineNum">    1708 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_ccbs == NULL) {</span>
+<span class="lineNum">    1709 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to allocate ccbs\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1710 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1711 </span>            :         }
+<span class="lineNum">    1712 </span>            : 
+<span class="lineNum">    1713 </span><span class="lineNoCov">          0 :         sc-&gt;sc_requests = qlw_dmamem_alloc(sc, sc-&gt;sc_maxrequests *</span>
+<span class="lineNum">    1714 </span>            :             QLW_QUEUE_ENTRY_SIZE);
+<span class="lineNum">    1715 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_requests == NULL) {</span>
+<span class="lineNum">    1716 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to allocate ccb dmamem\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1717 </span><span class="lineNoCov">          0 :                 goto free_ccbs;</span>
+<span class="lineNum">    1718 </span>            :         }
+<span class="lineNum">    1719 </span><span class="lineNoCov">          0 :         sc-&gt;sc_responses = qlw_dmamem_alloc(sc, sc-&gt;sc_maxresponses *</span>
+<span class="lineNum">    1720 </span>            :             QLW_QUEUE_ENTRY_SIZE);
+<span class="lineNum">    1721 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_responses == NULL) {</span>
+<span class="lineNum">    1722 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to allocate rcb dmamem\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1723 </span><span class="lineNoCov">          0 :                 goto free_req;</span>
+<span class="lineNum">    1724 </span>            :         }
+<span class="lineNum">    1725 </span>            : 
+<span class="lineNum">    1726 </span><span class="lineNoCov">          0 :         cmd = QLW_DMA_KVA(sc-&gt;sc_requests);</span>
+<span class="lineNum">    1727 </span><span class="lineNoCov">          0 :         memset(cmd, 0, QLW_QUEUE_ENTRY_SIZE * sc-&gt;sc_maxccbs);</span>
+<span class="lineNum">    1728 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sc-&gt;sc_maxccbs; i++) {</span>
+<span class="lineNum">    1729 </span><span class="lineNoCov">          0 :                 ccb = &amp;sc-&gt;sc_ccbs[i];</span>
+<span class="lineNum">    1730 </span>            : 
+<span class="lineNum">    1731 </span><span class="lineNoCov">          0 :                 if (bus_dmamap_create(sc-&gt;sc_dmat, MAXPHYS,</span>
+<span class="lineNum">    1732 </span>            :                     QLW_MAX_SEGS, MAXPHYS, 0,
+<span class="lineNum">    1733 </span>            :                     BUS_DMA_NOWAIT | BUS_DMA_ALLOCNOW,
+<span class="lineNum">    1734 </span><span class="lineNoCov">          0 :                     &amp;ccb-&gt;ccb_dmamap) != 0) {</span>
+<span class="lineNum">    1735 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: unable to create dma map\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">    1736 </span>            :                         goto free_maps;
+<span class="lineNum">    1737 </span>            :                 }
+<span class="lineNum">    1738 </span>            : 
+<span class="lineNum">    1739 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_sc = sc;</span>
+<span class="lineNum">    1740 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_id = i;</span>
+<span class="lineNum">    1741 </span>            : 
+<span class="lineNum">    1742 </span><span class="lineNoCov">          0 :                 qlw_put_ccb(sc, ccb);</span>
+<span class="lineNum">    1743 </span>            :         }
+<span class="lineNum">    1744 </span>            : 
+<span class="lineNum">    1745 </span><span class="lineNoCov">          0 :         scsi_iopool_init(&amp;sc-&gt;sc_iopool, sc, qlw_get_ccb, qlw_put_ccb);</span>
+<span class="lineNum">    1746 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1747 </span>            : 
+<span class="lineNum">    1748 </span>            : free_maps:
+<span class="lineNum">    1749 </span><span class="lineNoCov">          0 :         while ((ccb = qlw_get_ccb(sc)) != NULL)</span>
+<span class="lineNum">    1750 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;sc_dmat, ccb-&gt;ccb_dmamap);</span>
+<span class="lineNum">    1751 </span>            : 
+<span class="lineNum">    1752 </span><span class="lineNoCov">          0 :         qlw_dmamem_free(sc, sc-&gt;sc_responses);</span>
+<span class="lineNum">    1753 </span>            : free_req:
+<span class="lineNum">    1754 </span><span class="lineNoCov">          0 :         qlw_dmamem_free(sc, sc-&gt;sc_requests);</span>
+<span class="lineNum">    1755 </span>            : free_ccbs:
+<span class="lineNum">    1756 </span><span class="lineNoCov">          0 :         free(sc-&gt;sc_ccbs, M_DEVBUF, 0);</span>
+<span class="lineNum">    1757 </span>            : 
+<span class="lineNum">    1758 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">    1759 </span><span class="lineNoCov">          0 : }</span>
+<a name="1760"><span class="lineNum">    1760 </span>            : </a>
+<span class="lineNum">    1761 </span>            : void
+<span class="lineNum">    1762 </span><span class="lineNoCov">          0 : qlw_free_ccbs(struct qlw_softc *sc)</span>
+<span class="lineNum">    1763 </span>            : {
+<span class="lineNum">    1764 </span>            :         struct qlw_ccb          *ccb;
+<span class="lineNum">    1765 </span>            : 
+<span class="lineNum">    1766 </span><span class="lineNoCov">          0 :         scsi_iopool_destroy(&amp;sc-&gt;sc_iopool);</span>
+<span class="lineNum">    1767 </span><span class="lineNoCov">          0 :         while ((ccb = qlw_get_ccb(sc)) != NULL)</span>
+<span class="lineNum">    1768 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;sc_dmat, ccb-&gt;ccb_dmamap);</span>
+<span class="lineNum">    1769 </span><span class="lineNoCov">          0 :         qlw_dmamem_free(sc, sc-&gt;sc_responses);</span>
+<span class="lineNum">    1770 </span><span class="lineNoCov">          0 :         qlw_dmamem_free(sc, sc-&gt;sc_requests);</span>
+<span class="lineNum">    1771 </span><span class="lineNoCov">          0 :         free(sc-&gt;sc_ccbs, M_DEVBUF, 0);</span>
+<span class="lineNum">    1772 </span><span class="lineNoCov">          0 : }</span>
+<a name="1773"><span class="lineNum">    1773 </span>            : </a>
+<span class="lineNum">    1774 </span>            : void *
+<span class="lineNum">    1775 </span><span class="lineNoCov">          0 : qlw_get_ccb(void *xsc)</span>
+<span class="lineNum">    1776 </span>            : {
+<span class="lineNum">    1777 </span><span class="lineNoCov">          0 :         struct qlw_softc        *sc = xsc;</span>
+<span class="lineNum">    1778 </span>            :         struct qlw_ccb          *ccb;
+<span class="lineNum">    1779 </span>            : 
+<span class="lineNum">    1780 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_ccb_mtx);</span>
+<span class="lineNum">    1781 </span><span class="lineNoCov">          0 :         ccb = SIMPLEQ_FIRST(&amp;sc-&gt;sc_ccb_free);</span>
+<span class="lineNum">    1782 </span><span class="lineNoCov">          0 :         if (ccb != NULL) {</span>
+<span class="lineNum">    1783 </span><span class="lineNoCov">          0 :                 SIMPLEQ_REMOVE_HEAD(&amp;sc-&gt;sc_ccb_free, ccb_link);</span>
+<span class="lineNum">    1784 </span>            :         }
+<span class="lineNum">    1785 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_ccb_mtx);</span>
+<span class="lineNum">    1786 </span><span class="lineNoCov">          0 :         return (ccb);</span>
+<span class="lineNum">    1787 </span>            : }
+<a name="1788"><span class="lineNum">    1788 </span>            : </a>
+<span class="lineNum">    1789 </span>            : void
+<span class="lineNum">    1790 </span><span class="lineNoCov">          0 : qlw_put_ccb(void *xsc, void *io)</span>
+<span class="lineNum">    1791 </span>            : {
+<span class="lineNum">    1792 </span><span class="lineNoCov">          0 :         struct qlw_softc        *sc = xsc;</span>
+<span class="lineNum">    1793 </span><span class="lineNoCov">          0 :         struct qlw_ccb          *ccb = io;</span>
+<span class="lineNum">    1794 </span>            : 
+<span class="lineNum">    1795 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_xs = NULL;</span>
+<span class="lineNum">    1796 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_ccb_mtx);</span>
+<span class="lineNum">    1797 </span><span class="lineNoCov">          0 :         SIMPLEQ_INSERT_HEAD(&amp;sc-&gt;sc_ccb_free, ccb, ccb_link);</span>
+<span class="lineNum">    1798 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_ccb_mtx);</span>
+<span class="lineNum">    1799 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

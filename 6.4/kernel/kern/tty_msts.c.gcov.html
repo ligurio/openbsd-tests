@@ -1,0 +1,506 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - kern/tty_msts.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">kern</a> - tty_msts.c<span style="font-size: 80%;"> (source / <a href="tty_msts.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">182</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">9</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: tty_msts.c,v 1.21 2018/02/19 08:59:52 mpi Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2008 Marc Balmer &lt;mbalmer@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /*
+<span class="lineNum">      20 </span>            :  *  A tty line discipline to decode the Meinberg Standard Time String
+<span class="lineNum">      21 </span>            :  *  to get the time (http://www.meinberg.de/english/specs/timestr.htm).
+<span class="lineNum">      22 </span>            :  */
+<span class="lineNum">      23 </span>            : 
+<span class="lineNum">      24 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/sensors.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/tty.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/conf.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/time.h&gt;
+<span class="lineNum">      31 </span>            : 
+<span class="lineNum">      32 </span>            : #ifdef MSTS_DEBUG
+<span class="lineNum">      33 </span>            : #define DPRINTFN(n, x)  do { if (mstsdebug &gt; (n)) printf x; } while (0)
+<span class="lineNum">      34 </span>            : int mstsdebug = 0;
+<span class="lineNum">      35 </span>            : #else
+<span class="lineNum">      36 </span>            : #define DPRINTFN(n, x)
+<span class="lineNum">      37 </span>            : #endif
+<span class="lineNum">      38 </span>            : #define DPRINTF(x)      DPRINTFN(0, x)
+<span class="lineNum">      39 </span>            : 
+<span class="lineNum">      40 </span>            : void    mstsattach(int);
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : #define MSTSMAX 32
+<span class="lineNum">      43 </span>            : #define MAXFLDS 4
+<span class="lineNum">      44 </span>            : #ifdef MSTS_DEBUG
+<span class="lineNum">      45 </span>            : #define TRUSTTIME       30
+<span class="lineNum">      46 </span>            : #else
+<span class="lineNum">      47 </span>            : #define TRUSTTIME       (10 * 60)       /* 10 minutes */
+<span class="lineNum">      48 </span>            : #endif
+<span class="lineNum">      49 </span>            : 
+<span class="lineNum">      50 </span>            : int msts_count, msts_nxid;
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : struct msts {
+<span class="lineNum">      53 </span>            :         char                    cbuf[MSTSMAX];  /* receive buffer */
+<span class="lineNum">      54 </span>            :         struct ksensor          time;           /* the timedelta sensor */
+<span class="lineNum">      55 </span>            :         struct ksensor          signal;         /* signal status */
+<span class="lineNum">      56 </span>            :         struct ksensordev       timedev;
+<span class="lineNum">      57 </span>            :         struct timespec         ts;             /* current timestamp */
+<span class="lineNum">      58 </span>            :         struct timespec         lts;            /* timestamp of last &lt;STX&gt; */
+<span class="lineNum">      59 </span>            :         struct timeout          msts_tout;      /* invalidate sensor */
+<span class="lineNum">      60 </span>            :         int64_t                 gap;            /* gap between two sentences */
+<span class="lineNum">      61 </span>            :         int64_t                 last;           /* last time rcvd */
+<span class="lineNum">      62 </span>            :         int                     sync;           /* if 1, waiting for &lt;STX&gt; */
+<span class="lineNum">      63 </span>            :         int                     pos;            /* position in rcv buffer */
+<span class="lineNum">      64 </span>            :         int                     no_pps;         /* no PPS although requested */
+<span class="lineNum">      65 </span>            : };
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span>            : /* MSTS decoding */
+<span class="lineNum">      68 </span>            : void    msts_scan(struct msts *, struct tty *);
+<span class="lineNum">      69 </span>            : void    msts_decode(struct msts *, struct tty *, char *fld[], int fldcnt);
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : /* date and time conversion */
+<span class="lineNum">      72 </span>            : int     msts_date_to_nano(char *s, int64_t *nano);
+<span class="lineNum">      73 </span>            : int     msts_time_to_nano(char *s, int64_t *nano);
+<span class="lineNum">      74 </span>            : 
+<span class="lineNum">      75 </span>            : /* degrade the timedelta sensor */
+<span class="lineNum">      76 </span>            : void    msts_timeout(void *);
+<a name="77"><span class="lineNum">      77 </span>            : </a>
+<span class="lineNum">      78 </span>            : void
+<span class="lineNum">      79 </span><span class="lineNoCov">          0 : mstsattach(int dummy)</span>
+<span class="lineNum">      80 </span>            : {
+<span class="lineNum">      81 </span><span class="lineNoCov">          0 : }</span>
+<a name="82"><span class="lineNum">      82 </span>            : </a>
+<span class="lineNum">      83 </span>            : int
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 : mstsopen(dev_t dev, struct tty *tp, struct proc *p)</span>
+<span class="lineNum">      85 </span>            : {
+<span class="lineNum">      86 </span>            :         struct msts *np;
+<span class="lineNum">      87 </span>            :         int error;
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span>            :         DPRINTF((&quot;mstsopen\n&quot;));
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :         if (tp-&gt;t_line == MSTSDISC)</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :                 return ENODEV;</span>
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 :         if ((error = suser(p)) != 0)</span>
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :                 return error;</span>
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :         np = malloc(sizeof(struct msts), M_DEVBUF, M_WAITOK|M_ZERO);</span>
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         snprintf(np-&gt;timedev.xname, sizeof(np-&gt;timedev.xname), &quot;msts%d&quot;,</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :             msts_nxid++);</span>
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :         msts_count++;</span>
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :         np-&gt;time.status = SENSOR_S_UNKNOWN;</span>
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :         np-&gt;time.type = SENSOR_TIMEDELTA;</span>
+<span class="lineNum">     100 </span>            : #ifndef MSTS_DEBUG
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :         np-&gt;time.flags = SENSOR_FINVALID;</span>
+<span class="lineNum">     102 </span>            : #endif
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :         sensor_attach(&amp;np-&gt;timedev, &amp;np-&gt;time);</span>
+<span class="lineNum">     104 </span>            : 
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :         np-&gt;signal.type = SENSOR_PERCENT;</span>
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 :         np-&gt;signal.status = SENSOR_S_UNKNOWN;</span>
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         np-&gt;signal.value = 100000LL;</span>
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :         strlcpy(np-&gt;signal.desc, &quot;Signal&quot;, sizeof(np-&gt;signal.desc));</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         sensor_attach(&amp;np-&gt;timedev, &amp;np-&gt;signal);</span>
+<span class="lineNum">     110 </span>            : 
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :         np-&gt;sync = 1;</span>
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :         tp-&gt;t_sc = (caddr_t)np;</span>
+<span class="lineNum">     113 </span>            : 
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         error = linesw[TTYDISC].l_open(dev, tp, p);</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :                 free(np, M_DEVBUF, sizeof(*np));</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :                 tp-&gt;t_sc = NULL;</span>
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :                 sensordev_install(&amp;np-&gt;timedev);</span>
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :                 timeout_set(&amp;np-&gt;msts_tout, msts_timeout, np);</span>
+<span class="lineNum">     121 </span>            :         }
+<span class="lineNum">     122 </span>            : 
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 : }</span>
+<a name="125"><span class="lineNum">     125 </span>            : </a>
+<span class="lineNum">     126 </span>            : int
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 : mstsclose(struct tty *tp, int flags, struct proc *p)</span>
+<span class="lineNum">     128 </span>            : {
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :         struct msts *np = (struct msts *)tp-&gt;t_sc;</span>
+<span class="lineNum">     130 </span>            : 
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :         tp-&gt;t_line = TTYDISC;        /* switch back to termios */</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :         timeout_del(&amp;np-&gt;msts_tout);</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :         sensordev_deinstall(&amp;np-&gt;timedev);</span>
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         free(np, M_DEVBUF, sizeof(*np));</span>
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :         tp-&gt;t_sc = NULL;</span>
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         msts_count--;</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :         if (msts_count == 0)</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :                 msts_nxid = 0;</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         return linesw[TTYDISC].l_close(tp, flags, p);</span>
+<span class="lineNum">     140 </span>            : }
+<span class="lineNum">     141 </span>            : 
+<a name="142"><span class="lineNum">     142 </span>            : /* collect MSTS sentence from tty */</a>
+<span class="lineNum">     143 </span>            : int
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 : mstsinput(int c, struct tty *tp)</span>
+<span class="lineNum">     145 </span>            : {
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         struct msts *np = (struct msts *)tp-&gt;t_sc;</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         struct timespec ts;</span>
+<span class="lineNum">     148 </span>            :         int64_t gap;
+<span class="lineNum">     149 </span>            :         long tmin, tmax;
+<span class="lineNum">     150 </span>            : 
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         switch (c) {</span>
+<span class="lineNum">     152 </span>            :         case 2:         /* ASCII &lt;STX&gt; */
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :                 nanotime(&amp;ts);</span>
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :                 np-&gt;pos = np-&gt;sync = 0;</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :                 gap = (ts.tv_sec * 1000000000LL + ts.tv_nsec) -</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :                     (np-&gt;lts.tv_sec * 1000000000LL + np-&gt;lts.tv_nsec);</span>
+<span class="lineNum">     157 </span>            : 
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :                 np-&gt;lts.tv_sec = ts.tv_sec;</span>
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :                 np-&gt;lts.tv_nsec = ts.tv_nsec;</span>
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :                 if (gap &lt;= np-&gt;gap)</span>
+<span class="lineNum">     162 </span>            :                         break;
+<span class="lineNum">     163 </span>            : 
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                 np-&gt;ts.tv_sec = ts.tv_sec;</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :                 np-&gt;ts.tv_nsec = ts.tv_nsec;</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 np-&gt;gap = gap;</span>
+<span class="lineNum">     167 </span>            : 
+<span class="lineNum">     168 </span>            :                 /*
+<span class="lineNum">     169 </span>            :                  * If a tty timestamp is available, make sure its value is
+<span class="lineNum">     170 </span>            :                  * reasonable by comparing against the timestamp just taken.
+<span class="lineNum">     171 </span>            :                  * If they differ by more than 2 seconds, assume no PPS signal
+<span class="lineNum">     172 </span>            :                  * is present, note the fact, and keep using the timestamp
+<span class="lineNum">     173 </span>            :                  * value.  When this happens, the sensor state is set to
+<span class="lineNum">     174 </span>            :                  * CRITICAL later when the MSTS sentence is decoded.
+<span class="lineNum">     175 </span>            :                  */
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                 if (tp-&gt;t_flags &amp; (TS_TSTAMPDCDSET | TS_TSTAMPDCDCLR |</span>
+<span class="lineNum">     177 </span>            :                     TS_TSTAMPCTSSET | TS_TSTAMPCTSCLR)) {
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                         tmax = lmax(np-&gt;ts.tv_sec, tp-&gt;t_tv.tv_sec);</span>
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                         tmin = lmin(np-&gt;ts.tv_sec, tp-&gt;t_tv.tv_sec);</span>
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :                         if (tmax - tmin &gt; 1)</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                                 np-&gt;no_pps = 1;</span>
+<span class="lineNum">     182 </span>            :                         else {
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :                                 np-&gt;ts.tv_sec = tp-&gt;t_tv.tv_sec;</span>
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :                                 np-&gt;ts.tv_nsec = tp-&gt;t_tv.tv_usec *</span>
+<span class="lineNum">     185 </span>            :                                     1000L;
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                                 np-&gt;no_pps = 0;</span>
+<span class="lineNum">     187 </span>            :                         }
+<span class="lineNum">     188 </span>            :                 }
+<span class="lineNum">     189 </span>            :                 break;
+<span class="lineNum">     190 </span>            :         case 3:         /* ASCII &lt;ETX&gt; */
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :                 if (!np-&gt;sync) {</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                         np-&gt;cbuf[np-&gt;pos] = '\0';</span>
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :                         msts_scan(np, tp);</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                         np-&gt;sync = 1;</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     196 </span>            :                 break;
+<span class="lineNum">     197 </span>            :         default:
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                 if (!np-&gt;sync &amp;&amp; np-&gt;pos &lt; (MSTSMAX - 1))</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                         np-&gt;cbuf[np-&gt;pos++] = c;</span>
+<span class="lineNum">     200 </span>            :                 break;
+<span class="lineNum">     201 </span>            :         }
+<span class="lineNum">     202 </span>            :         /* pass data to termios */
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :         return linesw[TTYDISC].l_rint(c, tp);</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     205 </span>            : 
+<a name="206"><span class="lineNum">     206 </span>            : /* Scan the MSTS sentence just received */</a>
+<span class="lineNum">     207 </span>            : void
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 : msts_scan(struct msts *np, struct tty *tp)</span>
+<span class="lineNum">     209 </span>            : {
+<span class="lineNum">     210 </span>            :         int fldcnt = 0, n;
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :         char *fld[MAXFLDS], *cs;</span>
+<span class="lineNum">     212 </span>            : 
+<span class="lineNum">     213 </span>            :         /* split into fields */
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :         fld[fldcnt++] = &amp;np-&gt;cbuf[0];</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         for (cs = NULL, n = 0; n &lt; np-&gt;pos &amp;&amp; cs == NULL; n++) {</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                 switch (np-&gt;cbuf[n]) {</span>
+<span class="lineNum">     217 </span>            :                 case 3:         /* ASCII &lt;ETX&gt; */
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                         np-&gt;cbuf[n] = '\0';</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                         cs = &amp;np-&gt;cbuf[n + 1];</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     221 </span>            :                 case ';':
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :                         if (fldcnt &lt; MAXFLDS) {</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                                 np-&gt;cbuf[n] = '\0';</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :                                 fld[fldcnt++] = &amp;np-&gt;cbuf[n + 1];</span>
+<span class="lineNum">     225 </span>            :                         } else {
+<span class="lineNum">     226 </span>            :                                 DPRINTF((&quot;nr of fields in sentence exceeds &quot;
+<span class="lineNum">     227 </span>            :                                     &quot;maximum of %d\n&quot;, MAXFLDS));
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                                 return;</span>
+<span class="lineNum">     229 </span>            :                         }
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     231 </span>            :                 }
+<span class="lineNum">     232 </span>            :         }
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :         msts_decode(np, tp, fld, fldcnt);</span>
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     235 </span>            : 
+<a name="236"><span class="lineNum">     236 </span>            : /* Decode the time string */</a>
+<span class="lineNum">     237 </span>            : void
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 : msts_decode(struct msts *np, struct tty *tp, char *fld[], int fldcnt)</span>
+<span class="lineNum">     239 </span>            : {
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :         int64_t date_nano, time_nano, msts_now;</span>
+<span class="lineNum">     241 </span>            :         int jumped = 0;
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         if (fldcnt != MAXFLDS) {</span>
+<span class="lineNum">     244 </span>            :                 DPRINTF((&quot;msts: field count mismatch, %d\n&quot;, fldcnt));
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     246 </span>            :         }
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         if (msts_time_to_nano(fld[2], &amp;time_nano)) {</span>
+<span class="lineNum">     248 </span>            :                 DPRINTF((&quot;msts: illegal time, %s\n&quot;, fld[2]));
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     250 </span>            :         }
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :         if (msts_date_to_nano(fld[0], &amp;date_nano)) {</span>
+<span class="lineNum">     252 </span>            :                 DPRINTF((&quot;msts: illegal date, %s\n&quot;, fld[0]));
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     254 </span>            :         }
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         msts_now = date_nano + time_nano;</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         if ( fld[3][2] == ' ' )         /* received time in CET */</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :                 msts_now = msts_now - 3600 * 1000000000LL;</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         if ( fld[3][2] == 'S' )         /* received time in CEST */</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :                 msts_now = msts_now - 2 * 3600 * 1000000000LL;</span>
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         if (msts_now &lt;= np-&gt;last) {</span>
+<span class="lineNum">     261 </span>            :                 DPRINTF((&quot;msts: time not monotonically increasing\n&quot;));
+<span class="lineNum">     262 </span>            :                 jumped = 1;
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         np-&gt;last = msts_now;</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         np-&gt;gap = 0LL;</span>
+<span class="lineNum">     266 </span>            : #ifdef MSTS_DEBUG
+<span class="lineNum">     267 </span>            :         if (np-&gt;time.status == SENSOR_S_UNKNOWN) {
+<span class="lineNum">     268 </span>            :                 np-&gt;time.status = SENSOR_S_OK;
+<span class="lineNum">     269 </span>            :                 timeout_add_sec(&amp;np-&gt;msts_tout, TRUSTTIME);
+<span class="lineNum">     270 </span>            :         }
+<span class="lineNum">     271 </span>            : #endif
+<span class="lineNum">     272 </span>            : 
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         np-&gt;time.value = np-&gt;ts.tv_sec * 1000000000LL +</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :             np-&gt;ts.tv_nsec - msts_now;</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         np-&gt;time.tv.tv_sec = np-&gt;ts.tv_sec;</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :         np-&gt;time.tv.tv_usec = np-&gt;ts.tv_nsec / 1000L;</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         if (np-&gt;time.status == SENSOR_S_UNKNOWN) {</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :                 np-&gt;time.status = SENSOR_S_OK;</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                 np-&gt;time.flags &amp;= ~SENSOR_FINVALID;</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                 strlcpy(np-&gt;time.desc, &quot;MSTS&quot;, sizeof(np-&gt;time.desc));</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     282 </span>            :         /*
+<span class="lineNum">     283 </span>            :          * only update the timeout if the clock reports the time a valid,
+<span class="lineNum">     284 </span>            :          * the status is reported in fld[3][0] and fld[3][1] as follows:
+<span class="lineNum">     285 </span>            :          * fld[3][0] == '#'                             critical
+<span class="lineNum">     286 </span>            :          * fld[3][0] == ' ' &amp;&amp; fld[3][1] == '*'         warning
+<span class="lineNum">     287 </span>            :          * fld[3][0] == ' ' &amp;&amp; fld[3][1] == ' '         ok
+<span class="lineNum">     288 </span>            :          */
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :         if (fld[3][0] == ' ' &amp;&amp; fld[3][1] == ' ') {</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                 np-&gt;time.status = SENSOR_S_OK;</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :                 np-&gt;signal.status = SENSOR_S_OK;</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                 np-&gt;signal.status = SENSOR_S_WARN;</span>
+<span class="lineNum">     294 </span>            : 
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :         if (jumped)</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :                 np-&gt;time.status = SENSOR_S_WARN;</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         if (np-&gt;time.status == SENSOR_S_OK)</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :                 timeout_add_sec(&amp;np-&gt;msts_tout, TRUSTTIME);</span>
+<span class="lineNum">     299 </span>            : 
+<span class="lineNum">     300 </span>            :         /*
+<span class="lineNum">     301 </span>            :          * If tty timestamping is requested, but no PPS signal is present, set
+<span class="lineNum">     302 </span>            :          * the sensor state to CRITICAL.
+<span class="lineNum">     303 </span>            :          */
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         if (np-&gt;no_pps)</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                 np-&gt;time.status = SENSOR_S_CRIT;</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     307 </span>            : 
+<span class="lineNum">     308 </span>            : /*
+<span class="lineNum">     309 </span>            :  * Convert date field from MSTS to nanoseconds since the epoch.
+<span class="lineNum">     310 </span>            :  * The string must be of the form D:DD.MM.YY .
+<span class="lineNum">     311 </span>            :  * Return 0 on success, -1 if illegal characters are encountered.
+<a name="312"><span class="lineNum">     312 </span>            :  */</a>
+<span class="lineNum">     313 </span>            : int
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 : msts_date_to_nano(char *s, int64_t *nano)</span>
+<span class="lineNum">     315 </span>            : {
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         struct clock_ymdhms ymd;</span>
+<span class="lineNum">     317 </span>            :         time_t secs;
+<span class="lineNum">     318 </span>            :         char *p;
+<span class="lineNum">     319 </span>            :         int n;
+<span class="lineNum">     320 </span>            : 
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :         if (s[0] != 'D' || s[1] != ':' || s[4] != '.' || s[7] != '.')</span>
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     323 </span>            : 
+<span class="lineNum">     324 </span>            :         /* shift numbers to DDMMYY */
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         s[0]=s[2];</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :         s[1]=s[3];</span>
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :         s[2]=s[5];</span>
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :         s[3]=s[6];</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :         s[4]=s[8];</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         s[5]=s[9];</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         s[6]='\0';</span>
+<span class="lineNum">     332 </span>            : 
+<span class="lineNum">     333 </span>            :         /* make sure the input contains only numbers and is six digits long */
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :         for (n = 0, p = s; n &lt; 6 &amp;&amp; *p &amp;&amp; *p &gt;= '0' &amp;&amp; *p &lt;= '9'; n++, p++)</span>
+<span class="lineNum">     335 </span>            :                 ;
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         if (n != 6 || (*p != '\0'))</span>
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     338 </span>            : 
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         ymd.dt_year = 2000 + (s[4] - '0') * 10 + (s[5] - '0');</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :         ymd.dt_mon = (s[2] - '0') * 10 + (s[3] - '0');</span>
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         ymd.dt_day = (s[0] - '0') * 10 + (s[1] - '0');</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :         ymd.dt_hour = ymd.dt_min = ymd.dt_sec = 0;</span>
+<span class="lineNum">     343 </span>            : 
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         secs = clock_ymdhms_to_secs(&amp;ymd);</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :         *nano = secs * 1000000000LL;</span>
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     348 </span>            : 
+<span class="lineNum">     349 </span>            : /*
+<span class="lineNum">     350 </span>            :  * Convert time field from MSTS to nanoseconds since midnight.
+<span class="lineNum">     351 </span>            :  * The string must be of the form U:HH.MM.SS .
+<span class="lineNum">     352 </span>            :  * Return 0 on success, -1 if illegal characters are encountered.
+<a name="353"><span class="lineNum">     353 </span>            :  */</a>
+<span class="lineNum">     354 </span>            : int
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 : msts_time_to_nano(char *s, int64_t *nano)</span>
+<span class="lineNum">     356 </span>            : {
+<span class="lineNum">     357 </span>            :         long fac = 36000L, div = 6L, secs = 0L;
+<span class="lineNum">     358 </span>            :         char ul = '2';
+<span class="lineNum">     359 </span>            :         int n;
+<span class="lineNum">     360 </span>            : 
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         if (s[0] != 'U' || s[1] != ':' || s[4] != '.' || s[7] != '.')</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     363 </span>            : 
+<span class="lineNum">     364 </span>            :         /* shift numbers to HHMMSS */
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :         s[0]=s[2];</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         s[1]=s[3];</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :         s[2]=s[5];</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         s[3]=s[6];</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :         s[4]=s[8];</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :         s[5]=s[9];</span>
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :         s[6]='\0';</span>
+<span class="lineNum">     372 </span>            : 
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :         for (n = 0, secs = 0; fac &amp;&amp; *s &amp;&amp; *s &gt;= '0' &amp;&amp; *s &lt;= ul; s++, n++) {</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                 secs += (*s - '0') * fac;</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                 div = 16 - div;</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                 fac /= div;</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                 switch (n) {</span>
+<span class="lineNum">     378 </span>            :                 case 0:
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :                         if (*s &lt;= '1')</span>
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :                                 ul = '9';</span>
+<span class="lineNum">     381 </span>            :                         else
+<span class="lineNum">     382 </span>            :                                 ul = '3';
+<span class="lineNum">     383 </span>            :                         break;
+<span class="lineNum">     384 </span>            :                 case 1:
+<span class="lineNum">     385 </span>            :                 case 3:
+<span class="lineNum">     386 </span>            :                         ul = '5';
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     388 </span>            :                 case 2:
+<span class="lineNum">     389 </span>            :                 case 4:
+<span class="lineNum">     390 </span>            :                         ul = '9';
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     392 </span>            :                 }
+<span class="lineNum">     393 </span>            :         }
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :         if (fac)</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     396 </span>            : 
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :         if (*s != '\0')</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                 return -1;</span>
+<span class="lineNum">     399 </span>            : 
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :         *nano = secs * 1000000000LL;</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     403 </span>            : 
+<span class="lineNum">     404 </span>            : /*
+<span class="lineNum">     405 </span>            :  * Degrade the sensor state if we received no MSTS string for more than
+<span class="lineNum">     406 </span>            :  * TRUSTTIME seconds.
+<a name="407"><span class="lineNum">     407 </span>            :  */</a>
+<span class="lineNum">     408 </span>            : void
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 : msts_timeout(void *xnp)</span>
+<span class="lineNum">     410 </span>            : {
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         struct msts *np = xnp;</span>
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         if (np-&gt;time.status == SENSOR_S_OK) {</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :                 np-&gt;time.status = SENSOR_S_WARN;</span>
+<span class="lineNum">     415 </span>            :                 /*
+<span class="lineNum">     416 </span>            :                  * further degrade in TRUSTTIME seconds if no new valid MSTS
+<span class="lineNum">     417 </span>            :                  * strings are received.
+<span class="lineNum">     418 </span>            :                  */
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :                 timeout_add_sec(&amp;np-&gt;msts_tout, TRUSTTIME);</span>
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                 np-&gt;time.status = SENSOR_S_CRIT;</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

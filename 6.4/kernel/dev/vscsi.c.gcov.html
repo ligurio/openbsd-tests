@@ -1,0 +1,769 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/vscsi.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">dev</a> - vscsi.c<span style="font-size: 80%;"> (source / <a href="vscsi.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">310</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">20</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: vscsi.c,v 1.41 2017/02/12 17:12:37 chl Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2008 David Gwynne &lt;dlg@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      20 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;sys/kernel.h&gt;  
+<span class="lineNum">      22 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/conf.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/rwlock.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/task.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/poll.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/selinfo.h&gt;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : #include &lt;scsi/scsi_all.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;scsi/scsiconf.h&gt;
+<span class="lineNum">      35 </span>            : 
+<span class="lineNum">      36 </span>            : #include &lt;dev/vscsivar.h&gt;
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : int             vscsi_match(struct device *, void *, void *);
+<span class="lineNum">      39 </span>            : void            vscsi_attach(struct device *, struct device *, void *);
+<span class="lineNum">      40 </span>            : void            vscsi_shutdown(void *);
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : struct vscsi_ccb {
+<span class="lineNum">      43 </span>            :         TAILQ_ENTRY(vscsi_ccb)  ccb_entry;
+<span class="lineNum">      44 </span>            :         int                     ccb_tag;
+<span class="lineNum">      45 </span>            :         struct scsi_xfer        *ccb_xs;
+<span class="lineNum">      46 </span>            :         size_t                  ccb_datalen;
+<span class="lineNum">      47 </span>            : };
+<span class="lineNum">      48 </span>            : 
+<span class="lineNum">      49 </span>            : TAILQ_HEAD(vscsi_ccb_list, vscsi_ccb);
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span>            : enum vscsi_state {
+<span class="lineNum">      52 </span>            :         VSCSI_S_CLOSED,
+<span class="lineNum">      53 </span>            :         VSCSI_S_CONFIG,
+<span class="lineNum">      54 </span>            :         VSCSI_S_RUNNING
+<span class="lineNum">      55 </span>            : };
+<span class="lineNum">      56 </span>            : 
+<span class="lineNum">      57 </span>            : struct vscsi_softc {
+<span class="lineNum">      58 </span>            :         struct device           sc_dev;
+<span class="lineNum">      59 </span>            :         struct scsi_link        sc_link;
+<span class="lineNum">      60 </span>            :         struct scsibus_softc    *sc_scsibus;
+<span class="lineNum">      61 </span>            : 
+<span class="lineNum">      62 </span>            :         struct mutex            sc_state_mtx;
+<span class="lineNum">      63 </span>            :         enum vscsi_state        sc_state;
+<span class="lineNum">      64 </span>            :         u_int                   sc_ref_count;
+<span class="lineNum">      65 </span>            :         struct pool             sc_ccb_pool;
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span>            :         struct scsi_iopool      sc_iopool;
+<span class="lineNum">      68 </span>            : 
+<span class="lineNum">      69 </span>            :         struct vscsi_ccb_list   sc_ccb_i2t;
+<span class="lineNum">      70 </span>            :         struct vscsi_ccb_list   sc_ccb_t2i;
+<span class="lineNum">      71 </span>            :         int                     sc_ccb_tag;
+<span class="lineNum">      72 </span>            :         struct mutex            sc_poll_mtx;
+<span class="lineNum">      73 </span>            :         struct rwlock           sc_ioc_lock;
+<span class="lineNum">      74 </span>            : 
+<span class="lineNum">      75 </span>            :         struct selinfo          sc_sel;
+<span class="lineNum">      76 </span>            :         struct mutex            sc_sel_mtx;
+<span class="lineNum">      77 </span>            : };
+<span class="lineNum">      78 </span>            : 
+<span class="lineNum">      79 </span>            : #define DEVNAME(_s) ((_s)-&gt;sc_dev.dv_xname)
+<span class="lineNum">      80 </span>            : #define DEV2SC(_d) ((struct vscsi_softc *)device_lookup(&amp;vscsi_cd, minor(_d)))
+<span class="lineNum">      81 </span>            : 
+<span class="lineNum">      82 </span>            : struct cfattach vscsi_ca = {
+<span class="lineNum">      83 </span>            :         sizeof(struct vscsi_softc),
+<span class="lineNum">      84 </span>            :         vscsi_match,
+<span class="lineNum">      85 </span>            :         vscsi_attach
+<span class="lineNum">      86 </span>            : };
+<span class="lineNum">      87 </span>            : 
+<span class="lineNum">      88 </span>            : struct cfdriver vscsi_cd = {
+<span class="lineNum">      89 </span>            :         NULL,
+<span class="lineNum">      90 </span>            :         &quot;vscsi&quot;,
+<span class="lineNum">      91 </span>            :         DV_DULL
+<span class="lineNum">      92 </span>            : };
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span>            : void            vscsi_cmd(struct scsi_xfer *);
+<span class="lineNum">      95 </span>            : int             vscsi_probe(struct scsi_link *);
+<span class="lineNum">      96 </span>            : void            vscsi_free(struct scsi_link *);
+<span class="lineNum">      97 </span>            : 
+<span class="lineNum">      98 </span>            : struct scsi_adapter vscsi_switch = {
+<span class="lineNum">      99 </span>            :         vscsi_cmd,
+<span class="lineNum">     100 </span>            :         scsi_minphys,
+<span class="lineNum">     101 </span>            :         vscsi_probe,
+<span class="lineNum">     102 </span>            :         vscsi_free
+<span class="lineNum">     103 </span>            : };
+<span class="lineNum">     104 </span>            : 
+<span class="lineNum">     105 </span>            : int             vscsi_i2t(struct vscsi_softc *, struct vscsi_ioc_i2t *);
+<span class="lineNum">     106 </span>            : int             vscsi_data(struct vscsi_softc *, struct vscsi_ioc_data *, int);
+<span class="lineNum">     107 </span>            : int             vscsi_t2i(struct vscsi_softc *, struct vscsi_ioc_t2i *);
+<span class="lineNum">     108 </span>            : int             vscsi_devevent(struct vscsi_softc *, u_long,
+<span class="lineNum">     109 </span>            :                     struct vscsi_ioc_devevent *);
+<span class="lineNum">     110 </span>            : void            vscsi_devevent_task(void *);
+<span class="lineNum">     111 </span>            : void            vscsi_done(struct vscsi_softc *, struct vscsi_ccb *);
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span>            : void *          vscsi_ccb_get(void *);
+<span class="lineNum">     114 </span>            : void            vscsi_ccb_put(void *, void *);
+<span class="lineNum">     115 </span>            : 
+<span class="lineNum">     116 </span>            : void            filt_vscsidetach(struct knote *);
+<span class="lineNum">     117 </span>            : int             filt_vscsiread(struct knote *, long);
+<span class="lineNum">     118 </span>            :   
+<span class="lineNum">     119 </span>            : struct filterops vscsi_filtops = {
+<span class="lineNum">     120 </span>            :         1,
+<span class="lineNum">     121 </span>            :         NULL,
+<span class="lineNum">     122 </span>            :         filt_vscsidetach,
+<span class="lineNum">     123 </span>            :         filt_vscsiread
+<span class="lineNum">     124 </span>            : };
+<span class="lineNum">     125 </span>            : 
+<a name="126"><span class="lineNum">     126 </span>            : </a>
+<span class="lineNum">     127 </span>            : int
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 : vscsi_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     129 </span>            : {
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     131 </span>            : }
+<a name="132"><span class="lineNum">     132 </span>            : </a>
+<span class="lineNum">     133 </span>            : void
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 : vscsi_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     135 </span>            : {
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         struct vscsi_softc              *sc = (struct vscsi_softc *)self;</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :         struct scsibus_attach_args      saa;</span>
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     140 </span>            : 
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         mtx_init(&amp;sc-&gt;sc_state_mtx, IPL_BIO);</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         sc-&gt;sc_state = VSCSI_S_CLOSED;</span>
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         TAILQ_INIT(&amp;sc-&gt;sc_ccb_i2t);</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         TAILQ_INIT(&amp;sc-&gt;sc_ccb_t2i);</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         mtx_init(&amp;sc-&gt;sc_poll_mtx, IPL_BIO);</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         mtx_init(&amp;sc-&gt;sc_sel_mtx, IPL_BIO);</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         rw_init(&amp;sc-&gt;sc_ioc_lock, &quot;vscsiioc&quot;);</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         scsi_iopool_init(&amp;sc-&gt;sc_iopool, sc, vscsi_ccb_get, vscsi_ccb_put);</span>
+<span class="lineNum">     150 </span>            : 
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.adapter = &amp;vscsi_switch;</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.adapter_softc = sc;</span>
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.adapter_target = 256;</span>
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.adapter_buswidth = 256;</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.openings = 16;</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         sc-&gt;sc_link.pool = &amp;sc-&gt;sc_iopool;</span>
+<span class="lineNum">     157 </span>            : 
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :         memset(&amp;saa, 0, sizeof(saa));</span>
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         saa.saa_sc_link = &amp;sc-&gt;sc_link;</span>
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         sc-&gt;sc_scsibus = (struct scsibus_softc *)config_found(&amp;sc-&gt;sc_dev,</span>
+<span class="lineNum">     162 </span>            :             &amp;saa, scsiprint);
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 : }</span>
+<a name="164"><span class="lineNum">     164 </span>            : </a>
+<span class="lineNum">     165 </span>            : void
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 : vscsi_cmd(struct scsi_xfer *xs)</span>
+<span class="lineNum">     167 </span>            : {
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :         struct scsi_link                *link = xs-&gt;sc_link;</span>
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :         struct vscsi_softc              *sc = link-&gt;adapter_softc;</span>
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :         struct vscsi_ccb                *ccb = xs-&gt;io;</span>
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         int                             polled = ISSET(xs-&gt;flags, SCSI_POLL);</span>
+<span class="lineNum">     172 </span>            :         int                             running = 0;
+<span class="lineNum">     173 </span>            : 
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         if (ISSET(xs-&gt;flags, SCSI_POLL) &amp;&amp; ISSET(xs-&gt;flags, SCSI_NOSLEEP)) {</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: POLL &amp;&amp; NOSLEEP for 0x%02x\n&quot;, DEVNAME(sc),</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                     xs-&gt;cmd-&gt;opcode);</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :                 xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                 scsi_done(xs);</span>
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     180 </span>            :         }
+<span class="lineNum">     181 </span>            : 
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         ccb-&gt;ccb_xs = xs;</span>
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_state == VSCSI_S_RUNNING) {</span>
+<span class="lineNum">     186 </span>            :                 running = 1;
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :                 TAILQ_INSERT_TAIL(&amp;sc-&gt;sc_ccb_i2t, ccb, ccb_entry);</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         if (!running) {</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                 xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :                 scsi_done(xs);</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     195 </span>            :         }
+<span class="lineNum">     196 </span>            : 
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         selwakeup(&amp;sc-&gt;sc_sel);</span>
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         if (polled) {</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                 mtx_enter(&amp;sc-&gt;sc_poll_mtx);</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                 while (ccb-&gt;ccb_xs != NULL)</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                         msleep(ccb, &amp;sc-&gt;sc_poll_mtx, PRIBIO, &quot;vscsipoll&quot;, 0);</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;sc-&gt;sc_poll_mtx);</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                 scsi_done(xs);</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 : }</span>
+<a name="207"><span class="lineNum">     207 </span>            : </a>
+<span class="lineNum">     208 </span>            : void
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 : vscsi_done(struct vscsi_softc *sc, struct vscsi_ccb *ccb)</span>
+<span class="lineNum">     210 </span>            : {
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :         struct scsi_xfer                *xs = ccb-&gt;ccb_xs;</span>
+<span class="lineNum">     212 </span>            : 
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         if (ISSET(xs-&gt;flags, SCSI_POLL)) {</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                 mtx_enter(&amp;sc-&gt;sc_poll_mtx);</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_xs = NULL;</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                 wakeup(ccb);</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;sc-&gt;sc_poll_mtx);</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                 scsi_done(xs);</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 : }</span>
+<a name="221"><span class="lineNum">     221 </span>            : </a>
+<span class="lineNum">     222 </span>            : int
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 : vscsi_probe(struct scsi_link *link)</span>
+<span class="lineNum">     224 </span>            : {
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :         struct vscsi_softc              *sc = link-&gt;adapter_softc;</span>
+<span class="lineNum">     226 </span>            :         int                             rv = 0;
+<span class="lineNum">     227 </span>            : 
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_state == VSCSI_S_RUNNING)</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_ref_count++;</span>
+<span class="lineNum">     231 </span>            :         else
+<span class="lineNum">     232 </span>            :                 rv = ENXIO;
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     234 </span>            : 
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     236 </span>            : }
+<a name="237"><span class="lineNum">     237 </span>            : </a>
+<span class="lineNum">     238 </span>            : void
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 : vscsi_free(struct scsi_link *link)</span>
+<span class="lineNum">     240 </span>            : {
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :         struct vscsi_softc              *sc = link-&gt;adapter_softc;</span>
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :         sc-&gt;sc_ref_count--;</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_state != VSCSI_S_RUNNING &amp;&amp; sc-&gt;sc_ref_count == 0)</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :                 wakeup(&amp;sc-&gt;sc_ref_count);</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 : }</span>
+<a name="249"><span class="lineNum">     249 </span>            : </a>
+<span class="lineNum">     250 </span>            : int
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 : vscsiopen(dev_t dev, int flags, int mode, struct proc *p)</span>
+<span class="lineNum">     252 </span>            : {
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         struct vscsi_softc              *sc = DEV2SC(dev);</span>
+<span class="lineNum">     254 </span>            :         enum vscsi_state                state = VSCSI_S_RUNNING;
+<span class="lineNum">     255 </span>            :         int                             rv = 0;
+<span class="lineNum">     256 </span>            : 
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         if (sc == NULL)</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     259 </span>            : 
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_state != VSCSI_S_CLOSED)</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :                 rv = EBUSY;</span>
+<span class="lineNum">     263 </span>            :         else
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_state = VSCSI_S_CONFIG;</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     266 </span>            : 
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         if (rv != 0) {</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :                 device_unref(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :                 return (rv);</span>
+<span class="lineNum">     270 </span>            :         }
+<span class="lineNum">     271 </span>            : 
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :         pool_init(&amp;sc-&gt;sc_ccb_pool, sizeof(struct vscsi_ccb), 0, IPL_BIO, 0,</span>
+<span class="lineNum">     273 </span>            :             &quot;vscsiccb&quot;, NULL);
+<span class="lineNum">     274 </span>            : 
+<span class="lineNum">     275 </span>            :         /* we need to guarantee some ccbs will be available for the iopool */
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :         rv = pool_prime(&amp;sc-&gt;sc_ccb_pool, 8);</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         if (rv != 0) {</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :                 pool_destroy(&amp;sc-&gt;sc_ccb_pool);</span>
+<span class="lineNum">     279 </span>            :                 state = VSCSI_S_CLOSED;
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     281 </span>            : 
+<span class="lineNum">     282 </span>            :         /* commit changes */
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         sc-&gt;sc_state = state;</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     286 </span>            : 
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         device_unref(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 : }</span>
+<a name="290"><span class="lineNum">     290 </span>            : </a>
+<span class="lineNum">     291 </span>            : int
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 : vscsiioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)</span>
+<span class="lineNum">     293 </span>            : {
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         struct vscsi_softc              *sc = DEV2SC(dev);</span>
+<span class="lineNum">     295 </span>            :         int                             read = 0;
+<span class="lineNum">     296 </span>            :         int                             err = 0;
+<span class="lineNum">     297 </span>            : 
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         if (sc == NULL)</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     300 </span>            : 
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         rw_enter_write(&amp;sc-&gt;sc_ioc_lock);</span>
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     304 </span>            :         case VSCSI_I2T:
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                 err = vscsi_i2t(sc, (struct vscsi_ioc_i2t *)addr);</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     307 </span>            : 
+<span class="lineNum">     308 </span>            :         case VSCSI_DATA_READ:
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :                 read = 1;</span>
+<span class="lineNum">     310 </span>            :         case VSCSI_DATA_WRITE:
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 err = vscsi_data(sc, (struct vscsi_ioc_data *)addr, read);</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     313 </span>            : 
+<span class="lineNum">     314 </span>            :         case VSCSI_T2I:
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :                 err = vscsi_t2i(sc, (struct vscsi_ioc_t2i *)addr);</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span>            :         case VSCSI_REQPROBE:
+<span class="lineNum">     319 </span>            :         case VSCSI_REQDETACH:
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :                 err = vscsi_devevent(sc, cmd,</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :                     (struct vscsi_ioc_devevent *)addr);</span>
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     323 </span>            : 
+<span class="lineNum">     324 </span>            :         default:
+<span class="lineNum">     325 </span>            :                 err = ENOTTY;
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     327 </span>            :         }
+<span class="lineNum">     328 </span>            : 
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :         rw_exit_write(&amp;sc-&gt;sc_ioc_lock);</span>
+<span class="lineNum">     330 </span>            : 
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         device_unref(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         return (err);</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 : }</span>
+<a name="334"><span class="lineNum">     334 </span>            : </a>
+<span class="lineNum">     335 </span>            : int
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 : vscsi_i2t(struct vscsi_softc *sc, struct vscsi_ioc_i2t *i2t)</span>
+<span class="lineNum">     337 </span>            : {
+<span class="lineNum">     338 </span>            :         struct vscsi_ccb                *ccb;
+<span class="lineNum">     339 </span>            :         struct scsi_xfer                *xs;
+<span class="lineNum">     340 </span>            :         struct scsi_link                *link;
+<span class="lineNum">     341 </span>            : 
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :         ccb = TAILQ_FIRST(&amp;sc-&gt;sc_ccb_i2t);</span>
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         if (ccb != NULL)</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :                 TAILQ_REMOVE(&amp;sc-&gt;sc_ccb_i2t, ccb, ccb_entry);</span>
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     347 </span>            : 
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         if (ccb == NULL)</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                 return (EAGAIN);</span>
+<span class="lineNum">     350 </span>            : 
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         xs = ccb-&gt;ccb_xs;</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :         link = xs-&gt;sc_link;</span>
+<span class="lineNum">     353 </span>            : 
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         i2t-&gt;tag = ccb-&gt;ccb_tag;</span>
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :         i2t-&gt;target = link-&gt;target;</span>
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :         i2t-&gt;lun = link-&gt;lun;</span>
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :         memcpy(&amp;i2t-&gt;cmd, xs-&gt;cmd, xs-&gt;cmdlen);</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :         i2t-&gt;cmdlen = xs-&gt;cmdlen;</span>
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :         i2t-&gt;datalen = xs-&gt;datalen;</span>
+<span class="lineNum">     360 </span>            : 
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         switch (xs-&gt;flags &amp; (SCSI_DATA_IN | SCSI_DATA_OUT)) {</span>
+<span class="lineNum">     362 </span>            :         case SCSI_DATA_IN:
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :                 i2t-&gt;direction = VSCSI_DIR_READ;</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     365 </span>            :         case SCSI_DATA_OUT:
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :                 i2t-&gt;direction = VSCSI_DIR_WRITE;</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     368 </span>            :         default:
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                 i2t-&gt;direction = VSCSI_DIR_NONE;</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     371 </span>            :         }
+<span class="lineNum">     372 </span>            : 
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :         TAILQ_INSERT_TAIL(&amp;sc-&gt;sc_ccb_t2i, ccb, ccb_entry);</span>
+<span class="lineNum">     374 </span>            : 
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 : }</span>
+<a name="377"><span class="lineNum">     377 </span>            : </a>
+<span class="lineNum">     378 </span>            : int
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 : vscsi_data(struct vscsi_softc *sc, struct vscsi_ioc_data *data, int read)</span>
+<span class="lineNum">     380 </span>            : {
+<span class="lineNum">     381 </span>            :         struct vscsi_ccb                *ccb;
+<span class="lineNum">     382 </span>            :         struct scsi_xfer                *xs;
+<span class="lineNum">     383 </span>            :         int                             xsread;
+<span class="lineNum">     384 </span>            :         u_int8_t                        *buf;
+<span class="lineNum">     385 </span>            :         int                             rv = EINVAL;
+<span class="lineNum">     386 </span>            : 
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(ccb, &amp;sc-&gt;sc_ccb_t2i, ccb_entry) {</span>
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                 if (ccb-&gt;ccb_tag == data-&gt;tag)</span>
+<span class="lineNum">     389 </span>            :                         break;
+<span class="lineNum">     390 </span>            :         }
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :         if (ccb == NULL)</span>
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                 return (EFAULT);</span>
+<span class="lineNum">     393 </span>            : 
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :         xs = ccb-&gt;ccb_xs;</span>
+<span class="lineNum">     395 </span>            : 
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         if (data-&gt;datalen &gt; xs-&gt;datalen - ccb-&gt;ccb_datalen)</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     398 </span>            : 
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :         switch (xs-&gt;flags &amp; (SCSI_DATA_IN | SCSI_DATA_OUT)) {</span>
+<span class="lineNum">     400 </span>            :         case SCSI_DATA_IN:
+<span class="lineNum">     401 </span>            :                 xsread = 1;
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     403 </span>            :         case SCSI_DATA_OUT:
+<span class="lineNum">     404 </span>            :                 xsread = 0;
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     406 </span>            :         default:
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     408 </span>            :         }
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         if (read != xsread)</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         buf = xs-&gt;data;</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         buf += ccb-&gt;ccb_datalen;</span>
+<span class="lineNum">     415 </span>            : 
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         if (read)</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 rv = copyin(data-&gt;data, buf, data-&gt;datalen);</span>
+<span class="lineNum">     418 </span>            :         else
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :                 rv = copyout(buf, data-&gt;data, data-&gt;datalen);</span>
+<span class="lineNum">     420 </span>            : 
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         if (rv == 0)</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_datalen += data-&gt;datalen;</span>
+<span class="lineNum">     423 </span>            : 
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 : }</span>
+<a name="426"><span class="lineNum">     426 </span>            : </a>
+<span class="lineNum">     427 </span>            : int
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 : vscsi_t2i(struct vscsi_softc *sc, struct vscsi_ioc_t2i *t2i)</span>
+<span class="lineNum">     429 </span>            : {
+<span class="lineNum">     430 </span>            :         struct vscsi_ccb                *ccb;
+<span class="lineNum">     431 </span>            :         struct scsi_xfer                *xs;
+<span class="lineNum">     432 </span>            :         int                             rv = 0;
+<span class="lineNum">     433 </span>            : 
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(ccb, &amp;sc-&gt;sc_ccb_t2i, ccb_entry) {</span>
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :                 if (ccb-&gt;ccb_tag == t2i-&gt;tag)</span>
+<span class="lineNum">     436 </span>            :                         break;
+<span class="lineNum">     437 </span>            :         }
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :         if (ccb == NULL)</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :                 return (EFAULT);</span>
+<span class="lineNum">     440 </span>            : 
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :         TAILQ_REMOVE(&amp;sc-&gt;sc_ccb_t2i, ccb, ccb_entry);</span>
+<span class="lineNum">     442 </span>            : 
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :         xs = ccb-&gt;ccb_xs;</span>
+<span class="lineNum">     444 </span>            : 
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :         xs-&gt;resid = xs-&gt;datalen - ccb-&gt;ccb_datalen;</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :         xs-&gt;status = SCSI_OK;</span>
+<span class="lineNum">     447 </span>            : 
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :         switch (t2i-&gt;status) {</span>
+<span class="lineNum">     449 </span>            :         case VSCSI_STAT_DONE:
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                 xs-&gt;error = XS_NOERROR;</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     452 </span>            :         case VSCSI_STAT_SENSE:
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                 xs-&gt;error = XS_SENSE;</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :                 memcpy(&amp;xs-&gt;sense, &amp;t2i-&gt;sense, sizeof(xs-&gt;sense));</span>
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     456 </span>            :         case VSCSI_STAT_RESET:
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                 xs-&gt;error = XS_RESET;</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     459 </span>            :         case VSCSI_STAT_ERR:
+<span class="lineNum">     460 </span>            :         default:
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                 xs-&gt;error = XS_DRIVER_STUFFUP;</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     463 </span>            :         }
+<span class="lineNum">     464 </span>            : 
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :         vscsi_done(sc, ccb);</span>
+<span class="lineNum">     466 </span>            : 
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     469 </span>            : 
+<span class="lineNum">     470 </span>            : struct vscsi_devevent_task {
+<span class="lineNum">     471 </span>            :         struct vscsi_softc *sc;
+<span class="lineNum">     472 </span>            :         struct task t;
+<span class="lineNum">     473 </span>            :         struct vscsi_ioc_devevent de;
+<span class="lineNum">     474 </span>            :         u_long cmd;
+<span class="lineNum">     475 </span>            : };
+<a name="476"><span class="lineNum">     476 </span>            : </a>
+<span class="lineNum">     477 </span>            : int
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 : vscsi_devevent(struct vscsi_softc *sc, u_long cmd,</span>
+<span class="lineNum">     479 </span>            :     struct vscsi_ioc_devevent *de)
+<span class="lineNum">     480 </span>            : {
+<span class="lineNum">     481 </span>            :         struct vscsi_devevent_task *dt;
+<span class="lineNum">     482 </span>            : 
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :         dt = malloc(sizeof(*dt), M_TEMP, M_WAITOK | M_CANFAIL);</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         if (dt == NULL)</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :                 return (ENOMEM);</span>
+<span class="lineNum">     486 </span>            : 
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :         task_set(&amp;dt-&gt;t, vscsi_devevent_task, dt);</span>
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :         dt-&gt;sc = sc;</span>
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :         dt-&gt;de = *de;</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :         dt-&gt;cmd = cmd;</span>
+<span class="lineNum">     491 </span>            : 
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :         device_ref(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         task_add(systq, &amp;dt-&gt;t);</span>
+<span class="lineNum">     494 </span>            : 
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 : }</span>
+<a name="497"><span class="lineNum">     497 </span>            : </a>
+<span class="lineNum">     498 </span>            : void
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 : vscsi_devevent_task(void *xdt)</span>
+<span class="lineNum">     500 </span>            : {
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         struct vscsi_devevent_task *dt = xdt;</span>
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :         struct vscsi_softc *sc = dt-&gt;sc;</span>
+<span class="lineNum">     503 </span>            :         int state;
+<span class="lineNum">     504 </span>            : 
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :         state = sc-&gt;sc_state;</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     508 </span>            : 
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :         if (state != VSCSI_S_RUNNING)</span>
+<span class="lineNum">     510 </span>            :                 goto gone;
+<span class="lineNum">     511 </span>            : 
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :         switch (dt-&gt;cmd) {</span>
+<span class="lineNum">     513 </span>            :         case VSCSI_REQPROBE:
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                 scsi_probe(sc-&gt;sc_scsibus, dt-&gt;de.target, dt-&gt;de.lun);</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     516 </span>            :         case VSCSI_REQDETACH:
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :                 scsi_detach(sc-&gt;sc_scsibus, dt-&gt;de.target, dt-&gt;de.lun,</span>
+<span class="lineNum">     518 </span>            :                     DETACH_FORCE);
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     520 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     521 </span>            :         default:
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :                 panic(&quot;unexpected vscsi_devevent cmd&quot;);</span>
+<span class="lineNum">     523 </span>            :                 /* NOTREACHED */
+<span class="lineNum">     524 </span>            : #endif
+<span class="lineNum">     525 </span>            :         }
+<span class="lineNum">     526 </span>            : 
+<span class="lineNum">     527 </span>            : gone:
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :         device_unref(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     529 </span>            : 
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :         free(dt, M_TEMP, sizeof(*dt));</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 : }</span>
+<a name="532"><span class="lineNum">     532 </span>            : </a>
+<span class="lineNum">     533 </span>            : int
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 : vscsipoll(dev_t dev, int events, struct proc *p)</span>
+<span class="lineNum">     535 </span>            : {
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         struct vscsi_softc              *sc = DEV2SC(dev);</span>
+<span class="lineNum">     537 </span>            :         int                             revents = 0;
+<span class="lineNum">     538 </span>            : 
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :         if (sc == NULL)</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     541 </span>            : 
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :         if (events &amp; (POLLIN | POLLRDNORM)) {</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :                 mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :                 if (!TAILQ_EMPTY(&amp;sc-&gt;sc_ccb_i2t))</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :                         revents |= events &amp; (POLLIN | POLLRDNORM);</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :                 mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     548 </span>            : 
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :         if (revents == 0) {</span>
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :                 if (events &amp; (POLLIN | POLLRDNORM))</span>
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :                         selrecord(p, &amp;sc-&gt;sc_sel);</span>
+<span class="lineNum">     552 </span>            :         }
+<span class="lineNum">     553 </span>            : 
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :         device_unref(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 :         return (revents);</span>
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 : }</span>
+<a name="557"><span class="lineNum">     557 </span>            : </a>
+<span class="lineNum">     558 </span>            : int
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 : vscsikqfilter(dev_t dev, struct knote *kn)</span>
+<span class="lineNum">     560 </span>            : {
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :         struct vscsi_softc *sc = DEV2SC(dev);</span>
+<span class="lineNum">     562 </span>            :         struct klist *klist;
+<span class="lineNum">     563 </span>            : 
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :         if (sc == NULL)</span>
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     566 </span>            : 
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :         klist = &amp;sc-&gt;sc_sel.si_note;</span>
+<span class="lineNum">     568 </span>            : 
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :         switch (kn-&gt;kn_filter) {</span>
+<span class="lineNum">     570 </span>            :         case EVFILT_READ:
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :                 kn-&gt;kn_fop = &amp;vscsi_filtops;</span>
+<span class="lineNum">     572 </span>            :                 break;
+<span class="lineNum">     573 </span>            :         default:
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :                 device_unref(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     576 </span>            :         }
+<span class="lineNum">     577 </span>            : 
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :         kn-&gt;kn_hook = sc;</span>
+<span class="lineNum">     579 </span>            : 
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_sel_mtx);</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :         SLIST_INSERT_HEAD(klist, kn, kn_selnext);</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_sel_mtx);</span>
+<span class="lineNum">     583 </span>            : 
+<span class="lineNum">     584 </span>            :         /* device ref is given to the knote in the klist */
+<span class="lineNum">     585 </span>            : 
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 : }</span>
+<a name="588"><span class="lineNum">     588 </span>            : </a>
+<span class="lineNum">     589 </span>            : void
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 : filt_vscsidetach(struct knote *kn)</span>
+<span class="lineNum">     591 </span>            : {
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :         struct vscsi_softc *sc = kn-&gt;kn_hook;</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :         struct klist *klist = &amp;sc-&gt;sc_sel.si_note;</span>
+<span class="lineNum">     594 </span>            :  
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_sel_mtx);</span>
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :         SLIST_REMOVE(klist, kn, knote, kn_selnext);</span>
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_sel_mtx);</span>
+<span class="lineNum">     598 </span>            : 
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :         device_unref(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 : }</span>
+<a name="601"><span class="lineNum">     601 </span>            : </a>
+<span class="lineNum">     602 </span>            : int
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 : filt_vscsiread(struct knote *kn, long hint)</span>
+<span class="lineNum">     604 </span>            : {
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :         struct vscsi_softc *sc = kn-&gt;kn_hook;</span>
+<span class="lineNum">     606 </span>            :         int event = 0;
+<span class="lineNum">     607 </span>            : 
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         if (!TAILQ_EMPTY(&amp;sc-&gt;sc_ccb_i2t))</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :                 event = 1;</span>
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     612 </span>            : 
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         return (event);</span>
+<span class="lineNum">     614 </span>            : }
+<a name="615"><span class="lineNum">     615 </span>            : </a>
+<span class="lineNum">     616 </span>            : int
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 : vscsiclose(dev_t dev, int flags, int mode, struct proc *p)</span>
+<span class="lineNum">     618 </span>            : {
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :         struct vscsi_softc              *sc = DEV2SC(dev);</span>
+<span class="lineNum">     620 </span>            :         struct vscsi_ccb                *ccb;
+<span class="lineNum">     621 </span>            : 
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :         if (sc == NULL)</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     624 </span>            : 
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :         KASSERT(sc-&gt;sc_state == VSCSI_S_RUNNING);</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :         sc-&gt;sc_state = VSCSI_S_CONFIG;</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     629 </span>            : 
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :         scsi_activate(sc-&gt;sc_scsibus, -1, -1, DVACT_DEACTIVATE);</span>
+<span class="lineNum">     631 </span>            : 
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :         while ((ccb = TAILQ_FIRST(&amp;sc-&gt;sc_ccb_t2i)) != NULL) {</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :                 TAILQ_REMOVE(&amp;sc-&gt;sc_ccb_t2i, ccb, ccb_entry);</span>
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_xs-&gt;error = XS_RESET;</span>
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :                 vscsi_done(sc, ccb);</span>
+<span class="lineNum">     636 </span>            :         }
+<span class="lineNum">     637 </span>            : 
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :         while ((ccb = TAILQ_FIRST(&amp;sc-&gt;sc_ccb_i2t)) != NULL) {</span>
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :                 TAILQ_REMOVE(&amp;sc-&gt;sc_ccb_i2t, ccb, ccb_entry);</span>
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_xs-&gt;error = XS_RESET;</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :                 vscsi_done(sc, ccb);</span>
+<span class="lineNum">     642 </span>            :         }
+<span class="lineNum">     643 </span>            : 
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :         scsi_req_detach(sc-&gt;sc_scsibus, -1, -1, DETACH_FORCE);</span>
+<span class="lineNum">     645 </span>            : 
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         while (sc-&gt;sc_ref_count &gt; 0) {</span>
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :                 msleep(&amp;sc-&gt;sc_ref_count, &amp;sc-&gt;sc_state_mtx,</span>
+<span class="lineNum">     649 </span>            :                     PRIBIO, &quot;vscsiref&quot;, 0);
+<span class="lineNum">     650 </span>            :         }
+<span class="lineNum">     651 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     652 </span>            : 
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :         pool_destroy(&amp;sc-&gt;sc_ccb_pool);</span>
+<span class="lineNum">     654 </span>            : 
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :         mtx_enter(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :         sc-&gt;sc_state = VSCSI_S_CLOSED;</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :         mtx_leave(&amp;sc-&gt;sc_state_mtx);</span>
+<span class="lineNum">     658 </span>            : 
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :         device_unref(&amp;sc-&gt;sc_dev);</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 : }</span>
+<a name="662"><span class="lineNum">     662 </span>            : </a>
+<span class="lineNum">     663 </span>            : void *
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 : vscsi_ccb_get(void *cookie)</span>
+<span class="lineNum">     665 </span>            : {
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :         struct vscsi_softc              *sc = cookie;</span>
+<span class="lineNum">     667 </span>            :         struct vscsi_ccb                *ccb = NULL;
+<span class="lineNum">     668 </span>            : 
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :         ccb = pool_get(&amp;sc-&gt;sc_ccb_pool, PR_NOWAIT);</span>
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :         if (ccb != NULL) {</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_tag = sc-&gt;sc_ccb_tag++;</span>
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :                 ccb-&gt;ccb_datalen = 0;</span>
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     674 </span>            : 
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         return (ccb);</span>
+<span class="lineNum">     676 </span>            : }
+<a name="677"><span class="lineNum">     677 </span>            : </a>
+<span class="lineNum">     678 </span>            : void
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 : vscsi_ccb_put(void *cookie, void *io)</span>
+<span class="lineNum">     680 </span>            : {
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         struct vscsi_softc              *sc = cookie;</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :         struct vscsi_ccb                *ccb = io;</span>
+<span class="lineNum">     683 </span>            : 
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :         pool_put(&amp;sc-&gt;sc_ccb_pool, ccb);</span>
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

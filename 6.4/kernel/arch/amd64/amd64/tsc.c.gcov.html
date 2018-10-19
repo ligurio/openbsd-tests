@@ -1,0 +1,305 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - arch/amd64/amd64/tsc.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../index.html">top level</a> - <a href="index.html">arch/amd64/amd64</a> - tsc.c<span style="font-size: 80%;"> (source / <a href="tsc.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">92</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">9</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: tsc.c,v 1.10 2018/07/27 21:11:31 kettenis Exp $       */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2016,2017 Reyk Floeter &lt;reyk@openbsd.org&gt;
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2017 Adam Steen &lt;adam@adamsteen.com.au&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2017 Mike Belopuhov &lt;mike@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       8 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       9 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      12 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      13 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      14 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      15 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      16 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      17 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      18 </span>            :  */
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/timetc.h&gt;
+<span class="lineNum">      23 </span>            : 
+<span class="lineNum">      24 </span>            : #include &lt;machine/cpu.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;machine/cpufunc.h&gt;
+<span class="lineNum">      26 </span>            : 
+<span class="lineNum">      27 </span>            : #define RECALIBRATE_MAX_RETRIES         5
+<span class="lineNum">      28 </span>            : #define RECALIBRATE_SMI_THRESHOLD       50000
+<span class="lineNum">      29 </span>            : #define RECALIBRATE_DELAY_THRESHOLD     50
+<span class="lineNum">      30 </span>            : 
+<span class="lineNum">      31 </span>            : int             tsc_recalibrate;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : uint64_t        tsc_frequency;
+<span class="lineNum">      34 </span>            : int             tsc_is_invariant;
+<span class="lineNum">      35 </span>            : 
+<span class="lineNum">      36 </span>            : uint            tsc_get_timecount(struct timecounter *tc);
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : struct timecounter tsc_timecounter = {
+<span class="lineNum">      39 </span>            :         tsc_get_timecount, NULL, ~0u, 0, &quot;tsc&quot;, -1000, NULL
+<span class="lineNum">      40 </span>            : };
+<a name="41"><span class="lineNum">      41 </span>            : </a>
+<span class="lineNum">      42 </span>            : uint64_t
+<span class="lineNum">      43 </span><span class="lineNoCov">          0 : tsc_freq_cpuid(struct cpu_info *ci)</span>
+<span class="lineNum">      44 </span>            : {
+<span class="lineNum">      45 </span>            :         uint64_t count;
+<span class="lineNum">      46 </span>            :         uint32_t eax, ebx, khz, dummy;
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span><span class="lineNoCov">          0 :         if (!strcmp(cpu_vendor, &quot;GenuineIntel&quot;) &amp;&amp;</span>
+<span class="lineNum">      49 </span><span class="lineNoCov">          0 :             cpuid_level &gt;= 0x15) {</span>
+<span class="lineNum">      50 </span>            :                 eax = ebx = khz = dummy = 0;
+<span class="lineNum">      51 </span><span class="lineNoCov">          0 :                 CPUID(0x15, eax, ebx, khz, dummy);</span>
+<span class="lineNum">      52 </span><span class="lineNoCov">          0 :                 khz /= 1000;</span>
+<span class="lineNum">      53 </span><span class="lineNoCov">          0 :                 if (khz == 0) {</span>
+<span class="lineNum">      54 </span><span class="lineNoCov">          0 :                         switch (ci-&gt;ci_model) {</span>
+<span class="lineNum">      55 </span>            :                         case 0x4e: /* Skylake mobile */
+<span class="lineNum">      56 </span>            :                         case 0x5e: /* Skylake desktop */
+<span class="lineNum">      57 </span>            :                         case 0x8e: /* Kabylake mobile */
+<span class="lineNum">      58 </span>            :                         case 0x9e: /* Kabylake desktop */
+<span class="lineNum">      59 </span>            :                                 khz = 24000; /* 24.0 MHz */
+<span class="lineNum">      60 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">      61 </span>            :                         case 0x5f: /* Atom Denverton */
+<span class="lineNum">      62 </span>            :                                 khz = 25000; /* 25.0 MHz */
+<span class="lineNum">      63 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">      64 </span>            :                         case 0x5c: /* Atom Goldmont */
+<span class="lineNum">      65 </span>            :                                 khz = 19200; /* 19.2 MHz */
+<span class="lineNum">      66 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">      67 </span>            :                         }
+<span class="lineNum">      68 </span>            :                 }
+<span class="lineNum">      69 </span><span class="lineNoCov">          0 :                 if (ebx == 0 || eax == 0)</span>
+<span class="lineNum">      70 </span><span class="lineNoCov">          0 :                         count = 0;</span>
+<span class="lineNum">      71 </span><span class="lineNoCov">          0 :                 else if ((count = (uint64_t)khz * (uint64_t)ebx / eax) != 0)</span>
+<span class="lineNum">      72 </span><span class="lineNoCov">          0 :                         return (count * 1000);</span>
+<span class="lineNum">      73 </span>            :         }
+<span class="lineNum">      74 </span>            : 
+<span class="lineNum">      75 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">      76 </span><span class="lineNoCov">          0 : }</span>
+<a name="77"><span class="lineNum">      77 </span>            : </a>
+<span class="lineNum">      78 </span>            : static inline int
+<span class="lineNum">      79 </span><span class="lineNoCov">          0 : get_tsc_and_timecount(struct timecounter *tc, uint64_t *tsc, uint64_t *count)</span>
+<span class="lineNum">      80 </span>            : {
+<span class="lineNum">      81 </span>            :         uint64_t n, tsc1, tsc2;
+<span class="lineNum">      82 </span>            :         int i;
+<span class="lineNum">      83 </span>            : 
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RECALIBRATE_MAX_RETRIES; i++) {</span>
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :                 tsc1 = rdtsc();</span>
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :                 n = (tc-&gt;tc_get_timecount(tc) &amp; tc-&gt;tc_counter_mask);</span>
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :                 tsc2 = rdtsc();</span>
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :                 if ((tsc2 - tsc1) &lt; RECALIBRATE_SMI_THRESHOLD) {</span>
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :                         *count = n;</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :                         *tsc = tsc2;</span>
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">      93 </span>            :                 }
+<span class="lineNum">      94 </span>            :         }
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 : }</span>
+<a name="97"><span class="lineNum">      97 </span>            : </a>
+<span class="lineNum">      98 </span>            : static inline uint64_t
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 : calculate_tsc_freq(uint64_t tsc1, uint64_t tsc2, int usec)</span>
+<span class="lineNum">     100 </span>            : {
+<span class="lineNum">     101 </span>            :         uint64_t delta;
+<span class="lineNum">     102 </span>            : 
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :         delta = (tsc2 - tsc1);</span>
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 :         return (delta * 1000000 / usec);</span>
+<span class="lineNum">     105 </span>            : }
+<a name="106"><span class="lineNum">     106 </span>            : </a>
+<span class="lineNum">     107 </span>            : static inline uint64_t
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 : calculate_tc_delay(struct timecounter *tc, uint64_t count1, uint64_t count2)</span>
+<span class="lineNum">     109 </span>            : {
+<span class="lineNum">     110 </span>            :         uint64_t delta;
+<span class="lineNum">     111 </span>            : 
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :         if (count2 &lt; count1)</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :                 count2 += tc-&gt;tc_counter_mask;</span>
+<span class="lineNum">     114 </span>            : 
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         delta = (count2 - count1);</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         return (delta * 1000000 / tc-&gt;tc_frequency);</span>
+<span class="lineNum">     117 </span>            : }
+<a name="118"><span class="lineNum">     118 </span>            : </a>
+<span class="lineNum">     119 </span>            : uint64_t
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 : measure_tsc_freq(struct timecounter *tc)</span>
+<span class="lineNum">     121 </span>            : {
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :         uint64_t count1, count2, frequency, min_freq, tsc1, tsc2;</span>
+<span class="lineNum">     123 </span>            :         u_long s;
+<span class="lineNum">     124 </span>            :         int delay_usec, i, err1, err2, usec, success = 0;
+<span class="lineNum">     125 </span>            : 
+<span class="lineNum">     126 </span>            :         /* warmup the timers */
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; 3; i++) {</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :                 (void)tc-&gt;tc_get_timecount(tc);</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :                 (void)rdtsc();</span>
+<span class="lineNum">     130 </span>            :         }
+<span class="lineNum">     131 </span>            : 
+<span class="lineNum">     132 </span>            :         min_freq = ULLONG_MAX;
+<span class="lineNum">     133 </span>            : 
+<span class="lineNum">     134 </span>            :         delay_usec = 100000;
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; 3; i++) {</span>
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :                 s = intr_disable();</span>
+<span class="lineNum">     137 </span>            : 
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :                 err1 = get_tsc_and_timecount(tc, &amp;tsc1, &amp;count1);</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :                 delay(delay_usec);</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :                 err2 = get_tsc_and_timecount(tc, &amp;tsc2, &amp;count2);</span>
+<span class="lineNum">     141 </span>            : 
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                 intr_restore(s);</span>
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :                 if (err1 || err2)</span>
+<span class="lineNum">     145 </span>            :                         continue;
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :                 usec = calculate_tc_delay(tc, count1, count2);</span>
+<span class="lineNum">     148 </span>            : 
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :                 if ((usec &lt; (delay_usec - RECALIBRATE_DELAY_THRESHOLD)) ||</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :                     (usec &gt; (delay_usec + RECALIBRATE_DELAY_THRESHOLD)))</span>
+<span class="lineNum">     151 </span>            :                         continue;
+<span class="lineNum">     152 </span>            : 
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :                 frequency = calculate_tsc_freq(tsc1, tsc2, usec);</span>
+<span class="lineNum">     154 </span>            : 
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :                 min_freq = MIN(min_freq, frequency);</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :                 success++;</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         return (success &gt; 1 ? min_freq : 0);</span>
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 : }</span>
+<a name="161"><span class="lineNum">     161 </span>            : </a>
+<span class="lineNum">     162 </span>            : void
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 : calibrate_tsc_freq(void)</span>
+<span class="lineNum">     164 </span>            : {
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         struct timecounter *reference = tsc_timecounter.tc_priv;</span>
+<span class="lineNum">     166 </span>            :         uint64_t freq;
+<span class="lineNum">     167 </span>            : 
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :         if (!reference || !tsc_recalibrate)</span>
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         if ((freq = measure_tsc_freq(reference)) == 0)</span>
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :         tsc_frequency = freq;</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         tsc_timecounter.tc_frequency = freq;</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :         if (tsc_is_invariant)</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                 tsc_timecounter.tc_quality = 2000;</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 : }</span>
+<a name="178"><span class="lineNum">     178 </span>            : </a>
+<span class="lineNum">     179 </span>            : void
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 : cpu_recalibrate_tsc(struct timecounter *tc)</span>
+<span class="lineNum">     181 </span>            : {
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         struct timecounter *reference = tsc_timecounter.tc_priv;</span>
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span>            :         /* Prevent recalibration with a worse timecounter source */
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         if (reference &amp;&amp; reference-&gt;tc_quality &gt; tc-&gt;tc_quality)</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     187 </span>            : 
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         tsc_timecounter.tc_priv = tc;</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :         calibrate_tsc_freq();</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 : }</span>
+<a name="191"><span class="lineNum">     191 </span>            : </a>
+<span class="lineNum">     192 </span>            : uint
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 : tsc_get_timecount(struct timecounter *tc)</span>
+<span class="lineNum">     194 </span>            : {
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         return rdtsc();</span>
+<span class="lineNum">     196 </span>            : }
+<a name="197"><span class="lineNum">     197 </span>            : </a>
+<span class="lineNum">     198 </span>            : void
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 : tsc_timecounter_init(struct cpu_info *ci, uint64_t cpufreq)</span>
+<span class="lineNum">     200 </span>            : {
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :         if (!(ci-&gt;ci_flags &amp; CPUF_PRIMARY) ||</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :             !(ci-&gt;ci_flags &amp; CPUF_CONST_TSC) ||</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :             !(ci-&gt;ci_flags &amp; CPUF_INVAR_TSC))</span>
+<span class="lineNum">     204 </span>            :                 return;
+<span class="lineNum">     205 </span>            : 
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         tsc_frequency = tsc_freq_cpuid(ci);</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :         tsc_is_invariant = 1;</span>
+<span class="lineNum">     208 </span>            : 
+<span class="lineNum">     209 </span>            :         /* Newer CPUs don't require recalibration */
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :         if (tsc_frequency &gt; 0) {</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                 tsc_timecounter.tc_frequency = tsc_frequency;</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :                 tsc_timecounter.tc_quality = 2000;</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                 tsc_recalibrate = 1;</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                 tsc_frequency = cpufreq;</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                 tsc_timecounter.tc_frequency = cpufreq;</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :                 calibrate_tsc_freq();</span>
+<span class="lineNum">     218 </span>            :         }
+<span class="lineNum">     219 </span>            : 
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         tc_init(&amp;tsc_timecounter);</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

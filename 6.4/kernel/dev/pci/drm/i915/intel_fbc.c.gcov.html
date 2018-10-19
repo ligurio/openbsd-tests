@@ -1,0 +1,1210 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/i915/intel_fbc.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">dev/pci/drm/i915</a> - intel_fbc.c<span style="font-size: 80%;"> (source / <a href="intel_fbc.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">506</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">40</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * Copyright © 2014 Intel Corporation
+<span class="lineNum">       3 </span>            :  *
+<span class="lineNum">       4 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       5 </span>            :  * copy of this software and associated documentation files (the &quot;Software&quot;),
+<span class="lineNum">       6 </span>            :  * to deal in the Software without restriction, including without limitation
+<span class="lineNum">       7 </span>            :  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+<span class="lineNum">       8 </span>            :  * and/or sell copies of the Software, and to permit persons to whom the
+<span class="lineNum">       9 </span>            :  * Software is furnished to do so, subject to the following conditions:
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * The above copyright notice and this permission notice (including the next
+<span class="lineNum">      12 </span>            :  * paragraph) shall be included in all copies or substantial portions of the
+<span class="lineNum">      13 </span>            :  * Software.
+<span class="lineNum">      14 </span>            :  *
+<span class="lineNum">      15 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      16 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      17 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+<span class="lineNum">      18 </span>            :  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+<span class="lineNum">      19 </span>            :  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+<span class="lineNum">      20 </span>            :  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+<span class="lineNum">      21 </span>            :  * DEALINGS IN THE SOFTWARE.
+<span class="lineNum">      22 </span>            :  */
+<span class="lineNum">      23 </span>            : 
+<span class="lineNum">      24 </span>            : /**
+<span class="lineNum">      25 </span>            :  * DOC: Frame Buffer Compression (FBC)
+<span class="lineNum">      26 </span>            :  *
+<span class="lineNum">      27 </span>            :  * FBC tries to save memory bandwidth (and so power consumption) by
+<span class="lineNum">      28 </span>            :  * compressing the amount of memory used by the display. It is total
+<span class="lineNum">      29 </span>            :  * transparent to user space and completely handled in the kernel.
+<span class="lineNum">      30 </span>            :  *
+<span class="lineNum">      31 </span>            :  * The benefits of FBC are mostly visible with solid backgrounds and
+<span class="lineNum">      32 </span>            :  * variation-less patterns. It comes from keeping the memory footprint small
+<span class="lineNum">      33 </span>            :  * and having fewer memory pages opened and accessed for refreshing the display.
+<span class="lineNum">      34 </span>            :  *
+<span class="lineNum">      35 </span>            :  * i915 is responsible to reserve stolen memory for FBC and configure its
+<span class="lineNum">      36 </span>            :  * offset on proper registers. The hardware takes care of all
+<span class="lineNum">      37 </span>            :  * compress/decompress. However there are many known cases where we have to
+<span class="lineNum">      38 </span>            :  * forcibly disable it to allow proper screen updates.
+<span class="lineNum">      39 </span>            :  */
+<span class="lineNum">      40 </span>            : 
+<span class="lineNum">      41 </span>            : #include &quot;intel_drv.h&quot;
+<a name="42"><span class="lineNum">      42 </span>            : #include &quot;i915_drv.h&quot;</a>
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span><span class="lineNoCov">          0 : static inline bool fbc_supported(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">      45 </span>            : {
+<span class="lineNum">      46 </span><span class="lineNoCov">          0 :         return dev_priv-&gt;fbc.enable_fbc != NULL;</span>
+<span class="lineNum">      47 </span>            : }
+<span class="lineNum">      48 </span>            : 
+<span class="lineNum">      49 </span>            : /*
+<span class="lineNum">      50 </span>            :  * In some platforms where the CRTC's x:0/y:0 coordinates doesn't match the
+<span class="lineNum">      51 </span>            :  * frontbuffer's x:0/y:0 coordinates we lie to the hardware about the plane's
+<span class="lineNum">      52 </span>            :  * origin so the x and y offsets can actually fit the registers. As a
+<span class="lineNum">      53 </span>            :  * consequence, the fence doesn't really start exactly at the display plane
+<span class="lineNum">      54 </span>            :  * address we program because it starts at the real start of the buffer, so we
+<a name="55"><span class="lineNum">      55 </span>            :  * have to take this into consideration here.</a>
+<span class="lineNum">      56 </span>            :  */
+<span class="lineNum">      57 </span><span class="lineNoCov">          0 : static unsigned int get_crtc_fence_y_offset(struct intel_crtc *crtc)</span>
+<span class="lineNum">      58 </span>            : {
+<span class="lineNum">      59 </span><span class="lineNoCov">          0 :         return crtc-&gt;base.y - crtc-&gt;adjusted_y;</span>
+<a name="60"><span class="lineNum">      60 </span>            : }</a>
+<span class="lineNum">      61 </span>            : 
+<span class="lineNum">      62 </span><span class="lineNoCov">          0 : static void i8xx_fbc_disable(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">      63 </span>            : {
+<span class="lineNum">      64 </span>            :         u32 fbc_ctl;
+<span class="lineNum">      65 </span>            : 
+<span class="lineNum">      66 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.enabled = false;</span>
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            :         /* Disable compression */
+<span class="lineNum">      69 </span><span class="lineNoCov">          0 :         fbc_ctl = I915_READ(FBC_CONTROL);</span>
+<span class="lineNum">      70 </span><span class="lineNoCov">          0 :         if ((fbc_ctl &amp; FBC_CTL_EN) == 0)</span>
+<span class="lineNum">      71 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span><span class="lineNoCov">          0 :         fbc_ctl &amp;= ~FBC_CTL_EN;</span>
+<span class="lineNum">      74 </span><span class="lineNoCov">          0 :         I915_WRITE(FBC_CONTROL, fbc_ctl);</span>
+<span class="lineNum">      75 </span>            : 
+<span class="lineNum">      76 </span>            :         /* Wait for compressing bit to clear */
+<span class="lineNum">      77 </span><span class="lineNoCov">          0 :         if (wait_for((I915_READ(FBC_STATUS) &amp; FBC_STAT_COMPRESSING) == 0, 10)) {</span>
+<span class="lineNum">      78 </span>            :                 DRM_DEBUG_KMS(&quot;FBC idle timed out\n&quot;);
+<span class="lineNum">      79 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">      80 </span>            :         }
+<span class="lineNum">      81 </span>            : 
+<span class="lineNum">      82 </span>            :         DRM_DEBUG_KMS(&quot;disabled FBC\n&quot;);
+<a name="83"><span class="lineNum">      83 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">      84 </span>            : 
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 : static void i8xx_fbc_enable(struct intel_crtc *crtc)</span>
+<span class="lineNum">      86 </span>            : {
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :         struct drm_framebuffer *fb = crtc-&gt;base.primary-&gt;fb;</span>
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_object *obj = intel_fb_obj(fb);</span>
+<span class="lineNum">      90 </span>            :         int cfb_pitch;
+<span class="lineNum">      91 </span>            :         int i;
+<span class="lineNum">      92 </span>            :         u32 fbc_ctl;
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.enabled = true;</span>
+<span class="lineNum">      95 </span>            : 
+<span class="lineNum">      96 </span>            :         /* Note: fbc.threshold == 1 for i8xx */
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :         cfb_pitch = dev_priv-&gt;fbc.uncompressed_size / FBC_LL_SIZE;</span>
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :         if (fb-&gt;pitches[0] &lt; cfb_pitch)</span>
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :                 cfb_pitch = fb-&gt;pitches[0];</span>
+<span class="lineNum">     100 </span>            : 
+<span class="lineNum">     101 </span>            :         /* FBC_CTL wants 32B or 64B units */
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :         if (IS_GEN2(dev_priv))</span>
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :                 cfb_pitch = (cfb_pitch / 32) - 1;</span>
+<span class="lineNum">     104 </span>            :         else
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :                 cfb_pitch = (cfb_pitch / 64) - 1;</span>
+<span class="lineNum">     106 </span>            : 
+<span class="lineNum">     107 </span>            :         /* Clear old tags */
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; (FBC_LL_SIZE / 32) + 1; i++)</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :                 I915_WRITE(FBC_TAG(i), 0);</span>
+<span class="lineNum">     110 </span>            : 
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :         if (IS_GEN4(dev_priv)) {</span>
+<span class="lineNum">     112 </span>            :                 u32 fbc_ctl2;
+<span class="lineNum">     113 </span>            : 
+<span class="lineNum">     114 </span>            :                 /* Set it up... */
+<span class="lineNum">     115 </span>            :                 fbc_ctl2 = FBC_CTL_FENCE_DBL | FBC_CTL_IDLE_IMM | FBC_CTL_CPU_FENCE;
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :                 fbc_ctl2 |= FBC_CTL_PLANE(crtc-&gt;plane);</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :                 I915_WRITE(FBC_CONTROL2, fbc_ctl2);</span>
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :                 I915_WRITE(FBC_FENCE_OFF, get_crtc_fence_y_offset(crtc));</span>
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     120 </span>            : 
+<span class="lineNum">     121 </span>            :         /* enable it... */
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :         fbc_ctl = I915_READ(FBC_CONTROL);</span>
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         fbc_ctl &amp;= 0x3fff &lt;&lt; FBC_CTL_INTERVAL_SHIFT;</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         fbc_ctl |= FBC_CTL_EN | FBC_CTL_PERIODIC;</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         if (IS_I945GM(dev_priv))</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :                 fbc_ctl |= FBC_CTL_C3_IDLE; /* 945 needs special SR handling */</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :         fbc_ctl |= (cfb_pitch &amp; 0xff) &lt;&lt; FBC_CTL_STRIDE_SHIFT;</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         fbc_ctl |= obj-&gt;fence_reg;</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :         I915_WRITE(FBC_CONTROL, fbc_ctl);</span>
+<span class="lineNum">     130 </span>            : 
+<span class="lineNum">     131 </span>            :         DRM_DEBUG_KMS(&quot;enabled FBC, pitch %d, yoff %d, plane %c\n&quot;,
+<span class="lineNum">     132 </span>            :                       cfb_pitch, crtc-&gt;base.y, plane_name(crtc-&gt;plane));
+<a name="133"><span class="lineNum">     133 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     134 </span>            : 
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 : static bool i8xx_fbc_enabled(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     136 </span>            : {
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :         return I915_READ(FBC_CONTROL) &amp; FBC_CTL_EN;</span>
+<a name="138"><span class="lineNum">     138 </span>            : }</a>
+<span class="lineNum">     139 </span>            : 
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 : static void g4x_fbc_enable(struct intel_crtc *crtc)</span>
+<span class="lineNum">     141 </span>            : {
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         struct drm_framebuffer *fb = crtc-&gt;base.primary-&gt;fb;</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_object *obj = intel_fb_obj(fb);</span>
+<span class="lineNum">     145 </span>            :         u32 dpfc_ctl;
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.enabled = true;</span>
+<span class="lineNum">     148 </span>            : 
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         dpfc_ctl = DPFC_CTL_PLANE(crtc-&gt;plane) | DPFC_SR_EN;</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         if (drm_format_plane_cpp(fb-&gt;pixel_format, 0) == 2)</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :                 dpfc_ctl |= DPFC_CTL_LIMIT_2X;</span>
+<span class="lineNum">     152 </span>            :         else
+<span class="lineNum">     153 </span>            :                 dpfc_ctl |= DPFC_CTL_LIMIT_1X;
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         dpfc_ctl |= DPFC_CTL_FENCE_EN | obj-&gt;fence_reg;</span>
+<span class="lineNum">     155 </span>            : 
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         I915_WRITE(DPFC_FENCE_YOFF, get_crtc_fence_y_offset(crtc));</span>
+<span class="lineNum">     157 </span>            : 
+<span class="lineNum">     158 </span>            :         /* enable it... */
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         I915_WRITE(DPFC_CONTROL, dpfc_ctl | DPFC_CTL_EN);</span>
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span>            :         DRM_DEBUG_KMS(&quot;enabled fbc on plane %c\n&quot;, plane_name(crtc-&gt;plane));
+<a name="162"><span class="lineNum">     162 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     163 </span>            : 
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 : static void g4x_fbc_disable(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     165 </span>            : {
+<span class="lineNum">     166 </span>            :         u32 dpfc_ctl;
+<span class="lineNum">     167 </span>            : 
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.enabled = false;</span>
+<span class="lineNum">     169 </span>            : 
+<span class="lineNum">     170 </span>            :         /* Disable compression */
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         dpfc_ctl = I915_READ(DPFC_CONTROL);</span>
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :         if (dpfc_ctl &amp; DPFC_CTL_EN) {</span>
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :                 dpfc_ctl &amp;= ~DPFC_CTL_EN;</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :                 I915_WRITE(DPFC_CONTROL, dpfc_ctl);</span>
+<span class="lineNum">     175 </span>            : 
+<span class="lineNum">     176 </span>            :                 DRM_DEBUG_KMS(&quot;disabled FBC\n&quot;);
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :         }</span>
+<a name="178"><span class="lineNum">     178 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 : static bool g4x_fbc_enabled(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     181 </span>            : {
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         return I915_READ(DPFC_CONTROL) &amp; DPFC_CTL_EN;</span>
+<a name="183"><span class="lineNum">     183 </span>            : }</a>
+<span class="lineNum">     184 </span>            : 
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 : static void intel_fbc_nuke(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     186 </span>            : {
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         I915_WRITE(MSG_FBC_REND_STATE, FBC_REND_NUKE);</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         POSTING_READ(MSG_FBC_REND_STATE);</span>
+<a name="189"><span class="lineNum">     189 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 : static void ilk_fbc_enable(struct intel_crtc *crtc)</span>
+<span class="lineNum">     192 </span>            : {
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :         struct drm_framebuffer *fb = crtc-&gt;base.primary-&gt;fb;</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_object *obj = intel_fb_obj(fb);</span>
+<span class="lineNum">     196 </span>            :         u32 dpfc_ctl;
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         int threshold = dev_priv-&gt;fbc.threshold;</span>
+<span class="lineNum">     198 </span>            :         unsigned int y_offset;
+<span class="lineNum">     199 </span>            : 
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.enabled = true;</span>
+<span class="lineNum">     201 </span>            : 
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :         dpfc_ctl = DPFC_CTL_PLANE(crtc-&gt;plane);</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :         if (drm_format_plane_cpp(fb-&gt;pixel_format, 0) == 2)</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                 threshold++;</span>
+<span class="lineNum">     205 </span>            : 
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         switch (threshold) {</span>
+<span class="lineNum">     207 </span>            :         case 4:
+<span class="lineNum">     208 </span>            :         case 3:
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :                 dpfc_ctl |= DPFC_CTL_LIMIT_4X;</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     211 </span>            :         case 2:
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :                 dpfc_ctl |= DPFC_CTL_LIMIT_2X;</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     214 </span>            :         case 1:
+<span class="lineNum">     215 </span>            :                 dpfc_ctl |= DPFC_CTL_LIMIT_1X;
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     217 </span>            :         }
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :         dpfc_ctl |= DPFC_CTL_FENCE_EN;</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         if (IS_GEN5(dev_priv))</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :                 dpfc_ctl |= obj-&gt;fence_reg;</span>
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         y_offset = get_crtc_fence_y_offset(crtc);</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :         I915_WRITE(ILK_DPFC_FENCE_YOFF, y_offset);</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :         I915_WRITE(ILK_FBC_RT_BASE, i915_gem_obj_ggtt_offset(obj) | ILK_FBC_RT_VALID);</span>
+<span class="lineNum">     225 </span>            :         /* enable it... */
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :         I915_WRITE(ILK_DPFC_CONTROL, dpfc_ctl | DPFC_CTL_EN);</span>
+<span class="lineNum">     227 </span>            : 
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :         if (IS_GEN6(dev_priv)) {</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                 I915_WRITE(SNB_DPFC_CTL_SA,</span>
+<span class="lineNum">     230 </span>            :                            SNB_CPU_FENCE_ENABLE | obj-&gt;fence_reg);
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                 I915_WRITE(DPFC_CPU_FENCE_OFFSET, y_offset);</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :         intel_fbc_nuke(dev_priv);</span>
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span>            :         DRM_DEBUG_KMS(&quot;enabled fbc on plane %c\n&quot;, plane_name(crtc-&gt;plane));
+<a name="237"><span class="lineNum">     237 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     238 </span>            : 
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 : static void ilk_fbc_disable(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     240 </span>            : {
+<span class="lineNum">     241 </span>            :         u32 dpfc_ctl;
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.enabled = false;</span>
+<span class="lineNum">     244 </span>            : 
+<span class="lineNum">     245 </span>            :         /* Disable compression */
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         dpfc_ctl = I915_READ(ILK_DPFC_CONTROL);</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         if (dpfc_ctl &amp; DPFC_CTL_EN) {</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :                 dpfc_ctl &amp;= ~DPFC_CTL_EN;</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                 I915_WRITE(ILK_DPFC_CONTROL, dpfc_ctl);</span>
+<span class="lineNum">     250 </span>            : 
+<span class="lineNum">     251 </span>            :                 DRM_DEBUG_KMS(&quot;disabled FBC\n&quot;);
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         }</span>
+<a name="253"><span class="lineNum">     253 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     254 </span>            : 
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 : static bool ilk_fbc_enabled(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     256 </span>            : {
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         return I915_READ(ILK_DPFC_CONTROL) &amp; DPFC_CTL_EN;</span>
+<a name="258"><span class="lineNum">     258 </span>            : }</a>
+<span class="lineNum">     259 </span>            : 
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 : static void gen7_fbc_enable(struct intel_crtc *crtc)</span>
+<span class="lineNum">     261 </span>            : {
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :         struct drm_framebuffer *fb = crtc-&gt;base.primary-&gt;fb;</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         struct drm_i915_gem_object *obj = intel_fb_obj(fb);</span>
+<span class="lineNum">     265 </span>            :         u32 dpfc_ctl;
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         int threshold = dev_priv-&gt;fbc.threshold;</span>
+<span class="lineNum">     267 </span>            : 
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.enabled = true;</span>
+<span class="lineNum">     269 </span>            : 
+<span class="lineNum">     270 </span>            :         dpfc_ctl = 0;
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         if (IS_IVYBRIDGE(dev_priv))</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                 dpfc_ctl |= IVB_DPFC_CTL_PLANE(crtc-&gt;plane);</span>
+<span class="lineNum">     273 </span>            : 
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :         if (drm_format_plane_cpp(fb-&gt;pixel_format, 0) == 2)</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :                 threshold++;</span>
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         switch (threshold) {</span>
+<span class="lineNum">     278 </span>            :         case 4:
+<span class="lineNum">     279 </span>            :         case 3:
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                 dpfc_ctl |= DPFC_CTL_LIMIT_4X;</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     282 </span>            :         case 2:
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :                 dpfc_ctl |= DPFC_CTL_LIMIT_2X;</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     285 </span>            :         case 1:
+<span class="lineNum">     286 </span>            :                 dpfc_ctl |= DPFC_CTL_LIMIT_1X;
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     288 </span>            :         }
+<span class="lineNum">     289 </span>            : 
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :         dpfc_ctl |= IVB_DPFC_CTL_FENCE_EN;</span>
+<span class="lineNum">     291 </span>            : 
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;fbc.false_color)</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                 dpfc_ctl |= FBC_CTL_FALSE_COLOR;</span>
+<span class="lineNum">     294 </span>            : 
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :         if (IS_IVYBRIDGE(dev_priv)) {</span>
+<span class="lineNum">     296 </span>            :                 /* WaFbcAsynchFlipDisableFbcQueue:ivb */
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                 I915_WRITE(ILK_DISPLAY_CHICKEN1,</span>
+<span class="lineNum">     298 </span>            :                            I915_READ(ILK_DISPLAY_CHICKEN1) |
+<span class="lineNum">     299 </span>            :                            ILK_FBCQ_DIS);
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         } else if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {</span>
+<span class="lineNum">     301 </span>            :                 /* WaFbcAsynchFlipDisableFbcQueue:hsw,bdw */
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                 I915_WRITE(CHICKEN_PIPESL_1(crtc-&gt;pipe),</span>
+<span class="lineNum">     303 </span>            :                            I915_READ(CHICKEN_PIPESL_1(crtc-&gt;pipe)) |
+<span class="lineNum">     304 </span>            :                            HSW_FBCQ_DIS);
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     306 </span>            : 
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :         I915_WRITE(ILK_DPFC_CONTROL, dpfc_ctl | DPFC_CTL_EN);</span>
+<span class="lineNum">     308 </span>            : 
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         I915_WRITE(SNB_DPFC_CTL_SA,</span>
+<span class="lineNum">     310 </span>            :                    SNB_CPU_FENCE_ENABLE | obj-&gt;fence_reg);
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :         I915_WRITE(DPFC_CPU_FENCE_OFFSET, get_crtc_fence_y_offset(crtc));</span>
+<span class="lineNum">     312 </span>            : 
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         intel_fbc_nuke(dev_priv);</span>
+<span class="lineNum">     314 </span>            : 
+<span class="lineNum">     315 </span>            :         DRM_DEBUG_KMS(&quot;enabled fbc on plane %c\n&quot;, plane_name(crtc-&gt;plane));
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span>            : /**
+<span class="lineNum">     319 </span>            :  * intel_fbc_enabled - Is FBC enabled?
+<span class="lineNum">     320 </span>            :  * @dev_priv: i915 device instance
+<span class="lineNum">     321 </span>            :  *
+<span class="lineNum">     322 </span>            :  * This function is used to verify the current state of FBC.
+<span class="lineNum">     323 </span>            :  * FIXME: This should be tracked in the plane config eventually
+<a name="324"><span class="lineNum">     324 </span>            :  *        instead of queried at runtime for most callers.</a>
+<span class="lineNum">     325 </span>            :  */
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 : bool intel_fbc_enabled(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     327 </span>            : {
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :         return dev_priv-&gt;fbc.enabled;</span>
+<a name="329"><span class="lineNum">     329 </span>            : }</a>
+<span class="lineNum">     330 </span>            : 
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 : static void intel_fbc_enable(struct intel_crtc *crtc,</span>
+<span class="lineNum">     332 </span>            :                              const struct drm_framebuffer *fb)
+<span class="lineNum">     333 </span>            : {
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     335 </span>            : 
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.enable_fbc(crtc);</span>
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.crtc = crtc;</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.fb_id = fb-&gt;base.id;</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.y = crtc-&gt;base.y;</span>
+<a name="341"><span class="lineNum">     341 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     342 </span>            : 
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 : static void intel_fbc_work_fn(struct work_struct *__work)</span>
+<span class="lineNum">     344 </span>            : {
+<span class="lineNum">     345 </span>            :         struct intel_fbc_work *work =
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :                 container_of(to_delayed_work(__work),</span>
+<span class="lineNum">     347 </span>            :                              struct intel_fbc_work, work);
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = work-&gt;crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :         struct drm_framebuffer *crtc_fb = work-&gt;crtc-&gt;base.primary-&gt;fb;</span>
+<span class="lineNum">     350 </span>            : 
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :         if (work == dev_priv-&gt;fbc.fbc_work) {</span>
+<span class="lineNum">     353 </span>            :                 /* Double check that we haven't switched fb without cancelling
+<span class="lineNum">     354 </span>            :                  * the prior work.
+<span class="lineNum">     355 </span>            :                  */
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :                 if (crtc_fb == work-&gt;fb)</span>
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :                         intel_fbc_enable(work-&gt;crtc, work-&gt;fb);</span>
+<span class="lineNum">     358 </span>            : 
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.fbc_work = NULL;</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">     362 </span>            : 
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :         kfree(work);</span>
+<a name="364"><span class="lineNum">     364 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     365 </span>            : 
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 : static void intel_fbc_cancel_work(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     367 </span>            : {
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         WARN_ON(!mutex_is_locked(&amp;dev_priv-&gt;fbc.lock));</span>
+<span class="lineNum">     369 </span>            : 
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;fbc.fbc_work == NULL)</span>
+<span class="lineNum">     371 </span>            :                 return;
+<span class="lineNum">     372 </span>            : 
+<span class="lineNum">     373 </span>            :         DRM_DEBUG_KMS(&quot;cancelling pending FBC enable\n&quot;);
+<span class="lineNum">     374 </span>            : 
+<span class="lineNum">     375 </span>            :         /* Synchronisation is provided by struct_mutex and checking of
+<span class="lineNum">     376 </span>            :          * dev_priv-&gt;fbc.fbc_work, so we can perform the cancellation
+<span class="lineNum">     377 </span>            :          * entirely asynchronously.
+<span class="lineNum">     378 </span>            :          */
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :         if (cancel_delayed_work(&amp;dev_priv-&gt;fbc.fbc_work-&gt;work))</span>
+<span class="lineNum">     380 </span>            :                 /* tasklet was killed before being run, clean up */
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                 kfree(dev_priv-&gt;fbc.fbc_work);</span>
+<span class="lineNum">     382 </span>            : 
+<span class="lineNum">     383 </span>            :         /* Mark the work as no longer wanted so that if it does
+<span class="lineNum">     384 </span>            :          * wake-up (because the work was already running and waiting
+<span class="lineNum">     385 </span>            :          * for our mutex), it will discover that is no longer
+<span class="lineNum">     386 </span>            :          * necessary to run.
+<span class="lineNum">     387 </span>            :          */
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.fbc_work = NULL;</span>
+<a name="389"><span class="lineNum">     389 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     390 </span>            : 
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 : static void intel_fbc_schedule_enable(struct intel_crtc *crtc)</span>
+<span class="lineNum">     392 </span>            : {
+<span class="lineNum">     393 </span>            :         struct intel_fbc_work *work;
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     395 </span>            : 
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         WARN_ON(!mutex_is_locked(&amp;dev_priv-&gt;fbc.lock));</span>
+<span class="lineNum">     397 </span>            : 
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :         intel_fbc_cancel_work(dev_priv);</span>
+<span class="lineNum">     399 </span>            : 
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :         work = kzalloc(sizeof(*work), GFP_KERNEL);</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :         if (work == NULL) {</span>
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;Failed to allocate FBC work structure\n&quot;);</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                 intel_fbc_enable(crtc, crtc-&gt;base.primary-&gt;fb);</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     405 </span>            :         }
+<span class="lineNum">     406 </span>            : 
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         work-&gt;crtc = crtc;</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :         work-&gt;fb = crtc-&gt;base.primary-&gt;fb;</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :         INIT_DELAYED_WORK(&amp;work-&gt;work, intel_fbc_work_fn);</span>
+<span class="lineNum">     410 </span>            : 
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.fbc_work = work;</span>
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span>            :         /* Delay the actual enabling to let pageflipping cease and the
+<span class="lineNum">     414 </span>            :          * display to settle before starting the compression. Note that
+<span class="lineNum">     415 </span>            :          * this delay also serves a second purpose: it allows for a
+<span class="lineNum">     416 </span>            :          * vblank to pass after disabling the FBC before we attempt
+<span class="lineNum">     417 </span>            :          * to modify the control registers.
+<span class="lineNum">     418 </span>            :          *
+<span class="lineNum">     419 </span>            :          * A more complicated solution would involve tracking vblanks
+<span class="lineNum">     420 </span>            :          * following the termination of the page-flipping sequence
+<span class="lineNum">     421 </span>            :          * and indeed performing the enable as a co-routine and not
+<span class="lineNum">     422 </span>            :          * waiting synchronously upon the vblank.
+<span class="lineNum">     423 </span>            :          *
+<span class="lineNum">     424 </span>            :          * WaFbcWaitForVBlankBeforeEnable:ilk,snb
+<span class="lineNum">     425 </span>            :          */
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :         schedule_delayed_work(&amp;work-&gt;work, msecs_to_jiffies(50));</span>
+<a name="427"><span class="lineNum">     427 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     428 </span>            : 
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 : static void __intel_fbc_disable(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     430 </span>            : {
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :         WARN_ON(!mutex_is_locked(&amp;dev_priv-&gt;fbc.lock));</span>
+<span class="lineNum">     432 </span>            : 
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         intel_fbc_cancel_work(dev_priv);</span>
+<span class="lineNum">     434 </span>            : 
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.disable_fbc(dev_priv);</span>
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.crtc = NULL;</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     438 </span>            : 
+<span class="lineNum">     439 </span>            : /**
+<span class="lineNum">     440 </span>            :  * intel_fbc_disable - disable FBC
+<span class="lineNum">     441 </span>            :  * @dev_priv: i915 device instance
+<span class="lineNum">     442 </span>            :  *
+<a name="443"><span class="lineNum">     443 </span>            :  * This function disables FBC.</a>
+<span class="lineNum">     444 </span>            :  */
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 : void intel_fbc_disable(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     446 </span>            : {
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :         if (!fbc_supported(dev_priv))</span>
+<span class="lineNum">     448 </span>            :                 return;
+<span class="lineNum">     449 </span>            : 
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :         __intel_fbc_disable(dev_priv);</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     454 </span>            : 
+<span class="lineNum">     455 </span>            : /*
+<span class="lineNum">     456 </span>            :  * intel_fbc_disable_crtc - disable FBC if it's associated with crtc
+<span class="lineNum">     457 </span>            :  * @crtc: the CRTC
+<span class="lineNum">     458 </span>            :  *
+<a name="459"><span class="lineNum">     459 </span>            :  * This function disables FBC if it's associated with the provided CRTC.</a>
+<span class="lineNum">     460 </span>            :  */
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 : void intel_fbc_disable_crtc(struct intel_crtc *crtc)</span>
+<span class="lineNum">     462 </span>            : {
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     464 </span>            : 
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :         if (!fbc_supported(dev_priv))</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     467 </span>            : 
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;fbc.crtc == crtc)</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :                 __intel_fbc_disable(dev_priv);</span>
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev_priv-&gt;fbc.lock);</span>
+<a name="472"><span class="lineNum">     472 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     473 </span>            : 
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 : const char *intel_no_fbc_reason_str(enum no_fbc_reason reason)</span>
+<span class="lineNum">     475 </span>            : {
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :         switch (reason) {</span>
+<span class="lineNum">     477 </span>            :         case FBC_OK:
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :                 return &quot;FBC enabled but currently disabled in hardware&quot;;</span>
+<span class="lineNum">     479 </span>            :         case FBC_UNSUPPORTED:
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :                 return &quot;unsupported by this chipset&quot;;</span>
+<span class="lineNum">     481 </span>            :         case FBC_NO_OUTPUT:
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :                 return &quot;no output&quot;;</span>
+<span class="lineNum">     483 </span>            :         case FBC_STOLEN_TOO_SMALL:
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :                 return &quot;not enough stolen memory&quot;;</span>
+<span class="lineNum">     485 </span>            :         case FBC_UNSUPPORTED_MODE:
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                 return &quot;mode incompatible with compression&quot;;</span>
+<span class="lineNum">     487 </span>            :         case FBC_MODE_TOO_LARGE:
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :                 return &quot;mode too large for compression&quot;;</span>
+<span class="lineNum">     489 </span>            :         case FBC_BAD_PLANE:
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :                 return &quot;FBC unsupported on plane&quot;;</span>
+<span class="lineNum">     491 </span>            :         case FBC_NOT_TILED:
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :                 return &quot;framebuffer not tiled or fenced&quot;;</span>
+<span class="lineNum">     493 </span>            :         case FBC_MULTIPLE_PIPES:
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                 return &quot;more than one pipe active&quot;;</span>
+<span class="lineNum">     495 </span>            :         case FBC_MODULE_PARAM:
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                 return &quot;disabled per module param&quot;;</span>
+<span class="lineNum">     497 </span>            :         case FBC_CHIP_DEFAULT:
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :                 return &quot;disabled per chip default&quot;;</span>
+<span class="lineNum">     499 </span>            :         case FBC_ROTATION:
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :                 return &quot;rotation unsupported&quot;;</span>
+<span class="lineNum">     501 </span>            :         case FBC_IN_DBG_MASTER:
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                 return &quot;Kernel debugger is active&quot;;</span>
+<span class="lineNum">     503 </span>            :         case FBC_BAD_STRIDE:
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :                 return &quot;framebuffer stride not supported&quot;;</span>
+<span class="lineNum">     505 </span>            :         case FBC_PIXEL_RATE:
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :                 return &quot;pixel rate is too big&quot;;</span>
+<span class="lineNum">     507 </span>            :         case FBC_PIXEL_FORMAT:
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :                 return &quot;pixel format is invalid&quot;;</span>
+<span class="lineNum">     509 </span>            :         default:
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :                 MISSING_CASE(reason);</span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :                 return &quot;unknown reason&quot;;</span>
+<span class="lineNum">     512 </span>            :         }
+<a name="513"><span class="lineNum">     513 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     514 </span>            : 
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 : static void set_no_fbc_reason(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">     516 </span>            :                               enum no_fbc_reason reason)
+<span class="lineNum">     517 </span>            : {
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;fbc.no_fbc_reason == reason)</span>
+<span class="lineNum">     519 </span>            :                 return;
+<span class="lineNum">     520 </span>            : 
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.no_fbc_reason = reason;</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :         DRM_DEBUG_KMS(&quot;Disabling FBC: %s\n&quot;, intel_no_fbc_reason_str(reason));</span>
+<a name="523"><span class="lineNum">     523 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     524 </span>            : 
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 : static struct drm_crtc *intel_fbc_find_crtc(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     526 </span>            : {
+<span class="lineNum">     527 </span>            :         struct drm_crtc *crtc = NULL, *tmp_crtc;
+<span class="lineNum">     528 </span>            :         enum pipe pipe;
+<span class="lineNum">     529 </span>            :         bool pipe_a_only = false;
+<span class="lineNum">     530 </span>            : 
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :         if (IS_HASWELL(dev_priv) || INTEL_INFO(dev_priv)-&gt;gen &gt;= 8)</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :                 pipe_a_only = true;</span>
+<span class="lineNum">     533 </span>            : 
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :         for_each_pipe(dev_priv, pipe) {</span>
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                 tmp_crtc = dev_priv-&gt;pipe_to_crtc_mapping[pipe];</span>
+<span class="lineNum">     536 </span>            : 
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                 if (intel_crtc_active(tmp_crtc) &amp;&amp;</span>
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :                     to_intel_plane_state(tmp_crtc-&gt;primary-&gt;state)-&gt;visible)</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :                         crtc = tmp_crtc;</span>
+<span class="lineNum">     540 </span>            : 
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                 if (pipe_a_only)</span>
+<span class="lineNum">     542 </span>            :                         break;
+<span class="lineNum">     543 </span>            :         }
+<span class="lineNum">     544 </span>            : 
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         if (!crtc || crtc-&gt;primary-&gt;fb == NULL)</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         return crtc;</span>
+<a name="549"><span class="lineNum">     549 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     550 </span>            : 
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 : static bool multiple_pipes_ok(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     552 </span>            : {
+<span class="lineNum">     553 </span>            :         enum pipe pipe;
+<span class="lineNum">     554 </span>            :         int n_pipes = 0;
+<span class="lineNum">     555 </span>            :         struct drm_crtc *crtc;
+<span class="lineNum">     556 </span>            : 
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev_priv)-&gt;gen &gt; 4)</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">     559 </span>            : 
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :         for_each_pipe(dev_priv, pipe) {</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                 crtc = dev_priv-&gt;pipe_to_crtc_mapping[pipe];</span>
+<span class="lineNum">     562 </span>            : 
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                 if (intel_crtc_active(crtc) &amp;&amp;</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :                     to_intel_plane_state(crtc-&gt;primary-&gt;state)-&gt;visible)</span>
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :                         n_pipes++;</span>
+<span class="lineNum">     566 </span>            :         }
+<span class="lineNum">     567 </span>            : 
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :         return (n_pipes &lt; 2);</span>
+<a name="569"><span class="lineNum">     569 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     570 </span>            : 
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 : static int find_compression_threshold(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">     572 </span>            :                                       struct drm_mm_node *node,
+<span class="lineNum">     573 </span>            :                                       int size,
+<span class="lineNum">     574 </span>            :                                       int fb_cpp)
+<span class="lineNum">     575 </span>            : {
+<span class="lineNum">     576 </span>            :         int compression_threshold = 1;
+<span class="lineNum">     577 </span>            :         int ret;
+<span class="lineNum">     578 </span>            :         u64 end;
+<span class="lineNum">     579 </span>            : 
+<span class="lineNum">     580 </span>            :         /* The FBC hardware for BDW/SKL doesn't have access to the stolen
+<span class="lineNum">     581 </span>            :          * reserved range size, so it always assumes the maximum (8mb) is used.
+<span class="lineNum">     582 </span>            :          * If we enable FBC using a CFB on that memory range we'll get FIFO
+<span class="lineNum">     583 </span>            :          * underruns, even if that range is not reserved by the BIOS. */
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :         if (IS_BROADWELL(dev_priv) ||</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :             IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev_priv))</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 end = dev_priv-&gt;gtt.stolen_size - 8 * 1024 * 1024;</span>
+<span class="lineNum">     587 </span>            :         else
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :                 end = dev_priv-&gt;gtt.stolen_usable_size;</span>
+<span class="lineNum">     589 </span>            : 
+<span class="lineNum">     590 </span>            :         /* HACK: This code depends on what we will do in *_enable_fbc. If that
+<span class="lineNum">     591 </span>            :          * code changes, this code needs to change as well.
+<span class="lineNum">     592 </span>            :          *
+<span class="lineNum">     593 </span>            :          * The enable_fbc code will attempt to use one of our 2 compression
+<span class="lineNum">     594 </span>            :          * thresholds, therefore, in that case, we only have 1 resort.
+<span class="lineNum">     595 </span>            :          */
+<span class="lineNum">     596 </span>            : 
+<span class="lineNum">     597 </span>            :         /* Try to over-allocate to reduce reallocations and fragmentation. */
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :         ret = i915_gem_stolen_insert_node_in_range(dev_priv, node, size &lt;&lt;= 1,</span>
+<span class="lineNum">     599 </span>            :                                                    4096, 0, end);
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :         if (ret == 0)</span>
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :                 return compression_threshold;</span>
+<span class="lineNum">     602 </span>            : 
+<span class="lineNum">     603 </span>            : again:
+<span class="lineNum">     604 </span>            :         /* HW's ability to limit the CFB is 1:4 */
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :         if (compression_threshold &gt; 4 ||</span>
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :             (fb_cpp == 2 &amp;&amp; compression_threshold == 2))</span>
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     608 </span>            : 
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         ret = i915_gem_stolen_insert_node_in_range(dev_priv, node, size &gt;&gt;= 1,</span>
+<span class="lineNum">     610 </span>            :                                                    4096, 0, end);
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :         if (ret &amp;&amp; INTEL_INFO(dev_priv)-&gt;gen &lt;= 4) {</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         } else if (ret) {</span>
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                 compression_threshold &lt;&lt;= 1;</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :                 goto again;</span>
+<span class="lineNum">     616 </span>            :         } else {
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                 return compression_threshold;</span>
+<span class="lineNum">     618 </span>            :         }
+<a name="619"><span class="lineNum">     619 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     620 </span>            : 
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 : static int intel_fbc_alloc_cfb(struct drm_i915_private *dev_priv, int size,</span>
+<span class="lineNum">     622 </span>            :                                int fb_cpp)
+<span class="lineNum">     623 </span>            : {
+<span class="lineNum">     624 </span>            :         struct drm_mm_node *uninitialized_var(compressed_llb);
+<span class="lineNum">     625 </span>            :         int ret;
+<span class="lineNum">     626 </span>            : 
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :         ret = find_compression_threshold(dev_priv, &amp;dev_priv-&gt;fbc.compressed_fb,</span>
+<span class="lineNum">     628 </span>            :                                          size, fb_cpp);
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :         if (!ret)</span>
+<span class="lineNum">     630 </span>            :                 goto err_llb;
+<span class="lineNum">     631 </span>            :         else if (ret &gt; 1) {
+<span class="lineNum">     632 </span>            :                 DRM_INFO(&quot;Reducing the compressed framebuffer size. This may lead to less power savings than a non-reduced-size. Try to increase stolen memory size if available in BIOS.\n&quot;);
+<span class="lineNum">     633 </span>            : 
+<span class="lineNum">     634 </span>            :         }
+<span class="lineNum">     635 </span>            : 
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.threshold = ret;</span>
+<span class="lineNum">     637 </span>            : 
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev_priv)-&gt;gen &gt;= 5)</span>
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :                 I915_WRITE(ILK_DPFC_CB_BASE, dev_priv-&gt;fbc.compressed_fb.start);</span>
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :         else if (IS_GM45(dev_priv)) {</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :                 I915_WRITE(DPFC_CB_BASE, dev_priv-&gt;fbc.compressed_fb.start);</span>
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :                 compressed_llb = kzalloc(sizeof(*compressed_llb), GFP_KERNEL);</span>
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :                 if (!compressed_llb)</span>
+<span class="lineNum">     645 </span>            :                         goto err_fb;
+<span class="lineNum">     646 </span>            : 
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :                 ret = i915_gem_stolen_insert_node(dev_priv, compressed_llb,</span>
+<span class="lineNum">     648 </span>            :                                                   4096, 4096);
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">     650 </span>            :                         goto err_fb;
+<span class="lineNum">     651 </span>            : 
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.compressed_llb = compressed_llb;</span>
+<span class="lineNum">     653 </span>            : 
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :                 I915_WRITE(FBC_CFB_BASE,</span>
+<span class="lineNum">     655 </span>            :                            dev_priv-&gt;mm.stolen_base + dev_priv-&gt;fbc.compressed_fb.start);
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :                 I915_WRITE(FBC_LL_BASE,</span>
+<span class="lineNum">     657 </span>            :                            dev_priv-&gt;mm.stolen_base + compressed_llb-&gt;start);
+<span class="lineNum">     658 </span>            :         }
+<span class="lineNum">     659 </span>            : 
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.uncompressed_size = size;</span>
+<span class="lineNum">     661 </span>            : 
+<span class="lineNum">     662 </span>            :         DRM_DEBUG_KMS(&quot;reserved %llu bytes of contiguous stolen space for FBC, threshold: %d\n&quot;,
+<span class="lineNum">     663 </span>            :                       dev_priv-&gt;fbc.compressed_fb.size,
+<span class="lineNum">     664 </span>            :                       dev_priv-&gt;fbc.threshold);
+<span class="lineNum">     665 </span>            : 
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     667 </span>            : 
+<span class="lineNum">     668 </span>            : err_fb:
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :         kfree(compressed_llb);</span>
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :         i915_gem_stolen_remove_node(dev_priv, &amp;dev_priv-&gt;fbc.compressed_fb);</span>
+<span class="lineNum">     671 </span>            : err_llb:
+<span class="lineNum">     672 </span>            :         pr_info_once(&quot;drm: not enough stolen space for compressed buffer (need %d more bytes), disabling. Hint: you may be able to increase stolen memory size in the BIOS to avoid this.\n&quot;, size);
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :         return -ENOSPC;</span>
+<a name="674"><span class="lineNum">     674 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     675 </span>            : 
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 : static void __intel_fbc_cleanup_cfb(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     677 </span>            : {
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;fbc.uncompressed_size == 0)</span>
+<span class="lineNum">     679 </span>            :                 return;
+<span class="lineNum">     680 </span>            : 
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         i915_gem_stolen_remove_node(dev_priv, &amp;dev_priv-&gt;fbc.compressed_fb);</span>
+<span class="lineNum">     682 </span>            : 
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;fbc.compressed_llb) {</span>
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :                 i915_gem_stolen_remove_node(dev_priv,</span>
+<span class="lineNum">     685 </span>            :                                             dev_priv-&gt;fbc.compressed_llb);
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :                 kfree(dev_priv-&gt;fbc.compressed_llb);</span>
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     688 </span>            : 
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.uncompressed_size = 0;</span>
+<a name="690"><span class="lineNum">     690 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     691 </span>            : 
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 : void intel_fbc_cleanup_cfb(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     693 </span>            : {
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :         if (!fbc_supported(dev_priv))</span>
+<span class="lineNum">     695 </span>            :                 return;
+<span class="lineNum">     696 </span>            : 
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :         __intel_fbc_cleanup_cfb(dev_priv);</span>
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     701 </span>            : 
+<span class="lineNum">     702 </span>            : /*
+<span class="lineNum">     703 </span>            :  * For SKL+, the plane source size used by the hardware is based on the value we
+<span class="lineNum">     704 </span>            :  * write to the PLANE_SIZE register. For BDW-, the hardware looks at the value
+<a name="705"><span class="lineNum">     705 </span>            :  * we wrote to PIPESRC.</a>
+<span class="lineNum">     706 </span>            :  */
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 : static void intel_fbc_get_plane_source_size(struct intel_crtc *crtc,</span>
+<span class="lineNum">     708 </span>            :                                             int *width, int *height)
+<span class="lineNum">     709 </span>            : {
+<span class="lineNum">     710 </span>            :         struct intel_plane_state *plane_state =
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                         to_intel_plane_state(crtc-&gt;base.primary-&gt;state);</span>
+<span class="lineNum">     712 </span>            :         int w, h;
+<span class="lineNum">     713 </span>            : 
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 :         if (intel_rotation_90_or_270(plane_state-&gt;base.rotation)) {</span>
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :                 w = drm_rect_height(&amp;plane_state-&gt;src) &gt;&gt; 16;</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :                 h = drm_rect_width(&amp;plane_state-&gt;src) &gt;&gt; 16;</span>
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :                 w = drm_rect_width(&amp;plane_state-&gt;src) &gt;&gt; 16;</span>
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :                 h = drm_rect_height(&amp;plane_state-&gt;src) &gt;&gt; 16;</span>
+<span class="lineNum">     720 </span>            :         }
+<span class="lineNum">     721 </span>            : 
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :         if (width)</span>
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :                 *width = w;</span>
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :         if (height)</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :                 *height = h;</span>
+<a name="726"><span class="lineNum">     726 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     727 </span>            : 
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 : static int intel_fbc_calculate_cfb_size(struct intel_crtc *crtc)</span>
+<span class="lineNum">     729 </span>            : {
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :         struct drm_framebuffer *fb = crtc-&gt;base.primary-&gt;fb;</span>
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :         int lines;</span>
+<span class="lineNum">     733 </span>            : 
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :         intel_fbc_get_plane_source_size(crtc, NULL, &amp;lines);</span>
+<span class="lineNum">     735 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev_priv)-&gt;gen &gt;= 7)</span>
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :                 lines = min(lines, 2048);</span>
+<span class="lineNum">     737 </span>            : 
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :         return lines * fb-&gt;pitches[0];</span>
+<a name="739"><span class="lineNum">     739 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     740 </span>            : 
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 : static int intel_fbc_setup_cfb(struct intel_crtc *crtc)</span>
+<span class="lineNum">     742 </span>            : {
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :         struct drm_framebuffer *fb = crtc-&gt;base.primary-&gt;fb;</span>
+<span class="lineNum">     745 </span>            :         int size, cpp;
+<span class="lineNum">     746 </span>            : 
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :         size = intel_fbc_calculate_cfb_size(crtc);</span>
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :         cpp = drm_format_plane_cpp(fb-&gt;pixel_format, 0);</span>
+<span class="lineNum">     749 </span>            : 
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :         if (size &lt;= dev_priv-&gt;fbc.uncompressed_size)</span>
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     752 </span>            : 
+<span class="lineNum">     753 </span>            :         /* Release any current block */
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :         __intel_fbc_cleanup_cfb(dev_priv);</span>
+<span class="lineNum">     755 </span>            : 
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         return intel_fbc_alloc_cfb(dev_priv, size, cpp);</span>
+<a name="757"><span class="lineNum">     757 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     758 </span>            : 
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 : static bool stride_is_valid(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">     760 </span>            :                             unsigned int stride)
+<span class="lineNum">     761 </span>            : {
+<span class="lineNum">     762 </span>            :         /* These should have been caught earlier. */
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :         WARN_ON(stride &lt; 512);</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :         WARN_ON((stride &amp; (64 - 1)) != 0);</span>
+<span class="lineNum">     765 </span>            : 
+<span class="lineNum">     766 </span>            :         /* Below are the additional FBC restrictions. */
+<span class="lineNum">     767 </span>            : 
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :         if (IS_GEN2(dev_priv) || IS_GEN3(dev_priv))</span>
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :                 return stride == 4096 || stride == 8192;</span>
+<span class="lineNum">     770 </span>            : 
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :         if (IS_GEN4(dev_priv) &amp;&amp; !IS_G4X(dev_priv) &amp;&amp; stride &lt; 2048)</span>
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     773 </span>            : 
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :         if (stride &gt; 16384)</span>
+<span class="lineNum">     775 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     776 </span>            : 
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :         return true;</span>
+<a name="778"><span class="lineNum">     778 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     779 </span>            : 
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 : static bool pixel_format_is_valid(struct drm_framebuffer *fb)</span>
+<span class="lineNum">     781 </span>            : {
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :         struct drm_device *dev = fb-&gt;dev;</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     784 </span>            : 
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         switch (fb-&gt;pixel_format) {</span>
+<span class="lineNum">     786 </span>            :         case DRM_FORMAT_XRGB8888:
+<span class="lineNum">     787 </span>            :         case DRM_FORMAT_XBGR8888:
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">     789 </span>            :         case DRM_FORMAT_XRGB1555:
+<span class="lineNum">     790 </span>            :         case DRM_FORMAT_RGB565:
+<span class="lineNum">     791 </span>            :                 /* 16bpp not supported on gen2 */
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :                 if (IS_GEN2(dev))</span>
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :                         return false;</span>
+<span class="lineNum">     794 </span>            :                 /* WaFbcOnly1to1Ratio:ctg */
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :                 if (IS_G4X(dev_priv))</span>
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 :                         return false;</span>
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">     798 </span>            :         default:
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     800 </span>            :         }
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     802 </span>            : 
+<span class="lineNum">     803 </span>            : /*
+<span class="lineNum">     804 </span>            :  * For some reason, the hardware tracking starts looking at whatever we
+<span class="lineNum">     805 </span>            :  * programmed as the display plane base address register. It does not look at
+<span class="lineNum">     806 </span>            :  * the X and Y offset registers. That's why we look at the crtc-&gt;adjusted{x,y}
+<a name="807"><span class="lineNum">     807 </span>            :  * variables instead of just looking at the pipe/plane size.</a>
+<span class="lineNum">     808 </span>            :  */
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 : static bool intel_fbc_hw_tracking_covers_screen(struct intel_crtc *crtc)</span>
+<span class="lineNum">     810 </span>            : {
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = crtc-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :         unsigned int effective_w, effective_h, max_w, max_h;</span>
+<span class="lineNum">     813 </span>            : 
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev_priv)-&gt;gen &gt;= 8 || IS_HASWELL(dev_priv)) {</span>
+<span class="lineNum">     815 </span>            :                 max_w = 4096;
+<span class="lineNum">     816 </span>            :                 max_h = 4096;
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 :         } else if (IS_G4X(dev_priv) || INTEL_INFO(dev_priv)-&gt;gen &gt;= 5) {</span>
+<span class="lineNum">     818 </span>            :                 max_w = 4096;
+<span class="lineNum">     819 </span>            :                 max_h = 2048;
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     821 </span>            :                 max_w = 2048;
+<span class="lineNum">     822 </span>            :                 max_h = 1536;
+<span class="lineNum">     823 </span>            :         }
+<span class="lineNum">     824 </span>            : 
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :         intel_fbc_get_plane_source_size(crtc, &amp;effective_w, &amp;effective_h);</span>
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         effective_w += crtc-&gt;adjusted_x;</span>
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :         effective_h += crtc-&gt;adjusted_y;</span>
+<span class="lineNum">     828 </span>            : 
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :         return effective_w &lt;= max_w &amp;&amp; effective_h &lt;= max_h;</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     831 </span>            : 
+<span class="lineNum">     832 </span>            : /**
+<span class="lineNum">     833 </span>            :  * __intel_fbc_update - enable/disable FBC as needed, unlocked
+<span class="lineNum">     834 </span>            :  * @dev_priv: i915 device instance
+<span class="lineNum">     835 </span>            :  *
+<span class="lineNum">     836 </span>            :  * Set up the framebuffer compression hardware at mode set time.  We
+<span class="lineNum">     837 </span>            :  * enable it if possible:
+<span class="lineNum">     838 </span>            :  *   - plane A only (on pre-965)
+<span class="lineNum">     839 </span>            :  *   - no pixel mulitply/line duplication
+<span class="lineNum">     840 </span>            :  *   - no alpha buffer discard
+<span class="lineNum">     841 </span>            :  *   - no dual wide
+<span class="lineNum">     842 </span>            :  *   - framebuffer &lt;= max_hdisplay in width, max_vdisplay in height
+<span class="lineNum">     843 </span>            :  *
+<span class="lineNum">     844 </span>            :  * We can't assume that any compression will take place (worst case),
+<span class="lineNum">     845 </span>            :  * so the compressed buffer has to be the same size as the uncompressed
+<span class="lineNum">     846 </span>            :  * one.  It also must reside (along with the line length buffer) in
+<span class="lineNum">     847 </span>            :  * stolen memory.
+<span class="lineNum">     848 </span>            :  *
+<a name="849"><span class="lineNum">     849 </span>            :  * We need to enable/disable FBC on a global basis.</a>
+<span class="lineNum">     850 </span>            :  */
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 : static void __intel_fbc_update(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">     852 </span>            : {
+<span class="lineNum">     853 </span>            :         struct drm_crtc *crtc = NULL;
+<span class="lineNum">     854 </span>            :         struct intel_crtc *intel_crtc;
+<span class="lineNum">     855 </span>            :         struct drm_framebuffer *fb;
+<span class="lineNum">     856 </span>            :         struct drm_i915_gem_object *obj;
+<span class="lineNum">     857 </span>            :         const struct drm_display_mode *adjusted_mode;
+<span class="lineNum">     858 </span>            : 
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :         WARN_ON(!mutex_is_locked(&amp;dev_priv-&gt;fbc.lock));</span>
+<span class="lineNum">     860 </span>            : 
+<span class="lineNum">     861 </span>            :         /* disable framebuffer compression in vGPU */
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :         if (intel_vgpu_active(dev_priv-&gt;dev))</span>
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :                 i915.enable_fbc = 0;</span>
+<span class="lineNum">     864 </span>            : 
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :         if (i915.enable_fbc &lt; 0) {</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_CHIP_DEFAULT);</span>
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     868 </span>            :         }
+<span class="lineNum">     869 </span>            : 
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         if (!i915.enable_fbc) {</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_MODULE_PARAM);</span>
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     873 </span>            :         }
+<span class="lineNum">     874 </span>            : 
+<span class="lineNum">     875 </span>            :         /*
+<span class="lineNum">     876 </span>            :          * If FBC is already on, we just have to verify that we can
+<span class="lineNum">     877 </span>            :          * keep it that way...
+<span class="lineNum">     878 </span>            :          * Need to disable if:
+<span class="lineNum">     879 </span>            :          *   - more than one pipe is active
+<span class="lineNum">     880 </span>            :          *   - changing FBC params (stride, fence, mode)
+<span class="lineNum">     881 </span>            :          *   - new fb is too large to fit in compressed buffer
+<span class="lineNum">     882 </span>            :          *   - going to an unsupported config (interlace, pixel multiply, etc.)
+<span class="lineNum">     883 </span>            :          */
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :         crtc = intel_fbc_find_crtc(dev_priv);</span>
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :         if (!crtc) {</span>
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_NO_OUTPUT);</span>
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     888 </span>            :         }
+<span class="lineNum">     889 </span>            : 
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 :         if (!multiple_pipes_ok(dev_priv)) {</span>
+<span class="lineNum">     891 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_MULTIPLE_PIPES);</span>
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     893 </span>            :         }
+<span class="lineNum">     894 </span>            : 
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :         intel_crtc = to_intel_crtc(crtc);</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :         fb = crtc-&gt;primary-&gt;fb;</span>
+<span class="lineNum">     897 </span><span class="lineNoCov">          0 :         obj = intel_fb_obj(fb);</span>
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :         adjusted_mode = &amp;intel_crtc-&gt;config-&gt;base.adjusted_mode;</span>
+<span class="lineNum">     899 </span>            : 
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :         if ((adjusted_mode-&gt;flags &amp; DRM_MODE_FLAG_INTERLACE) ||</span>
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :             (adjusted_mode-&gt;flags &amp; DRM_MODE_FLAG_DBLSCAN)) {</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_UNSUPPORTED_MODE);</span>
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     904 </span>            :         }
+<span class="lineNum">     905 </span>            : 
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :         if (!intel_fbc_hw_tracking_covers_screen(intel_crtc)) {</span>
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_MODE_TOO_LARGE);</span>
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     909 </span>            :         }
+<span class="lineNum">     910 </span>            : 
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :         if ((INTEL_INFO(dev_priv)-&gt;gen &lt; 4 || HAS_DDI(dev_priv)) &amp;&amp;</span>
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :             intel_crtc-&gt;plane != PLANE_A) {</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_BAD_PLANE);</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     915 </span>            :         }
+<span class="lineNum">     916 </span>            : 
+<span class="lineNum">     917 </span>            :         /* The use of a CPU fence is mandatory in order to detect writes
+<span class="lineNum">     918 </span>            :          * by the CPU to the scanout and trigger updates to the FBC.
+<span class="lineNum">     919 </span>            :          */
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :         if (obj-&gt;tiling_mode != I915_TILING_X ||</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :             obj-&gt;fence_reg == I915_FENCE_REG_NONE) {</span>
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_NOT_TILED);</span>
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     924 </span>            :         }
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev_priv)-&gt;gen &lt;= 4 &amp;&amp; !IS_G4X(dev_priv) &amp;&amp;</span>
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :             crtc-&gt;primary-&gt;state-&gt;rotation != BIT(DRM_ROTATE_0)) {</span>
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_ROTATION);</span>
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     929 </span>            :         }
+<span class="lineNum">     930 </span>            : 
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :         if (!stride_is_valid(dev_priv, fb-&gt;pitches[0])) {</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_BAD_STRIDE);</span>
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     934 </span>            :         }
+<span class="lineNum">     935 </span>            : 
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :         if (!pixel_format_is_valid(fb)) {</span>
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_PIXEL_FORMAT);</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     939 </span>            :         }
+<span class="lineNum">     940 </span>            : 
+<span class="lineNum">     941 </span>            :         /* If the kernel debugger is active, always disable compression */
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :         if (in_dbg_master()) {</span>
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_IN_DBG_MASTER);</span>
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     945 </span>            :         }
+<span class="lineNum">     946 </span>            : 
+<span class="lineNum">     947 </span>            :         /* WaFbcExceedCdClockThreshold:hsw,bdw */
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 :         if ((IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) &amp;&amp;</span>
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :             ilk_pipe_pixel_rate(intel_crtc-&gt;config) &gt;=</span>
+<span class="lineNum">     950 </span><span class="lineNoCov">          0 :             dev_priv-&gt;cdclk_freq * 95 / 100) {</span>
+<span class="lineNum">     951 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_PIXEL_RATE);</span>
+<span class="lineNum">     952 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     953 </span>            :         }
+<span class="lineNum">     954 </span>            : 
+<span class="lineNum">     955 </span><span class="lineNoCov">          0 :         if (intel_fbc_setup_cfb(intel_crtc)) {</span>
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :                 set_no_fbc_reason(dev_priv, FBC_STOLEN_TOO_SMALL);</span>
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :                 goto out_disable;</span>
+<span class="lineNum">     958 </span>            :         }
+<span class="lineNum">     959 </span>            : 
+<span class="lineNum">     960 </span>            :         /* If the scanout has not changed, don't modify the FBC settings.
+<span class="lineNum">     961 </span>            :          * Note that we make the fundamental assumption that the fb-&gt;obj
+<span class="lineNum">     962 </span>            :          * cannot be unpinned (and have its GTT offset and fence revoked)
+<span class="lineNum">     963 </span>            :          * without first being decoupled from the scanout and FBC disabled.
+<span class="lineNum">     964 </span>            :          */
+<span class="lineNum">     965 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;fbc.crtc == intel_crtc &amp;&amp;</span>
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :             dev_priv-&gt;fbc.fb_id == fb-&gt;base.id &amp;&amp;</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :             dev_priv-&gt;fbc.y == crtc-&gt;y)</span>
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     969 </span>            : 
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :         if (intel_fbc_enabled(dev_priv)) {</span>
+<span class="lineNum">     971 </span>            :                 /* We update FBC along two paths, after changing fb/crtc
+<span class="lineNum">     972 </span>            :                  * configuration (modeswitching) and after page-flipping
+<span class="lineNum">     973 </span>            :                  * finishes. For the latter, we know that not only did
+<span class="lineNum">     974 </span>            :                  * we disable the FBC at the start of the page-flip
+<span class="lineNum">     975 </span>            :                  * sequence, but also more than one vblank has passed.
+<span class="lineNum">     976 </span>            :                  *
+<span class="lineNum">     977 </span>            :                  * For the former case of modeswitching, it is possible
+<span class="lineNum">     978 </span>            :                  * to switch between two FBC valid configurations
+<span class="lineNum">     979 </span>            :                  * instantaneously so we do need to disable the FBC
+<span class="lineNum">     980 </span>            :                  * before we can modify its control registers. We also
+<span class="lineNum">     981 </span>            :                  * have to wait for the next vblank for that to take
+<span class="lineNum">     982 </span>            :                  * effect. However, since we delay enabling FBC we can
+<span class="lineNum">     983 </span>            :                  * assume that a vblank has passed since disabling and
+<span class="lineNum">     984 </span>            :                  * that we can safely alter the registers in the deferred
+<span class="lineNum">     985 </span>            :                  * callback.
+<span class="lineNum">     986 </span>            :                  *
+<span class="lineNum">     987 </span>            :                  * In the scenario that we go from a valid to invalid
+<span class="lineNum">     988 </span>            :                  * and then back to valid FBC configuration we have
+<span class="lineNum">     989 </span>            :                  * no strict enforcement that a vblank occurred since
+<span class="lineNum">     990 </span>            :                  * disabling the FBC. However, along all current pipe
+<span class="lineNum">     991 </span>            :                  * disabling paths we do need to wait for a vblank at
+<span class="lineNum">     992 </span>            :                  * some point. And we wait before enabling FBC anyway.
+<span class="lineNum">     993 </span>            :                  */
+<span class="lineNum">     994 </span>            :                 DRM_DEBUG_KMS(&quot;disabling active FBC for update\n&quot;);
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :                 __intel_fbc_disable(dev_priv);</span>
+<span class="lineNum">     996 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     997 </span>            : 
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 :         intel_fbc_schedule_enable(intel_crtc);</span>
+<span class="lineNum">     999 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.no_fbc_reason = FBC_OK;</span>
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">    1001 </span>            : 
+<span class="lineNum">    1002 </span>            : out_disable:
+<span class="lineNum">    1003 </span>            :         /* Multiple disables should be harmless */
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :         if (intel_fbc_enabled(dev_priv)) {</span>
+<span class="lineNum">    1005 </span>            :                 DRM_DEBUG_KMS(&quot;unsupported config, disabling FBC\n&quot;);
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :                 __intel_fbc_disable(dev_priv);</span>
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :         __intel_fbc_cleanup_cfb(dev_priv);</span>
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1010 </span>            : 
+<span class="lineNum">    1011 </span>            : /*
+<span class="lineNum">    1012 </span>            :  * intel_fbc_update - enable/disable FBC as needed
+<span class="lineNum">    1013 </span>            :  * @dev_priv: i915 device instance
+<span class="lineNum">    1014 </span>            :  *
+<a name="1015"><span class="lineNum">    1015 </span>            :  * This function reevaluates the overall state and enables or disables FBC.</a>
+<span class="lineNum">    1016 </span>            :  */
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 : void intel_fbc_update(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">    1018 </span>            : {
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :         if (!fbc_supported(dev_priv))</span>
+<span class="lineNum">    1020 </span>            :                 return;
+<span class="lineNum">    1021 </span>            : 
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 :         __intel_fbc_update(dev_priv);</span>
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev_priv-&gt;fbc.lock);</span>
+<a name="1025"><span class="lineNum">    1025 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1026 </span>            : 
+<span class="lineNum">    1027 </span><span class="lineNoCov">          0 : void intel_fbc_invalidate(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">    1028 </span>            :                           unsigned int frontbuffer_bits,
+<span class="lineNum">    1029 </span>            :                           enum fb_op_origin origin)
+<span class="lineNum">    1030 </span>            : {
+<span class="lineNum">    1031 </span>            :         unsigned int fbc_bits;
+<span class="lineNum">    1032 </span>            : 
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :         if (!fbc_supported(dev_priv))</span>
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1035 </span>            : 
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 :         if (origin == ORIGIN_GTT)</span>
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1038 </span>            : 
+<span class="lineNum">    1039 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">    1040 </span>            : 
+<span class="lineNum">    1041 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;fbc.enabled)</span>
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :                 fbc_bits = INTEL_FRONTBUFFER_PRIMARY(dev_priv-&gt;fbc.crtc-&gt;pipe);</span>
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :         else if (dev_priv-&gt;fbc.fbc_work)</span>
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 :                 fbc_bits = INTEL_FRONTBUFFER_PRIMARY(</span>
+<span class="lineNum">    1045 </span>            :                                         dev_priv-&gt;fbc.fbc_work-&gt;crtc-&gt;pipe);
+<span class="lineNum">    1046 </span>            :         else
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :                 fbc_bits = dev_priv-&gt;fbc.possible_framebuffer_bits;</span>
+<span class="lineNum">    1048 </span>            : 
+<span class="lineNum">    1049 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.busy_bits |= (fbc_bits &amp; frontbuffer_bits);</span>
+<span class="lineNum">    1050 </span>            : 
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;fbc.busy_bits)</span>
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :                 __intel_fbc_disable(dev_priv);</span>
+<span class="lineNum">    1053 </span>            : 
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev_priv-&gt;fbc.lock);</span>
+<a name="1055"><span class="lineNum">    1055 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1056 </span>            : 
+<span class="lineNum">    1057 </span><span class="lineNoCov">          0 : void intel_fbc_flush(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">    1058 </span>            :                      unsigned int frontbuffer_bits, enum fb_op_origin origin)
+<span class="lineNum">    1059 </span>            : {
+<span class="lineNum">    1060 </span><span class="lineNoCov">          0 :         if (!fbc_supported(dev_priv))</span>
+<span class="lineNum">    1061 </span>            :                 return;
+<span class="lineNum">    1062 </span>            : 
+<span class="lineNum">    1063 </span><span class="lineNoCov">          0 :         if (origin == ORIGIN_GTT)</span>
+<span class="lineNum">    1064 </span>            :                 return;
+<span class="lineNum">    1065 </span>            : 
+<span class="lineNum">    1066 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">    1067 </span>            : 
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.busy_bits &amp;= ~frontbuffer_bits;</span>
+<span class="lineNum">    1069 </span>            : 
+<span class="lineNum">    1070 </span><span class="lineNoCov">          0 :         if (!dev_priv-&gt;fbc.busy_bits) {</span>
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :                 __intel_fbc_disable(dev_priv);</span>
+<span class="lineNum">    1072 </span><span class="lineNoCov">          0 :                 __intel_fbc_update(dev_priv);</span>
+<span class="lineNum">    1073 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1074 </span>            : 
+<span class="lineNum">    1075 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev_priv-&gt;fbc.lock);</span>
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1077 </span>            : 
+<span class="lineNum">    1078 </span>            : /**
+<span class="lineNum">    1079 </span>            :  * intel_fbc_init - Initialize FBC
+<span class="lineNum">    1080 </span>            :  * @dev_priv: the i915 device
+<span class="lineNum">    1081 </span>            :  *
+<a name="1082"><span class="lineNum">    1082 </span>            :  * This function might be called during PM init process.</a>
+<span class="lineNum">    1083 </span>            :  */
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 : void intel_fbc_init(struct drm_i915_private *dev_priv)</span>
+<span class="lineNum">    1085 </span>            : {
+<span class="lineNum">    1086 </span>            :         enum pipe pipe;
+<span class="lineNum">    1087 </span>            : 
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :         rw_init(&amp;dev_priv-&gt;fbc.lock, &quot;fbclk&quot;);</span>
+<span class="lineNum">    1089 </span>            : 
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :         if (!HAS_FBC(dev_priv)) {</span>
+<span class="lineNum">    1091 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.enabled = false;</span>
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.no_fbc_reason = FBC_UNSUPPORTED;</span>
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1094 </span>            :         }
+<span class="lineNum">    1095 </span>            : 
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 :         for_each_pipe(dev_priv, pipe) {</span>
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.possible_framebuffer_bits |=</span>
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 :                                 INTEL_FRONTBUFFER_PRIMARY(pipe);</span>
+<span class="lineNum">    1099 </span>            : 
+<span class="lineNum">    1100 </span><span class="lineNoCov">          0 :                 if (IS_HASWELL(dev_priv) || INTEL_INFO(dev_priv)-&gt;gen &gt;= 8)</span>
+<span class="lineNum">    1101 </span>            :                         break;
+<span class="lineNum">    1102 </span>            :         }
+<span class="lineNum">    1103 </span>            : 
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev_priv)-&gt;gen &gt;= 7) {</span>
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.fbc_enabled = ilk_fbc_enabled;</span>
+<span class="lineNum">    1106 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.enable_fbc = gen7_fbc_enable;</span>
+<span class="lineNum">    1107 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.disable_fbc = ilk_fbc_disable;</span>
+<span class="lineNum">    1108 </span><span class="lineNoCov">          0 :         } else if (INTEL_INFO(dev_priv)-&gt;gen &gt;= 5) {</span>
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.fbc_enabled = ilk_fbc_enabled;</span>
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.enable_fbc = ilk_fbc_enable;</span>
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.disable_fbc = ilk_fbc_disable;</span>
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 :         } else if (IS_GM45(dev_priv)) {</span>
+<span class="lineNum">    1113 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.fbc_enabled = g4x_fbc_enabled;</span>
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.enable_fbc = g4x_fbc_enable;</span>
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.disable_fbc = g4x_fbc_disable;</span>
+<span class="lineNum">    1116 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1117 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.fbc_enabled = i8xx_fbc_enabled;</span>
+<span class="lineNum">    1118 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.enable_fbc = i8xx_fbc_enable;</span>
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;fbc.disable_fbc = i8xx_fbc_disable;</span>
+<span class="lineNum">    1120 </span>            : 
+<span class="lineNum">    1121 </span>            :                 /* This value was pulled out of someone's hat */
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :                 I915_WRITE(FBC_CONTROL, 500 &lt;&lt; FBC_CTL_INTERVAL_SHIFT);</span>
+<span class="lineNum">    1123 </span>            :         }
+<span class="lineNum">    1124 </span>            : 
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :         dev_priv-&gt;fbc.enabled = dev_priv-&gt;fbc.fbc_enabled(dev_priv);</span>
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

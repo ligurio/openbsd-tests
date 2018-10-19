@@ -1,0 +1,948 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/radeon/radeon_vce.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">dev/pci/drm/radeon</a> - radeon_vce.c<span style="font-size: 80%;"> (source / <a href="radeon_vce.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">368</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">17</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * Copyright 2013 Advanced Micro Devices, Inc.
+<span class="lineNum">       3 </span>            :  * All Rights Reserved.
+<span class="lineNum">       4 </span>            :  *
+<span class="lineNum">       5 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       6 </span>            :  * copy of this software and associated documentation files (the
+<span class="lineNum">       7 </span>            :  * &quot;Software&quot;), to deal in the Software without restriction, including
+<span class="lineNum">       8 </span>            :  * without limitation the rights to use, copy, modify, merge, publish,
+<span class="lineNum">       9 </span>            :  * distribute, sub license, and/or sell copies of the Software, and to
+<span class="lineNum">      10 </span>            :  * permit persons to whom the Software is furnished to do so, subject to
+<span class="lineNum">      11 </span>            :  * the following conditions:
+<span class="lineNum">      12 </span>            :  *
+<span class="lineNum">      13 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      14 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      15 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
+<span class="lineNum">      16 </span>            :  * THE COPYRIGHT HOLDERS, AUTHORS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM,
+<span class="lineNum">      17 </span>            :  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+<span class="lineNum">      18 </span>            :  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+<span class="lineNum">      19 </span>            :  * USE OR OTHER DEALINGS IN THE SOFTWARE.
+<span class="lineNum">      20 </span>            :  *
+<span class="lineNum">      21 </span>            :  * The above copyright notice and this permission notice (including the
+<span class="lineNum">      22 </span>            :  * next paragraph) shall be included in all copies or substantial portions
+<span class="lineNum">      23 </span>            :  * of the Software.
+<span class="lineNum">      24 </span>            :  *
+<span class="lineNum">      25 </span>            :  * Authors: Christian König &lt;christian.koenig@amd.com&gt;
+<span class="lineNum">      26 </span>            :  */
+<span class="lineNum">      27 </span>            : 
+<span class="lineNum">      28 </span>            : #include &lt;dev/pci/drm/drmP.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;dev/pci/drm/drm.h&gt;
+<span class="lineNum">      30 </span>            : 
+<span class="lineNum">      31 </span>            : #include &quot;radeon.h&quot;
+<span class="lineNum">      32 </span>            : #include &quot;radeon_asic.h&quot;
+<span class="lineNum">      33 </span>            : #include &quot;sid.h&quot;
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : /* 1 second timeout */
+<span class="lineNum">      36 </span>            : #define VCE_IDLE_TIMEOUT_MS     1000
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : /* Firmware Names */
+<span class="lineNum">      39 </span>            : #define FIRMWARE_TAHITI &quot;radeon/TAHITI_vce.bin&quot;
+<span class="lineNum">      40 </span>            : #define FIRMWARE_BONAIRE        &quot;radeon/BONAIRE_vce.bin&quot;
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : MODULE_FIRMWARE(FIRMWARE_TAHITI);
+<span class="lineNum">      43 </span>            : MODULE_FIRMWARE(FIRMWARE_BONAIRE);
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : static void radeon_vce_idle_work_handler(struct work_struct *work);
+<span class="lineNum">      46 </span>            : 
+<span class="lineNum">      47 </span>            : /**
+<span class="lineNum">      48 </span>            :  * radeon_vce_init - allocate memory, load vce firmware
+<span class="lineNum">      49 </span>            :  *
+<span class="lineNum">      50 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">      51 </span>            :  *
+<a name="52"><span class="lineNum">      52 </span>            :  * First step to get VCE online, allocate memory and load the firmware</a>
+<span class="lineNum">      53 </span>            :  */
+<span class="lineNum">      54 </span><span class="lineNoCov">          0 : int radeon_vce_init(struct radeon_device *rdev)</span>
+<span class="lineNum">      55 </span>            : {
+<span class="lineNum">      56 </span>            :         static const char *fw_version = &quot;[ATI LIB=VCEFW,&quot;;
+<span class="lineNum">      57 </span>            :         static const char *fb_version = &quot;[ATI LIB=VCEFWSTATS,&quot;;
+<span class="lineNum">      58 </span>            :         unsigned long size;
+<span class="lineNum">      59 </span>            :         const char *fw_name, *c;
+<span class="lineNum">      60 </span>            :         uint8_t start, mid, end;
+<span class="lineNum">      61 </span>            :         int i, r;
+<span class="lineNum">      62 </span>            : 
+<span class="lineNum">      63 </span><span class="lineNoCov">          0 :         INIT_DELAYED_WORK(&amp;rdev-&gt;vce.idle_work, radeon_vce_idle_work_handler);</span>
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span><span class="lineNoCov">          0 :         switch (rdev-&gt;family) {</span>
+<span class="lineNum">      66 </span>            :         case CHIP_TAHITI:
+<span class="lineNum">      67 </span>            :         case CHIP_PITCAIRN:
+<span class="lineNum">      68 </span>            :         case CHIP_VERDE:
+<span class="lineNum">      69 </span>            :         case CHIP_OLAND:
+<span class="lineNum">      70 </span>            :         case CHIP_ARUBA:
+<span class="lineNum">      71 </span>            :                 fw_name = FIRMWARE_TAHITI;
+<span class="lineNum">      72 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">      73 </span>            : 
+<span class="lineNum">      74 </span>            :         case CHIP_BONAIRE:
+<span class="lineNum">      75 </span>            :         case CHIP_KAVERI:
+<span class="lineNum">      76 </span>            :         case CHIP_KABINI:
+<span class="lineNum">      77 </span>            :         case CHIP_HAWAII:
+<span class="lineNum">      78 </span>            :         case CHIP_MULLINS:
+<span class="lineNum">      79 </span>            :                 fw_name = FIRMWARE_BONAIRE;
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">      81 </span>            : 
+<span class="lineNum">      82 </span>            :         default:
+<span class="lineNum">      83 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">      84 </span>            :         }
+<span class="lineNum">      85 </span>            : 
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :         r = request_firmware(&amp;rdev-&gt;vce_fw, fw_name, rdev-&gt;dev);</span>
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :                 dev_err(rdev-&gt;dev, &quot;radeon_vce: Can't load firmware \&quot;%s\&quot;\n&quot;,</span>
+<span class="lineNum">      89 </span>            :                         fw_name);
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">      91 </span>            :         }
+<span class="lineNum">      92 </span>            : 
+<span class="lineNum">      93 </span>            :         /* search for firmware version */
+<span class="lineNum">      94 </span>            : 
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         size = rdev-&gt;vce_fw-&gt;size - strlen(fw_version) - 9;</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :         c = rdev-&gt;vce_fw-&gt;data;</span>
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :         for (;size &gt; 0; --size, ++c)</span>
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :                 if (strncmp(c, fw_version, strlen(fw_version)) == 0)</span>
+<span class="lineNum">      99 </span>            :                         break;
+<span class="lineNum">     100 </span>            : 
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :         if (size == 0)</span>
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     103 </span>            : 
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 :         c += strlen(fw_version);</span>
+<span class="lineNum">     105 </span>            : #ifdef notyet
+<span class="lineNum">     106 </span>            :         if (sscanf(c, &quot;%2hhd.%2hhd.%2hhd]&quot;, &amp;start, &amp;mid, &amp;end) != 3)
+<span class="lineNum">     107 </span>            :                 return -EINVAL;
+<span class="lineNum">     108 </span>            : #else
+<span class="lineNum">     109 </span>            : #if 0
+<span class="lineNum">     110 </span>            :         int x;
+<span class="lineNum">     111 </span>            :         printf(&quot;\n%s A\n&quot;, __func__);
+<span class="lineNum">     112 </span>            :         for (x = 0; x &lt; 16; x++) {
+<span class="lineNum">     113 </span>            :                 printf(&quot;%02x &quot;, c[x]);
+<span class="lineNum">     114 </span>            :         }
+<span class="lineNum">     115 </span>            : #endif
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         if (c[2] != '.') {</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :                 printf(&quot;%s %s bad start value\n&quot;, rdev-&gt;self.dv_xname, __func__);</span>
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     119 </span>            :         }
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         start = (10 * (c[0] - '0')) + (c[1] - '0');</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :         c += 3;</span>
+<span class="lineNum">     122 </span>            : 
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         if (c[1] != '.') {</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :                 printf(&quot;%s %s bad mid value\n&quot;, rdev-&gt;self.dv_xname, __func__);</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     126 </span>            :         }
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :         mid = c[0] - '0';</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         c += 2;</span>
+<span class="lineNum">     129 </span>            : 
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :         if (c[1] != ']') {</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :                 printf(&quot;%s %s bad end value\n&quot;, rdev-&gt;self.dv_xname, __func__);</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     133 </span>            :         }
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         end = c[0] - '0';</span>
+<span class="lineNum">     135 </span>            : #endif
+<span class="lineNum">     136 </span>            : 
+<span class="lineNum">     137 </span>            :         /* search for feedback version */
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         size = rdev-&gt;vce_fw-&gt;size - strlen(fb_version) - 3;</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :         c = rdev-&gt;vce_fw-&gt;data;</span>
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         for (;size &gt; 0; --size, ++c)</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                 if (strncmp(c, fb_version, strlen(fb_version)) == 0)</span>
+<span class="lineNum">     143 </span>            :                         break;
+<span class="lineNum">     144 </span>            : 
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         if (size == 0)</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     147 </span>            : 
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         c += strlen(fb_version);</span>
+<span class="lineNum">     149 </span>            : #ifdef notyet
+<span class="lineNum">     150 </span>            :         if (sscanf(c, &quot;%2u]&quot;, &amp;rdev-&gt;vce.fb_version) != 1)
+<span class="lineNum">     151 </span>            :                 return -EINVAL;
+<span class="lineNum">     152 </span>            : #else
+<span class="lineNum">     153 </span>            : #if 0
+<span class="lineNum">     154 </span>            :         printf(&quot;\n%s B\n&quot;, __func__);
+<span class="lineNum">     155 </span>            :         for (x = 0; x &lt; 16; x++) {
+<span class="lineNum">     156 </span>            :                 printf(&quot;%02x &quot;, c[x]);
+<span class="lineNum">     157 </span>            :         }
+<span class="lineNum">     158 </span>            :         printf(&quot;\n&quot;);
+<span class="lineNum">     159 </span>            : #endif
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         if (c[2] != ']') {</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :                 printf(&quot;%s %s bad fb_version value\n&quot;, rdev-&gt;self.dv_xname, __func__);</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     163 </span>            :         }
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :         rdev-&gt;vce.fb_version = (10 * (c[0] - '0')) + (c[1] - '0');</span>
+<span class="lineNum">     165 </span>            : #endif
+<span class="lineNum">     166 </span>            : 
+<span class="lineNum">     167 </span>            :         DRM_INFO(&quot;Found VCE firmware/feedback version %hhd.%hhd.%hhd / %d!\n&quot;,
+<span class="lineNum">     168 </span>            :                  start, mid, end, rdev-&gt;vce.fb_version);
+<span class="lineNum">     169 </span>            : 
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :         rdev-&gt;vce.fw_version = (start &lt;&lt; 24) | (mid &lt;&lt; 16) | (end &lt;&lt; 8);</span>
+<span class="lineNum">     171 </span>            : 
+<span class="lineNum">     172 </span>            :         /* we can only work with this fw version for now */
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :         if ((rdev-&gt;vce.fw_version != ((40 &lt;&lt; 24) | (2 &lt;&lt; 16) | (2 &lt;&lt; 8))) &amp;&amp;</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :             (rdev-&gt;vce.fw_version != ((50 &lt;&lt; 24) | (0 &lt;&lt; 16) | (1 &lt;&lt; 8))) &amp;&amp;</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :             (rdev-&gt;vce.fw_version != ((50 &lt;&lt; 24) | (1 &lt;&lt; 16) | (2 &lt;&lt; 8))))</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     177 </span>            : 
+<span class="lineNum">     178 </span>            :         /* allocate firmware, stack and heap BO */
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         if (rdev-&gt;family &lt; CHIP_BONAIRE)</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                 size = vce_v1_0_bo_size(rdev);</span>
+<span class="lineNum">     182 </span>            :         else
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :                 size = vce_v2_0_bo_size(rdev);</span>
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :         r = radeon_bo_create(rdev, size, PAGE_SIZE, true,</span>
+<span class="lineNum">     185 </span>            :                              RADEON_GEM_DOMAIN_VRAM, 0, NULL, NULL,
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                              &amp;rdev-&gt;vce.vcpu_bo);</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :                 dev_err(rdev-&gt;dev, &quot;(%d) failed to allocate VCE bo\n&quot;, r);</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     190 </span>            :         }
+<span class="lineNum">     191 </span>            : 
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :         r = radeon_bo_reserve(rdev-&gt;vce.vcpu_bo, false);</span>
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                 radeon_bo_unref(&amp;rdev-&gt;vce.vcpu_bo);</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                 dev_err(rdev-&gt;dev, &quot;(%d) failed to reserve VCE bo\n&quot;, r);</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     197 </span>            :         }
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         r = radeon_bo_pin(rdev-&gt;vce.vcpu_bo, RADEON_GEM_DOMAIN_VRAM,</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                           &amp;rdev-&gt;vce.gpu_addr);</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :         radeon_bo_unreserve(rdev-&gt;vce.vcpu_bo);</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :                 radeon_bo_unref(&amp;rdev-&gt;vce.vcpu_bo);</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                 dev_err(rdev-&gt;dev, &quot;(%d) VCE bo pin failed\n&quot;, r);</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     206 </span>            :         }
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RADEON_MAX_VCE_HANDLES; ++i) {</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :                 atomic_set(&amp;rdev-&gt;vce.handles[i], 0);</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                 rdev-&gt;vce.filp[i] = NULL;</span>
+<span class="lineNum">     211 </span>            :         }
+<span class="lineNum">     212 </span>            : 
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     215 </span>            : 
+<span class="lineNum">     216 </span>            : /**
+<span class="lineNum">     217 </span>            :  * radeon_vce_fini - free memory
+<span class="lineNum">     218 </span>            :  *
+<span class="lineNum">     219 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     220 </span>            :  *
+<a name="221"><span class="lineNum">     221 </span>            :  * Last step on VCE teardown, free firmware memory</a>
+<span class="lineNum">     222 </span>            :  */
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 : void radeon_vce_fini(struct radeon_device *rdev)</span>
+<span class="lineNum">     224 </span>            : {
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :         if (rdev-&gt;vce.vcpu_bo == NULL)</span>
+<span class="lineNum">     226 </span>            :                 return;
+<span class="lineNum">     227 </span>            : 
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :         radeon_bo_unref(&amp;rdev-&gt;vce.vcpu_bo);</span>
+<span class="lineNum">     229 </span>            : 
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         release_firmware(rdev-&gt;vce_fw);</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     232 </span>            : 
+<span class="lineNum">     233 </span>            : /**
+<span class="lineNum">     234 </span>            :  * radeon_vce_suspend - unpin VCE fw memory
+<span class="lineNum">     235 </span>            :  *
+<span class="lineNum">     236 </span>            :  * @rdev: radeon_device pointer
+<a name="237"><span class="lineNum">     237 </span>            :  *</a>
+<span class="lineNum">     238 </span>            :  */
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 : int radeon_vce_suspend(struct radeon_device *rdev)</span>
+<span class="lineNum">     240 </span>            : {
+<span class="lineNum">     241 </span>            :         int i;
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         if (rdev-&gt;vce.vcpu_bo == NULL)</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     245 </span>            : 
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RADEON_MAX_VCE_HANDLES; ++i)</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :                 if (atomic_read(&amp;rdev-&gt;vce.handles[i]))</span>
+<span class="lineNum">     248 </span>            :                         break;
+<span class="lineNum">     249 </span>            : 
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         if (i == RADEON_MAX_VCE_HANDLES)</span>
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span>            :         /* TODO: suspending running encoding sessions isn't supported */
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         return -EINVAL;</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     256 </span>            : 
+<span class="lineNum">     257 </span>            : /**
+<span class="lineNum">     258 </span>            :  * radeon_vce_resume - pin VCE fw memory
+<span class="lineNum">     259 </span>            :  *
+<span class="lineNum">     260 </span>            :  * @rdev: radeon_device pointer
+<a name="261"><span class="lineNum">     261 </span>            :  *</a>
+<span class="lineNum">     262 </span>            :  */
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 : int radeon_vce_resume(struct radeon_device *rdev)</span>
+<span class="lineNum">     264 </span>            : {
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         void *cpu_addr;</span>
+<span class="lineNum">     266 </span>            :         int r;
+<span class="lineNum">     267 </span>            : 
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         if (rdev-&gt;vce.vcpu_bo == NULL)</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         r = radeon_bo_reserve(rdev-&gt;vce.vcpu_bo, false);</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                 dev_err(rdev-&gt;dev, &quot;(%d) failed to reserve VCE bo\n&quot;, r);</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     275 </span>            :         }
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         r = radeon_bo_kmap(rdev-&gt;vce.vcpu_bo, &amp;cpu_addr);</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                 radeon_bo_unreserve(rdev-&gt;vce.vcpu_bo);</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :                 dev_err(rdev-&gt;dev, &quot;(%d) VCE map failed\n&quot;, r);</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     282 </span>            :         }
+<span class="lineNum">     283 </span>            : 
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         memset(cpu_addr, 0, radeon_bo_size(rdev-&gt;vce.vcpu_bo));</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         if (rdev-&gt;family &lt; CHIP_BONAIRE)</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                 r = vce_v1_0_load_fw(rdev, cpu_addr);</span>
+<span class="lineNum">     287 </span>            :         else
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                 memcpy(cpu_addr, rdev-&gt;vce_fw-&gt;data, rdev-&gt;vce_fw-&gt;size);</span>
+<span class="lineNum">     289 </span>            : 
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :         radeon_bo_kunmap(rdev-&gt;vce.vcpu_bo);</span>
+<span class="lineNum">     291 </span>            : 
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :         radeon_bo_unreserve(rdev-&gt;vce.vcpu_bo);</span>
+<span class="lineNum">     293 </span>            : 
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         return r;</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     296 </span>            : 
+<span class="lineNum">     297 </span>            : /**
+<span class="lineNum">     298 </span>            :  * radeon_vce_idle_work_handler - power off VCE
+<span class="lineNum">     299 </span>            :  *
+<span class="lineNum">     300 </span>            :  * @work: pointer to work structure
+<span class="lineNum">     301 </span>            :  *
+<a name="302"><span class="lineNum">     302 </span>            :  * power of VCE when it's not used any more</a>
+<span class="lineNum">     303 </span>            :  */
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 : static void radeon_vce_idle_work_handler(struct work_struct *work)</span>
+<span class="lineNum">     305 </span>            : {
+<span class="lineNum">     306 </span>            :         struct radeon_device *rdev =
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :                 container_of(work, struct radeon_device, vce.idle_work.work);</span>
+<span class="lineNum">     308 </span>            : 
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         if ((radeon_fence_count_emitted(rdev, TN_RING_TYPE_VCE1_INDEX) == 0) &amp;&amp;</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :             (radeon_fence_count_emitted(rdev, TN_RING_TYPE_VCE2_INDEX) == 0)) {</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 if ((rdev-&gt;pm.pm_method == PM_METHOD_DPM) &amp;&amp; rdev-&gt;pm.dpm_enabled) {</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                         radeon_dpm_enable_vce(rdev, false);</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                         radeon_set_vce_clocks(rdev, 0, 0);</span>
+<span class="lineNum">     315 </span>            :                 }
+<span class="lineNum">     316 </span>            :         } else {
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :                 schedule_delayed_work(&amp;rdev-&gt;vce.idle_work,</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :                                       msecs_to_jiffies(VCE_IDLE_TIMEOUT_MS));</span>
+<span class="lineNum">     319 </span>            :         }
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     321 </span>            : 
+<span class="lineNum">     322 </span>            : /**
+<span class="lineNum">     323 </span>            :  * radeon_vce_note_usage - power up VCE
+<span class="lineNum">     324 </span>            :  *
+<span class="lineNum">     325 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     326 </span>            :  *
+<a name="327"><span class="lineNum">     327 </span>            :  * Make sure VCE is powerd up when we want to use it</a>
+<span class="lineNum">     328 </span>            :  */
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 : void radeon_vce_note_usage(struct radeon_device *rdev)</span>
+<span class="lineNum">     330 </span>            : {
+<span class="lineNum">     331 </span>            :         bool streams_changed = false;
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         bool set_clocks = !cancel_delayed_work_sync(&amp;rdev-&gt;vce.idle_work);</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         set_clocks &amp;= schedule_delayed_work(&amp;rdev-&gt;vce.idle_work,</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :                                             msecs_to_jiffies(VCE_IDLE_TIMEOUT_MS));</span>
+<span class="lineNum">     335 </span>            : 
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         if ((rdev-&gt;pm.pm_method == PM_METHOD_DPM) &amp;&amp; rdev-&gt;pm.dpm_enabled) {</span>
+<span class="lineNum">     337 </span>            :                 /* XXX figure out if the streams changed */
+<span class="lineNum">     338 </span>            :                 streams_changed = false;
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     340 </span>            : 
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         if (set_clocks || streams_changed) {</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :                 if ((rdev-&gt;pm.pm_method == PM_METHOD_DPM) &amp;&amp; rdev-&gt;pm.dpm_enabled) {</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :                         radeon_dpm_enable_vce(rdev, true);</span>
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :                         radeon_set_vce_clocks(rdev, 53300, 40000);</span>
+<span class="lineNum">     346 </span>            :                 }
+<span class="lineNum">     347 </span>            :         }
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     349 </span>            : 
+<span class="lineNum">     350 </span>            : /**
+<span class="lineNum">     351 </span>            :  * radeon_vce_free_handles - free still open VCE handles
+<span class="lineNum">     352 </span>            :  *
+<span class="lineNum">     353 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     354 </span>            :  * @filp: drm file pointer
+<span class="lineNum">     355 </span>            :  *
+<a name="356"><span class="lineNum">     356 </span>            :  * Close all VCE handles still open by this file pointer</a>
+<span class="lineNum">     357 </span>            :  */
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 : void radeon_vce_free_handles(struct radeon_device *rdev, struct drm_file *filp)</span>
+<span class="lineNum">     359 </span>            : {
+<span class="lineNum">     360 </span>            :         int i, r;
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RADEON_MAX_VCE_HANDLES; ++i) {</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :                 uint32_t handle = atomic_read(&amp;rdev-&gt;vce.handles[i]);</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :                 if (!handle || rdev-&gt;vce.filp[i] != filp)</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     365 </span>            : 
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :                 radeon_vce_note_usage(rdev);</span>
+<span class="lineNum">     367 </span>            : 
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :                 r = radeon_vce_get_destroy_msg(rdev, TN_RING_TYPE_VCE1_INDEX,</span>
+<span class="lineNum">     369 </span>            :                                                handle, NULL);
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                 if (r)</span>
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                         DRM_ERROR(&quot;Error destroying VCE handle (%d)!\n&quot;, r);</span>
+<span class="lineNum">     372 </span>            : 
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                 rdev-&gt;vce.filp[i] = NULL;</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                 atomic_set(&amp;rdev-&gt;vce.handles[i], 0);</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     377 </span>            : 
+<span class="lineNum">     378 </span>            : /**
+<span class="lineNum">     379 </span>            :  * radeon_vce_get_create_msg - generate a VCE create msg
+<span class="lineNum">     380 </span>            :  *
+<span class="lineNum">     381 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     382 </span>            :  * @ring: ring we should submit the msg to
+<span class="lineNum">     383 </span>            :  * @handle: VCE session handle to use
+<span class="lineNum">     384 </span>            :  * @fence: optional fence to return
+<span class="lineNum">     385 </span>            :  *
+<a name="386"><span class="lineNum">     386 </span>            :  * Open up a stream for HW test</a>
+<span class="lineNum">     387 </span>            :  */
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 : int radeon_vce_get_create_msg(struct radeon_device *rdev, int ring,</span>
+<span class="lineNum">     389 </span>            :                               uint32_t handle, struct radeon_fence **fence)
+<span class="lineNum">     390 </span>            : {
+<span class="lineNum">     391 </span>            :         const unsigned ib_size_dw = 1024;
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         struct radeon_ib ib;</span>
+<span class="lineNum">     393 </span>            :         uint64_t dummy;
+<span class="lineNum">     394 </span>            :         int i, r;
+<span class="lineNum">     395 </span>            : 
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         r = radeon_ib_get(rdev, ring, &amp;ib, NULL, ib_size_dw * 4);</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;radeon: failed to get ib (%d).\n&quot;, r);</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     400 </span>            :         }
+<span class="lineNum">     401 </span>            : 
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :         dummy = ib.gpu_addr + 1024;</span>
+<span class="lineNum">     403 </span>            : 
+<span class="lineNum">     404 </span>            :         /* stitch together an VCE create msg */
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         ib.length_dw = 0;</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x0000000c); /* len */</span>
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000001); /* session cmd */</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(handle);</span>
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000030); /* len */</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x01000001); /* create cmd */</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000000);</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000042);</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x0000000a);</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000001);</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000080);</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000060);</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000100);</span>
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000100);</span>
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x0000000c);</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000000);</span>
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000014); /* len */</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x05000005); /* feedback buffer */</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(upper_32_bits(dummy));</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(dummy);</span>
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000001);</span>
+<span class="lineNum">     428 </span>            : 
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :         for (i = ib.length_dw; i &lt; ib_size_dw; ++i)</span>
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :                 ib.ptr[i] = cpu_to_le32(0x0);</span>
+<span class="lineNum">     431 </span>            : 
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :         r = radeon_ib_schedule(rdev, &amp;ib, NULL, false);</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;radeon: failed to schedule ib (%d).\n&quot;, r);</span>
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     436 </span>            : 
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         if (fence)</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                 *fence = radeon_fence_ref(ib.fence);</span>
+<span class="lineNum">     439 </span>            : 
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :         radeon_ib_free(rdev, &amp;ib);</span>
+<span class="lineNum">     441 </span>            : 
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         return r;</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     444 </span>            : 
+<span class="lineNum">     445 </span>            : /**
+<span class="lineNum">     446 </span>            :  * radeon_vce_get_destroy_msg - generate a VCE destroy msg
+<span class="lineNum">     447 </span>            :  *
+<span class="lineNum">     448 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     449 </span>            :  * @ring: ring we should submit the msg to
+<span class="lineNum">     450 </span>            :  * @handle: VCE session handle to use
+<span class="lineNum">     451 </span>            :  * @fence: optional fence to return
+<span class="lineNum">     452 </span>            :  *
+<a name="453"><span class="lineNum">     453 </span>            :  * Close up a stream for HW test or if userspace failed to do so</a>
+<span class="lineNum">     454 </span>            :  */
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 : int radeon_vce_get_destroy_msg(struct radeon_device *rdev, int ring,</span>
+<span class="lineNum">     456 </span>            :                                uint32_t handle, struct radeon_fence **fence)
+<span class="lineNum">     457 </span>            : {
+<span class="lineNum">     458 </span>            :         const unsigned ib_size_dw = 1024;
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :         struct radeon_ib ib;</span>
+<span class="lineNum">     460 </span>            :         uint64_t dummy;
+<span class="lineNum">     461 </span>            :         int i, r;
+<span class="lineNum">     462 </span>            : 
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :         r = radeon_ib_get(rdev, ring, &amp;ib, NULL, ib_size_dw * 4);</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;radeon: failed to get ib (%d).\n&quot;, r);</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     467 </span>            :         }
+<span class="lineNum">     468 </span>            : 
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :         dummy = ib.gpu_addr + 1024;</span>
+<span class="lineNum">     470 </span>            : 
+<span class="lineNum">     471 </span>            :         /* stitch together an VCE destroy msg */
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :         ib.length_dw = 0;</span>
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x0000000c); /* len */</span>
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000001); /* session cmd */</span>
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(handle);</span>
+<span class="lineNum">     476 </span>            : 
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000014); /* len */</span>
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x05000005); /* feedback buffer */</span>
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(upper_32_bits(dummy));</span>
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(dummy);</span>
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000001);</span>
+<span class="lineNum">     482 </span>            : 
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x00000008); /* len */</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         ib.ptr[ib.length_dw++] = cpu_to_le32(0x02000001); /* destroy cmd */</span>
+<span class="lineNum">     485 </span>            : 
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :         for (i = ib.length_dw; i &lt; ib_size_dw; ++i)</span>
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :                 ib.ptr[i] = cpu_to_le32(0x0);</span>
+<span class="lineNum">     488 </span>            : 
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :         r = radeon_ib_schedule(rdev, &amp;ib, NULL, false);</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;radeon: failed to schedule ib (%d).\n&quot;, r);</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :         if (fence)</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :                 *fence = radeon_fence_ref(ib.fence);</span>
+<span class="lineNum">     496 </span>            : 
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :         radeon_ib_free(rdev, &amp;ib);</span>
+<span class="lineNum">     498 </span>            : 
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :         return r;</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     501 </span>            : 
+<span class="lineNum">     502 </span>            : /**
+<span class="lineNum">     503 </span>            :  * radeon_vce_cs_reloc - command submission relocation
+<span class="lineNum">     504 </span>            :  *
+<span class="lineNum">     505 </span>            :  * @p: parser context
+<span class="lineNum">     506 </span>            :  * @lo: address of lower dword
+<span class="lineNum">     507 </span>            :  * @hi: address of higher dword
+<span class="lineNum">     508 </span>            :  * @size: size of checker for relocation buffer
+<span class="lineNum">     509 </span>            :  *
+<a name="510"><span class="lineNum">     510 </span>            :  * Patch relocation inside command stream with real buffer address</a>
+<span class="lineNum">     511 </span>            :  */
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 : int radeon_vce_cs_reloc(struct radeon_cs_parser *p, int lo, int hi,</span>
+<span class="lineNum">     513 </span>            :                         unsigned size)
+<span class="lineNum">     514 </span>            : {
+<span class="lineNum">     515 </span>            :         struct radeon_cs_chunk *relocs_chunk;
+<span class="lineNum">     516 </span>            :         struct radeon_bo_list *reloc;
+<span class="lineNum">     517 </span>            :         uint64_t start, end, offset;
+<span class="lineNum">     518 </span>            :         unsigned idx;
+<span class="lineNum">     519 </span>            : 
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         relocs_chunk = p-&gt;chunk_relocs;</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :         offset = radeon_get_ib_value(p, lo);</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :         idx = radeon_get_ib_value(p, hi);</span>
+<span class="lineNum">     523 </span>            : 
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :         if (idx &gt;= relocs_chunk-&gt;length_dw) {</span>
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;Relocs at %d after relocations chunk end %d !\n&quot;,</span>
+<span class="lineNum">     526 </span>            :                           idx, relocs_chunk-&gt;length_dw);
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     528 </span>            :         }
+<span class="lineNum">     529 </span>            : 
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :         reloc = &amp;p-&gt;relocs[(idx / 4)];</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :         start = reloc-&gt;gpu_offset;</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :         end = start + radeon_bo_size(reloc-&gt;robj);</span>
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :         start += offset;</span>
+<span class="lineNum">     534 </span>            : 
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :         p-&gt;ib.ptr[lo] = start &amp; 0xFFFFFFFF;</span>
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         p-&gt;ib.ptr[hi] = start &gt;&gt; 32;</span>
+<span class="lineNum">     537 </span>            : 
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :         if (end &lt;= start) {</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;invalid reloc offset %llX!\n&quot;, offset);</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     541 </span>            :         }
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :         if ((end - start) &lt; size) {</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;buffer to small (%d / %d)!\n&quot;,</span>
+<span class="lineNum">     544 </span>            :                         (unsigned)(end - start), size);
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :                 return -EINVAL;</span>
+<span class="lineNum">     546 </span>            :         }
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     550 </span>            : 
+<span class="lineNum">     551 </span>            : /**
+<span class="lineNum">     552 </span>            :  * radeon_vce_validate_handle - validate stream handle
+<span class="lineNum">     553 </span>            :  *
+<span class="lineNum">     554 </span>            :  * @p: parser context
+<span class="lineNum">     555 </span>            :  * @handle: handle to validate
+<span class="lineNum">     556 </span>            :  * @allocated: allocated a new handle?
+<span class="lineNum">     557 </span>            :  *
+<span class="lineNum">     558 </span>            :  * Validates the handle and return the found session index or -EINVAL
+<a name="559"><span class="lineNum">     559 </span>            :  * we we don't have another free session index.</a>
+<span class="lineNum">     560 </span>            :  */
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 : static int radeon_vce_validate_handle(struct radeon_cs_parser *p,</span>
+<span class="lineNum">     562 </span>            :                                       uint32_t handle, bool *allocated)
+<span class="lineNum">     563 </span>            : {
+<span class="lineNum">     564 </span>            :         unsigned i;
+<span class="lineNum">     565 </span>            : 
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :         *allocated = false;</span>
+<span class="lineNum">     567 </span>            : 
+<span class="lineNum">     568 </span>            :         /* validate the handle */
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RADEON_MAX_VCE_HANDLES; ++i) {</span>
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :                 if (atomic_read(&amp;p-&gt;rdev-&gt;vce.handles[i]) == handle) {</span>
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :                         if (p-&gt;rdev-&gt;vce.filp[i] != p-&gt;filp) {</span>
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :                                 DRM_ERROR(&quot;VCE handle collision detected!\n&quot;);</span>
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :                                 return -EINVAL;</span>
+<span class="lineNum">     574 </span>            :                         }
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 :                         return i;</span>
+<span class="lineNum">     576 </span>            :                 }
+<span class="lineNum">     577 </span>            :         }
+<span class="lineNum">     578 </span>            : 
+<span class="lineNum">     579 </span>            :         /* handle not found try to alloc a new one */
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; RADEON_MAX_VCE_HANDLES; ++i) {</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :                 if (!atomic_cmpxchg(&amp;p-&gt;rdev-&gt;vce.handles[i], 0, handle)) {</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :                         p-&gt;rdev-&gt;vce.filp[i] = p-&gt;filp;</span>
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :                         p-&gt;rdev-&gt;vce.img_size[i] = 0;</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                         *allocated = true;</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :                         return i;</span>
+<span class="lineNum">     586 </span>            :                 }
+<span class="lineNum">     587 </span>            :         }
+<span class="lineNum">     588 </span>            : 
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :         DRM_ERROR(&quot;No more free VCE handles!\n&quot;);</span>
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :         return -EINVAL;</span>
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     592 </span>            : 
+<span class="lineNum">     593 </span>            : /**
+<span class="lineNum">     594 </span>            :  * radeon_vce_cs_parse - parse and validate the command stream
+<span class="lineNum">     595 </span>            :  *
+<span class="lineNum">     596 </span>            :  * @p: parser context
+<a name="597"><span class="lineNum">     597 </span>            :  *</a>
+<span class="lineNum">     598 </span>            :  */
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 : int radeon_vce_cs_parse(struct radeon_cs_parser *p)</span>
+<span class="lineNum">     600 </span>            : {
+<span class="lineNum">     601 </span>            :         int session_idx = -1;
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :         bool destroyed = false, created = false, allocated = false;</span>
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :         uint32_t tmp, handle = 0;</span>
+<span class="lineNum">     604 </span>            :         uint32_t *size = &amp;tmp;
+<span class="lineNum">     605 </span>            :         int i, r = 0;
+<span class="lineNum">     606 </span>            : 
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :         while (p-&gt;idx &lt; p-&gt;chunk_ib-&gt;length_dw) {</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                 uint32_t len = radeon_get_ib_value(p, p-&gt;idx);</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :                 uint32_t cmd = radeon_get_ib_value(p, p-&gt;idx + 1);</span>
+<span class="lineNum">     610 </span>            : 
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :                 if ((len &lt; 8) || (len &amp; 3)) {</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                         DRM_ERROR(&quot;invalid VCE command length (%d)!\n&quot;, len);</span>
+<span class="lineNum">     613 </span>            :                         r = -EINVAL;
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                         goto out;</span>
+<span class="lineNum">     615 </span>            :                 }
+<span class="lineNum">     616 </span>            : 
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                 if (destroyed) {</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                         DRM_ERROR(&quot;No other command allowed after destroy!\n&quot;);</span>
+<span class="lineNum">     619 </span>            :                         r = -EINVAL;
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :                         goto out;</span>
+<span class="lineNum">     621 </span>            :                 }
+<span class="lineNum">     622 </span>            : 
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :                 switch (cmd) {</span>
+<span class="lineNum">     624 </span>            :                 case 0x00000001: // session
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :                         handle = radeon_get_ib_value(p, p-&gt;idx + 2);</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                         session_idx = radeon_vce_validate_handle(p, handle,</span>
+<span class="lineNum">     627 </span>            :                                                                  &amp;allocated);
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                         if (session_idx &lt; 0)</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                                 return session_idx;</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :                         size = &amp;p-&gt;rdev-&gt;vce.img_size[session_idx];</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     632 </span>            : 
+<span class="lineNum">     633 </span>            :                 case 0x00000002: // task info
+<span class="lineNum">     634 </span>            :                         break;
+<span class="lineNum">     635 </span>            : 
+<span class="lineNum">     636 </span>            :                 case 0x01000001: // create
+<span class="lineNum">     637 </span>            :                         created = true;
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :                         if (!allocated) {</span>
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :                                 DRM_ERROR(&quot;Handle already in use!\n&quot;);</span>
+<span class="lineNum">     640 </span>            :                                 r = -EINVAL;
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :                                 goto out;</span>
+<span class="lineNum">     642 </span>            :                         }
+<span class="lineNum">     643 </span>            : 
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :                         *size = radeon_get_ib_value(p, p-&gt;idx + 8) *</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :                                 radeon_get_ib_value(p, p-&gt;idx + 10) *</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :                                 8 * 3 / 2;</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     648 </span>            : 
+<span class="lineNum">     649 </span>            :                 case 0x04000001: // config extension
+<span class="lineNum">     650 </span>            :                 case 0x04000002: // pic control
+<span class="lineNum">     651 </span>            :                 case 0x04000005: // rate control
+<span class="lineNum">     652 </span>            :                 case 0x04000007: // motion estimation
+<span class="lineNum">     653 </span>            :                 case 0x04000008: // rdo
+<span class="lineNum">     654 </span>            :                 case 0x04000009: // vui
+<span class="lineNum">     655 </span>            :                         break;
+<span class="lineNum">     656 </span>            : 
+<span class="lineNum">     657 </span>            :                 case 0x03000001: // encode
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                         r = radeon_vce_cs_reloc(p, p-&gt;idx + 10, p-&gt;idx + 9,</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                                                 *size);</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :                         if (r)</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                                 goto out;</span>
+<span class="lineNum">     662 </span>            : 
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                         r = radeon_vce_cs_reloc(p, p-&gt;idx + 12, p-&gt;idx + 11,</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                                                 *size / 3);</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :                         if (r)</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :                                 goto out;</span>
+<span class="lineNum">     667 </span>            :                         break;
+<span class="lineNum">     668 </span>            : 
+<span class="lineNum">     669 </span>            :                 case 0x02000001: // destroy
+<span class="lineNum">     670 </span>            :                         destroyed = true;
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     672 </span>            : 
+<span class="lineNum">     673 </span>            :                 case 0x05000001: // context buffer
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :                         r = radeon_vce_cs_reloc(p, p-&gt;idx + 3, p-&gt;idx + 2,</span>
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :                                                 *size * 2);</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :                         if (r)</span>
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :                                 goto out;</span>
+<span class="lineNum">     678 </span>            :                         break;
+<span class="lineNum">     679 </span>            : 
+<span class="lineNum">     680 </span>            :                 case 0x05000004: // video bitstream buffer
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :                         tmp = radeon_get_ib_value(p, p-&gt;idx + 4);</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :                         r = radeon_vce_cs_reloc(p, p-&gt;idx + 3, p-&gt;idx + 2,</span>
+<span class="lineNum">     683 </span>            :                                                 tmp);
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :                         if (r)</span>
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :                                 goto out;</span>
+<span class="lineNum">     686 </span>            :                         break;
+<span class="lineNum">     687 </span>            : 
+<span class="lineNum">     688 </span>            :                 case 0x05000005: // feedback buffer
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :                         r = radeon_vce_cs_reloc(p, p-&gt;idx + 3, p-&gt;idx + 2,</span>
+<span class="lineNum">     690 </span>            :                                                 4096);
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :                         if (r)</span>
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :                                 goto out;</span>
+<span class="lineNum">     693 </span>            :                         break;
+<span class="lineNum">     694 </span>            : 
+<span class="lineNum">     695 </span>            :                 default:
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :                         DRM_ERROR(&quot;invalid VCE command (0x%x)!\n&quot;, cmd);</span>
+<span class="lineNum">     697 </span>            :                         r = -EINVAL;
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :                         goto out;</span>
+<span class="lineNum">     699 </span>            :                 }
+<span class="lineNum">     700 </span>            : 
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :                 if (session_idx == -1) {</span>
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :                         DRM_ERROR(&quot;no session command at start of IB\n&quot;);</span>
+<span class="lineNum">     703 </span>            :                         r = -EINVAL;
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :                         goto out;</span>
+<span class="lineNum">     705 </span>            :                 }
+<span class="lineNum">     706 </span>            : 
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :                 p-&gt;idx += len / 4;</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     709 </span>            : 
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :         if (allocated &amp;&amp; !created) {</span>
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;New session without create command!\n&quot;);</span>
+<span class="lineNum">     712 </span>            :                 r = -ENOENT;
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     714 </span>            : 
+<span class="lineNum">     715 </span>            : out:
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :         if ((!r &amp;&amp; destroyed) || (r &amp;&amp; allocated)) {</span>
+<span class="lineNum">     717 </span>            :                 /*
+<span class="lineNum">     718 </span>            :                  * IB contains a destroy msg or we have allocated an
+<span class="lineNum">     719 </span>            :                  * handle and got an error, anyway free the handle
+<span class="lineNum">     720 </span>            :                  */
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; RADEON_MAX_VCE_HANDLES; ++i)</span>
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :                         atomic_cmpxchg(&amp;p-&gt;rdev-&gt;vce.handles[i], handle, 0);</span>
+<span class="lineNum">     723 </span>            :         }
+<span class="lineNum">     724 </span>            : 
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :         return r;</span>
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     727 </span>            : 
+<span class="lineNum">     728 </span>            : /**
+<span class="lineNum">     729 </span>            :  * radeon_vce_semaphore_emit - emit a semaphore command
+<span class="lineNum">     730 </span>            :  *
+<span class="lineNum">     731 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     732 </span>            :  * @ring: engine to use
+<span class="lineNum">     733 </span>            :  * @semaphore: address of semaphore
+<span class="lineNum">     734 </span>            :  * @emit_wait: true=emit wait, false=emit signal
+<a name="735"><span class="lineNum">     735 </span>            :  *</a>
+<span class="lineNum">     736 </span>            :  */
+<span class="lineNum">     737 </span><span class="lineNoCov">          0 : bool radeon_vce_semaphore_emit(struct radeon_device *rdev,</span>
+<span class="lineNum">     738 </span>            :                                struct radeon_ring *ring,
+<span class="lineNum">     739 </span>            :                                struct radeon_semaphore *semaphore,
+<span class="lineNum">     740 </span>            :                                bool emit_wait)
+<span class="lineNum">     741 </span>            : {
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :         uint64_t addr = semaphore-&gt;gpu_addr;</span>
+<span class="lineNum">     743 </span>            : 
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(VCE_CMD_SEMAPHORE));</span>
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32((addr &gt;&gt; 3) &amp; 0x000FFFFF));</span>
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32((addr &gt;&gt; 23) &amp; 0x000FFFFF));</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(0x01003000 | (emit_wait ? 1 : 0)));</span>
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :         if (!emit_wait)</span>
+<span class="lineNum">     749 </span><span class="lineNoCov">          0 :                 radeon_ring_write(ring, cpu_to_le32(VCE_CMD_END));</span>
+<span class="lineNum">     750 </span>            : 
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     752 </span>            : }
+<span class="lineNum">     753 </span>            : 
+<span class="lineNum">     754 </span>            : /**
+<span class="lineNum">     755 </span>            :  * radeon_vce_ib_execute - execute indirect buffer
+<span class="lineNum">     756 </span>            :  *
+<span class="lineNum">     757 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     758 </span>            :  * @ib: the IB to execute
+<a name="759"><span class="lineNum">     759 </span>            :  *</a>
+<span class="lineNum">     760 </span>            :  */
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 : void radeon_vce_ib_execute(struct radeon_device *rdev, struct radeon_ib *ib)</span>
+<span class="lineNum">     762 </span>            : {
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :         struct radeon_ring *ring = &amp;rdev-&gt;ring[ib-&gt;ring];</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(VCE_CMD_IB));</span>
+<span class="lineNum">     765 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(ib-&gt;gpu_addr));</span>
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(upper_32_bits(ib-&gt;gpu_addr)));</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(ib-&gt;length_dw));</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     769 </span>            : 
+<span class="lineNum">     770 </span>            : /**
+<span class="lineNum">     771 </span>            :  * radeon_vce_fence_emit - add a fence command to the ring
+<span class="lineNum">     772 </span>            :  *
+<span class="lineNum">     773 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     774 </span>            :  * @fence: the fence
+<a name="775"><span class="lineNum">     775 </span>            :  *</a>
+<span class="lineNum">     776 </span>            :  */
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 : void radeon_vce_fence_emit(struct radeon_device *rdev,</span>
+<span class="lineNum">     778 </span>            :                            struct radeon_fence *fence)
+<span class="lineNum">     779 </span>            : {
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :         struct radeon_ring *ring = &amp;rdev-&gt;ring[fence-&gt;ring];</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :         uint64_t addr = rdev-&gt;fence_drv[fence-&gt;ring].gpu_addr;</span>
+<span class="lineNum">     782 </span>            : 
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(VCE_CMD_FENCE));</span>
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(addr));</span>
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(upper_32_bits(addr)));</span>
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(fence-&gt;seq));</span>
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(VCE_CMD_TRAP));</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(VCE_CMD_END));</span>
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     790 </span>            : 
+<span class="lineNum">     791 </span>            : /**
+<span class="lineNum">     792 </span>            :  * radeon_vce_ring_test - test if VCE ring is working
+<span class="lineNum">     793 </span>            :  *
+<span class="lineNum">     794 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     795 </span>            :  * @ring: the engine to test on
+<a name="796"><span class="lineNum">     796 </span>            :  *</a>
+<span class="lineNum">     797 </span>            :  */
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 : int radeon_vce_ring_test(struct radeon_device *rdev, struct radeon_ring *ring)</span>
+<span class="lineNum">     799 </span>            : {
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :         uint32_t rptr = vce_v1_0_get_rptr(rdev, ring);</span>
+<span class="lineNum">     801 </span>            :         unsigned i;
+<span class="lineNum">     802 </span>            :         int r;
+<span class="lineNum">     803 </span>            : 
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :         r = radeon_ring_lock(rdev, ring, 16);</span>
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;radeon: vce failed to lock ring %d (%d).\n&quot;,</span>
+<span class="lineNum">     807 </span>            :                           ring-&gt;idx, r);
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                 return r;</span>
+<span class="lineNum">     809 </span>            :         }
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :         radeon_ring_write(ring, cpu_to_le32(VCE_CMD_END));</span>
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :         radeon_ring_unlock_commit(rdev, ring, false);</span>
+<span class="lineNum">     812 </span>            : 
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; rdev-&gt;usec_timeout; i++) {</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :                 if (vce_v1_0_get_rptr(rdev, ring) != rptr)</span>
+<span class="lineNum">     815 </span>            :                         break;
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 :                 DRM_UDELAY(1);</span>
+<span class="lineNum">     817 </span>            :         }
+<span class="lineNum">     818 </span>            : 
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 :         if (i &lt; rdev-&gt;usec_timeout) {</span>
+<span class="lineNum">     820 </span>            :                 DRM_INFO(&quot;ring test on %d succeeded in %d usecs\n&quot;,
+<span class="lineNum">     821 </span>            :                          ring-&gt;idx, i);
+<span class="lineNum">     822 </span>            :         } else {
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;radeon: ring %d test failed\n&quot;,</span>
+<span class="lineNum">     824 </span>            :                           ring-&gt;idx);
+<span class="lineNum">     825 </span>            :                 r = -ETIMEDOUT;
+<span class="lineNum">     826 </span>            :         }
+<span class="lineNum">     827 </span>            : 
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :         return r;</span>
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     830 </span>            : 
+<span class="lineNum">     831 </span>            : /**
+<span class="lineNum">     832 </span>            :  * radeon_vce_ib_test - test if VCE IBs are working
+<span class="lineNum">     833 </span>            :  *
+<span class="lineNum">     834 </span>            :  * @rdev: radeon_device pointer
+<span class="lineNum">     835 </span>            :  * @ring: the engine to test on
+<a name="836"><span class="lineNum">     836 </span>            :  *</a>
+<span class="lineNum">     837 </span>            :  */
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 : int radeon_vce_ib_test(struct radeon_device *rdev, struct radeon_ring *ring)</span>
+<span class="lineNum">     839 </span>            : {
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 :         struct radeon_fence *fence = NULL;</span>
+<span class="lineNum">     841 </span>            :         int r;
+<span class="lineNum">     842 </span>            : 
+<span class="lineNum">     843 </span><span class="lineNoCov">          0 :         r = radeon_vce_get_create_msg(rdev, ring-&gt;idx, 1, NULL);</span>
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;radeon: failed to get create msg (%d).\n&quot;, r);</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :                 goto error;</span>
+<span class="lineNum">     847 </span>            :         }
+<span class="lineNum">     848 </span>            : 
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :         r = radeon_vce_get_destroy_msg(rdev, ring-&gt;idx, 1, &amp;fence);</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;radeon: failed to get destroy ib (%d).\n&quot;, r);</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :                 goto error;</span>
+<span class="lineNum">     853 </span>            :         }
+<span class="lineNum">     854 </span>            : 
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :         r = radeon_fence_wait(fence, false);</span>
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :         if (r) {</span>
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :                 DRM_ERROR(&quot;radeon: fence wait failed (%d).\n&quot;, r);</span>
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     859 </span>            :                 DRM_INFO(&quot;ib test on ring %d succeeded\n&quot;, ring-&gt;idx);
+<span class="lineNum">     860 </span>            :         }
+<span class="lineNum">     861 </span>            : error:
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :         radeon_fence_unref(&amp;fence);</span>
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :         return r;</span>
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

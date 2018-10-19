@@ -1,0 +1,361 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/kcov.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">dev</a> - kcov.c<span style="font-size: 80%;"> (source / <a href="kcov.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">100</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: kcov.c,v 1.4 2018/08/27 15:57:39 anton Exp $  */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2018 Anton Lindqvist &lt;anton@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      20 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;sys/proc.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/kcov.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/stdint.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      26 </span>            : 
+<span class="lineNum">      27 </span>            : #include &lt;uvm/uvm_extern.h&gt;
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span>            : /* #define KCOV_DEBUG */
+<span class="lineNum">      30 </span>            : #ifdef KCOV_DEBUG
+<span class="lineNum">      31 </span>            : #define DPRINTF(x...) do { if (kcov_debug) printf(x); } while (0)
+<span class="lineNum">      32 </span>            : #else
+<span class="lineNum">      33 </span>            : #define DPRINTF(x...)
+<span class="lineNum">      34 </span>            : #endif
+<span class="lineNum">      35 </span>            : 
+<span class="lineNum">      36 </span>            : struct kcov_dev {
+<span class="lineNum">      37 </span>            :         enum {
+<span class="lineNum">      38 </span>            :                 KCOV_MODE_DISABLED,
+<span class="lineNum">      39 </span>            :                 KCOV_MODE_INIT,
+<span class="lineNum">      40 </span>            :                 KCOV_MODE_TRACE_PC,
+<span class="lineNum">      41 </span>            :                 KCOV_MODE_DYING,
+<span class="lineNum">      42 </span>            :         }                kd_mode;
+<span class="lineNum">      43 </span>            :         int              kd_unit;       /* device minor */
+<span class="lineNum">      44 </span>            :         uintptr_t       *kd_buf;        /* traced coverage */
+<span class="lineNum">      45 </span>            :         size_t           kd_nmemb;
+<span class="lineNum">      46 </span>            :         size_t           kd_size;
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            :         TAILQ_ENTRY(kcov_dev)   kd_entry;
+<span class="lineNum">      49 </span>            : };
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span>            : void kcovattach(int);
+<span class="lineNum">      52 </span>            : 
+<span class="lineNum">      53 </span>            : int kd_alloc(struct kcov_dev *, unsigned long);
+<span class="lineNum">      54 </span>            : void kd_free(struct kcov_dev *);
+<span class="lineNum">      55 </span>            : struct kcov_dev *kd_lookup(int);
+<span class="lineNum">      56 </span>            : 
+<span class="lineNum">      57 </span>            : static inline int inintr(void);
+<span class="lineNum">      58 </span>            : 
+<span class="lineNum">      59 </span>            : TAILQ_HEAD(, kcov_dev) kd_list = TAILQ_HEAD_INITIALIZER(kd_list);
+<span class="lineNum">      60 </span>            : 
+<span class="lineNum">      61 </span>            : #ifdef KCOV_DEBUG
+<span class="lineNum">      62 </span>            : int kcov_debug = 1;
+<span class="lineNum">      63 </span>            : #endif
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span>            : /*
+<span class="lineNum">      66 </span>            :  * Compiling the kernel with the `-fsanitize-coverage=trace-pc' option will
+<span class="lineNum">      67 </span>            :  * cause the following function to be called upon function entry and before
+<span class="lineNum">      68 </span>            :  * each block instructions that maps to a single line in the original source
+<span class="lineNum">      69 </span>            :  * code.
+<span class="lineNum">      70 </span>            :  *
+<span class="lineNum">      71 </span>            :  * If kcov is enabled for the current thread, the kernel program counter will
+<span class="lineNum">      72 </span>            :  * be stored in its corresponding coverage buffer.
+<span class="lineNum">      73 </span>            :  * The first element in the coverage buffer holds the index of next available
+<span class="lineNum">      74 </span>            :  * element.
+<a name="75"><span class="lineNum">      75 </span>            :  */</a>
+<span class="lineNum">      76 </span>            : void
+<span class="lineNum">      77 </span><span class="lineNoCov">          0 : __sanitizer_cov_trace_pc(void)</span>
+<span class="lineNum">      78 </span>            : {
+<span class="lineNum">      79 </span>            :         extern int cold;
+<span class="lineNum">      80 </span>            :         struct kcov_dev *kd;
+<span class="lineNum">      81 </span>            :         uint64_t idx;
+<span class="lineNum">      82 </span>            : 
+<span class="lineNum">      83 </span>            :         /* Do not trace during boot. */
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 :         if (cold)</span>
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">      86 </span>            : 
+<span class="lineNum">      87 </span>            :         /* Do not trace in interrupts to prevent noisy coverage. */
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :         if (inintr())</span>
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">      90 </span>            : 
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :         kd = curproc-&gt;p_kd;</span>
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 :         if (kd == NULL || kd-&gt;kd_mode != KCOV_MODE_TRACE_PC)</span>
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">      94 </span>            : 
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         idx = kd-&gt;kd_buf[0];</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :         if (idx &lt; kd-&gt;kd_nmemb) {</span>
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :                 kd-&gt;kd_buf[idx + 1] = (uintptr_t)__builtin_return_address(0);</span>
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :                 kd-&gt;kd_buf[0] = idx + 1;</span>
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 : }</span>
+<a name="101"><span class="lineNum">     101 </span>            : </a>
+<span class="lineNum">     102 </span>            : void
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 : kcovattach(int count)</span>
+<span class="lineNum">     104 </span>            : {
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 : }</span>
+<a name="106"><span class="lineNum">     106 </span>            : </a>
+<span class="lineNum">     107 </span>            : int
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 : kcovopen(dev_t dev, int flag, int mode, struct proc *p)</span>
+<span class="lineNum">     109 </span>            : {
+<span class="lineNum">     110 </span>            :         struct kcov_dev *kd;
+<span class="lineNum">     111 </span>            : 
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :         if (kd_lookup(minor(dev)) != NULL)</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :                 return (EBUSY);</span>
+<span class="lineNum">     114 </span>            : 
+<span class="lineNum">     115 </span>            :         DPRINTF(&quot;%s: unit=%d\n&quot;, __func__, minor(dev));
+<span class="lineNum">     116 </span>            : 
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         kd = malloc(sizeof(*kd), M_SUBPROC, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :         kd-&gt;kd_unit = minor(dev);</span>
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :         TAILQ_INSERT_TAIL(&amp;kd_list, kd, kd_entry);</span>
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 : }</span>
+<a name="122"><span class="lineNum">     122 </span>            : </a>
+<span class="lineNum">     123 </span>            : int
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 : kcovclose(dev_t dev, int flag, int mode, struct proc *p)</span>
+<span class="lineNum">     125 </span>            : {
+<span class="lineNum">     126 </span>            :         struct kcov_dev *kd;
+<span class="lineNum">     127 </span>            : 
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         kd = kd_lookup(minor(dev));</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :         if (kd == NULL)</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     131 </span>            : 
+<span class="lineNum">     132 </span>            :         DPRINTF(&quot;%s: unit=%d\n&quot;, __func__, minor(dev));
+<span class="lineNum">     133 </span>            : 
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         if (kd-&gt;kd_mode == KCOV_MODE_TRACE_PC)</span>
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :                 kd-&gt;kd_mode = KCOV_MODE_DYING;</span>
+<span class="lineNum">     136 </span>            :         else
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :                 kd_free(kd);</span>
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 : }</span>
+<a name="141"><span class="lineNum">     141 </span>            : </a>
+<span class="lineNum">     142 </span>            : int
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 : kcovioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)</span>
+<span class="lineNum">     144 </span>            : {
+<span class="lineNum">     145 </span>            :         struct kcov_dev *kd;
+<span class="lineNum">     146 </span>            :         int error = 0;
+<span class="lineNum">     147 </span>            : 
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         kd = kd_lookup(minor(dev));</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         if (kd == NULL)</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     151 </span>            : 
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     153 </span>            :         case KIOSETBUFSIZE:
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :                 if (kd-&gt;kd_mode != KCOV_MODE_DISABLED) {</span>
+<span class="lineNum">     155 </span>            :                         error = EBUSY;
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     157 </span>            :                 }
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :                 error = kd_alloc(kd, *((unsigned long *)data));</span>
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :                 if (error == 0)</span>
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :                         kd-&gt;kd_mode = KCOV_MODE_INIT;</span>
+<span class="lineNum">     161 </span>            :                 break;
+<span class="lineNum">     162 </span>            :         case KIOENABLE:
+<span class="lineNum">     163 </span>            :                 /* Only one kcov descriptor can be enabled per thread. */
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                 if (p-&gt;p_kd != NULL || kd-&gt;kd_mode != KCOV_MODE_INIT) {</span>
+<span class="lineNum">     165 </span>            :                         error = EBUSY;
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     167 </span>            :                 }
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                 kd-&gt;kd_mode = KCOV_MODE_TRACE_PC;</span>
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :                 p-&gt;p_kd = kd;</span>
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     171 </span>            :         case KIODISABLE:
+<span class="lineNum">     172 </span>            :                 /* Only the enabled thread may disable itself. */
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :                 if (p-&gt;p_kd != kd || kd-&gt;kd_mode != KCOV_MODE_TRACE_PC) {</span>
+<span class="lineNum">     174 </span>            :                         error = EBUSY;
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     176 </span>            :                 }
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :                 kd-&gt;kd_mode = KCOV_MODE_INIT;</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                 p-&gt;p_kd = NULL;</span>
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     180 </span>            :         default:
+<span class="lineNum">     181 </span>            :                 error = EINVAL;
+<span class="lineNum">     182 </span>            :                 DPRINTF(&quot;%s: %lu: unknown command\n&quot;, __func__, cmd);
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     184 </span>            : 
+<span class="lineNum">     185 </span>            :         DPRINTF(&quot;%s: unit=%d, mode=%d, error=%d\n&quot;,
+<span class="lineNum">     186 </span>            :             __func__, kd-&gt;kd_unit, kd-&gt;kd_mode, error);
+<span class="lineNum">     187 </span>            : 
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 : }</span>
+<a name="190"><span class="lineNum">     190 </span>            : </a>
+<span class="lineNum">     191 </span>            : paddr_t
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 : kcovmmap(dev_t dev, off_t offset, int prot)</span>
+<span class="lineNum">     193 </span>            : {
+<span class="lineNum">     194 </span>            :         struct kcov_dev *kd;
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         paddr_t pa;</span>
+<span class="lineNum">     196 </span>            :         vaddr_t va;
+<span class="lineNum">     197 </span>            : 
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         kd = kd_lookup(minor(dev));</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         if (kd == NULL)</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                 return (paddr_t)(-1);</span>
+<span class="lineNum">     201 </span>            : 
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :         if (offset &lt; 0 || offset &gt;= kd-&gt;kd_nmemb * sizeof(uintptr_t))</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :                 return (paddr_t)(-1);</span>
+<span class="lineNum">     204 </span>            : 
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         va = (vaddr_t)kd-&gt;kd_buf + offset;</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         if (pmap_extract(pmap_kernel(), va, &amp;pa) == FALSE)</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :                 return (paddr_t)(-1);</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         return (pa);</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 : }</span>
+<a name="210"><span class="lineNum">     210 </span>            : </a>
+<span class="lineNum">     211 </span>            : void
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 : kcov_exit(struct proc *p)</span>
+<span class="lineNum">     213 </span>            : {
+<span class="lineNum">     214 </span>            :         struct kcov_dev *kd;
+<span class="lineNum">     215 </span>            : 
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :         kd = p-&gt;p_kd;</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         if (kd == NULL)</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     219 </span>            : 
+<span class="lineNum">     220 </span>            :         DPRINTF(&quot;%s: unit=%d\n&quot;, __func__, kd-&gt;kd_unit);
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         if (kd-&gt;kd_mode == KCOV_MODE_DYING)</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                 kd_free(kd);</span>
+<span class="lineNum">     224 </span>            :         else
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                 kd-&gt;kd_mode = KCOV_MODE_INIT;</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :         p-&gt;p_kd = NULL;</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 : }</span>
+<a name="228"><span class="lineNum">     228 </span>            : </a>
+<span class="lineNum">     229 </span>            : struct kcov_dev *
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 : kd_lookup(int unit)</span>
+<span class="lineNum">     231 </span>            : {
+<span class="lineNum">     232 </span>            :         struct kcov_dev *kd;
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(kd, &amp;kd_list, kd_entry) {</span>
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :                 if (kd-&gt;kd_unit == unit)</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :                         return (kd);</span>
+<span class="lineNum">     237 </span>            :         }
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 : }</span>
+<a name="240"><span class="lineNum">     240 </span>            : </a>
+<span class="lineNum">     241 </span>            : int
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 : kd_alloc(struct kcov_dev *kd, unsigned long nmemb)</span>
+<span class="lineNum">     243 </span>            : {
+<span class="lineNum">     244 </span>            :         size_t size;
+<span class="lineNum">     245 </span>            : 
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         KASSERT(kd-&gt;kd_buf == NULL);</span>
+<span class="lineNum">     247 </span>            : 
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :         if (nmemb == 0 || nmemb &gt; KCOV_BUF_MAX_NMEMB)</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     250 </span>            : 
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :         size = roundup(nmemb * sizeof(uintptr_t), PAGE_SIZE);</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         kd-&gt;kd_buf = malloc(size, M_SUBPROC, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">     253 </span>            :         /* The first element is reserved to hold the number of used elements. */
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         kd-&gt;kd_nmemb = nmemb - 1;</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         kd-&gt;kd_size = size;</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 : }</span>
+<a name="258"><span class="lineNum">     258 </span>            : </a>
+<span class="lineNum">     259 </span>            : void
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 : kd_free(struct kcov_dev *kd)</span>
+<span class="lineNum">     261 </span>            : {
+<span class="lineNum">     262 </span>            :         DPRINTF(&quot;%s: unit=%d mode=%d\n&quot;, __func__, kd-&gt;kd_unit, kd-&gt;kd_mode);
+<span class="lineNum">     263 </span>            : 
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         TAILQ_REMOVE(&amp;kd_list, kd, kd_entry);</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         free(kd-&gt;kd_buf, M_SUBPROC, kd-&gt;kd_size);</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         free(kd, M_SUBPROC, sizeof(*kd));</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 : }</span>
+<a name="268"><span class="lineNum">     268 </span>            : </a>
+<span class="lineNum">     269 </span>            : static inline int
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 : inintr(void)</span>
+<span class="lineNum">     271 </span>            : {
+<span class="lineNum">     272 </span>            : #if defined(__amd64__) || defined(__i386__)
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         return (curcpu()-&gt;ci_idepth &gt; 0);</span>
+<span class="lineNum">     274 </span>            : #else
+<span class="lineNum">     275 </span>            :         return (0);
+<span class="lineNum">     276 </span>            : #endif
+<span class="lineNum">     277 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,1475 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/usb/if_mue.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/usb</a> - if_mue.c<span style="font-size: 80%;"> (source / <a href="if_mue.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">680</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">36</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: if_mue.c,v 1.4 2018/08/15 07:13:51 kevlo Exp $        */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2018 Kevin Lo &lt;kevlo@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /* Driver for Microchip LAN7500/LAN7800 chipsets. */
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #include &quot;bpfilter.h&quot;
+<span class="lineNum">      22 </span>            : 
+<span class="lineNum">      23 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/sockio.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/rwlock.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      30 </span>            : 
+<span class="lineNum">      31 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : #include &lt;machine/bus.h&gt;
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;net/if_dl.h&gt;
+<span class="lineNum">      37 </span>            : #include &lt;net/if_media.h&gt;
+<span class="lineNum">      38 </span>            : 
+<span class="lineNum">      39 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">      40 </span>            : #include &lt;net/bpf.h&gt;
+<span class="lineNum">      41 </span>            : #endif
+<span class="lineNum">      42 </span>            : 
+<span class="lineNum">      43 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      44 </span>            : #include &lt;netinet/if_ether.h&gt;
+<span class="lineNum">      45 </span>            : 
+<span class="lineNum">      46 </span>            : #include &lt;dev/mii/miivar.h&gt;
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : #include &lt;dev/usb/usb.h&gt;
+<span class="lineNum">      49 </span>            : #include &lt;dev/usb/usbdi.h&gt;
+<span class="lineNum">      50 </span>            : #include &lt;dev/usb/usbdi_util.h&gt;
+<span class="lineNum">      51 </span>            : #include &lt;dev/usb/usbdivar.h&gt;
+<span class="lineNum">      52 </span>            : #include &lt;dev/usb/usbdevs.h&gt;
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span>            : #include &lt;dev/usb/if_muereg.h&gt;
+<span class="lineNum">      55 </span>            : 
+<span class="lineNum">      56 </span>            : #ifdef MUE_DEBUG
+<span class="lineNum">      57 </span>            : #define DPRINTF(x)      do { if (muedebug) printf x; } while (0)
+<span class="lineNum">      58 </span>            : #define DPRINTFN(n,x)   do { if (muedebug &gt;= (n)) printf x; } while (0)
+<span class="lineNum">      59 </span>            : int     muedebug = 0;
+<span class="lineNum">      60 </span>            : #else
+<span class="lineNum">      61 </span>            : #define DPRINTF(x)
+<span class="lineNum">      62 </span>            : #define DPRINTFN(n,x)
+<span class="lineNum">      63 </span>            : #endif
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span>            : /*
+<span class="lineNum">      66 </span>            :  * Various supported device vendors/products.
+<span class="lineNum">      67 </span>            :  */
+<span class="lineNum">      68 </span>            : struct mue_type {
+<span class="lineNum">      69 </span>            :         struct usb_devno        mue_dev;
+<span class="lineNum">      70 </span>            :         uint16_t                mue_flags;
+<span class="lineNum">      71 </span>            : #define LAN7500 0x0001          /* LAN7500 */
+<span class="lineNum">      72 </span>            : };
+<span class="lineNum">      73 </span>            : 
+<span class="lineNum">      74 </span>            : const struct mue_type mue_devs[] = {
+<span class="lineNum">      75 </span>            :         { { USB_VENDOR_SMC2, USB_PRODUCT_SMC2_LAN7500 }, LAN7500 },
+<span class="lineNum">      76 </span>            :         { { USB_VENDOR_SMC2, USB_PRODUCT_SMC2_LAN7505 }, LAN7500 },
+<span class="lineNum">      77 </span>            :         { { USB_VENDOR_SMC2, USB_PRODUCT_SMC2_LAN7800 }, 0 },
+<span class="lineNum">      78 </span>            :         { { USB_VENDOR_SMC2, USB_PRODUCT_SMC2_LAN7801 }, 0 },
+<span class="lineNum">      79 </span>            :         { { USB_VENDOR_SMC2, USB_PRODUCT_SMC2_LAN7850 }, 0 }
+<span class="lineNum">      80 </span>            : };
+<span class="lineNum">      81 </span>            : 
+<span class="lineNum">      82 </span>            : #define mue_lookup(v, p)        ((struct mue_type *)usb_lookup(mue_devs, v, p))
+<span class="lineNum">      83 </span>            : 
+<span class="lineNum">      84 </span>            : int     mue_match(struct device *, void *, void *);
+<span class="lineNum">      85 </span>            : void    mue_attach(struct device *, struct device *, void *);
+<span class="lineNum">      86 </span>            : int     mue_detach(struct device *, int);
+<span class="lineNum">      87 </span>            :  
+<span class="lineNum">      88 </span>            : struct cfdriver mue_cd = {
+<span class="lineNum">      89 </span>            :         NULL, &quot;mue&quot;, DV_IFNET
+<span class="lineNum">      90 </span>            : };
+<span class="lineNum">      91 </span>            :           
+<span class="lineNum">      92 </span>            : const struct cfattach mue_ca = {
+<span class="lineNum">      93 </span>            :         sizeof(struct mue_softc), mue_match, mue_attach, mue_detach
+<span class="lineNum">      94 </span>            : };
+<span class="lineNum">      95 </span>            : 
+<span class="lineNum">      96 </span>            : uint32_t        mue_csr_read(struct mue_softc *, uint32_t);
+<span class="lineNum">      97 </span>            : int             mue_csr_write(struct mue_softc *, uint32_t, uint32_t);
+<span class="lineNum">      98 </span>            : 
+<span class="lineNum">      99 </span>            : void            mue_lock_mii(struct mue_softc *);
+<span class="lineNum">     100 </span>            : void            mue_unlock_mii(struct mue_softc *);
+<span class="lineNum">     101 </span>            : 
+<span class="lineNum">     102 </span>            : int             mue_mii_wait(struct mue_softc *);
+<span class="lineNum">     103 </span>            : int             mue_miibus_readreg(struct device *, int, int);
+<span class="lineNum">     104 </span>            : void            mue_miibus_writereg(struct device *, int, int, int);
+<span class="lineNum">     105 </span>            : void            mue_miibus_statchg(struct device *);
+<span class="lineNum">     106 </span>            : int             mue_ifmedia_upd(struct ifnet *);
+<span class="lineNum">     107 </span>            : void            mue_ifmedia_sts(struct ifnet *, struct ifmediareq *);
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span>            : int             mue_eeprom_wait(struct mue_softc *);
+<span class="lineNum">     110 </span>            : uint8_t         mue_eeprom_getbyte(struct mue_softc *, int, uint8_t *);
+<span class="lineNum">     111 </span>            : int             mue_read_eeprom(struct mue_softc *, caddr_t, int, int);
+<span class="lineNum">     112 </span>            : int             mue_dataport_wait(struct mue_softc *);
+<span class="lineNum">     113 </span>            : void            mue_dataport_write(struct mue_softc *, uint32_t, uint32_t,
+<span class="lineNum">     114 </span>            :                     uint32_t, uint32_t *);
+<span class="lineNum">     115 </span>            : void            mue_init_ltm(struct mue_softc *);
+<span class="lineNum">     116 </span>            : int             mue_chip_init(struct mue_softc *);
+<span class="lineNum">     117 </span>            : void            mue_set_macaddr(struct mue_softc *);
+<span class="lineNum">     118 </span>            : 
+<span class="lineNum">     119 </span>            : int             mue_rx_list_init(struct mue_softc *);
+<span class="lineNum">     120 </span>            : int             mue_tx_list_init(struct mue_softc *);
+<span class="lineNum">     121 </span>            : int             mue_open_pipes(struct mue_softc *);
+<span class="lineNum">     122 </span>            : int             mue_encap(struct mue_softc *, struct mbuf *, int);
+<span class="lineNum">     123 </span>            : void            mue_iff(struct mue_softc *);
+<span class="lineNum">     124 </span>            : void            mue_rxeof(struct usbd_xfer *, void *, usbd_status);
+<span class="lineNum">     125 </span>            : void            mue_txeof(struct usbd_xfer *, void *, usbd_status);
+<span class="lineNum">     126 </span>            : 
+<span class="lineNum">     127 </span>            : void            mue_init(void *);
+<span class="lineNum">     128 </span>            : int             mue_ioctl(struct ifnet *, u_long, caddr_t);
+<span class="lineNum">     129 </span>            : void            mue_watchdog(struct ifnet *);
+<span class="lineNum">     130 </span>            : void            mue_reset(struct mue_softc *);
+<span class="lineNum">     131 </span>            : void            mue_start(struct ifnet *);
+<span class="lineNum">     132 </span>            : void            mue_stop(struct mue_softc *);
+<span class="lineNum">     133 </span>            : void            mue_tick(void *);
+<span class="lineNum">     134 </span>            : void            mue_tick_task(void *);
+<span class="lineNum">     135 </span>            : 
+<span class="lineNum">     136 </span>            : #define MUE_SETBIT(sc, reg, x)  \
+<span class="lineNum">     137 </span>            :         mue_csr_write(sc, reg, mue_csr_read(sc, reg) | (x))
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span>            : #define MUE_CLRBIT(sc, reg, x)  \
+<span class="lineNum">     140 </span>            :         mue_csr_write(sc, reg, mue_csr_read(sc, reg) &amp; ~(x))
+<span class="lineNum">     141 </span>            : 
+<span class="lineNum">     142 </span>            : #if defined(__arm__) || defined(__arm64__)
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span>            : #include &lt;dev/ofw/openfirm.h&gt;
+<span class="lineNum">     145 </span>            : 
+<span class="lineNum">     146 </span>            : void
+<span class="lineNum">     147 </span>            : mue_enaddr_OF(struct mue_softc *sc)
+<span class="lineNum">     148 </span>            : {
+<span class="lineNum">     149 </span>            :         char *device = &quot;/axi/usb/hub/ethernet&quot;;
+<span class="lineNum">     150 </span>            :         char prop[64];
+<span class="lineNum">     151 </span>            :         int node;
+<span class="lineNum">     152 </span>            : 
+<span class="lineNum">     153 </span>            :         if (sc-&gt;mue_dev.dv_unit != 0)
+<span class="lineNum">     154 </span>            :                 return;
+<span class="lineNum">     155 </span>            : 
+<span class="lineNum">     156 </span>            :         /* Get the Raspberry Pi MAC address from FDT. */
+<span class="lineNum">     157 </span>            :         if ((node = OF_finddevice(&quot;/aliases&quot;)) == -1)
+<span class="lineNum">     158 </span>            :                 return;
+<span class="lineNum">     159 </span>            :         if (OF_getprop(node, &quot;ethernet0&quot;, prop, sizeof(prop)) &gt; 0 ||
+<span class="lineNum">     160 </span>            :             OF_getprop(node, &quot;ethernet&quot;, prop, sizeof(prop)) &gt; 0)
+<span class="lineNum">     161 </span>            :                 device = prop;
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span>            :         if ((node = OF_finddevice(device)) == -1)
+<span class="lineNum">     164 </span>            :                 return;
+<span class="lineNum">     165 </span>            :         if (OF_getprop(node, &quot;local-mac-address&quot;, sc-&gt;arpcom.ac_enaddr,
+<span class="lineNum">     166 </span>            :             sizeof(sc-&gt;arpcom.ac_enaddr)) != sizeof(sc-&gt;arpcom.ac_enaddr)) {
+<span class="lineNum">     167 </span>            :                 OF_getprop(node, &quot;mac-address&quot;, sc-&gt;arpcom.ac_enaddr,
+<span class="lineNum">     168 </span>            :                     sizeof(sc-&gt;arpcom.ac_enaddr));
+<span class="lineNum">     169 </span>            :         }
+<span class="lineNum">     170 </span>            : }
+<span class="lineNum">     171 </span>            : #else
+<span class="lineNum">     172 </span>            : #define mue_enaddr_OF(x) do {} while(0)
+<span class="lineNum">     173 </span>            : #endif
+<a name="174"><span class="lineNum">     174 </span>            : </a>
+<span class="lineNum">     175 </span>            : uint32_t
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 : mue_csr_read(struct mue_softc *sc, uint32_t reg)</span>
+<span class="lineNum">     177 </span>            : {
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :         usb_device_request_t req;</span>
+<span class="lineNum">     179 </span>            :         usbd_status err;
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         uDWord val;</span>
+<span class="lineNum">     181 </span>            : 
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;mue_udev))</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     184 </span>            : 
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         USETDW(val, 0);</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :         req.bmRequestType = UT_READ_VENDOR_DEVICE;</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         req.bRequest = MUE_UR_READREG;</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         USETW(req.wValue, 0);</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :         USETW(req.wIndex, reg);</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         USETW(req.wLength, 4);</span>
+<span class="lineNum">     191 </span>            : 
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :         err = usbd_do_request(sc-&gt;mue_udev, &amp;req, &amp;val);</span>
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         if (err) {</span>
+<span class="lineNum">     194 </span>            :                 DPRINTF((&quot;%s: mue_csr_read: reg=0x%x err=%s\n&quot;,
+<span class="lineNum">     195 </span>            :                     sc-&gt;mue_dev.dv_xname, reg, usbd_errstr(err)));
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     197 </span>            :         }
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         return (UGETDW(val));</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 : }</span>
+<a name="201"><span class="lineNum">     201 </span>            : </a>
+<span class="lineNum">     202 </span>            : int
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 : mue_csr_write(struct mue_softc *sc, uint32_t reg, uint32_t aval)</span>
+<span class="lineNum">     204 </span>            : {
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         usb_device_request_t req;</span>
+<span class="lineNum">     206 </span>            :         usbd_status err;
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :         uDWord val;</span>
+<span class="lineNum">     208 </span>            : 
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;mue_udev))</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     211 </span>            : 
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :         USETDW(val, aval);</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         req.bmRequestType = UT_WRITE_VENDOR_DEVICE;</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :         req.bRequest = MUE_UR_WRITEREG;</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         USETW(req.wValue, 0);</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :         USETW(req.wIndex, reg);</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         USETW(req.wLength, 4);</span>
+<span class="lineNum">     218 </span>            : 
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         err = usbd_do_request(sc-&gt;mue_udev, &amp;req, &amp;val);</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         if (err) {</span>
+<span class="lineNum">     221 </span>            :                 DPRINTF((&quot;%s: mue_csr_write: reg=0x%x err=%s\n&quot;,
+<span class="lineNum">     222 </span>            :                     sc-&gt;mue_dev.dv_xname, reg, usbd_errstr(err)));
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     224 </span>            :         }
+<span class="lineNum">     225 </span>            : 
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     228 </span>            : 
+<span class="lineNum">     229 </span>            : /* 
+<span class="lineNum">     230 </span>            :  * Get exclusive access to the MII registers.
+<a name="231"><span class="lineNum">     231 </span>            :  */</a>
+<span class="lineNum">     232 </span>            : void
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 : mue_lock_mii(struct mue_softc *sc)</span>
+<span class="lineNum">     234 </span>            : {
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :         sc-&gt;mue_refcnt++;</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         rw_enter_write(&amp;sc-&gt;mue_mii_lock);</span>
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 : }</span>
+<a name="238"><span class="lineNum">     238 </span>            : </a>
+<span class="lineNum">     239 </span>            : void
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 : mue_unlock_mii(struct mue_softc *sc)</span>
+<span class="lineNum">     241 </span>            : {
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         rw_exit_write(&amp;sc-&gt;mue_mii_lock);</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         if (--sc-&gt;mue_refcnt &lt; 0)</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :                 usb_detach_wakeup(&amp;sc-&gt;mue_dev);</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     246 </span>            : 
+<span class="lineNum">     247 </span>            : /*
+<span class="lineNum">     248 </span>            :  * Wait for the MII to become ready.
+<a name="249"><span class="lineNum">     249 </span>            :  */</a>
+<span class="lineNum">     250 </span>            : int
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 : mue_mii_wait(struct mue_softc *sc)</span>
+<span class="lineNum">     252 </span>            : {
+<span class="lineNum">     253 </span>            :         int ntries;     
+<span class="lineNum">     254 </span>            : 
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         for (ntries = 0; ntries &lt; 100; ntries++) {</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :                 if (!(mue_csr_read(sc, MUE_MII_ACCESS) &amp; MUE_MII_ACCESS_BUSY))</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :                 DELAY(5);</span>
+<span class="lineNum">     259 </span>            :         }
+<span class="lineNum">     260 </span>            : 
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         printf(&quot;%s: MII timed out\n&quot;, sc-&gt;mue_dev.dv_xname); </span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 : }</span>
+<a name="264"><span class="lineNum">     264 </span>            : </a>
+<span class="lineNum">     265 </span>            : int
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 : mue_miibus_readreg(struct device *dev, int phy, int reg)</span>
+<span class="lineNum">     267 </span>            : {
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = (void *)dev;</span>
+<span class="lineNum">     269 </span>            :         uint32_t val;
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;mue_udev))</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     273 </span>            : 
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_phyno != phy)</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         mue_lock_mii(sc);</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :         if (mue_mii_wait(sc) != 0)</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     280 </span>            : 
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, MUE_MII_ACCESS, MUE_MII_ACCESS_READ |</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :             MUE_MII_ACCESS_BUSY | MUE_MII_ACCESS_REGADDR(reg) |</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :             MUE_MII_ACCESS_PHYADDR(phy));</span>
+<span class="lineNum">     284 </span>            : 
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         if (mue_mii_wait(sc) != 0)</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: MII read timed out\n&quot;, sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">     287 </span>            : 
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         val = mue_csr_read(sc, MUE_MII_DATA);</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :         mue_unlock_mii(sc);</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :         return (val &amp; 0xffff);</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 : }</span>
+<a name="292"><span class="lineNum">     292 </span>            : </a>
+<span class="lineNum">     293 </span>            : void
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 : mue_miibus_writereg(struct device *dev, int phy, int reg, int data)</span>
+<span class="lineNum">     295 </span>            : {
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = (void *)dev;</span>
+<span class="lineNum">     297 </span>            : 
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;mue_udev))</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     300 </span>            : 
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_phyno != phy)</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     303 </span>            : 
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         mue_lock_mii(sc);</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         if (mue_mii_wait(sc) != 0)</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     307 </span>            : 
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, MUE_MII_DATA, data);</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, MUE_MII_ACCESS, MUE_MII_ACCESS_WRITE |</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :             MUE_MII_ACCESS_BUSY | MUE_MII_ACCESS_REGADDR(reg) |</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :             MUE_MII_ACCESS_PHYADDR(phy));</span>
+<span class="lineNum">     312 </span>            : 
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         if (mue_mii_wait(sc) != 0)</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: MII write timed out\n&quot;, sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">     315 </span>            : 
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         mue_unlock_mii(sc);</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 : }</span>
+<a name="318"><span class="lineNum">     318 </span>            : </a>
+<span class="lineNum">     319 </span>            : void
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 : mue_miibus_statchg(struct device *dev)</span>
+<span class="lineNum">     321 </span>            : {
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = (void *)dev;</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         struct mii_data *mii = GET_MII(sc);</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = GET_IFP(sc);</span>
+<span class="lineNum">     325 </span>            :         uint32_t flow, threshold;
+<span class="lineNum">     326 </span>            : 
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :         if (mii == NULL || ifp == NULL ||</span>
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :             (ifp-&gt;if_flags &amp; IFF_RUNNING) == 0)</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     330 </span>            : 
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         sc-&gt;mue_link = 0;</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         if ((mii-&gt;mii_media_status &amp; (IFM_ACTIVE | IFM_AVALID)) ==</span>
+<span class="lineNum">     333 </span>            :             (IFM_ACTIVE | IFM_AVALID)) {
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :                 switch (IFM_SUBTYPE(mii-&gt;mii_media_active)) {</span>
+<span class="lineNum">     335 </span>            :                 case IFM_10_T:
+<span class="lineNum">     336 </span>            :                 case IFM_100_TX:
+<span class="lineNum">     337 </span>            :                 case IFM_1000_T:
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                         sc-&gt;mue_link++;</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     340 </span>            :                 default:
+<span class="lineNum">     341 </span>            :                         break;
+<span class="lineNum">     342 </span>            :                 }
+<span class="lineNum">     343 </span>            :         }
+<span class="lineNum">     344 </span>            : 
+<span class="lineNum">     345 </span>            :         /* Lost link, do nothing. */
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_link == 0)</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     348 </span>            : 
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :         if (!(sc-&gt;mue_flags &amp; LAN7500)) {</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                 if (sc-&gt;mue_udev-&gt;speed == USB_SPEED_SUPER) {</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                         if (IFM_SUBTYPE(mii-&gt;mii_media_active) == IFM_1000_T) {</span>
+<span class="lineNum">     352 </span>            :                                 /* Disable U2 and enable U1. */
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :                                 MUE_CLRBIT(sc, MUE_USB_CFG1,</span>
+<span class="lineNum">     354 </span>            :                                     MUE_USB_CFG1_DEV_U2_INIT_EN);
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :                                 MUE_SETBIT(sc, MUE_USB_CFG1,</span>
+<span class="lineNum">     356 </span>            :                                     MUE_USB_CFG1_DEV_U1_INIT_EN);
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :                         } else {</span>
+<span class="lineNum">     358 </span>            :                                 /* Enable U1 and U2. */
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :                                 MUE_SETBIT(sc, MUE_USB_CFG1,</span>
+<span class="lineNum">     360 </span>            :                                     MUE_USB_CFG1_DEV_U1_INIT_EN |
+<span class="lineNum">     361 </span>            :                                     MUE_USB_CFG1_DEV_U2_INIT_EN);
+<span class="lineNum">     362 </span>            :                         }
+<span class="lineNum">     363 </span>            :                 }
+<span class="lineNum">     364 </span>            :         }
+<span class="lineNum">     365 </span>            : 
+<span class="lineNum">     366 </span>            :         threshold = 0;
+<span class="lineNum">     367 </span>            :         flow = 0;
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         if (IFM_OPTIONS(mii-&gt;mii_media_active) &amp; IFM_FDX) {</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                 if (IFM_OPTIONS(mii-&gt;mii_media_active) &amp; IFM_ETH_TXPAUSE) {</span>
+<span class="lineNum">     370 </span>            :                         flow |= MUE_FLOW_TX_FCEN | MUE_FLOW_PAUSE_TIME;
+<span class="lineNum">     371 </span>            : 
+<span class="lineNum">     372 </span>            :                         /* XXX magic numbers come from Linux driver. */
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                         if (sc-&gt;mue_flags &amp; LAN7500) {</span>
+<span class="lineNum">     374 </span>            :                                 threshold = 0x820;
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                         } else {</span>
+<span class="lineNum">     376 </span>            :                                 threshold =
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                                     (sc-&gt;mue_udev-&gt;speed == USB_SPEED_SUPER) ?</span>
+<span class="lineNum">     378 </span>            :                                     0x817 : 0x211;
+<span class="lineNum">     379 </span>            :                         }
+<span class="lineNum">     380 </span>            :                 }
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                 if (IFM_OPTIONS(mii-&gt;mii_media_active) &amp; IFM_ETH_RXPAUSE)</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                         flow |= MUE_FLOW_RX_FCEN;</span>
+<span class="lineNum">     383 </span>            :         }
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, (sc-&gt;mue_flags &amp; LAN7500) ?</span>
+<span class="lineNum">     385 </span>            :             MUE_FCT_FLOW : MUE_7800_FCT_FLOW, threshold);
+<span class="lineNum">     386 </span>            : 
+<span class="lineNum">     387 </span>            :         /* Threshold value should be set before enabling flow. */
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, MUE_FLOW, flow);</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     390 </span>            : 
+<span class="lineNum">     391 </span>            : /*
+<span class="lineNum">     392 </span>            :  * Set media options.
+<a name="393"><span class="lineNum">     393 </span>            :  */</a>
+<span class="lineNum">     394 </span>            : int
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 : mue_ifmedia_upd(struct ifnet *ifp)</span>
+<span class="lineNum">     396 </span>            : {
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :         struct mii_data *mii = GET_MII(sc);</span>
+<span class="lineNum">     399 </span>            : 
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :         if (mii-&gt;mii_instance) {</span>
+<span class="lineNum">     401 </span>            :                 struct mii_softc *miisc;
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                 LIST_FOREACH(miisc, &amp;mii-&gt;mii_phys, mii_list)</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                         mii_phy_reset(miisc);</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         return (mii_mediachg(mii));</span>
+<span class="lineNum">     406 </span>            : }
+<span class="lineNum">     407 </span>            : 
+<span class="lineNum">     408 </span>            : /*
+<span class="lineNum">     409 </span>            :  * Report current media status.
+<a name="410"><span class="lineNum">     410 </span>            :  */</a>
+<span class="lineNum">     411 </span>            : void
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 : mue_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)</span>
+<span class="lineNum">     413 </span>            : {
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :         struct mii_data *mii = GET_MII(sc);</span>
+<span class="lineNum">     416 </span>            : 
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :         mii_pollstat(mii);</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :         ifmr-&gt;ifm_active = mii-&gt;mii_media_active;</span>
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :         ifmr-&gt;ifm_status = mii-&gt;mii_media_status;</span>
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 : }</span>
+<a name="421"><span class="lineNum">     421 </span>            : </a>
+<span class="lineNum">     422 </span>            : int
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 : mue_eeprom_wait(struct mue_softc *sc)</span>
+<span class="lineNum">     424 </span>            : {
+<span class="lineNum">     425 </span>            :         uint32_t val;
+<span class="lineNum">     426 </span>            :         int ntries;     
+<span class="lineNum">     427 </span>            : 
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :         for (ntries = 0; ntries &lt; 100; ntries++) {</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :                 val = mue_csr_read(sc, MUE_E2P_CMD);</span>
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :                 if (!(val &amp; MUE_E2P_CMD_BUSY) || (val &amp; MUE_E2P_CMD_TIMEOUT))</span>
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                 DELAY(5);</span>
+<span class="lineNum">     433 </span>            :         }
+<span class="lineNum">     434 </span>            : 
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 : }</span>
+<a name="437"><span class="lineNum">     437 </span>            : </a>
+<span class="lineNum">     438 </span>            : uint8_t
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 : mue_eeprom_getbyte(struct mue_softc *sc, int addr, uint8_t *dest)</span>
+<span class="lineNum">     440 </span>            : {
+<span class="lineNum">     441 </span>            :         uint32_t byte = 0;
+<span class="lineNum">     442 </span>            :         int ntries;
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :         for (ntries = 0; ntries &lt; 100; ntries++) {</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                 if (!(mue_csr_read(sc, MUE_E2P_CMD) &amp; MUE_E2P_CMD_BUSY))</span>
+<span class="lineNum">     446 </span>            :                         break;
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                 DELAY(5);</span>
+<span class="lineNum">     448 </span>            :         }
+<span class="lineNum">     449 </span>            : 
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :         if (ntries == 100) {</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: EEPROM failed to come ready\n&quot;,</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                     sc-&gt;mue_dev.dv_xname); </span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                 return (ETIMEDOUT);</span>
+<span class="lineNum">     454 </span>            :         }
+<span class="lineNum">     455 </span>            : 
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, MUE_E2P_CMD, MUE_E2P_CMD_READ | MUE_E2P_CMD_BUSY |</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :             (addr &amp; MUE_E2P_CMD_ADDR_MASK));</span>
+<span class="lineNum">     458 </span>            : 
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :         if (mue_eeprom_wait(sc) != 0) {</span>
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: EEPROM read timed out\n&quot;, sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                 return (ETIMEDOUT);</span>
+<span class="lineNum">     462 </span>            :         }
+<span class="lineNum">     463 </span>            : 
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :         byte = mue_csr_read(sc, MUE_E2P_DATA);</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :         *dest = byte &amp; 0xff;</span>
+<span class="lineNum">     466 </span>            : 
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 : }</span>
+<a name="469"><span class="lineNum">     469 </span>            : </a>
+<span class="lineNum">     470 </span>            : int
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 : mue_read_eeprom(struct mue_softc *sc, caddr_t dest, int off, int cnt)</span>
+<span class="lineNum">     472 </span>            : {
+<span class="lineNum">     473 </span>            :         uint32_t val;
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :         uint8_t byte = 0;</span>
+<span class="lineNum">     475 </span>            :         int i, err = 0;
+<span class="lineNum">     476 </span>            : 
+<span class="lineNum">     477 </span>            :         /* 
+<span class="lineNum">     478 </span>            :          * EEPROM pins are muxed with the LED function on LAN7800 device.
+<span class="lineNum">     479 </span>            :          */
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :         val = mue_csr_read(sc, MUE_HW_CFG);</span>
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_product == USB_PRODUCT_SMC2_LAN7800) {</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :                 MUE_CLRBIT(sc, MUE_HW_CFG,</span>
+<span class="lineNum">     483 </span>            :                     MUE_HW_CFG_LED0_EN | MUE_HW_CFG_LED1_EN);
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     485 </span>            : 
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; cnt; i++) {</span>
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :                 err = mue_eeprom_getbyte(sc, off + i, &amp;byte);</span>
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :                 if (err)</span>
+<span class="lineNum">     489 </span>            :                         break;
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :                 *(dest + i) = byte;</span>
+<span class="lineNum">     491 </span>            :         }
+<span class="lineNum">     492 </span>            : 
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_product == USB_PRODUCT_SMC2_LAN7800)</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_HW_CFG, val);</span>
+<span class="lineNum">     495 </span>            : 
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :         return (err ? 1 : 0);</span>
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 : }</span>
+<a name="498"><span class="lineNum">     498 </span>            : </a>
+<span class="lineNum">     499 </span>            : int             
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 : mue_dataport_wait(struct mue_softc *sc)</span>
+<span class="lineNum">     501 </span>            : {
+<span class="lineNum">     502 </span>            :         int ntries;     
+<span class="lineNum">     503 </span>            : 
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :         for (ntries = 0; ntries &lt; 100; ntries++) {</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :                 if (mue_csr_read(sc, MUE_DP_SEL) &amp; MUE_DP_SEL_DPRDY)</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :                 DELAY(5);</span>
+<span class="lineNum">     508 </span>            :         }
+<span class="lineNum">     509 </span>            : 
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :         printf(&quot;%s: dataport timed out\n&quot;, sc-&gt;mue_dev.dv_xname); </span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 : }</span>
+<a name="513"><span class="lineNum">     513 </span>            : </a>
+<span class="lineNum">     514 </span>            : void
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 : mue_dataport_write(struct mue_softc *sc, uint32_t sel, uint32_t addr,</span>
+<span class="lineNum">     516 </span>            :     uint32_t cnt, uint32_t *data)
+<span class="lineNum">     517 </span>            : {
+<span class="lineNum">     518 </span>            :         int i;
+<span class="lineNum">     519 </span>            : 
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         if (mue_dataport_wait(sc) != 0)</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     522 </span>            : 
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, MUE_DP_SEL,</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :             (mue_csr_read(sc, MUE_DP_SEL) &amp; ~MUE_DP_SEL_RSEL_MASK) | sel);</span>
+<span class="lineNum">     525 </span>            : 
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; cnt; i++) {</span>
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_DP_ADDR, addr + i);</span>
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_DP_DATA, data[i]);</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_DP_CMD, MUE_DP_CMD_WRITE);</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :                 if (mue_dataport_wait(sc) != 0)</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     532 </span>            :         }
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 : }</span>
+<a name="534"><span class="lineNum">     534 </span>            : </a>
+<span class="lineNum">     535 </span>            : void
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 : mue_init_ltm(struct mue_softc *sc)</span>
+<span class="lineNum">     537 </span>            : {
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :         uint8_t idx[6] = { 0 };</span>
+<span class="lineNum">     539 </span>            :         int i;
+<span class="lineNum">     540 </span>            : 
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :         if (mue_csr_read(sc, MUE_USB_CFG1) &amp; MUE_USB_CFG1_LTM_ENABLE) {</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                 uint8_t temp[2];</span>
+<span class="lineNum">     543 </span>            : 
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :                 if (mue_read_eeprom(sc, (caddr_t)&amp;temp, MUE_EE_LTM_OFFSET, 2)) {</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :                         if (temp[0] != 24)</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :                                 goto done;</span>
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 :                         mue_read_eeprom(sc, (caddr_t)&amp;idx, temp[1] &lt;&lt; 1, 24);</span>
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     550 </span>            : done:
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; sizeof(idx); i++)</span>
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_LTM_INDEX(i), idx[i]);</span>
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 : }</span>
+<a name="554"><span class="lineNum">     554 </span>            : </a>
+<span class="lineNum">     555 </span>            : int
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 : mue_chip_init(struct mue_softc *sc)</span>
+<span class="lineNum">     557 </span>            : {
+<span class="lineNum">     558 </span>            :         uint32_t val;
+<span class="lineNum">     559 </span>            :         int ntries;
+<span class="lineNum">     560 </span>            : 
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_flags &amp; LAN7500) {</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :                 for (ntries = 0; ntries &lt; 100; ntries++) {</span>
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                         if (mue_csr_read(sc, MUE_PMT_CTL) &amp; MUE_PMT_CTL_READY)</span>
+<span class="lineNum">     564 </span>            :                                 break;
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :                         DELAY(1000);    /* 1 msec */</span>
+<span class="lineNum">     566 </span>            :                 }
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :                 if (ntries == 100) {</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: timeout waiting for device ready\n&quot;,</span>
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :                             sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :                         return (ETIMEDOUT);</span>
+<span class="lineNum">     571 </span>            :                 }
+<span class="lineNum">     572 </span>            :         }
+<span class="lineNum">     573 </span>            : 
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :         MUE_SETBIT(sc, MUE_HW_CFG, MUE_HW_CFG_LRST);</span>
+<span class="lineNum">     575 </span>            : 
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :         for (ntries = 0; ntries &lt; 1000; ntries++) {</span>
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :                 if (!(mue_csr_read(sc, MUE_HW_CFG) &amp; MUE_HW_CFG_LRST))</span>
+<span class="lineNum">     578 </span>            :                         break;
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :                 DELAY(5);</span>
+<span class="lineNum">     580 </span>            :         }
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :         if (ntries == 1000) {</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: timeout on lite software reset\n&quot;,</span>
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :                     sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                 return (ETIMEDOUT);</span>
+<span class="lineNum">     585 </span>            :         }
+<span class="lineNum">     586 </span>            : 
+<span class="lineNum">     587 </span>            :         /* Respond to the IN token with a NAK. */
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_flags &amp; LAN7500)</span>
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :                 MUE_SETBIT(sc, MUE_HW_CFG, MUE_HW_CFG_BIR);</span>
+<span class="lineNum">     590 </span>            :         else
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :                 MUE_SETBIT(sc, MUE_USB_CFG0, MUE_USB_CFG0_BIR);</span>
+<span class="lineNum">     592 </span>            : 
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_flags &amp; LAN7500) {</span>
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_BURST_CAP,</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                     (sc-&gt;mue_udev-&gt;speed == USB_SPEED_HIGH) ?</span>
+<span class="lineNum">     596 </span>            :                     MUE_BURST_MIN_BUFSZ : MUE_BURST_MAX_BUFSZ);
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_BULK_IN_DELAY, MUE_DEFAULT_BULKIN_DELAY);</span>
+<span class="lineNum">     598 </span>            : 
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :                 MUE_SETBIT(sc, MUE_HW_CFG, MUE_HW_CFG_BCE | MUE_HW_CFG_MEF);</span>
+<span class="lineNum">     600 </span>            : 
+<span class="lineNum">     601 </span>            :                 /* Set undocumented FIFO sizes. */
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_FCT_RX_FIFO_END, 0x27);</span>
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_FCT_TX_FIFO_END, 0x17);</span>
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     605 </span>            :                 /* Init LTM. */
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :                 mue_init_ltm(sc);</span>
+<span class="lineNum">     607 </span>            : 
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                 val = (sc-&gt;mue_udev-&gt;speed == USB_SPEED_SUPER) ?</span>
+<span class="lineNum">     609 </span>            :                     MUE_7800_BURST_MIN_BUFSZ : MUE_7800_BURST_MAX_BUFSZ;
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_7800_BURST_CAP, val);</span>
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :                 mue_csr_write(sc, MUE_7800_BULK_IN_DELAY,</span>
+<span class="lineNum">     612 </span>            :                     MUE_7800_DEFAULT_BULKIN_DELAY);
+<span class="lineNum">     613 </span>            : 
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                 MUE_SETBIT(sc, MUE_HW_CFG, MUE_HW_CFG_MEF);</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :                 MUE_SETBIT(sc, MUE_USB_CFG0, MUE_USB_CFG0_BCE);</span>
+<span class="lineNum">     616 </span>            :         }
+<span class="lineNum">     617 </span>            : 
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, MUE_INT_STATUS, 0xffffffff);</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, (sc-&gt;mue_flags &amp; LAN7500) ?</span>
+<span class="lineNum">     620 </span>            :             MUE_FCT_FLOW : MUE_7800_FCT_FLOW, 0);
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, MUE_FLOW, 0);</span>
+<span class="lineNum">     622 </span>            :  
+<span class="lineNum">     623 </span>            :         /* Reset PHY. */
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :         MUE_SETBIT(sc, MUE_PMT_CTL, MUE_PMT_CTL_PHY_RST);</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :         for (ntries = 0; ntries &lt; 100; ntries++) {</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                 val = mue_csr_read(sc, MUE_PMT_CTL);</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :                 if (!(val &amp; MUE_PMT_CTL_PHY_RST) &amp;&amp; (val &amp; MUE_PMT_CTL_READY))</span>
+<span class="lineNum">     628 </span>            :                         break;
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                 DELAY(10000);</span>
+<span class="lineNum">     630 </span>            :         }
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :         if (ntries == 100) {</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: timeout waiting for PHY reset\n&quot;,</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :                     sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 :                 return (ETIMEDOUT);</span>
+<span class="lineNum">     635 </span>            :         }
+<span class="lineNum">     636 </span>            : 
+<span class="lineNum">     637 </span>            :         /* LAN7801 only has RGMII mode. */
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_product == USB_PRODUCT_SMC2_LAN7801)</span>
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :                 MUE_CLRBIT(sc, MUE_MAC_CR, MUE_MAC_CR_GMII_EN);</span>
+<span class="lineNum">     640 </span>            : 
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_flags &amp; LAN7500 || !sc-&gt;mue_eeprom_present) {</span>
+<span class="lineNum">     642 </span>            :                 /* Allow MAC to detect speed and duplex from PHY. */
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :                 MUE_SETBIT(sc, MUE_MAC_CR, MUE_MAC_CR_AUTO_SPEED |</span>
+<span class="lineNum">     644 </span>            :                     MUE_MAC_CR_AUTO_DUPLEX);
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     646 </span>            : 
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         MUE_SETBIT(sc, MUE_MAC_TX, MUE_MAC_TX_TXEN);</span>
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :         MUE_SETBIT(sc, (sc-&gt;mue_flags &amp; LAN7500) ?</span>
+<span class="lineNum">     649 </span>            :             MUE_FCT_TX_CTL : MUE_7800_FCT_TX_CTL, MUE_FCT_TX_CTL_EN);
+<span class="lineNum">     650 </span>            : 
+<span class="lineNum">     651 </span>            :         /* Set the maximum frame size. */
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :         MUE_CLRBIT(sc, MUE_MAC_RX, MUE_MAC_RX_RXEN);</span>
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :         MUE_SETBIT(sc, MUE_MAC_RX, MUE_MAC_RX_MAX_LEN(ETHER_MAX_LEN));</span>
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :         MUE_SETBIT(sc, MUE_MAC_RX, MUE_MAC_RX_RXEN);</span>
+<span class="lineNum">     655 </span>            : 
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :         MUE_SETBIT(sc, (sc-&gt;mue_flags &amp; LAN7500) ?</span>
+<span class="lineNum">     657 </span>            :             MUE_FCT_RX_CTL : MUE_7800_FCT_RX_CTL, MUE_FCT_RX_CTL_EN);
+<span class="lineNum">     658 </span>            : 
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 : }</span>
+<a name="661"><span class="lineNum">     661 </span>            : </a>
+<span class="lineNum">     662 </span>            : void
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 : mue_set_macaddr(struct mue_softc *sc)</span>
+<span class="lineNum">     664 </span>            : {
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;arpcom.ac_if;</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :         const uint8_t *eaddr = LLADDR(ifp-&gt;if_sadl);</span>
+<span class="lineNum">     667 </span>            :         uint32_t val, reg;
+<span class="lineNum">     668 </span>            : 
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :         reg = (sc-&gt;mue_flags &amp; LAN7500) ? MUE_ADDR_FILTX : MUE_7800_ADDR_FILTX;</span>
+<span class="lineNum">     670 </span>            : 
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :         val = (eaddr[3] &lt;&lt; 24) | (eaddr[2] &lt;&lt; 16) | (eaddr[1] &lt;&lt; 8) | eaddr[0];</span>
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, MUE_RX_ADDRL, val);</span>
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, reg + 4, val);</span>
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :         val = (eaddr[5] &lt;&lt; 8) | eaddr[4];</span>
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, MUE_RX_ADDRH, val);</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, reg, val | MUE_ADDR_FILTX_VALID);</span>
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     678 </span>            : 
+<span class="lineNum">     679 </span>            : /* 
+<span class="lineNum">     680 </span>            :  * Probe for a Microchip chip.
+<a name="681"><span class="lineNum">     681 </span>            :  */</a>
+<span class="lineNum">     682 </span>            : int
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 : mue_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     684 </span>            : {
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :         struct usb_attach_arg *uaa = aux;</span>
+<span class="lineNum">     686 </span>            : 
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :         if (uaa-&gt;iface == NULL || uaa-&gt;configno != 1)</span>
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :                 return (UMATCH_NONE);</span>
+<span class="lineNum">     689 </span>            : 
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :         return (mue_lookup(uaa-&gt;vendor, uaa-&gt;product) != NULL ?</span>
+<span class="lineNum">     691 </span>            :             UMATCH_VENDOR_PRODUCT_CONF_IFACE : UMATCH_NONE);
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 : }</span>
+<a name="693"><span class="lineNum">     693 </span>            : </a>
+<span class="lineNum">     694 </span>            : void
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 : mue_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     696 </span>            : {
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = (struct mue_softc *)self;</span>
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :         struct usb_attach_arg *uaa = aux;</span>
+<span class="lineNum">     699 </span>            :         usb_interface_descriptor_t *id;
+<span class="lineNum">     700 </span>            :         usb_endpoint_descriptor_t *ed;
+<span class="lineNum">     701 </span>            :         struct mii_data *mii;
+<span class="lineNum">     702 </span>            :         struct ifnet *ifp;
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :         int i, s;</span>
+<span class="lineNum">     704 </span>            : 
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :         sc-&gt;mue_udev = uaa-&gt;device;</span>
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :         sc-&gt;mue_iface = uaa-&gt;iface;</span>
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :         sc-&gt;mue_product = uaa-&gt;product;</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :         sc-&gt;mue_flags = mue_lookup(uaa-&gt;vendor, uaa-&gt;product)-&gt;mue_flags;</span>
+<span class="lineNum">     709 </span>            : 
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :         usb_init_task(&amp;sc-&gt;mue_tick_task, mue_tick_task, sc,</span>
+<span class="lineNum">     711 </span>            :             USB_TASK_TYPE_GENERIC);
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :         rw_init(&amp;sc-&gt;mue_mii_lock, &quot;muemii&quot;);</span>
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 :         usb_init_task(&amp;sc-&gt;mue_stop_task, (void (*)(void *))mue_stop, sc,</span>
+<span class="lineNum">     714 </span>            :             USB_TASK_TYPE_GENERIC);
+<span class="lineNum">     715 </span>            : 
+<span class="lineNum">     716 </span>            :         /* Decide on what our bufsize will be. */
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_flags &amp; LAN7500)</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :                 sc-&gt;mue_bufsz = (sc-&gt;mue_udev-&gt;speed == USB_SPEED_HIGH) ?</span>
+<span class="lineNum">     719 </span>            :                     MUE_MAX_BUFSZ : MUE_MIN_BUFSZ;
+<span class="lineNum">     720 </span>            :         else
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :                 sc-&gt;mue_bufsz = MUE_7800_BUFSZ;</span>
+<span class="lineNum">     722 </span>            : 
+<span class="lineNum">     723 </span>            :         /* Find endpoints. */
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :         id = usbd_get_interface_descriptor(sc-&gt;mue_iface);</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; id-&gt;bNumEndpoints; i++) {</span>
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 :                 ed = usbd_interface2endpoint_descriptor(sc-&gt;mue_iface, i);</span>
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :                 if (ed == NULL) {</span>
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: couldn't get ep %d\n&quot;,</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :                             sc-&gt;mue_dev.dv_xname, i);</span>
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     731 </span>            :                 }
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :                 if (UE_GET_DIR(ed-&gt;bEndpointAddress) == UE_DIR_IN &amp;&amp;</span>
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :                     UE_GET_XFERTYPE(ed-&gt;bmAttributes) == UE_BULK) {</span>
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :                         sc-&gt;mue_ed[MUE_ENDPT_RX] = ed-&gt;bEndpointAddress;</span>
+<span class="lineNum">     735 </span><span class="lineNoCov">          0 :                 } else if (UE_GET_DIR(ed-&gt;bEndpointAddress) == UE_DIR_OUT &amp;&amp;</span>
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :                            UE_GET_XFERTYPE(ed-&gt;bmAttributes) == UE_BULK) {</span>
+<span class="lineNum">     737 </span><span class="lineNoCov">          0 :                         sc-&gt;mue_ed[MUE_ENDPT_TX] = ed-&gt;bEndpointAddress;</span>
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :                 } else if (UE_GET_DIR(ed-&gt;bEndpointAddress) == UE_DIR_IN &amp;&amp;</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :                            UE_GET_XFERTYPE(ed-&gt;bmAttributes) == UE_INTERRUPT) {</span>
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :                         sc-&gt;mue_ed[MUE_ENDPT_INTR] = ed-&gt;bEndpointAddress;</span>
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     742 </span>            :         }
+<span class="lineNum">     743 </span>            : 
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">     745 </span>            : 
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :         sc-&gt;mue_phyno = 1;</span>
+<span class="lineNum">     747 </span>            : 
+<span class="lineNum">     748 </span>            :         /* Check if the EEPROM programmed indicator is present. */
+<span class="lineNum">     749 </span><span class="lineNoCov">          0 :         mue_read_eeprom(sc, (caddr_t)&amp;i, MUE_EE_IND_OFFSET, 1);</span>
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :         sc-&gt;mue_eeprom_present = (i == MUE_EEPROM_INDICATOR) ? 1 : 0;</span>
+<span class="lineNum">     751 </span>            : 
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :         if (mue_chip_init(sc) != 0) {</span>
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: chip initialization failed\n&quot;,</span>
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :                     sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     757 </span>            :         }
+<span class="lineNum">     758 </span>            : 
+<span class="lineNum">     759 </span>            :         /* Get station address from the EEPROM. */
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_eeprom_present) {</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :                 if (mue_read_eeprom(sc, (caddr_t)&amp;sc-&gt;arpcom.ac_enaddr,</span>
+<span class="lineNum">     762 </span>            :                     MUE_EE_MAC_OFFSET, ETHER_ADDR_LEN)) {
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: failed to read station address\n&quot;,</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :                             sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">     765 </span><span class="lineNoCov">          0 :                         splx(s);</span>
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     767 </span>            :                 }
+<span class="lineNum">     768 </span>            :         } else
+<span class="lineNum">     769 </span>            :                 mue_enaddr_OF(sc);
+<span class="lineNum">     770 </span>            : 
+<span class="lineNum">     771 </span>            :         /* A Microchip chip was detected.  Inform the world. */
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :         printf(&quot;%s:&quot;, sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_flags &amp; LAN7500)</span>
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :                 printf(&quot; LAN7500&quot;);</span>
+<span class="lineNum">     775 </span>            :         else
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :                 printf(&quot; LAN7800&quot;);</span>
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :         printf(&quot;, address %s\n&quot;, ether_sprintf(sc-&gt;arpcom.ac_enaddr));</span>
+<span class="lineNum">     778 </span>            : 
+<span class="lineNum">     779 </span>            :         /* Initialize interface info.*/
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :         ifp = GET_IFP(sc);</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :         ifp-&gt;if_softc = sc;</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ioctl = mue_ioctl;</span>
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :         ifp-&gt;if_start = mue_start;</span>
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         ifp-&gt;if_watchdog = mue_watchdog;</span>
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :         strlcpy(ifp-&gt;if_xname, sc-&gt;mue_dev.dv_xname, IFNAMSIZ);</span>
+<span class="lineNum">     787 </span>            : 
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :         ifp-&gt;if_capabilities = IFCAP_VLAN_MTU;</span>
+<span class="lineNum">     789 </span>            : 
+<span class="lineNum">     790 </span>            :         /* Initialize MII/media info. */
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :         mii = GET_MII(sc);</span>
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :         mii-&gt;mii_ifp = ifp;</span>
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :         mii-&gt;mii_readreg = mue_miibus_readreg;</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :         mii-&gt;mii_writereg = mue_miibus_writereg;</span>
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :         mii-&gt;mii_statchg = mue_miibus_statchg;</span>
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 :         mii-&gt;mii_flags = MIIF_AUTOTSLEEP;</span>
+<span class="lineNum">     797 </span>            : 
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :         ifmedia_init(&amp;mii-&gt;mii_media, 0, mue_ifmedia_upd, mue_ifmedia_sts);</span>
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :         mii_attach(self, mii, 0xffffffff, MII_PHY_ANY, MII_OFFSET_ANY,</span>
+<span class="lineNum">     800 </span>            :             MIIF_DOPAUSE);
+<span class="lineNum">     801 </span>            : 
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :         if (LIST_FIRST(&amp;mii-&gt;mii_phys) == NULL) {</span>
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :                 ifmedia_add(&amp;mii-&gt;mii_media, IFM_ETHER | IFM_NONE, 0, NULL);</span>
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :                 ifmedia_set(&amp;mii-&gt;mii_media, IFM_ETHER | IFM_NONE);</span>
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :                 ifmedia_set(&amp;mii-&gt;mii_media, IFM_ETHER | IFM_AUTO);</span>
+<span class="lineNum">     807 </span>            : 
+<span class="lineNum">     808 </span>            :         /* Attach the interface. */
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 :         if_attach(ifp);</span>
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :         ether_ifattach(ifp);</span>
+<span class="lineNum">     811 </span>            : 
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :         timeout_set(&amp;sc-&gt;mue_stat_ch, mue_tick, sc);</span>
+<span class="lineNum">     813 </span>            : 
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 : }</span>
+<a name="816"><span class="lineNum">     816 </span>            : </a>
+<span class="lineNum">     817 </span>            : int
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 : mue_detach(struct device *self, int flags)</span>
+<span class="lineNum">     819 </span>            : {
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = (struct mue_softc *)self;</span>
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = GET_IFP(sc);</span>
+<span class="lineNum">     822 </span>            :         int s;
+<span class="lineNum">     823 </span>            : 
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :         if (timeout_initialized(&amp;sc-&gt;mue_stat_ch))</span>
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :                 timeout_del(&amp;sc-&gt;mue_stat_ch);</span>
+<span class="lineNum">     826 </span>            : 
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_ep[MUE_ENDPT_TX] != NULL)</span>
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :                 usbd_abort_pipe(sc-&gt;mue_ep[MUE_ENDPT_TX]);</span>
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_ep[MUE_ENDPT_RX] != NULL)</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :                 usbd_abort_pipe(sc-&gt;mue_ep[MUE_ENDPT_RX]);</span>
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_ep[MUE_ENDPT_INTR] != NULL)</span>
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                 usbd_abort_pipe(sc-&gt;mue_ep[MUE_ENDPT_INTR]);</span>
+<span class="lineNum">     833 </span>            : 
+<span class="lineNum">     834 </span>            :         /*
+<span class="lineNum">     835 </span>            :          * Remove any pending tasks.  They cannot be executing because they run
+<span class="lineNum">     836 </span>            :          * in the same thread as detach.
+<span class="lineNum">     837 </span>            :          */
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :         usb_rem_task(sc-&gt;mue_udev, &amp;sc-&gt;mue_tick_task);</span>
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :         usb_rem_task(sc-&gt;mue_udev, &amp;sc-&gt;mue_stop_task);</span>
+<span class="lineNum">     840 </span>            : 
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :         s = splusb();</span>
+<span class="lineNum">     842 </span>            : 
+<span class="lineNum">     843 </span><span class="lineNoCov">          0 :         if (--sc-&gt;mue_refcnt &gt;= 0) {</span>
+<span class="lineNum">     844 </span>            :                 /* Wait for processes to go away */
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                 usb_detach_wait(&amp;sc-&gt;mue_dev);</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     847 </span>            : 
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :                 mue_stop(sc);</span>
+<span class="lineNum">     850 </span>            : 
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :         mii_detach(&amp;sc-&gt;mue_mii, MII_PHY_ANY, MII_OFFSET_ANY);</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :         ifmedia_delete_instance(&amp;sc-&gt;mue_mii.mii_media, IFM_INST_ANY);</span>
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_softc != NULL) {</span>
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :                 ether_ifdetach(ifp);</span>
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :                 if_detach(ifp);</span>
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     857 </span>            : 
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :         if (--sc-&gt;mue_refcnt &gt;= 0) {</span>
+<span class="lineNum">     859 </span>            :                 /* Wait for processes to go away. */
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :                 usb_detach_wait(&amp;sc-&gt;mue_dev);</span>
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">     863 </span>            : 
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     865 </span>            : }
+<a name="866"><span class="lineNum">     866 </span>            : </a>
+<span class="lineNum">     867 </span>            : int
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 : mue_rx_list_init(struct mue_softc *sc)</span>
+<span class="lineNum">     869 </span>            : {
+<span class="lineNum">     870 </span>            :         struct mue_cdata *cd;
+<span class="lineNum">     871 </span>            :         struct mue_chain *c;
+<span class="lineNum">     872 </span>            :         int i;
+<span class="lineNum">     873 </span>            : 
+<span class="lineNum">     874 </span>            :         DPRINTF((&quot;%s: %s: enter\n&quot;, sc-&gt;mue_dev.dv_xname, __func__));
+<span class="lineNum">     875 </span>            : 
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :         cd = &amp;sc-&gt;mue_cdata;</span>
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; MUE_RX_LIST_CNT; i++) {</span>
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :                 c = &amp;cd-&gt;mue_rx_chain[i];</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :                 c-&gt;mue_sc = sc;</span>
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 :                 c-&gt;mue_idx = i;</span>
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :                 c-&gt;mue_mbuf = NULL;</span>
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :                 if (c-&gt;mue_xfer == NULL) {</span>
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :                         c-&gt;mue_xfer = usbd_alloc_xfer(sc-&gt;mue_udev);</span>
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :                         if (c-&gt;mue_xfer == NULL)</span>
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :                                 return (ENOBUFS);</span>
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :                         c-&gt;mue_buf = usbd_alloc_buffer(c-&gt;mue_xfer,</span>
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :                             sc-&gt;mue_bufsz);</span>
+<span class="lineNum">     888 </span><span class="lineNoCov">          0 :                         if (c-&gt;mue_buf == NULL) {</span>
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :                                 usbd_free_xfer(c-&gt;mue_xfer);</span>
+<span class="lineNum">     890 </span><span class="lineNoCov">          0 :                                 return (ENOBUFS);</span>
+<span class="lineNum">     891 </span>            :                         }
+<span class="lineNum">     892 </span>            :                 }
+<span class="lineNum">     893 </span>            :         }
+<span class="lineNum">     894 </span>            : 
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 : }</span>
+<a name="897"><span class="lineNum">     897 </span>            : </a>
+<span class="lineNum">     898 </span>            : int
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 : mue_tx_list_init(struct mue_softc *sc)</span>
+<span class="lineNum">     900 </span>            : {
+<span class="lineNum">     901 </span>            :         struct mue_cdata *cd;
+<span class="lineNum">     902 </span>            :         struct mue_chain *c;
+<span class="lineNum">     903 </span>            :         int i;
+<span class="lineNum">     904 </span>            : 
+<span class="lineNum">     905 </span>            :         DPRINTF((&quot;%s: %s: enter\n&quot;, sc-&gt;mue_dev.dv_xname, __func__));
+<span class="lineNum">     906 </span>            : 
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :         cd = &amp;sc-&gt;mue_cdata;</span>
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; MUE_TX_LIST_CNT; i++) {</span>
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :                 c = &amp;cd-&gt;mue_tx_chain[i];</span>
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :                 c-&gt;mue_sc = sc;</span>
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :                 c-&gt;mue_idx = i;</span>
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :                 c-&gt;mue_mbuf = NULL;</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :                 if (c-&gt;mue_xfer == NULL) {</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :                         c-&gt;mue_xfer = usbd_alloc_xfer(sc-&gt;mue_udev);</span>
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :                         if (c-&gt;mue_xfer == NULL)</span>
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :                                 return (ENOBUFS);</span>
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 :                         c-&gt;mue_buf = usbd_alloc_buffer(c-&gt;mue_xfer,</span>
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :                             sc-&gt;mue_bufsz);</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :                         if (c-&gt;mue_buf == NULL) {</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :                                 usbd_free_xfer(c-&gt;mue_xfer);</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :                                 return (ENOBUFS);</span>
+<span class="lineNum">     922 </span>            :                         }
+<span class="lineNum">     923 </span>            :                 }
+<span class="lineNum">     924 </span>            :         }
+<span class="lineNum">     925 </span>            : 
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 : }</span>
+<a name="928"><span class="lineNum">     928 </span>            : </a>
+<span class="lineNum">     929 </span>            : int
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 : mue_open_pipes(struct mue_softc *sc)</span>
+<span class="lineNum">     931 </span>            : {
+<span class="lineNum">     932 </span>            :         struct mue_chain *c;
+<span class="lineNum">     933 </span>            :         usbd_status err;
+<span class="lineNum">     934 </span>            :         int i;
+<span class="lineNum">     935 </span>            : 
+<span class="lineNum">     936 </span>            :         /* Open RX and TX pipes. */
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :         err = usbd_open_pipe(sc-&gt;mue_iface, sc-&gt;mue_ed[MUE_ENDPT_RX],</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :             USBD_EXCLUSIVE_USE, &amp;sc-&gt;mue_ep[MUE_ENDPT_RX]);</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :         if (err) {</span>
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: open rx pipe failed: %s\n&quot;,</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :                     sc-&gt;mue_dev.dv_xname, usbd_errstr(err));</span>
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :                 return (EIO);</span>
+<span class="lineNum">     943 </span>            :         }
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         err = usbd_open_pipe(sc-&gt;mue_iface, sc-&gt;mue_ed[MUE_ENDPT_TX],</span>
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 :             USBD_EXCLUSIVE_USE, &amp;sc-&gt;mue_ep[MUE_ENDPT_TX]);</span>
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :         if (err) {</span>
+<span class="lineNum">     947 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: open tx pipe failed: %s\n&quot;,</span>
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 :                     sc-&gt;mue_dev.dv_xname, usbd_errstr(err));</span>
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :                 return (EIO);</span>
+<span class="lineNum">     950 </span>            :         }
+<span class="lineNum">     951 </span>            : 
+<span class="lineNum">     952 </span>            :         /* Start up the receive pipe. */
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; MUE_RX_LIST_CNT; i++) {</span>
+<span class="lineNum">     954 </span><span class="lineNoCov">          0 :                 c = &amp;sc-&gt;mue_cdata.mue_rx_chain[i];</span>
+<span class="lineNum">     955 </span><span class="lineNoCov">          0 :                 usbd_setup_xfer(c-&gt;mue_xfer, sc-&gt;mue_ep[MUE_ENDPT_RX],</span>
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :                     c, c-&gt;mue_buf, sc-&gt;mue_bufsz,</span>
+<span class="lineNum">     957 </span>            :                     USBD_SHORT_XFER_OK | USBD_NO_COPY, USBD_NO_TIMEOUT,
+<span class="lineNum">     958 </span>            :                     mue_rxeof);
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :                 usbd_transfer(c-&gt;mue_xfer);</span>
+<span class="lineNum">     960 </span>            :         }
+<span class="lineNum">     961 </span>            : 
+<span class="lineNum">     962 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 : }</span>
+<a name="964"><span class="lineNum">     964 </span>            : </a>
+<span class="lineNum">     965 </span>            : int
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 : mue_encap(struct mue_softc *sc, struct mbuf *m, int idx)</span>
+<span class="lineNum">     967 </span>            : {
+<span class="lineNum">     968 </span>            :         struct mue_chain *c;
+<span class="lineNum">     969 </span>            :         usbd_status err;
+<span class="lineNum">     970 </span>            :         struct mue_txbuf_hdr hdr;
+<span class="lineNum">     971 </span>            :         int length;
+<span class="lineNum">     972 </span>            : 
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :         c = &amp;sc-&gt;mue_cdata.mue_tx_chain[idx];</span>
+<span class="lineNum">     974 </span>            : 
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 :         hdr.tx_cmd_a = htole32((m-&gt;m_pkthdr.len &amp; MUE_TX_CMD_A_LEN_MASK) |</span>
+<span class="lineNum">     976 </span>            :             MUE_TX_CMD_A_FCS);
+<span class="lineNum">     977 </span>            :         /* Disable segmentation offload. */
+<span class="lineNum">     978 </span>            :         hdr.tx_cmd_b = htole32(0);
+<span class="lineNum">     979 </span><span class="lineNoCov">          0 :         memcpy(c-&gt;mue_buf, &amp;hdr, sizeof(hdr)); </span>
+<span class="lineNum">     980 </span>            :         length = sizeof(hdr);
+<span class="lineNum">     981 </span>            : 
+<span class="lineNum">     982 </span><span class="lineNoCov">          0 :         m_copydata(m, 0, m-&gt;m_pkthdr.len, c-&gt;mue_buf + length);</span>
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 :         length += m-&gt;m_pkthdr.len;</span>
+<span class="lineNum">     984 </span>            : 
+<span class="lineNum">     985 </span><span class="lineNoCov">          0 :         c-&gt;mue_mbuf = m;</span>
+<span class="lineNum">     986 </span>            : 
+<span class="lineNum">     987 </span><span class="lineNoCov">          0 :         usbd_setup_xfer(c-&gt;mue_xfer, sc-&gt;mue_ep[MUE_ENDPT_TX],</span>
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :             c, c-&gt;mue_buf, length, USBD_FORCE_SHORT_XFER | USBD_NO_COPY,</span>
+<span class="lineNum">     989 </span>            :             10000, mue_txeof);
+<span class="lineNum">     990 </span>            : 
+<span class="lineNum">     991 </span>            :         /* Transmit */
+<span class="lineNum">     992 </span><span class="lineNoCov">          0 :         err = usbd_transfer(c-&gt;mue_xfer);</span>
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :         if (err != USBD_IN_PROGRESS) {</span>
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :                 mue_stop(sc);</span>
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :                 return(EIO);</span>
+<span class="lineNum">     996 </span>            :         }
+<span class="lineNum">     997 </span>            : 
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 :         sc-&gt;mue_cdata.mue_tx_cnt++;</span>
+<span class="lineNum">     999 </span>            : 
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :         return(0);</span>
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 : }</span>
+<a name="1002"><span class="lineNum">    1002 </span>            : </a>
+<span class="lineNum">    1003 </span>            : void
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 : mue_iff(struct mue_softc *sc)</span>
+<span class="lineNum">    1005 </span>            : {
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1007 </span>            :         struct arpcom *ac = &amp;sc-&gt;arpcom;
+<span class="lineNum">    1008 </span>            :         struct ether_multi *enm;
+<span class="lineNum">    1009 </span>            :         struct ether_multistep step;
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :         uint32_t h = 0, hashtbl[MUE_DP_SEL_VHF_HASH_LEN], reg, rxfilt;</span>
+<span class="lineNum">    1011 </span>            : 
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;mue_udev))</span>
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1014 </span>            : 
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :         reg = (sc-&gt;mue_flags &amp; LAN7500) ? MUE_RFE_CTL : MUE_7800_RFE_CTL;</span>
+<span class="lineNum">    1016 </span><span class="lineNoCov">          0 :         rxfilt = mue_csr_read(sc, reg);</span>
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :         rxfilt &amp;= ~(MUE_RFE_CTL_PERFECT | MUE_RFE_CTL_MULTICAST_HASH |</span>
+<span class="lineNum">    1018 </span>            :             MUE_RFE_CTL_UNICAST | MUE_RFE_CTL_MULTICAST);
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags &amp;= ~IFF_ALLMULTI;</span>
+<span class="lineNum">    1020 </span>            : 
+<span class="lineNum">    1021 </span>            :         /* Always accept broadcast frames. */
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :         rxfilt |= MUE_RFE_CTL_BROADCAST;</span>
+<span class="lineNum">    1023 </span>            : 
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_flags &amp; IFF_PROMISC || ac-&gt;ac_multirangecnt &gt; 0) {</span>
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_flags |= IFF_ALLMULTI;</span>
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :                 rxfilt |= MUE_RFE_CTL_MULTICAST;</span>
+<span class="lineNum">    1027 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_flags &amp; IFF_PROMISC)</span>
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :                         rxfilt |= MUE_RFE_CTL_UNICAST | MUE_RFE_CTL_MULTICAST;</span>
+<span class="lineNum">    1029 </span>            :         } else {
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :                 rxfilt |= MUE_RFE_CTL_PERFECT | MUE_RFE_CTL_MULTICAST_HASH;</span>
+<span class="lineNum">    1031 </span>            : 
+<span class="lineNum">    1032 </span>            :                 /* Clear hash table. */
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :                 memset(hashtbl, 0, sizeof(hashtbl));</span>
+<span class="lineNum">    1034 </span>            : 
+<span class="lineNum">    1035 </span>            :                 /* Now program new ones. */
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 :                 ETHER_FIRST_MULTI(step, ac, enm);</span>
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :                 while (enm != NULL) {</span>
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 :                         h = ether_crc32_be(enm-&gt;enm_addrlo,</span>
+<span class="lineNum">    1039 </span><span class="lineNoCov">          0 :                             ETHER_ADDR_LEN) &gt;&gt; 23;</span>
+<span class="lineNum">    1040 </span><span class="lineNoCov">          0 :                         hashtbl[h / 32] |= 1 &lt;&lt; (h % 32); </span>
+<span class="lineNum">    1041 </span><span class="lineNoCov">          0 :                         ETHER_NEXT_MULTI(step, enm);</span>
+<span class="lineNum">    1042 </span>            :                 }
+<span class="lineNum">    1043 </span>            :         }
+<span class="lineNum">    1044 </span>            : 
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :         mue_dataport_write(sc, MUE_DP_SEL_VHF, MUE_DP_SEL_VHF_VLAN_LEN,</span>
+<span class="lineNum">    1046 </span><span class="lineNoCov">          0 :             MUE_DP_SEL_VHF_HASH_LEN, hashtbl);</span>
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :         mue_csr_write(sc, reg, rxfilt);</span>
+<span class="lineNum">    1048 </span><span class="lineNoCov">          0 : }</span>
+<a name="1049"><span class="lineNum">    1049 </span>            : </a>
+<span class="lineNum">    1050 </span>            : void
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 : mue_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)</span>
+<span class="lineNum">    1052 </span>            : {
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 :         struct mue_chain *c = (struct mue_chain *)priv;</span>
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = c-&gt;mue_sc;</span>
+<span class="lineNum">    1055 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :         struct mbuf_list ml = MBUF_LIST_INITIALIZER();</span>
+<span class="lineNum">    1057 </span>            :         struct mbuf *m;
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :         struct mue_rxbuf_hdr hdr;</span>
+<span class="lineNum">    1059 </span><span class="lineNoCov">          0 :         u_char *buf = c-&gt;mue_buf;</span>
+<span class="lineNum">    1060 </span><span class="lineNoCov">          0 :         uint32_t total_len;</span>
+<span class="lineNum">    1061 </span>            :         int pktlen = 0;
+<span class="lineNum">    1062 </span>            :         int s;
+<span class="lineNum">    1063 </span>            : 
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;mue_udev))</span>
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1066 </span>            : 
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :         if (!(ifp-&gt;if_flags &amp; IFF_RUNNING))</span>
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1069 </span>            : 
+<span class="lineNum">    1070 </span><span class="lineNoCov">          0 :         if (status != USBD_NORMAL_COMPLETION) {</span>
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :                 if (status == USBD_NOT_STARTED || status == USBD_CANCELLED)</span>
+<span class="lineNum">    1072 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">    1073 </span><span class="lineNoCov">          0 :                 if (usbd_ratecheck(&amp;sc-&gt;mue_rx_notice)) {</span>
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: usb errors on rx: %s\n&quot;,</span>
+<span class="lineNum">    1075 </span><span class="lineNoCov">          0 :                             sc-&gt;mue_dev.dv_xname, usbd_errstr(status));</span>
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :                 if (status == USBD_STALLED)</span>
+<span class="lineNum">    1078 </span><span class="lineNoCov">          0 :                         usbd_clear_endpoint_stall_async(sc-&gt;mue_ep[MUE_ENDPT_RX]);</span>
+<span class="lineNum">    1079 </span>            :                 goto done;
+<span class="lineNum">    1080 </span>            :         }
+<span class="lineNum">    1081 </span>            : 
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :         usbd_get_xfer_status(xfer, NULL, NULL, &amp;total_len, NULL);</span>
+<span class="lineNum">    1083 </span>            : 
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">    1085 </span><span class="lineNoCov">          0 :                 if (total_len &lt; sizeof(hdr)) {</span>
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_ierrors++;</span>
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :                         goto done;</span>
+<span class="lineNum">    1088 </span>            :                 }
+<span class="lineNum">    1089 </span>            : 
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :                 buf += pktlen;</span>
+<span class="lineNum">    1091 </span>            : 
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :                 memcpy(&amp;hdr, buf, sizeof(hdr));</span>
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :                 total_len -= sizeof(hdr);</span>
+<span class="lineNum">    1094 </span>            : 
+<span class="lineNum">    1095 </span><span class="lineNoCov">          0 :                 if (letoh32(hdr.rx_cmd_a) &amp; MUE_RX_CMD_A_RED) {</span>
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_ierrors++;</span>
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :                         goto done;</span>
+<span class="lineNum">    1098 </span>            :                 }
+<span class="lineNum">    1099 </span>            : 
+<span class="lineNum">    1100 </span><span class="lineNoCov">          0 :                 pktlen = letoh32(hdr.rx_cmd_a) &amp; MUE_RX_CMD_A_LEN_MASK;</span>
+<span class="lineNum">    1101 </span><span class="lineNoCov">          0 :                 if (sc-&gt;mue_flags &amp; LAN7500)</span>
+<span class="lineNum">    1102 </span><span class="lineNoCov">          0 :                         pktlen -= 2;</span>
+<span class="lineNum">    1103 </span>            : 
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 :                 if (pktlen &gt; total_len) {</span>
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_ierrors++;</span>
+<span class="lineNum">    1106 </span><span class="lineNoCov">          0 :                         goto done;</span>
+<span class="lineNum">    1107 </span>            :                 }
+<span class="lineNum">    1108 </span>            : 
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 :                 buf += sizeof(hdr);</span>
+<span class="lineNum">    1110 </span>            : 
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 :                 if (total_len &lt; pktlen)</span>
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 :                         total_len = 0;</span>
+<span class="lineNum">    1113 </span>            :                 else
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :                         total_len -= pktlen;</span>
+<span class="lineNum">    1115 </span>            : 
+<span class="lineNum">    1116 </span><span class="lineNoCov">          0 :                 m = m_devget(buf, pktlen - ETHER_CRC_LEN, ETHER_ALIGN);</span>
+<span class="lineNum">    1117 </span><span class="lineNoCov">          0 :                 if (m == NULL) {</span>
+<span class="lineNum">    1118 </span>            :                         DPRINTF((&quot;unable to allocate mbuf for next packet\n&quot;));
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_ierrors++;</span>
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 :                         goto done;</span>
+<span class="lineNum">    1121 </span>            :                 }
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :                 ml_enqueue(&amp;ml, m);</span>
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 :         } while (total_len &gt; 0);</span>
+<span class="lineNum">    1124 </span>            : 
+<span class="lineNum">    1125 </span>            : done:
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :         if_input(ifp, &amp;ml);</span>
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1129 </span>            : 
+<span class="lineNum">    1130 </span><span class="lineNoCov">          0 :         memset(c-&gt;mue_buf, 0, sc-&gt;mue_bufsz);</span>
+<span class="lineNum">    1131 </span>            : 
+<span class="lineNum">    1132 </span>            :         /* Setup new transfer. */
+<span class="lineNum">    1133 </span><span class="lineNoCov">          0 :         usbd_setup_xfer(xfer, sc-&gt;mue_ep[MUE_ENDPT_RX],</span>
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :             c, c-&gt;mue_buf, sc-&gt;mue_bufsz, USBD_SHORT_XFER_OK | USBD_NO_COPY,</span>
+<span class="lineNum">    1135 </span>            :             USBD_NO_TIMEOUT, mue_rxeof);
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         usbd_transfer(xfer);</span>
+<span class="lineNum">    1137 </span>            : 
+<span class="lineNum">    1138 </span>            :         DPRINTFN(10,(&quot;%s: %s: start rx\n&quot;, sc-&gt;mue_dev.dv_xname, __func__));
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 : }</span>
+<a name="1140"><span class="lineNum">    1140 </span>            : </a>
+<span class="lineNum">    1141 </span>            : void
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 : mue_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)</span>
+<span class="lineNum">    1143 </span>            : {
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 :         struct mue_chain *c = priv;</span>
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = c-&gt;mue_sc;</span>
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1147 </span>            :         int s;
+<span class="lineNum">    1148 </span>            : 
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;mue_udev))</span>
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1151 </span>            : 
+<span class="lineNum">    1152 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">    1153 </span>            : 
+<span class="lineNum">    1154 </span>            :         DPRINTFN(10,(&quot;%s: %s: enter status=%d\n&quot;, sc-&gt;mue_dev.dv_xname,
+<span class="lineNum">    1155 </span>            :             __func__, status));
+<span class="lineNum">    1156 </span>            : 
+<span class="lineNum">    1157 </span><span class="lineNoCov">          0 :         if (status != USBD_NORMAL_COMPLETION) {</span>
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 :                 if (status == USBD_NOT_STARTED || status == USBD_CANCELLED) {</span>
+<span class="lineNum">    1159 </span><span class="lineNoCov">          0 :                         splx(s);</span>
+<span class="lineNum">    1160 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">    1161 </span>            :                 }
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_oerrors++;</span>
+<span class="lineNum">    1163 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: usb error on tx: %s\n&quot;, sc-&gt;mue_dev.dv_xname,</span>
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :                     usbd_errstr(status));</span>
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 :                 if (status == USBD_STALLED)</span>
+<span class="lineNum">    1166 </span><span class="lineNoCov">          0 :                         usbd_clear_endpoint_stall_async(sc-&gt;mue_ep[MUE_ENDPT_TX]);</span>
+<span class="lineNum">    1167 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1168 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1169 </span>            :         }
+<span class="lineNum">    1170 </span>            : 
+<span class="lineNum">    1171 </span><span class="lineNoCov">          0 :         ifp-&gt;if_timer = 0;</span>
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1173 </span>            : 
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :         m_freem(c-&gt;mue_mbuf);</span>
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :         c-&gt;mue_mbuf = NULL;</span>
+<span class="lineNum">    1176 </span>            : 
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :         if (IFQ_IS_EMPTY(&amp;ifp-&gt;if_snd) == 0)</span>
+<span class="lineNum">    1178 </span><span class="lineNoCov">          0 :                 mue_start(ifp);</span>
+<span class="lineNum">    1179 </span>            : 
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 : }</span>
+<a name="1182"><span class="lineNum">    1182 </span>            : </a>
+<span class="lineNum">    1183 </span>            : void
+<span class="lineNum">    1184 </span><span class="lineNoCov">          0 : mue_init(void *xsc)</span>
+<span class="lineNum">    1185 </span>            : {
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = xsc;</span>
+<span class="lineNum">    1187 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1188 </span>            :         int s;
+<span class="lineNum">    1189 </span>            : 
+<span class="lineNum">    1190 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">    1191 </span>            : 
+<span class="lineNum">    1192 </span>            :         /* Cancel pending I/O and free all TX/RX buffers. */
+<span class="lineNum">    1193 </span><span class="lineNoCov">          0 :         mue_reset(sc);</span>
+<span class="lineNum">    1194 </span>            : 
+<span class="lineNum">    1195 </span>            :         /* Set MAC address. */
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :         mue_set_macaddr(sc);</span>
+<span class="lineNum">    1197 </span>            : 
+<span class="lineNum">    1198 </span>            :         /* Init RX ring. */
+<span class="lineNum">    1199 </span><span class="lineNoCov">          0 :         if (mue_rx_list_init(sc) == ENOBUFS) {</span>
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: rx list init failed\n&quot;, sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">    1201 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1202 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1203 </span>            :         }
+<span class="lineNum">    1204 </span>            : 
+<span class="lineNum">    1205 </span>            :         /* Init TX ring. */
+<span class="lineNum">    1206 </span><span class="lineNoCov">          0 :         if (mue_tx_list_init(sc) == ENOBUFS) {</span>
+<span class="lineNum">    1207 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: tx list init failed\n&quot;, sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">    1208 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1209 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1210 </span>            :         }
+<span class="lineNum">    1211 </span>            : 
+<span class="lineNum">    1212 </span>            :         /* Program promiscuous mode and multicast filters. */
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :         mue_iff(sc);</span>
+<span class="lineNum">    1214 </span>            : 
+<span class="lineNum">    1215 </span><span class="lineNoCov">          0 :         if (mue_open_pipes(sc) != 0) {</span>
+<span class="lineNum">    1216 </span><span class="lineNoCov">          0 :                 splx(s);</span>
+<span class="lineNum">    1217 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1218 </span>            :         }
+<span class="lineNum">    1219 </span>            : 
+<span class="lineNum">    1220 </span><span class="lineNoCov">          0 :         sc-&gt;mue_link = 0;</span>
+<span class="lineNum">    1221 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags |= IFF_RUNNING;</span>
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1223 </span>            : 
+<span class="lineNum">    1224 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1225 </span>            : 
+<span class="lineNum">    1226 </span><span class="lineNoCov">          0 :         timeout_add_sec(&amp;sc-&gt;mue_stat_ch, 1);</span>
+<span class="lineNum">    1227 </span><span class="lineNoCov">          0 : }</span>
+<a name="1228"><span class="lineNum">    1228 </span>            : </a>
+<span class="lineNum">    1229 </span>            : int
+<span class="lineNum">    1230 </span><span class="lineNoCov">          0 : mue_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)</span>
+<span class="lineNum">    1231 </span>            : {
+<span class="lineNum">    1232 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">    1233 </span><span class="lineNoCov">          0 :         struct ifreq *ifr = (struct ifreq *)data;</span>
+<span class="lineNum">    1234 </span>            :         int s, error = 0;
+<span class="lineNum">    1235 </span>            : 
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">    1237 </span>            : 
+<span class="lineNum">    1238 </span><span class="lineNoCov">          0 :         switch(cmd) {</span>
+<span class="lineNum">    1239 </span>            :         case SIOCSIFADDR:
+<span class="lineNum">    1240 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_flags |= IFF_UP;</span>
+<span class="lineNum">    1241 </span><span class="lineNoCov">          0 :                 if (!(ifp-&gt;if_flags &amp; IFF_RUNNING))</span>
+<span class="lineNum">    1242 </span><span class="lineNoCov">          0 :                         mue_init(sc);</span>
+<span class="lineNum">    1243 </span>            :                 break;
+<span class="lineNum">    1244 </span>            :         case SIOCSIFFLAGS:
+<span class="lineNum">    1245 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_flags &amp; IFF_UP) {</span>
+<span class="lineNum">    1246 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">    1247 </span><span class="lineNoCov">          0 :                                 error = ENETRESET;</span>
+<span class="lineNum">    1248 </span>            :                         else
+<span class="lineNum">    1249 </span><span class="lineNoCov">          0 :                                 mue_init(sc);</span>
+<span class="lineNum">    1250 </span>            :                 } else {
+<span class="lineNum">    1251 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">    1252 </span><span class="lineNoCov">          0 :                                 mue_stop(sc);</span>
+<span class="lineNum">    1253 </span>            :                 }
+<span class="lineNum">    1254 </span>            :                 break;
+<span class="lineNum">    1255 </span>            :         case SIOCGIFMEDIA:
+<span class="lineNum">    1256 </span>            :         case SIOCSIFMEDIA:
+<span class="lineNum">    1257 </span><span class="lineNoCov">          0 :                 error = ifmedia_ioctl(ifp, ifr, &amp;sc-&gt;mue_mii.mii_media, cmd);</span>
+<span class="lineNum">    1258 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1259 </span>            :         default:
+<span class="lineNum">    1260 </span><span class="lineNoCov">          0 :                 error = ether_ioctl(ifp, &amp;sc-&gt;arpcom, cmd, data);</span>
+<span class="lineNum">    1261 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1262 </span>            : 
+<span class="lineNum">    1263 </span><span class="lineNoCov">          0 :         if (error == ENETRESET) {</span>
+<span class="lineNum">    1264 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">    1265 </span><span class="lineNoCov">          0 :                         mue_iff(sc);</span>
+<span class="lineNum">    1266 </span>            :                 error = 0;
+<span class="lineNum">    1267 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1268 </span>            : 
+<span class="lineNum">    1269 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1270 </span>            : 
+<span class="lineNum">    1271 </span><span class="lineNoCov">          0 :         return(error);</span>
+<span class="lineNum">    1272 </span>            : }
+<a name="1273"><span class="lineNum">    1273 </span>            : </a>
+<span class="lineNum">    1274 </span>            : void
+<span class="lineNum">    1275 </span><span class="lineNoCov">          0 : mue_watchdog(struct ifnet *ifp)</span>
+<span class="lineNum">    1276 </span>            : {
+<span class="lineNum">    1277 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">    1278 </span>            :         struct mue_chain *c;
+<span class="lineNum">    1279 </span><span class="lineNoCov">          0 :         usbd_status stat;</span>
+<span class="lineNum">    1280 </span>            :         int s;
+<span class="lineNum">    1281 </span>            : 
+<span class="lineNum">    1282 </span><span class="lineNoCov">          0 :         ifp-&gt;if_oerrors++;</span>
+<span class="lineNum">    1283 </span><span class="lineNoCov">          0 :         printf(&quot;%s: watchdog timeout\n&quot;, sc-&gt;mue_dev.dv_xname);</span>
+<span class="lineNum">    1284 </span>            : 
+<span class="lineNum">    1285 </span><span class="lineNoCov">          0 :         s = splusb();</span>
+<span class="lineNum">    1286 </span><span class="lineNoCov">          0 :         c = &amp;sc-&gt;mue_cdata.mue_tx_chain[0];</span>
+<span class="lineNum">    1287 </span><span class="lineNoCov">          0 :         usbd_get_xfer_status(c-&gt;mue_xfer, NULL, NULL, NULL, &amp;stat);</span>
+<span class="lineNum">    1288 </span><span class="lineNoCov">          0 :         mue_txeof(c-&gt;mue_xfer, c, stat);</span>
+<span class="lineNum">    1289 </span>            : 
+<span class="lineNum">    1290 </span><span class="lineNoCov">          0 :         if (!IFQ_IS_EMPTY(&amp;ifp-&gt;if_snd))</span>
+<span class="lineNum">    1291 </span><span class="lineNoCov">          0 :                 mue_start(ifp);</span>
+<span class="lineNum">    1292 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1293 </span><span class="lineNoCov">          0 : }</span>
+<a name="1294"><span class="lineNum">    1294 </span>            : </a>
+<span class="lineNum">    1295 </span>            : void
+<span class="lineNum">    1296 </span><span class="lineNoCov">          0 : mue_reset(struct mue_softc *sc)</span>
+<span class="lineNum">    1297 </span>            : {
+<span class="lineNum">    1298 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;mue_udev))</span>
+<span class="lineNum">    1299 </span>            :                 return;
+<span class="lineNum">    1300 </span>            : 
+<span class="lineNum">    1301 </span>            :         /* Wait a little while for the chip to get its brains in order. */
+<span class="lineNum">    1302 </span><span class="lineNoCov">          0 :         DELAY(1000);</span>
+<span class="lineNum">    1303 </span><span class="lineNoCov">          0 : }</span>
+<a name="1304"><span class="lineNum">    1304 </span>            : </a>
+<span class="lineNum">    1305 </span>            : void
+<span class="lineNum">    1306 </span><span class="lineNoCov">          0 : mue_start(struct ifnet *ifp)</span>
+<span class="lineNum">    1307 </span>            : {
+<span class="lineNum">    1308 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">    1309 </span>            :         struct mbuf *m_head = NULL;
+<span class="lineNum">    1310 </span>            : 
+<span class="lineNum">    1311 </span><span class="lineNoCov">          0 :         if (!sc-&gt;mue_link)</span>
+<span class="lineNum">    1312 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1313 </span>            : 
+<span class="lineNum">    1314 </span><span class="lineNoCov">          0 :         if (ifq_is_oactive(&amp;ifp-&gt;if_snd))</span>
+<span class="lineNum">    1315 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1316 </span>            : 
+<span class="lineNum">    1317 </span><span class="lineNoCov">          0 :         m_head = ifq_deq_begin(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1318 </span><span class="lineNoCov">          0 :         if (m_head == NULL)</span>
+<span class="lineNum">    1319 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1320 </span>            : 
+<span class="lineNum">    1321 </span><span class="lineNoCov">          0 :         if (mue_encap(sc, m_head, 0)) {</span>
+<span class="lineNum">    1322 </span><span class="lineNoCov">          0 :                 ifq_deq_rollback(&amp;ifp-&gt;if_snd, m_head);</span>
+<span class="lineNum">    1323 </span><span class="lineNoCov">          0 :                 ifq_set_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1324 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1325 </span>            :         }
+<span class="lineNum">    1326 </span><span class="lineNoCov">          0 :         ifq_deq_commit(&amp;ifp-&gt;if_snd, m_head);</span>
+<span class="lineNum">    1327 </span>            : 
+<span class="lineNum">    1328 </span>            :         /* If there's a BPF listener, bounce a copy of this frame to him. */
+<span class="lineNum">    1329 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">    1330 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_bpf)</span>
+<span class="lineNum">    1331 </span><span class="lineNoCov">          0 :                 bpf_mtap(ifp-&gt;if_bpf, m_head, BPF_DIRECTION_OUT);</span>
+<span class="lineNum">    1332 </span>            : #endif
+<span class="lineNum">    1333 </span>            : 
+<span class="lineNum">    1334 </span><span class="lineNoCov">          0 :         ifq_set_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1335 </span>            : 
+<span class="lineNum">    1336 </span>            :         /* Set a timeout in case the chip goes out to lunch. */
+<span class="lineNum">    1337 </span><span class="lineNoCov">          0 :         ifp-&gt;if_timer = 5;</span>
+<span class="lineNum">    1338 </span><span class="lineNoCov">          0 : }</span>
+<a name="1339"><span class="lineNum">    1339 </span>            : </a>
+<span class="lineNum">    1340 </span>            : void
+<span class="lineNum">    1341 </span><span class="lineNoCov">          0 : mue_stop(struct mue_softc *sc)</span>
+<span class="lineNum">    1342 </span>            : {
+<span class="lineNum">    1343 </span>            :         struct ifnet *ifp;
+<span class="lineNum">    1344 </span>            : 
+<span class="lineNum">    1345 </span><span class="lineNoCov">          0 :         ifp = GET_IFP(sc);</span>
+<span class="lineNum">    1346 </span><span class="lineNoCov">          0 :         ifp-&gt;if_timer = 0;</span>
+<span class="lineNum">    1347 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags &amp;= ~IFF_RUNNING;</span>
+<span class="lineNum">    1348 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1349 </span>            : 
+<span class="lineNum">    1350 </span><span class="lineNoCov">          0 :         timeout_del(&amp;sc-&gt;mue_stat_ch);</span>
+<span class="lineNum">    1351 </span>            : 
+<span class="lineNum">    1352 </span><span class="lineNoCov">          0 :         sc-&gt;mue_link = 0;</span>
+<span class="lineNum">    1353 </span><span class="lineNoCov">          0 : }</span>
+<a name="1354"><span class="lineNum">    1354 </span>            : </a>
+<span class="lineNum">    1355 </span>            : void
+<span class="lineNum">    1356 </span><span class="lineNoCov">          0 : mue_tick(void *xsc)</span>
+<span class="lineNum">    1357 </span>            : {
+<span class="lineNum">    1358 </span><span class="lineNoCov">          0 :         struct mue_softc *sc = xsc;</span>
+<span class="lineNum">    1359 </span>            : 
+<span class="lineNum">    1360 </span><span class="lineNoCov">          0 :         if (sc == NULL)</span>
+<span class="lineNum">    1361 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1362 </span>            : 
+<span class="lineNum">    1363 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;mue_udev))</span>
+<span class="lineNum">    1364 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1365 </span>            : 
+<span class="lineNum">    1366 </span>            :         /* Perform periodic stuff in process context. */
+<span class="lineNum">    1367 </span><span class="lineNoCov">          0 :         usb_add_task(sc-&gt;mue_udev, &amp;sc-&gt;mue_tick_task);</span>
+<span class="lineNum">    1368 </span><span class="lineNoCov">          0 : }</span>
+<a name="1369"><span class="lineNum">    1369 </span>            : </a>
+<span class="lineNum">    1370 </span>            : void
+<span class="lineNum">    1371 </span><span class="lineNoCov">          0 : mue_tick_task(void *xsc)</span>
+<span class="lineNum">    1372 </span>            : {
+<span class="lineNum">    1373 </span><span class="lineNoCov">          0 :         struct mue_softc *sc =xsc;</span>
+<span class="lineNum">    1374 </span>            :         struct mii_data *mii;
+<span class="lineNum">    1375 </span>            :         int s;
+<span class="lineNum">    1376 </span>            : 
+<span class="lineNum">    1377 </span><span class="lineNoCov">          0 :         if (sc == NULL)</span>
+<span class="lineNum">    1378 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1379 </span>            : 
+<span class="lineNum">    1380 </span><span class="lineNoCov">          0 :         if (usbd_is_dying(sc-&gt;mue_udev))</span>
+<span class="lineNum">    1381 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1382 </span>            : 
+<span class="lineNum">    1383 </span><span class="lineNoCov">          0 :         mii = GET_MII(sc);</span>
+<span class="lineNum">    1384 </span>            : 
+<span class="lineNum">    1385 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">    1386 </span><span class="lineNoCov">          0 :         mii_tick(mii);</span>
+<span class="lineNum">    1387 </span><span class="lineNoCov">          0 :         if (sc-&gt;mue_link == 0)</span>
+<span class="lineNum">    1388 </span><span class="lineNoCov">          0 :                 mue_miibus_statchg(&amp;sc-&gt;mue_dev);</span>
+<span class="lineNum">    1389 </span><span class="lineNoCov">          0 :         timeout_add_sec(&amp;sc-&gt;mue_stat_ch, 1);</span>
+<span class="lineNum">    1390 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1391 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

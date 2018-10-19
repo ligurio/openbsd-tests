@@ -1,0 +1,358 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - scsi/mpath_emc.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">scsi</a> - mpath_emc.c<span style="font-size: 80%;"> (source / <a href="mpath_emc.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">84</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: mpath_emc.c,v 1.21 2015/03/14 03:38:52 jsg Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2011 David Gwynne &lt;dlg@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /* EMC CLARiiON AX/CX support for mpath(4) */
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/conf.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/rwlock.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/poll.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/selinfo.h&gt;
+<span class="lineNum">      33 </span>            : 
+<span class="lineNum">      34 </span>            : #include &lt;scsi/scsi_all.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;scsi/scsiconf.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;scsi/mpathvar.h&gt;
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : #define EMC_VPD_SP_INFO                 0xc0
+<span class="lineNum">      39 </span>            : 
+<span class="lineNum">      40 </span>            : struct emc_vpd_sp_info {
+<span class="lineNum">      41 </span>            :         struct scsi_vpd_hdr     hdr; /* EMC_VPD_SP_INFO */
+<span class="lineNum">      42 </span>            : 
+<span class="lineNum">      43 </span>            :         u_int8_t                lun_state;
+<span class="lineNum">      44 </span>            : #define EMC_SP_INFO_LUN_STATE_UNBOUND   0x00
+<span class="lineNum">      45 </span>            : #define EMC_SP_INFO_LUN_STATE_BOUND     0x01
+<span class="lineNum">      46 </span>            : #define EMC_SP_INFO_LUN_STATE_OWNED     0x02
+<span class="lineNum">      47 </span>            :         u_int8_t                default_sp;
+<span class="lineNum">      48 </span>            :         u_int8_t                _reserved1[1];
+<span class="lineNum">      49 </span>            :         u_int8_t                port;
+<span class="lineNum">      50 </span>            :         u_int8_t                current_sp;
+<span class="lineNum">      51 </span>            :         u_int8_t                _reserved2[1];
+<span class="lineNum">      52 </span>            :         u_int8_t                unique_id[16];
+<span class="lineNum">      53 </span>            :         u_int8_t                _reserved3[1];
+<span class="lineNum">      54 </span>            :         u_int8_t                type;
+<span class="lineNum">      55 </span>            :         u_int8_t                failover_mode;
+<span class="lineNum">      56 </span>            :         u_int8_t                _reserved4[21];
+<span class="lineNum">      57 </span>            :         u_int8_t                serial[16];
+<span class="lineNum">      58 </span>            : } __packed;
+<span class="lineNum">      59 </span>            : 
+<span class="lineNum">      60 </span>            : struct emc_softc {
+<span class="lineNum">      61 </span>            :         struct device           sc_dev;
+<span class="lineNum">      62 </span>            :         struct mpath_path       sc_path;
+<span class="lineNum">      63 </span>            :         struct scsi_xshandler   sc_xsh;
+<span class="lineNum">      64 </span>            :         struct emc_vpd_sp_info  *sc_pg;
+<span class="lineNum">      65 </span>            : };
+<span class="lineNum">      66 </span>            : #define DEVNAME(_s) ((_s)-&gt;sc_dev.dv_xname)
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            : int             emc_match(struct device *, void *, void *);
+<span class="lineNum">      69 </span>            : void            emc_attach(struct device *, struct device *, void *);
+<span class="lineNum">      70 </span>            : int             emc_detach(struct device *, int);
+<span class="lineNum">      71 </span>            : int             emc_activate(struct device *, int);
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span>            : struct cfattach emc_ca = {
+<span class="lineNum">      74 </span>            :         sizeof(struct emc_softc),
+<span class="lineNum">      75 </span>            :         emc_match,
+<span class="lineNum">      76 </span>            :         emc_attach,
+<span class="lineNum">      77 </span>            :         emc_detach,
+<span class="lineNum">      78 </span>            :         emc_activate
+<span class="lineNum">      79 </span>            : };
+<span class="lineNum">      80 </span>            : 
+<span class="lineNum">      81 </span>            : struct cfdriver emc_cd = {
+<span class="lineNum">      82 </span>            :         NULL,
+<span class="lineNum">      83 </span>            :         &quot;emc&quot;,
+<span class="lineNum">      84 </span>            :         DV_DULL
+<span class="lineNum">      85 </span>            : };
+<span class="lineNum">      86 </span>            : 
+<span class="lineNum">      87 </span>            : void            emc_mpath_start(struct scsi_xfer *);
+<span class="lineNum">      88 </span>            : int             emc_mpath_checksense(struct scsi_xfer *);
+<span class="lineNum">      89 </span>            : void            emc_mpath_status(struct scsi_link *);
+<span class="lineNum">      90 </span>            : 
+<span class="lineNum">      91 </span>            : const struct mpath_ops emc_mpath_ops = {
+<span class="lineNum">      92 </span>            :         &quot;emc&quot;,
+<span class="lineNum">      93 </span>            :         emc_mpath_checksense,
+<span class="lineNum">      94 </span>            :         emc_mpath_status
+<span class="lineNum">      95 </span>            : };
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span>            : struct emc_device {
+<span class="lineNum">      98 </span>            :         char *vendor;
+<span class="lineNum">      99 </span>            :         char *product;
+<span class="lineNum">     100 </span>            : };
+<span class="lineNum">     101 </span>            : 
+<span class="lineNum">     102 </span>            : void            emc_status(struct scsi_xfer *);
+<span class="lineNum">     103 </span>            : void            emc_status_done(struct scsi_xfer *);
+<span class="lineNum">     104 </span>            : 
+<span class="lineNum">     105 </span>            : int             emc_sp_info(struct emc_softc *, int *);
+<span class="lineNum">     106 </span>            : 
+<span class="lineNum">     107 </span>            : struct emc_device emc_devices[] = {
+<span class="lineNum">     108 </span>            : /*        &quot; vendor &quot;  &quot;     device     &quot; */
+<span class="lineNum">     109 </span>            : /*        &quot;01234567&quot;  &quot;0123456789012345&quot; */
+<span class="lineNum">     110 </span>            :         { &quot;DGC     &quot;, &quot;RAID&quot; },
+<span class="lineNum">     111 </span>            :         { &quot;DGC     &quot;, &quot;DISK&quot; },
+<span class="lineNum">     112 </span>            :         { &quot;DGC     &quot;, &quot;VRAID&quot; }
+<span class="lineNum">     113 </span>            : };
+<a name="114"><span class="lineNum">     114 </span>            : </a>
+<span class="lineNum">     115 </span>            : int
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 : emc_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     117 </span>            : {
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :         struct scsi_attach_args *sa = aux;</span>
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :         struct scsi_inquiry_data *inq = sa-&gt;sa_inqbuf;</span>
+<span class="lineNum">     120 </span>            :         struct emc_device *s;
+<span class="lineNum">     121 </span>            :         int i;
+<span class="lineNum">     122 </span>            : 
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         if (mpath_path_probe(sa-&gt;sa_sc_link) != 0)</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     125 </span>            : 
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; nitems(emc_devices); i++) {</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :                 s = &amp;emc_devices[i];</span>
+<span class="lineNum">     128 </span>            : 
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :                 if (bcmp(s-&gt;vendor, inq-&gt;vendor, strlen(s-&gt;vendor)) == 0 &amp;&amp;</span>
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :                     bcmp(s-&gt;product, inq-&gt;product, strlen(s-&gt;product)) == 0)</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :                         return (8);</span>
+<span class="lineNum">     132 </span>            :         }
+<span class="lineNum">     133 </span>            : 
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 : }</span>
+<a name="136"><span class="lineNum">     136 </span>            : </a>
+<span class="lineNum">     137 </span>            : void
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 : emc_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     139 </span>            : {
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :         struct emc_softc *sc = (struct emc_softc *)self;</span>
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         struct scsi_attach_args *sa = aux;</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         struct scsi_link *link = sa-&gt;sa_sc_link;</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         int sp;</span>
+<span class="lineNum">     144 </span>            : 
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span>            :         /* init link */
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         link-&gt;device_softc = sc;</span>
+<span class="lineNum">     149 </span>            : 
+<span class="lineNum">     150 </span>            :         /* init path */
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         scsi_xsh_set(&amp;sc-&gt;sc_path.p_xsh, link, emc_mpath_start);</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         sc-&gt;sc_path.p_link = link;</span>
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span>            :         /* init status handler */
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         scsi_xsh_set(&amp;sc-&gt;sc_xsh, link, emc_status);</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         sc-&gt;sc_pg = dma_alloc(sizeof(*sc-&gt;sc_pg), PR_WAITOK);</span>
+<span class="lineNum">     157 </span>            : 
+<span class="lineNum">     158 </span>            :         /* let's go */
+<span class="lineNum">     159 </span>            : 
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         if (emc_sp_info(sc, &amp;sp)) {</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to get sp info\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     163 </span>            :         }
+<span class="lineNum">     164 </span>            : 
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         if (mpath_path_attach(&amp;sc-&gt;sc_path, sp, &amp;emc_mpath_ops) != 0)</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unable to attach path\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 : }</span>
+<a name="168"><span class="lineNum">     168 </span>            : </a>
+<span class="lineNum">     169 </span>            : int
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 : emc_detach(struct device *self, int flags)</span>
+<span class="lineNum">     171 </span>            : {
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :         struct emc_softc *sc = (struct emc_softc *)self;</span>
+<span class="lineNum">     173 </span>            : 
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         dma_free(sc-&gt;sc_pg, sizeof(*sc-&gt;sc_pg));</span>
+<span class="lineNum">     175 </span>            : 
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     177 </span>            : }
+<a name="178"><span class="lineNum">     178 </span>            : </a>
+<span class="lineNum">     179 </span>            : int
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 : emc_activate(struct device *self, int act)</span>
+<span class="lineNum">     181 </span>            : {
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         struct emc_softc *sc = (struct emc_softc *)self;</span>
+<span class="lineNum">     183 </span>            :         int rv = 0;
+<span class="lineNum">     184 </span>            : 
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         switch (act) {</span>
+<span class="lineNum">     186 </span>            :         case DVACT_DEACTIVATE:
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_path.p_group != NULL)</span>
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :                         mpath_path_detach(&amp;sc-&gt;sc_path);</span>
+<span class="lineNum">     189 </span>            :                 break;
+<span class="lineNum">     190 </span>            :         }
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     192 </span>            : }
+<a name="193"><span class="lineNum">     193 </span>            : </a>
+<span class="lineNum">     194 </span>            : void
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 : emc_mpath_start(struct scsi_xfer *xs)</span>
+<span class="lineNum">     196 </span>            : {
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         struct emc_softc *sc = xs-&gt;sc_link-&gt;device_softc;</span>
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         mpath_start(&amp;sc-&gt;sc_path, xs);</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 : }</span>
+<a name="201"><span class="lineNum">     201 </span>            : </a>
+<span class="lineNum">     202 </span>            : int
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 : emc_mpath_checksense(struct scsi_xfer *xs)</span>
+<span class="lineNum">     204 </span>            : {
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         struct scsi_sense_data *sense = &amp;xs-&gt;sense;</span>
+<span class="lineNum">     206 </span>            : 
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :         if ((sense-&gt;error_code &amp; SSD_ERRCODE) == SSD_ERRCODE_CURRENT &amp;&amp;</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :             (sense-&gt;flags &amp; SSD_KEY) == SKEY_NOT_READY &amp;&amp;</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :             ASC_ASCQ(sense) == 0x0403) {</span>
+<span class="lineNum">     210 </span>            :                 /* Logical Unit Not Ready, Manual Intervention Required */
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                 return (MPATH_SENSE_FAILOVER);</span>
+<span class="lineNum">     212 </span>            :         }
+<span class="lineNum">     213 </span>            : 
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :         return (MPATH_SENSE_DECLINED);</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 : }</span>
+<a name="216"><span class="lineNum">     216 </span>            : </a>
+<span class="lineNum">     217 </span>            : void
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 : emc_mpath_status(struct scsi_link *link)</span>
+<span class="lineNum">     219 </span>            : {
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         struct emc_softc *sc = link-&gt;device_softc;</span>
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         scsi_xsh_add(&amp;sc-&gt;sc_xsh);</span>
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 : }</span>
+<a name="224"><span class="lineNum">     224 </span>            : </a>
+<span class="lineNum">     225 </span>            : void
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 : emc_status(struct scsi_xfer *xs)</span>
+<span class="lineNum">     227 </span>            : {
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :         struct scsi_link *link = xs-&gt;sc_link;</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         struct emc_softc *sc = link-&gt;device_softc;</span>
+<span class="lineNum">     230 </span>            : 
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :         scsi_init_inquiry(xs, SI_EVPD, EMC_VPD_SP_INFO,</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :             sc-&gt;sc_pg, sizeof(*sc-&gt;sc_pg));</span>
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :         xs-&gt;done = emc_status_done;</span>
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         scsi_xs_exec(xs);</span>
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 : }</span>
+<a name="238"><span class="lineNum">     238 </span>            : </a>
+<span class="lineNum">     239 </span>            : void
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 : emc_status_done(struct scsi_xfer *xs)</span>
+<span class="lineNum">     241 </span>            : {
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         struct scsi_link *link = xs-&gt;sc_link;</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         struct emc_softc *sc = link-&gt;device_softc;</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :         struct emc_vpd_sp_info *pg = sc-&gt;sc_pg;</span>
+<span class="lineNum">     245 </span>            :         int status = MPATH_S_UNKNOWN;
+<span class="lineNum">     246 </span>            : 
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         if (xs-&gt;error == XS_NOERROR) {</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :                 status = (pg-&gt;lun_state == EMC_SP_INFO_LUN_STATE_OWNED) ?</span>
+<span class="lineNum">     249 </span>            :                     MPATH_S_ACTIVE : MPATH_S_PASSIVE;
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     251 </span>            : 
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         scsi_xs_put(xs);</span>
+<span class="lineNum">     253 </span>            : 
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         mpath_path_status(&amp;sc-&gt;sc_path, status);</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 : }</span>
+<a name="256"><span class="lineNum">     256 </span>            : </a>
+<span class="lineNum">     257 </span>            : int
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 : emc_sp_info(struct emc_softc *sc, int *sp)</span>
+<span class="lineNum">     259 </span>            : {
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         struct emc_vpd_sp_info *pg = sc-&gt;sc_pg;</span>
+<span class="lineNum">     261 </span>            :         int error;
+<span class="lineNum">     262 </span>            : 
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :         error = scsi_inquire_vpd(sc-&gt;sc_path.p_link, pg, sizeof(*pg),</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :             EMC_VPD_SP_INFO, scsi_autoconf);</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         if (error != 0)</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">     267 </span>            : 
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         *sp = pg-&gt;current_sp;</span>
+<span class="lineNum">     269 </span>            : 
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :         printf(&quot;%s: SP-%c port %d\n&quot;, DEVNAME(sc), pg-&gt;current_sp + 'A',</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :             pg-&gt;port);</span>
+<span class="lineNum">     272 </span>            : 
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,1241 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - net80211/ieee80211_pae_input.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">net80211</a> - ieee80211_pae_input.c<span style="font-size: 80%;"> (source / <a href="ieee80211_pae_input.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">523</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: ieee80211_pae_input.c,v 1.31 2017/10/16 10:39:41 stsp Exp $   */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*-
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2007,2008 Damien Bergamini &lt;damien.bergamini@free.fr&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /*
+<span class="lineNum">      20 </span>            :  * This code implements the 4-Way Handshake and Group Key Handshake protocols
+<span class="lineNum">      21 </span>            :  * (both Supplicant and Authenticator Key Receive state machines) defined in
+<span class="lineNum">      22 </span>            :  * IEEE Std 802.11-2007 section 8.5.
+<span class="lineNum">      23 </span>            :  */
+<span class="lineNum">      24 </span>            : 
+<span class="lineNum">      25 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/sockio.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/errno.h&gt;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;net/if_dl.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;net/if_media.h&gt;
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;netinet/if_ether.h&gt;
+<span class="lineNum">      39 </span>            : 
+<span class="lineNum">      40 </span>            : #include &lt;net80211/ieee80211_var.h&gt;
+<span class="lineNum">      41 </span>            : #include &lt;net80211/ieee80211_priv.h&gt;
+<span class="lineNum">      42 </span>            : 
+<span class="lineNum">      43 </span>            : void    ieee80211_recv_4way_msg1(struct ieee80211com *,
+<span class="lineNum">      44 </span>            :             struct ieee80211_eapol_key *, struct ieee80211_node *);
+<span class="lineNum">      45 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">      46 </span>            : void    ieee80211_recv_4way_msg2(struct ieee80211com *,
+<span class="lineNum">      47 </span>            :             struct ieee80211_eapol_key *, struct ieee80211_node *,
+<span class="lineNum">      48 </span>            :             const u_int8_t *);
+<span class="lineNum">      49 </span>            : #endif
+<span class="lineNum">      50 </span>            : int     ieee80211_must_update_group_key(struct ieee80211_key *, const uint8_t *,
+<span class="lineNum">      51 </span>            :             int);
+<span class="lineNum">      52 </span>            : void    ieee80211_recv_4way_msg3(struct ieee80211com *,
+<span class="lineNum">      53 </span>            :             struct ieee80211_eapol_key *, struct ieee80211_node *);
+<span class="lineNum">      54 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">      55 </span>            : void    ieee80211_recv_4way_msg4(struct ieee80211com *,
+<span class="lineNum">      56 </span>            :             struct ieee80211_eapol_key *, struct ieee80211_node *);
+<span class="lineNum">      57 </span>            : void    ieee80211_recv_4way_msg2or4(struct ieee80211com *,
+<span class="lineNum">      58 </span>            :             struct ieee80211_eapol_key *, struct ieee80211_node *);
+<span class="lineNum">      59 </span>            : #endif
+<span class="lineNum">      60 </span>            : void    ieee80211_recv_rsn_group_msg1(struct ieee80211com *,
+<span class="lineNum">      61 </span>            :             struct ieee80211_eapol_key *, struct ieee80211_node *);
+<span class="lineNum">      62 </span>            : void    ieee80211_recv_wpa_group_msg1(struct ieee80211com *,
+<span class="lineNum">      63 </span>            :             struct ieee80211_eapol_key *, struct ieee80211_node *);
+<span class="lineNum">      64 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">      65 </span>            : void    ieee80211_recv_group_msg2(struct ieee80211com *,
+<span class="lineNum">      66 </span>            :             struct ieee80211_eapol_key *, struct ieee80211_node *);
+<span class="lineNum">      67 </span>            : void    ieee80211_recv_eapol_key_req(struct ieee80211com *,
+<span class="lineNum">      68 </span>            :             struct ieee80211_eapol_key *, struct ieee80211_node *);
+<span class="lineNum">      69 </span>            : #endif
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : /*
+<span class="lineNum">      72 </span>            :  * Process an incoming EAPOL frame.  Notice that we are only interested in
+<span class="lineNum">      73 </span>            :  * EAPOL-Key frames with an IEEE 802.11 or WPA descriptor type.
+<a name="74"><span class="lineNum">      74 </span>            :  */</a>
+<span class="lineNum">      75 </span>            : void
+<span class="lineNum">      76 </span><span class="lineNoCov">          0 : ieee80211_eapol_key_input(struct ieee80211com *ic, struct mbuf *m,</span>
+<span class="lineNum">      77 </span>            :     struct ieee80211_node *ni)
+<span class="lineNum">      78 </span>            : {
+<span class="lineNum">      79 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;ic-&gt;ic_if;</span>
+<span class="lineNum">      80 </span>            :         struct ether_header *eh;
+<span class="lineNum">      81 </span>            :         struct ieee80211_eapol_key *key;
+<span class="lineNum">      82 </span>            :         u_int16_t info, desc;
+<span class="lineNum">      83 </span>            :         int totlen, bodylen, paylen;
+<span class="lineNum">      84 </span>            : 
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ibytes += m-&gt;m_pkthdr.len;</span>
+<span class="lineNum">      86 </span>            : 
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :         eh = mtod(m, struct ether_header *);</span>
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :         if (IEEE80211_IS_MULTICAST(eh-&gt;ether_dhost)) {</span>
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_imcasts++;</span>
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">      91 </span>            :         }
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 :         m_adj(m, sizeof(*eh));</span>
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :         if (m-&gt;m_pkthdr.len &lt; sizeof(*key))</span>
+<span class="lineNum">      95 </span>            :                 goto done;
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :         if (m-&gt;m_len &lt; sizeof(*key) &amp;&amp;</span>
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :             (m = m_pullup(m, sizeof(*key))) == NULL) {</span>
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_nombuf++;</span>
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     100 </span>            :         }
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :         key = mtod(m, struct ieee80211_eapol_key *);</span>
+<span class="lineNum">     102 </span>            : 
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :         if (key-&gt;type != EAPOL_KEY)</span>
+<span class="lineNum">     104 </span>            :                 goto done;
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :         ic-&gt;ic_stats.is_rx_eapol_key++;</span>
+<span class="lineNum">     106 </span>            : 
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         if ((ni-&gt;ni_rsnprotos == IEEE80211_PROTO_RSN &amp;&amp;</span>
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :              key-&gt;desc != EAPOL_KEY_DESC_IEEE80211) ||</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :             (ni-&gt;ni_rsnprotos == IEEE80211_PROTO_WPA &amp;&amp;</span>
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :              key-&gt;desc != EAPOL_KEY_DESC_WPA))</span>
+<span class="lineNum">     111 </span>            :                 goto done;
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span>            :         /* check packet body length */
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         bodylen = BE_READ_2(key-&gt;len);</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         totlen = 4 + bodylen;</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         if (m-&gt;m_pkthdr.len &lt; totlen || totlen &gt; MCLBYTES)</span>
+<span class="lineNum">     117 </span>            :                 goto done;
+<span class="lineNum">     118 </span>            : 
+<span class="lineNum">     119 </span>            :         /* check key data length */
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         paylen = BE_READ_2(key-&gt;paylen);</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :         if (paylen &gt; totlen - sizeof(*key))</span>
+<span class="lineNum">     122 </span>            :                 goto done;
+<span class="lineNum">     123 </span>            : 
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         info = BE_READ_2(key-&gt;info);</span>
+<span class="lineNum">     125 </span>            : 
+<span class="lineNum">     126 </span>            :         /* discard EAPOL-Key frames with an unknown descriptor version */
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :         desc = info &amp; EAPOL_KEY_VERSION_MASK;</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         if (desc &lt; EAPOL_KEY_DESC_V1 || desc &gt; EAPOL_KEY_DESC_V3)</span>
+<span class="lineNum">     129 </span>            :                 goto done;
+<span class="lineNum">     130 </span>            : 
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :         if (ieee80211_is_sha256_akm(ni-&gt;ni_rsnakms)) {</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :                 if (desc != EAPOL_KEY_DESC_V3)</span>
+<span class="lineNum">     133 </span>            :                         goto done;
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         } else if (ni-&gt;ni_rsncipher == IEEE80211_CIPHER_CCMP ||</span>
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :              ni-&gt;ni_rsngroupcipher == IEEE80211_CIPHER_CCMP) {</span>
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :                 if (desc != EAPOL_KEY_DESC_V2)</span>
+<span class="lineNum">     137 </span>            :                         goto done;
+<span class="lineNum">     138 </span>            :         }
+<span class="lineNum">     139 </span>            : 
+<span class="lineNum">     140 </span>            :         /* make sure the key data field is contiguous */
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         if (m-&gt;m_len &lt; totlen &amp;&amp; (m = m_pullup(m, totlen)) == NULL) {</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_nombuf++;</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :                 goto done;</span>
+<span class="lineNum">     144 </span>            :         }
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         key = mtod(m, struct ieee80211_eapol_key *);</span>
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span>            :         /* determine message type (see 8.5.3.7) */
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         if (info &amp; EAPOL_KEY_REQUEST) {</span>
+<span class="lineNum">     149 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     150 </span>            :                 /* EAPOL-Key Request frame */
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :                 ieee80211_recv_eapol_key_req(ic, key, ni);</span>
+<span class="lineNum">     152 </span>            : #endif
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         } else if (info &amp; EAPOL_KEY_PAIRWISE) {</span>
+<span class="lineNum">     154 </span>            :                 /* 4-Way Handshake */
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :                 if (info &amp; EAPOL_KEY_KEYMIC) {</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :                         if (info &amp; EAPOL_KEY_KEYACK)</span>
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :                                 ieee80211_recv_4way_msg3(ic, key, ni);</span>
+<span class="lineNum">     158 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     159 </span>            :                         else
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :                                 ieee80211_recv_4way_msg2or4(ic, key, ni);</span>
+<span class="lineNum">     161 </span>            : #endif
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                 } else if (info &amp; EAPOL_KEY_KEYACK)</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                         ieee80211_recv_4way_msg1(ic, key, ni);</span>
+<span class="lineNum">     164 </span>            :         } else {
+<span class="lineNum">     165 </span>            :                 /* Group Key Handshake */
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 if (!(info &amp; EAPOL_KEY_KEYMIC))</span>
+<span class="lineNum">     167 </span>            :                         goto done;
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                 if (info &amp; EAPOL_KEY_KEYACK) {</span>
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :                         if (key-&gt;desc == EAPOL_KEY_DESC_WPA)</span>
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :                                 ieee80211_recv_wpa_group_msg1(ic, key, ni);</span>
+<span class="lineNum">     171 </span>            :                         else
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :                                 ieee80211_recv_rsn_group_msg1(ic, key, ni);</span>
+<span class="lineNum">     173 </span>            :                 }
+<span class="lineNum">     174 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     175 </span>            :                 else
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                         ieee80211_recv_group_msg2(ic, key, ni);</span>
+<span class="lineNum">     177 </span>            : #endif
+<span class="lineNum">     178 </span>            :         }
+<span class="lineNum">     179 </span>            :  done:
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         m_freem(m);</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     182 </span>            : 
+<span class="lineNum">     183 </span>            : /*
+<span class="lineNum">     184 </span>            :  * Process Message 1 of the 4-Way Handshake (sent by Authenticator).
+<a name="185"><span class="lineNum">     185 </span>            :  */</a>
+<span class="lineNum">     186 </span>            : void
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 : ieee80211_recv_4way_msg1(struct ieee80211com *ic,</span>
+<span class="lineNum">     188 </span>            :     struct ieee80211_eapol_key *key, struct ieee80211_node *ni)
+<span class="lineNum">     189 </span>            : {
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         struct ieee80211_ptk tptk;</span>
+<span class="lineNum">     191 </span>            :         struct ieee80211_pmk *pmk;
+<span class="lineNum">     192 </span>            :         const u_int8_t *frm, *efrm;
+<span class="lineNum">     193 </span>            :         const u_int8_t *pmkid;
+<span class="lineNum">     194 </span>            : 
+<span class="lineNum">     195 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_opmode != IEEE80211_M_STA &amp;&amp;</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :             ic-&gt;ic_opmode != IEEE80211_M_IBSS)</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     199 </span>            : #endif
+<span class="lineNum">     200 </span>            :         /* 
+<span class="lineNum">     201 </span>            :          * Message 1 is always expected while RSN is active since some
+<span class="lineNum">     202 </span>            :          * APs will rekey the PTK by sending Msg1/4 after some time.
+<span class="lineNum">     203 </span>            :          */
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsn_supp_state == RSNA_SUPP_INITIALIZE) {</span>
+<span class="lineNum">     205 </span>            :                 DPRINTF((&quot;unexpected in state: %d\n&quot;, ni-&gt;ni_rsn_supp_state));
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     207 </span>            :         }
+<span class="lineNum">     208 </span>            :         /* enforce monotonicity of key request replay counter */
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_replaycnt_ok &amp;&amp;</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :             BE_READ_8(key-&gt;replaycnt) &lt;= ni-&gt;ni_replaycnt) {</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_replay++;</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     213 </span>            :         }
+<span class="lineNum">     214 </span>            : 
+<span class="lineNum">     215 </span>            :         /* parse key data field (may contain an encapsulated PMKID) */
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :         frm = (const u_int8_t *)&amp;key[1];</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         efrm = frm + BE_READ_2(key-&gt;paylen);</span>
+<span class="lineNum">     218 </span>            : 
+<span class="lineNum">     219 </span>            :         pmkid = NULL;
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :         while (frm + 2 &lt;= efrm) {</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                 if (frm + 2 + frm[1] &gt; efrm)</span>
+<span class="lineNum">     222 </span>            :                         break;
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                 switch (frm[0]) {</span>
+<span class="lineNum">     224 </span>            :                 case IEEE80211_ELEMID_VENDOR:
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                         if (frm[1] &lt; 4)</span>
+<span class="lineNum">     226 </span>            :                                 break;
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                         if (memcmp(&amp;frm[2], IEEE80211_OUI, 3) == 0) {</span>
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                                 switch (frm[5]) {</span>
+<span class="lineNum">     229 </span>            :                                 case IEEE80211_KDE_PMKID:
+<span class="lineNum">     230 </span>            :                                         pmkid = frm;
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                                         break;</span>
+<span class="lineNum">     232 </span>            :                                 }
+<span class="lineNum">     233 </span>            :                         }
+<span class="lineNum">     234 </span>            :                         break;
+<span class="lineNum">     235 </span>            :                 }
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :                 frm += 2 + frm[1];</span>
+<span class="lineNum">     237 </span>            :         }
+<span class="lineNum">     238 </span>            :         /* check that the PMKID KDE is valid (if present) */
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :         if (pmkid != NULL &amp;&amp; pmkid[1] != 4 + 16)</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     241 </span>            : 
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         if (ieee80211_is_8021x_akm(ni-&gt;ni_rsnakms)) {</span>
+<span class="lineNum">     243 </span>            :                 /* retrieve the PMK for this (AP,PMKID) */
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :                 pmk = ieee80211_pmksa_find(ic, ni,</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                     (pmkid != NULL) ? &amp;pmkid[6] : NULL);</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :                 if (pmk == NULL) {</span>
+<span class="lineNum">     247 </span>            :                         DPRINTF((&quot;no PMK available for %s\n&quot;,
+<span class="lineNum">     248 </span>            :                             ether_sprintf(ni-&gt;ni_macaddr)));
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     250 </span>            :                 }
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :                 memcpy(ni-&gt;ni_pmk, pmk-&gt;pmk_key, IEEE80211_PMK_LEN);</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         } else  /* use pre-shared key */</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :                 memcpy(ni-&gt;ni_pmk, ic-&gt;ic_psk, IEEE80211_PMK_LEN);</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         ni-&gt;ni_flags |= IEEE80211_NODE_PMK;</span>
+<span class="lineNum">     255 </span>            : 
+<span class="lineNum">     256 </span>            :         /* save authenticator's nonce (ANonce) */
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         memcpy(ni-&gt;ni_nonce, key-&gt;nonce, EAPOL_KEY_NONCE_LEN);</span>
+<span class="lineNum">     258 </span>            : 
+<span class="lineNum">     259 </span>            :         /* generate supplicant's nonce (SNonce) */
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         arc4random_buf(ic-&gt;ic_nonce, EAPOL_KEY_NONCE_LEN);</span>
+<span class="lineNum">     261 </span>            : 
+<span class="lineNum">     262 </span>            :         /* TPTK = CalcPTK(PMK, ANonce, SNonce) */
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :         ieee80211_derive_ptk(ni-&gt;ni_rsnakms, ni-&gt;ni_pmk, ni-&gt;ni_macaddr,</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :             ic-&gt;ic_myaddr, ni-&gt;ni_nonce, ic-&gt;ic_nonce, &amp;tptk);</span>
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span>            :         /* We are now expecting a new pairwise key. */
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         ni-&gt;ni_flags |= IEEE80211_NODE_RSN_NEW_PTK;</span>
+<span class="lineNum">     268 </span>            : 
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_if.if_flags &amp; IFF_DEBUG)</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: received msg %d/%d of the %s handshake from %s\n&quot;,</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :                     ic-&gt;ic_if.if_xname, 1, 4, &quot;4-way&quot;,</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                     ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">     273 </span>            : 
+<span class="lineNum">     274 </span>            :         /* send message 2 to authenticator using TPTK */
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         (void)ieee80211_send_4way_msg2(ic, ni, key-&gt;replaycnt, &amp;tptk);</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     277 </span>            : 
+<span class="lineNum">     278 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     279 </span>            : /*
+<span class="lineNum">     280 </span>            :  * Process Message 2 of the 4-Way Handshake (sent by Supplicant).
+<a name="281"><span class="lineNum">     281 </span>            :  */</a>
+<span class="lineNum">     282 </span>            : void
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 : ieee80211_recv_4way_msg2(struct ieee80211com *ic,</span>
+<span class="lineNum">     284 </span>            :     struct ieee80211_eapol_key *key, struct ieee80211_node *ni,
+<span class="lineNum">     285 </span>            :     const u_int8_t *rsnie)
+<span class="lineNum">     286 </span>            : {
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         struct ieee80211_ptk tptk;</span>
+<span class="lineNum">     288 </span>            : 
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_opmode != IEEE80211_M_HOSTAP &amp;&amp;</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :             ic-&gt;ic_opmode != IEEE80211_M_IBSS)</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     292 </span>            : 
+<span class="lineNum">     293 </span>            :         /* discard if we're not expecting this message */
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsn_state != RSNA_PTKSTART &amp;&amp;</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :             ni-&gt;ni_rsn_state != RSNA_PTKCALCNEGOTIATING) {</span>
+<span class="lineNum">     296 </span>            :                 DPRINTF((&quot;unexpected in state: %d\n&quot;, ni-&gt;ni_rsn_state));
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     298 </span>            :         }
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :         ni-&gt;ni_rsn_state = RSNA_PTKCALCNEGOTIATING;</span>
+<span class="lineNum">     300 </span>            : 
+<span class="lineNum">     301 </span>            :         /* NB: replay counter has already been verified by caller */
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span>            :         /* PTK = CalcPTK(ANonce, SNonce) */
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         ieee80211_derive_ptk(ni-&gt;ni_rsnakms, ni-&gt;ni_pmk, ic-&gt;ic_myaddr,</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :             ni-&gt;ni_macaddr, ni-&gt;ni_nonce, key-&gt;nonce, &amp;tptk);</span>
+<span class="lineNum">     306 </span>            : 
+<span class="lineNum">     307 </span>            :         /* check Key MIC field using KCK */
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         if (ieee80211_eapol_key_check_mic(key, tptk.kck) != 0) {</span>
+<span class="lineNum">     309 </span>            :                 DPRINTF((&quot;key MIC failed\n&quot;));
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_badmic++;</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 return; /* will timeout.. */</span>
+<span class="lineNum">     312 </span>            :         }
+<span class="lineNum">     313 </span>            : 
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :         timeout_del(&amp;ni-&gt;ni_eapol_to);</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :         ni-&gt;ni_rsn_state = RSNA_PTKCALCNEGOTIATING_2;</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         ni-&gt;ni_rsn_retries = 0;</span>
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span>            :         /* install TPTK as PTK now that MIC is verified */
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :         memcpy(&amp;ni-&gt;ni_ptk, &amp;tptk, sizeof(tptk));</span>
+<span class="lineNum">     320 </span>            : 
+<span class="lineNum">     321 </span>            :         /*
+<span class="lineNum">     322 </span>            :          * The RSN IE must match bit-wise with what the STA included in its
+<span class="lineNum">     323 </span>            :          * (Re)Association Request.
+<span class="lineNum">     324 </span>            :          */
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsnie == NULL || rsnie[1] != ni-&gt;ni_rsnie[1] ||</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :             memcmp(rsnie, ni-&gt;ni_rsnie, 2 + rsnie[1]) != 0) {</span>
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :                 IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_DEAUTH,</span>
+<span class="lineNum">     328 </span>            :                     IEEE80211_REASON_RSN_DIFFERENT_IE);
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                 ieee80211_node_leave(ic, ni);</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     331 </span>            :         }
+<span class="lineNum">     332 </span>            : 
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_if.if_flags &amp; IFF_DEBUG)</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: received msg %d/%d of the %s handshake from %s\n&quot;,</span>
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                     ic-&gt;ic_if.if_xname, 2, 4, &quot;4-way&quot;,</span>
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :                     ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span>            :         /* send message 3 to supplicant */
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         (void)ieee80211_send_4way_msg3(ic, ni);</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     341 </span>            : #endif  /* IEEE80211_STA_ONLY */
+<span class="lineNum">     342 </span>            : 
+<span class="lineNum">     343 </span>            : /* 
+<span class="lineNum">     344 </span>            :  * Check if a group key must be updated with a new GTK from an EAPOL frame.
+<span class="lineNum">     345 </span>            :  * Manipulated group key handshake messages could trick clients into
+<span class="lineNum">     346 </span>            :  * reinstalling an already used group key and hence lower or reset the
+<span class="lineNum">     347 </span>            :  * associated replay counter. This check prevents such attacks.
+<a name="348"><span class="lineNum">     348 </span>            :  */</a>
+<span class="lineNum">     349 </span>            : int
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 : ieee80211_must_update_group_key(struct ieee80211_key *k, const uint8_t *gtk,</span>
+<span class="lineNum">     351 </span>            :     int len)
+<span class="lineNum">     352 </span>            : {
+<span class="lineNum">     353 </span><span class="lineNoCov">          0 :         return (k-&gt;k_cipher == IEEE80211_CIPHER_NONE || k-&gt;k_len != len ||</span>
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :             memcmp(k-&gt;k_key, gtk, len) != 0);</span>
+<span class="lineNum">     355 </span>            : }
+<span class="lineNum">     356 </span>            : 
+<span class="lineNum">     357 </span>            : /*
+<span class="lineNum">     358 </span>            :  * Process Message 3 of the 4-Way Handshake (sent by Authenticator).
+<a name="359"><span class="lineNum">     359 </span>            :  */</a>
+<span class="lineNum">     360 </span>            : void
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 : ieee80211_recv_4way_msg3(struct ieee80211com *ic,</span>
+<span class="lineNum">     362 </span>            :     struct ieee80211_eapol_key *key, struct ieee80211_node *ni)
+<span class="lineNum">     363 </span>            : {
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :         struct ieee80211_ptk tptk;</span>
+<span class="lineNum">     365 </span>            :         struct ieee80211_key *k;
+<span class="lineNum">     366 </span>            :         const u_int8_t *frm, *efrm;
+<span class="lineNum">     367 </span>            :         const u_int8_t *rsnie1, *rsnie2, *gtk, *igtk;
+<span class="lineNum">     368 </span>            :         u_int16_t info, reason = 0;
+<span class="lineNum">     369 </span>            :         int keylen;
+<span class="lineNum">     370 </span>            : 
+<span class="lineNum">     371 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_opmode != IEEE80211_M_STA &amp;&amp;</span>
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :             ic-&gt;ic_opmode != IEEE80211_M_IBSS)</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     375 </span>            : #endif
+<span class="lineNum">     376 </span>            :         /* discard if we're not expecting this message */
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsn_supp_state != RSNA_SUPP_PTKNEGOTIATING &amp;&amp;</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :             ni-&gt;ni_rsn_supp_state != RNSA_SUPP_PTKDONE) {</span>
+<span class="lineNum">     379 </span>            :                 DPRINTF((&quot;unexpected in state: %d\n&quot;, ni-&gt;ni_rsn_supp_state));
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     381 </span>            :         }
+<span class="lineNum">     382 </span>            :         /* enforce monotonicity of key request replay counter */
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_replaycnt_ok &amp;&amp;</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :             BE_READ_8(key-&gt;replaycnt) &lt;= ni-&gt;ni_replaycnt) {</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_replay++;</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     387 </span>            :         }
+<span class="lineNum">     388 </span>            :         /* make sure that a PMK has been selected */
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         if (!(ni-&gt;ni_flags &amp; IEEE80211_NODE_PMK)) {</span>
+<span class="lineNum">     390 </span>            :                 DPRINTF((&quot;no PMK found for %s\n&quot;,
+<span class="lineNum">     391 </span>            :                     ether_sprintf(ni-&gt;ni_macaddr)));
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     393 </span>            :         }
+<span class="lineNum">     394 </span>            :         /* check that ANonce matches that of Message 1 */
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         if (memcmp(key-&gt;nonce, ni-&gt;ni_nonce, EAPOL_KEY_NONCE_LEN) != 0) {</span>
+<span class="lineNum">     396 </span>            :                 DPRINTF((&quot;ANonce does not match msg 1/4\n&quot;));
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     398 </span>            :         }
+<span class="lineNum">     399 </span>            :         /* TPTK = CalcPTK(PMK, ANonce, SNonce) */
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :         ieee80211_derive_ptk(ni-&gt;ni_rsnakms, ni-&gt;ni_pmk, ni-&gt;ni_macaddr,</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :             ic-&gt;ic_myaddr, key-&gt;nonce, ic-&gt;ic_nonce, &amp;tptk);</span>
+<span class="lineNum">     402 </span>            : 
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :         info = BE_READ_2(key-&gt;info);</span>
+<span class="lineNum">     404 </span>            : 
+<span class="lineNum">     405 </span>            :         /* check Key MIC field using KCK */
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :         if (ieee80211_eapol_key_check_mic(key, tptk.kck) != 0) {</span>
+<span class="lineNum">     407 </span>            :                 DPRINTF((&quot;key MIC failed\n&quot;));
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_badmic++;</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     410 </span>            :         }
+<span class="lineNum">     411 </span>            :         /* install TPTK as PTK now that MIC is verified */
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :         memcpy(&amp;ni-&gt;ni_ptk, &amp;tptk, sizeof(tptk));</span>
+<span class="lineNum">     413 </span>            : 
+<span class="lineNum">     414 </span>            :         /* if encrypted, decrypt Key Data field using KEK */
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :         if ((info &amp; EAPOL_KEY_ENCRYPTED) &amp;&amp;</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :             ieee80211_eapol_key_decrypt(key, ni-&gt;ni_ptk.kek) != 0) {</span>
+<span class="lineNum">     417 </span>            :                 DPRINTF((&quot;decryption failed\n&quot;));
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     419 </span>            :         }
+<span class="lineNum">     420 </span>            : 
+<span class="lineNum">     421 </span>            :         /* parse key data field */
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :         frm = (const u_int8_t *)&amp;key[1];</span>
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         efrm = frm + BE_READ_2(key-&gt;paylen);</span>
+<span class="lineNum">     424 </span>            : 
+<span class="lineNum">     425 </span>            :         /*
+<span class="lineNum">     426 </span>            :          * Some WPA1+WPA2 APs (like hostapd) appear to include both WPA and
+<span class="lineNum">     427 </span>            :          * RSN IEs in message 3/4.  We only take into account the IE of the
+<span class="lineNum">     428 </span>            :          * version of the protocol we negotiated at association time.
+<span class="lineNum">     429 </span>            :          */
+<span class="lineNum">     430 </span>            :         rsnie1 = rsnie2 = gtk = igtk = NULL;
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :         while (frm + 2 &lt;= efrm) {</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                 if (frm + 2 + frm[1] &gt; efrm)</span>
+<span class="lineNum">     433 </span>            :                         break;
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :                 switch (frm[0]) {</span>
+<span class="lineNum">     435 </span>            :                 case IEEE80211_ELEMID_RSN:
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :                         if (ni-&gt;ni_rsnprotos != IEEE80211_PROTO_RSN)</span>
+<span class="lineNum">     437 </span>            :                                 break;
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                         if (rsnie1 == NULL)</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :                                 rsnie1 = frm;</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :                         else if (rsnie2 == NULL)</span>
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                                 rsnie2 = frm;</span>
+<span class="lineNum">     442 </span>            :                         /* ignore others if more than two RSN IEs */
+<span class="lineNum">     443 </span>            :                         break;
+<span class="lineNum">     444 </span>            :                 case IEEE80211_ELEMID_VENDOR:
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                         if (frm[1] &lt; 4)</span>
+<span class="lineNum">     446 </span>            :                                 break;
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                         if (memcmp(&amp;frm[2], IEEE80211_OUI, 3) == 0) {</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                                 switch (frm[5]) {</span>
+<span class="lineNum">     449 </span>            :                                 case IEEE80211_KDE_GTK:
+<span class="lineNum">     450 </span>            :                                         gtk = frm;
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :                                         break;</span>
+<span class="lineNum">     452 </span>            :                                 case IEEE80211_KDE_IGTK:
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                                         if (ni-&gt;ni_flags &amp; IEEE80211_NODE_MFP)</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :                                                 igtk = frm;</span>
+<span class="lineNum">     455 </span>            :                                         break;
+<span class="lineNum">     456 </span>            :                                 }
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                         } else if (memcmp(&amp;frm[2], MICROSOFT_OUI, 3) == 0) {</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :                                 switch (frm[5]) {</span>
+<span class="lineNum">     459 </span>            :                                 case 1: /* WPA */
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :                                         if (ni-&gt;ni_rsnprotos !=</span>
+<span class="lineNum">     461 </span>            :                                             IEEE80211_PROTO_WPA)
+<span class="lineNum">     462 </span>            :                                                 break;
+<span class="lineNum">     463 </span>            :                                         rsnie1 = frm;
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :                                         break;</span>
+<span class="lineNum">     465 </span>            :                                 }
+<span class="lineNum">     466 </span>            :                         }
+<span class="lineNum">     467 </span>            :                         break;
+<span class="lineNum">     468 </span>            :                 }
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :                 frm += 2 + frm[1];</span>
+<span class="lineNum">     470 </span>            :         }
+<span class="lineNum">     471 </span>            :         /* first WPA/RSN IE is mandatory */
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :         if (rsnie1 == NULL) {</span>
+<span class="lineNum">     473 </span>            :                 DPRINTF((&quot;missing RSN IE\n&quot;));
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     475 </span>            :         }
+<span class="lineNum">     476 </span>            :         /* key data must be encrypted if GTK is included */
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :         if (gtk != NULL &amp;&amp; !(info &amp; EAPOL_KEY_ENCRYPTED)) {</span>
+<span class="lineNum">     478 </span>            :                 DPRINTF((&quot;GTK not encrypted\n&quot;));
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     480 </span>            :         }
+<span class="lineNum">     481 </span>            :         /* GTK KDE must be included if IGTK KDE is present */
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :         if (igtk != NULL &amp;&amp; gtk == NULL) {</span>
+<span class="lineNum">     483 </span>            :                 DPRINTF((&quot;IGTK KDE found but GTK KDE missing\n&quot;));
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     485 </span>            :         }
+<span class="lineNum">     486 </span>            :         /* check that the Install bit is set if using pairwise keys */
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsncipher != IEEE80211_CIPHER_USEGROUP &amp;&amp;</span>
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :             !(info &amp; EAPOL_KEY_INSTALL)) {</span>
+<span class="lineNum">     489 </span>            :                 DPRINTF((&quot;pairwise cipher but !Install\n&quot;));
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     491 </span>            :         }
+<span class="lineNum">     492 </span>            : 
+<span class="lineNum">     493 </span>            :         /*
+<span class="lineNum">     494 </span>            :          * Check that first WPA/RSN IE is identical to the one received in
+<span class="lineNum">     495 </span>            :          * the beacon or probe response frame.
+<span class="lineNum">     496 </span>            :          */
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsnie == NULL || rsnie1[1] != ni-&gt;ni_rsnie[1] ||</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :             memcmp(rsnie1, ni-&gt;ni_rsnie, 2 + rsnie1[1]) != 0) {</span>
+<span class="lineNum">     499 </span>            :                 reason = IEEE80211_REASON_RSN_DIFFERENT_IE;
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :                 goto deauth;</span>
+<span class="lineNum">     501 </span>            :         }
+<span class="lineNum">     502 </span>            : 
+<span class="lineNum">     503 </span>            :         /*
+<span class="lineNum">     504 </span>            :          * If a second RSN information element is present, use its pairwise
+<span class="lineNum">     505 </span>            :          * cipher suite or deauthenticate.
+<span class="lineNum">     506 </span>            :          */
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :         if (rsnie2 != NULL) {</span>
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :                 struct ieee80211_rsnparams rsn;</span>
+<span class="lineNum">     509 </span>            : 
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :                 if (ieee80211_parse_rsn(ic, rsnie2, &amp;rsn) == 0) {</span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :                         if (rsn.rsn_akms != ni-&gt;ni_rsnakms ||</span>
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :                             rsn.rsn_groupcipher != ni-&gt;ni_rsngroupcipher ||</span>
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :                             rsn.rsn_nciphers != 1 ||</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                             !(rsn.rsn_ciphers &amp; ic-&gt;ic_rsnciphers)) {</span>
+<span class="lineNum">     515 </span>            :                                 reason = IEEE80211_REASON_BAD_PAIRWISE_CIPHER;
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :                                 goto deauth;</span>
+<span class="lineNum">     517 </span>            :                         }
+<span class="lineNum">     518 </span>            :                         /* use pairwise cipher suite of second RSN IE */
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_rsnciphers = rsn.rsn_ciphers;</span>
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_rsncipher = ni-&gt;ni_rsnciphers;</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     523 </span>            : 
+<span class="lineNum">     524 </span>            :         /* update the last seen value of the key replay counter field */
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :         ni-&gt;ni_replaycnt = BE_READ_8(key-&gt;replaycnt);</span>
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :         ni-&gt;ni_replaycnt_ok = 1;</span>
+<span class="lineNum">     527 </span>            : 
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_if.if_flags &amp; IFF_DEBUG)</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: received msg %d/%d of the %s handshake from %s\n&quot;,</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :                     ic-&gt;ic_if.if_xname, 3, 4, &quot;4-way&quot;,</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :                     ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">     532 </span>            : 
+<span class="lineNum">     533 </span>            :         /* send message 4 to authenticator */
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :         if (ieee80211_send_4way_msg4(ic, ni) != 0)</span>
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                 return; /* ..authenticator will retry */</span>
+<span class="lineNum">     536 </span>            : 
+<span class="lineNum">     537 </span>            :         /* 
+<span class="lineNum">     538 </span>            :          * Only install a new pairwise key if we are still expecting a new key,
+<span class="lineNum">     539 </span>            :          * as indicated by the NODE_RSN_NEW_PTK flag. An adversary could be
+<span class="lineNum">     540 </span>            :          * sending manipulated retransmissions of message 3 of the 4-way
+<span class="lineNum">     541 </span>            :          * handshake in an attempt to trick us into reinstalling an already
+<span class="lineNum">     542 </span>            :          * used pairwise key. If this attack succeeded, the incremental nonce
+<span class="lineNum">     543 </span>            :          * and replay counter associated with the key would be reset.
+<span class="lineNum">     544 </span>            :          * Against CCMP, the adversary could abuse this to replay and decrypt
+<span class="lineNum">     545 </span>            :          * packets. Against TKIP, it would become possible to replay, decrypt,
+<span class="lineNum">     546 </span>            :          * and forge packets.
+<span class="lineNum">     547 </span>            :          */
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsncipher != IEEE80211_CIPHER_USEGROUP &amp;&amp;</span>
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :             (ni-&gt;ni_flags &amp; IEEE80211_NODE_RSN_NEW_PTK)) {</span>
+<span class="lineNum">     550 </span>            :                 u_int64_t prsc;
+<span class="lineNum">     551 </span>            : 
+<span class="lineNum">     552 </span>            :                 /* check that key length matches that of pairwise cipher */
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 :                 keylen = ieee80211_cipher_keylen(ni-&gt;ni_rsncipher);</span>
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :                 if (BE_READ_2(key-&gt;keylen) != keylen) {</span>
+<span class="lineNum">     555 </span>            :                         reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :                         goto deauth;</span>
+<span class="lineNum">     557 </span>            :                 }
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :                 prsc = (gtk == NULL) ? LE_READ_6(key-&gt;rsc) : 0;</span>
+<span class="lineNum">     559 </span>            : 
+<span class="lineNum">     560 </span>            :                 /* map PTK to 802.11 key */
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                 k = &amp;ni-&gt;ni_pairwise_key;</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :                 memset(k, 0, sizeof(*k));</span>
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                 k-&gt;k_cipher = ni-&gt;ni_rsncipher;</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :                 k-&gt;k_rsc[0] = prsc;</span>
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :                 k-&gt;k_len = keylen;</span>
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :                 memcpy(k-&gt;k_key, ni-&gt;ni_ptk.tk, k-&gt;k_len);</span>
+<span class="lineNum">     567 </span>            :                 /* install the PTK */
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                 if ((*ic-&gt;ic_set_key)(ic, ni, k) != 0) {</span>
+<span class="lineNum">     569 </span>            :                         reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :                         goto deauth;</span>
+<span class="lineNum">     571 </span>            :                 }
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_flags &amp;= ~IEEE80211_NODE_RSN_NEW_PTK;</span>
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_flags &amp;= ~IEEE80211_NODE_TXRXPROT;</span>
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_flags |= IEEE80211_NODE_RXPROT;</span>
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 :         } else if (ni-&gt;ni_rsncipher != IEEE80211_CIPHER_USEGROUP)</span>
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: unexpected pairwise key update received from %s\n&quot;,</span>
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :                     ic-&gt;ic_if.if_xname, ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">     578 </span>            : 
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :         if (gtk != NULL) {</span>
+<span class="lineNum">     580 </span>            :                 u_int8_t kid;
+<span class="lineNum">     581 </span>            : 
+<span class="lineNum">     582 </span>            :                 /* check that key length matches that of group cipher */
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :                 keylen = ieee80211_cipher_keylen(ni-&gt;ni_rsngroupcipher);</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                 if (gtk[1] != 6 + keylen) {</span>
+<span class="lineNum">     585 </span>            :                         reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                         goto deauth;</span>
+<span class="lineNum">     587 </span>            :                 }
+<span class="lineNum">     588 </span>            :                 /* map GTK to 802.11 key */
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :                 kid = gtk[6] &amp; 3;</span>
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :                 k = &amp;ic-&gt;ic_nw_keys[kid];</span>
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :                 if (ieee80211_must_update_group_key(k, &amp;gtk[8], keylen)) {</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :                         memset(k, 0, sizeof(*k));</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :                         k-&gt;k_id = kid;       /* 0-3 */</span>
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :                         k-&gt;k_cipher = ni-&gt;ni_rsngroupcipher;</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                         k-&gt;k_flags = IEEE80211_KEY_GROUP;</span>
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :                         if (gtk[6] &amp; (1 &lt;&lt; 2))</span>
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :                                 k-&gt;k_flags |= IEEE80211_KEY_TX;</span>
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :                         k-&gt;k_rsc[0] = LE_READ_6(key-&gt;rsc);</span>
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :                         k-&gt;k_len = keylen;</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :                         memcpy(k-&gt;k_key, &amp;gtk[8], k-&gt;k_len);</span>
+<span class="lineNum">     601 </span>            :                         /* install the GTK */
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :                         if ((*ic-&gt;ic_set_key)(ic, ni, k) != 0) {</span>
+<span class="lineNum">     603 </span>            :                                 reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :                                 goto deauth;</span>
+<span class="lineNum">     605 </span>            :                         }
+<span class="lineNum">     606 </span>            :                 } else
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: reused group key update received from %s\n&quot;,</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                             ic-&gt;ic_if.if_xname, ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :         if (igtk != NULL) {     /* implies MFP &amp;&amp; gtk != NULL */</span>
+<span class="lineNum">     611 </span>            :                 u_int16_t kid;
+<span class="lineNum">     612 </span>            : 
+<span class="lineNum">     613 </span>            :                 /* check that the IGTK KDE is valid */
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                 if (igtk[1] != 4 + 24) {</span>
+<span class="lineNum">     615 </span>            :                         reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :                         goto deauth;</span>
+<span class="lineNum">     617 </span>            :                 }
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                 kid = LE_READ_2(&amp;igtk[6]);</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :                 if (kid != 4 &amp;&amp; kid != 5) {</span>
+<span class="lineNum">     620 </span>            :                         DPRINTF((&quot;unsupported IGTK id %u\n&quot;, kid));
+<span class="lineNum">     621 </span>            :                         reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :                         goto deauth;</span>
+<span class="lineNum">     623 </span>            :                 }
+<span class="lineNum">     624 </span>            :                 /* map IGTK to 802.11 key */
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :                 k = &amp;ic-&gt;ic_nw_keys[kid];</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                 if (ieee80211_must_update_group_key(k, &amp;igtk[14], 16)) {</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :                         memset(k, 0, sizeof(*k));</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                         k-&gt;k_id = kid;       /* either 4 or 5 */</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                         k-&gt;k_cipher = ni-&gt;ni_rsngroupmgmtcipher;</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :                         k-&gt;k_flags = IEEE80211_KEY_IGTK;</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                         k-&gt;k_mgmt_rsc = LE_READ_6(&amp;igtk[8]);     /* IPN */</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :                         k-&gt;k_len = 16;</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :                         memcpy(k-&gt;k_key, &amp;igtk[14], k-&gt;k_len);</span>
+<span class="lineNum">     634 </span>            :                         /* install the IGTK */
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :                         if ((*ic-&gt;ic_set_key)(ic, ni, k) != 0) {</span>
+<span class="lineNum">     636 </span>            :                                 reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :                                 goto deauth;</span>
+<span class="lineNum">     638 </span>            :                         }
+<span class="lineNum">     639 </span>            :                 } else
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: reused group key update received from %s\n&quot;,</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :                             ic-&gt;ic_if.if_xname, ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :         if (info &amp; EAPOL_KEY_INSTALL)</span>
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_flags |= IEEE80211_NODE_TXRXPROT;</span>
+<span class="lineNum">     645 </span>            : 
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :         if (info &amp; EAPOL_KEY_SECURE) {</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_flags |= IEEE80211_NODE_TXRXPROT;</span>
+<span class="lineNum">     648 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :                 if (ic-&gt;ic_opmode != IEEE80211_M_IBSS ||</span>
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :                     ++ni-&gt;ni_key_count == 2)</span>
+<span class="lineNum">     651 </span>            : #endif
+<span class="lineNum">     652 </span>            :                 {
+<span class="lineNum">     653 </span>            :                         DPRINTF((&quot;marking port %s valid\n&quot;,
+<span class="lineNum">     654 </span>            :                             ether_sprintf(ni-&gt;ni_macaddr)));
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_port_valid = 1;</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :                         ieee80211_set_link_state(ic, LINK_STATE_UP);</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     658 </span>            :         }
+<span class="lineNum">     659 </span>            :  deauth:
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         if (reason != 0) {</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                 IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_DEAUTH,</span>
+<span class="lineNum">     662 </span>            :                     reason);
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                 ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     666 </span>            : 
+<span class="lineNum">     667 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     668 </span>            : /*
+<span class="lineNum">     669 </span>            :  * Process Message 4 of the 4-Way Handshake (sent by Supplicant).
+<a name="670"><span class="lineNum">     670 </span>            :  */</a>
+<span class="lineNum">     671 </span>            : void
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 : ieee80211_recv_4way_msg4(struct ieee80211com *ic,</span>
+<span class="lineNum">     673 </span>            :     struct ieee80211_eapol_key *key, struct ieee80211_node *ni)
+<span class="lineNum">     674 </span>            : {
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_opmode != IEEE80211_M_HOSTAP &amp;&amp;</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :             ic-&gt;ic_opmode != IEEE80211_M_IBSS)</span>
+<span class="lineNum">     677 </span>            :                 return;
+<span class="lineNum">     678 </span>            : 
+<span class="lineNum">     679 </span>            :         /* discard if we're not expecting this message */
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsn_state != RSNA_PTKINITNEGOTIATING) {</span>
+<span class="lineNum">     681 </span>            :                 DPRINTF((&quot;unexpected in state: %d\n&quot;, ni-&gt;ni_rsn_state));
+<span class="lineNum">     682 </span>            :                 return;
+<span class="lineNum">     683 </span>            :         }
+<span class="lineNum">     684 </span>            : 
+<span class="lineNum">     685 </span>            :         /* NB: replay counter has already been verified by caller */
+<span class="lineNum">     686 </span>            : 
+<span class="lineNum">     687 </span>            :         /* check Key MIC field using KCK */
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :         if (ieee80211_eapol_key_check_mic(key, ni-&gt;ni_ptk.kck) != 0) {</span>
+<span class="lineNum">     689 </span>            :                 DPRINTF((&quot;key MIC failed\n&quot;));
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_badmic++;</span>
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :                 return; /* will timeout.. */</span>
+<span class="lineNum">     692 </span>            :         }
+<span class="lineNum">     693 </span>            : 
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :         timeout_del(&amp;ni-&gt;ni_eapol_to);</span>
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :         ni-&gt;ni_rsn_state = RSNA_PTKINITDONE;</span>
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :         ni-&gt;ni_rsn_retries = 0;</span>
+<span class="lineNum">     697 </span>            : 
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsncipher != IEEE80211_CIPHER_USEGROUP) {</span>
+<span class="lineNum">     699 </span>            :                 struct ieee80211_key *k;
+<span class="lineNum">     700 </span>            : 
+<span class="lineNum">     701 </span>            :                 /* map PTK to 802.11 key */
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :                 k = &amp;ni-&gt;ni_pairwise_key;</span>
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :                 memset(k, 0, sizeof(*k));</span>
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :                 k-&gt;k_cipher = ni-&gt;ni_rsncipher;</span>
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :                 k-&gt;k_len = ieee80211_cipher_keylen(k-&gt;k_cipher);</span>
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :                 memcpy(k-&gt;k_key, ni-&gt;ni_ptk.tk, k-&gt;k_len);</span>
+<span class="lineNum">     707 </span>            :                 /* install the PTK */
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :                 if ((*ic-&gt;ic_set_key)(ic, ni, k) != 0) {</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :                         IEEE80211_SEND_MGMT(ic, ni,</span>
+<span class="lineNum">     710 </span>            :                             IEEE80211_FC0_SUBTYPE_DEAUTH,
+<span class="lineNum">     711 </span>            :                             IEEE80211_REASON_ASSOC_TOOMANY);
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :                         ieee80211_node_leave(ic, ni);</span>
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">     714 </span>            :                 }
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_flags |= IEEE80211_NODE_TXRXPROT;</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_opmode != IEEE80211_M_IBSS || ++ni-&gt;ni_key_count == 2) {</span>
+<span class="lineNum">     718 </span>            :                 DPRINTF((&quot;marking port %s valid\n&quot;,
+<span class="lineNum">     719 </span>            :                     ether_sprintf(ni-&gt;ni_macaddr)));
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_port_valid = 1;</span>
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     722 </span>            : 
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_if.if_flags &amp; IFF_DEBUG)</span>
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: received msg %d/%d of the %s handshake from %s\n&quot;,</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :                     ic-&gt;ic_if.if_xname, 4, 4, &quot;4-way&quot;,</span>
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 :                     ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">     727 </span>            : 
+<span class="lineNum">     728 </span>            :         /* initiate a group key handshake for WPA */
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsnprotos == IEEE80211_PROTO_WPA)</span>
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :                 (void)ieee80211_send_group_msg1(ic, ni);</span>
+<span class="lineNum">     731 </span>            :         else
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_rsn_gstate = RSNA_IDLE;</span>
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     734 </span>            : 
+<span class="lineNum">     735 </span>            : /*
+<span class="lineNum">     736 </span>            :  * Differentiate Message 2 from Message 4 of the 4-Way Handshake based on
+<span class="lineNum">     737 </span>            :  * the presence of an RSN or WPA Information Element.
+<a name="738"><span class="lineNum">     738 </span>            :  */</a>
+<span class="lineNum">     739 </span>            : void
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 : ieee80211_recv_4way_msg2or4(struct ieee80211com *ic,</span>
+<span class="lineNum">     741 </span>            :     struct ieee80211_eapol_key *key, struct ieee80211_node *ni)
+<span class="lineNum">     742 </span>            : {
+<span class="lineNum">     743 </span>            :         const u_int8_t *frm, *efrm;
+<span class="lineNum">     744 </span>            :         const u_int8_t *rsnie;
+<span class="lineNum">     745 </span>            : 
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :         if (BE_READ_8(key-&gt;replaycnt) != ni-&gt;ni_replaycnt) {</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_replay++;</span>
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     749 </span>            :         }
+<span class="lineNum">     750 </span>            : 
+<span class="lineNum">     751 </span>            :         /* parse key data field (check if an RSN IE is present) */
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :         frm = (const u_int8_t *)&amp;key[1];</span>
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :         efrm = frm + BE_READ_2(key-&gt;paylen);</span>
+<span class="lineNum">     754 </span>            : 
+<span class="lineNum">     755 </span>            :         rsnie = NULL;
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         while (frm + 2 &lt;= efrm) {</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :                 if (frm + 2 + frm[1] &gt; efrm)</span>
+<span class="lineNum">     758 </span>            :                         break;
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :                 switch (frm[0]) {</span>
+<span class="lineNum">     760 </span>            :                 case IEEE80211_ELEMID_RSN:
+<span class="lineNum">     761 </span>            :                         rsnie = frm;
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     763 </span>            :                 case IEEE80211_ELEMID_VENDOR:
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :                         if (frm[1] &lt; 4)</span>
+<span class="lineNum">     765 </span>            :                                 break;
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :                         if (memcmp(&amp;frm[2], MICROSOFT_OUI, 3) == 0) {</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :                                 switch (frm[5]) {</span>
+<span class="lineNum">     768 </span>            :                                 case 1: /* WPA */
+<span class="lineNum">     769 </span>            :                                         rsnie = frm;
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :                                         break;</span>
+<span class="lineNum">     771 </span>            :                                 }
+<span class="lineNum">     772 </span>            :                         }
+<span class="lineNum">     773 </span>            :                 }
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :                 frm += 2 + frm[1];</span>
+<span class="lineNum">     775 </span>            :         }
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :         if (rsnie != NULL)</span>
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :                 ieee80211_recv_4way_msg2(ic, key, ni, rsnie);</span>
+<span class="lineNum">     778 </span>            :         else
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :                 ieee80211_recv_4way_msg4(ic, key, ni);</span>
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     781 </span>            : #endif  /* IEEE80211_STA_ONLY */
+<span class="lineNum">     782 </span>            : 
+<span class="lineNum">     783 </span>            : /*
+<span class="lineNum">     784 </span>            :  * Process Message 1 of the RSN Group Key Handshake (sent by Authenticator).
+<a name="785"><span class="lineNum">     785 </span>            :  */</a>
+<span class="lineNum">     786 </span>            : void
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 : ieee80211_recv_rsn_group_msg1(struct ieee80211com *ic,</span>
+<span class="lineNum">     788 </span>            :     struct ieee80211_eapol_key *key, struct ieee80211_node *ni)
+<span class="lineNum">     789 </span>            : {
+<span class="lineNum">     790 </span>            :         struct ieee80211_key *k;
+<span class="lineNum">     791 </span>            :         const u_int8_t *frm, *efrm;
+<span class="lineNum">     792 </span>            :         const u_int8_t *gtk, *igtk;
+<span class="lineNum">     793 </span>            :         u_int16_t info, kid, reason = 0;
+<span class="lineNum">     794 </span>            :         int keylen;
+<span class="lineNum">     795 </span>            : 
+<span class="lineNum">     796 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_opmode != IEEE80211_M_STA &amp;&amp;</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :             ic-&gt;ic_opmode != IEEE80211_M_IBSS)</span>
+<span class="lineNum">     799 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     800 </span>            : #endif
+<span class="lineNum">     801 </span>            :         /* discard if we're not expecting this message */
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsn_supp_state != RNSA_SUPP_PTKDONE) {</span>
+<span class="lineNum">     803 </span>            :                 DPRINTF((&quot;unexpected in state: %d\n&quot;, ni-&gt;ni_rsn_supp_state));
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     805 </span>            :         }
+<span class="lineNum">     806 </span>            :         /* enforce monotonicity of key request replay counter */
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :         if (BE_READ_8(key-&gt;replaycnt) &lt;= ni-&gt;ni_replaycnt) {</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_replay++;</span>
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     810 </span>            :         }
+<span class="lineNum">     811 </span>            :         /* check Key MIC field using KCK */
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :         if (ieee80211_eapol_key_check_mic(key, ni-&gt;ni_ptk.kck) != 0) {</span>
+<span class="lineNum">     813 </span>            :                 DPRINTF((&quot;key MIC failed\n&quot;));
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_badmic++;</span>
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     816 </span>            :         }
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 :         info = BE_READ_2(key-&gt;info);</span>
+<span class="lineNum">     818 </span>            : 
+<span class="lineNum">     819 </span>            :         /* check that encrypted and decrypt Key Data field using KEK */
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :         if (!(info &amp; EAPOL_KEY_ENCRYPTED) ||</span>
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :             ieee80211_eapol_key_decrypt(key, ni-&gt;ni_ptk.kek) != 0) {</span>
+<span class="lineNum">     822 </span>            :                 DPRINTF((&quot;decryption failed\n&quot;));
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     824 </span>            :         }
+<span class="lineNum">     825 </span>            : 
+<span class="lineNum">     826 </span>            :         /* parse key data field (shall contain a GTK KDE) */
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :         frm = (const u_int8_t *)&amp;key[1];</span>
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :         efrm = frm + BE_READ_2(key-&gt;paylen);</span>
+<span class="lineNum">     829 </span>            : 
+<span class="lineNum">     830 </span>            :         gtk = igtk = NULL;
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :         while (frm + 2 &lt;= efrm) {</span>
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                 if (frm + 2 + frm[1] &gt; efrm)</span>
+<span class="lineNum">     833 </span>            :                         break;
+<span class="lineNum">     834 </span><span class="lineNoCov">          0 :                 switch (frm[0]) {</span>
+<span class="lineNum">     835 </span>            :                 case IEEE80211_ELEMID_VENDOR:
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :                         if (frm[1] &lt; 4)</span>
+<span class="lineNum">     837 </span>            :                                 break;
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :                         if (memcmp(&amp;frm[2], IEEE80211_OUI, 3) == 0) {</span>
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :                                 switch (frm[5]) {</span>
+<span class="lineNum">     840 </span>            :                                 case IEEE80211_KDE_GTK:
+<span class="lineNum">     841 </span>            :                                         gtk = frm;
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :                                         break;</span>
+<span class="lineNum">     843 </span>            :                                 case IEEE80211_KDE_IGTK:
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :                                         if (ni-&gt;ni_flags &amp; IEEE80211_NODE_MFP)</span>
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                                                 igtk = frm;</span>
+<span class="lineNum">     846 </span>            :                                         break;
+<span class="lineNum">     847 </span>            :                                 }
+<span class="lineNum">     848 </span>            :                         }
+<span class="lineNum">     849 </span>            :                         break;
+<span class="lineNum">     850 </span>            :                 }
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                 frm += 2 + frm[1];</span>
+<span class="lineNum">     852 </span>            :         }
+<span class="lineNum">     853 </span>            :         /* check that the GTK KDE is present */
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :         if (gtk == NULL) {</span>
+<span class="lineNum">     855 </span>            :                 DPRINTF((&quot;GTK KDE missing\n&quot;));
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     857 </span>            :         }
+<span class="lineNum">     858 </span>            : 
+<span class="lineNum">     859 </span>            :         /* check that key length matches that of group cipher */
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :         keylen = ieee80211_cipher_keylen(ni-&gt;ni_rsngroupcipher);</span>
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :         if (gtk[1] != 6 + keylen)</span>
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     863 </span>            : 
+<span class="lineNum">     864 </span>            :         /* map GTK to 802.11 key */
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :         kid = gtk[6] &amp; 3;</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :         k = &amp;ic-&gt;ic_nw_keys[kid];</span>
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :         if (ieee80211_must_update_group_key(k, &amp;gtk[8], keylen)) {</span>
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 :                 memset(k, 0, sizeof(*k));</span>
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :                 k-&gt;k_id = kid;       /* 0-3 */</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :                 k-&gt;k_cipher = ni-&gt;ni_rsngroupcipher;</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :                 k-&gt;k_flags = IEEE80211_KEY_GROUP;</span>
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                 if (gtk[6] &amp; (1 &lt;&lt; 2))</span>
+<span class="lineNum">     873 </span><span class="lineNoCov">          0 :                         k-&gt;k_flags |= IEEE80211_KEY_TX;</span>
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :                 k-&gt;k_rsc[0] = LE_READ_6(key-&gt;rsc);</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :                 k-&gt;k_len = keylen;</span>
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :                 memcpy(k-&gt;k_key, &amp;gtk[8], k-&gt;k_len);</span>
+<span class="lineNum">     877 </span>            :                 /* install the GTK */
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :                 if ((*ic-&gt;ic_set_key)(ic, ni, k) != 0) {</span>
+<span class="lineNum">     879 </span>            :                         reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 :                         goto deauth;</span>
+<span class="lineNum">     881 </span>            :                 }
+<span class="lineNum">     882 </span>            :         } else
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: reused group key update received from %s\n&quot;,</span>
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :                     ic-&gt;ic_if.if_xname, ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :         if (igtk != NULL) {     /* implies MFP */</span>
+<span class="lineNum">     886 </span>            :                 /* check that the IGTK KDE is valid */
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :                 if (igtk[1] != 4 + 24) {</span>
+<span class="lineNum">     888 </span>            :                         reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :                         goto deauth;</span>
+<span class="lineNum">     890 </span>            :                 }
+<span class="lineNum">     891 </span><span class="lineNoCov">          0 :                 kid = LE_READ_2(&amp;igtk[6]);</span>
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :                 if (kid != 4 &amp;&amp; kid != 5) {</span>
+<span class="lineNum">     893 </span>            :                         DPRINTF((&quot;unsupported IGTK id %u\n&quot;, kid));
+<span class="lineNum">     894 </span>            :                         reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :                         goto deauth;</span>
+<span class="lineNum">     896 </span>            :                 }
+<span class="lineNum">     897 </span>            :                 /* map IGTK to 802.11 key */
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :                 k = &amp;ic-&gt;ic_nw_keys[kid];</span>
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 :                 if (ieee80211_must_update_group_key(k, &amp;igtk[14], 16)) {</span>
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :                         memset(k, 0, sizeof(*k));</span>
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :                         k-&gt;k_id = kid;       /* either 4 or 5 */</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :                         k-&gt;k_cipher = ni-&gt;ni_rsngroupmgmtcipher;</span>
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :                         k-&gt;k_flags = IEEE80211_KEY_IGTK;</span>
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :                         k-&gt;k_mgmt_rsc = LE_READ_6(&amp;igtk[8]);     /* IPN */</span>
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :                         k-&gt;k_len = 16;</span>
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :                         memcpy(k-&gt;k_key, &amp;igtk[14], k-&gt;k_len);</span>
+<span class="lineNum">     907 </span>            :                         /* install the IGTK */
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :                         if ((*ic-&gt;ic_set_key)(ic, ni, k) != 0) {</span>
+<span class="lineNum">     909 </span>            :                                 reason = IEEE80211_REASON_AUTH_LEAVE;
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :                                 goto deauth;</span>
+<span class="lineNum">     911 </span>            :                         }
+<span class="lineNum">     912 </span>            :                 } else
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: reused group key update received from %s\n&quot;,</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :                             ic-&gt;ic_if.if_xname, ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">     915 </span>            :         }
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :         if (info &amp; EAPOL_KEY_SECURE) {</span>
+<span class="lineNum">     917 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :                 if (ic-&gt;ic_opmode != IEEE80211_M_IBSS ||</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :                     ++ni-&gt;ni_key_count == 2)</span>
+<span class="lineNum">     920 </span>            : #endif
+<span class="lineNum">     921 </span>            :                 {
+<span class="lineNum">     922 </span>            :                         DPRINTF((&quot;marking port %s valid\n&quot;,
+<span class="lineNum">     923 </span>            :                             ether_sprintf(ni-&gt;ni_macaddr)));
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_port_valid = 1;</span>
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :                         ieee80211_set_link_state(ic, LINK_STATE_UP);</span>
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     927 </span>            :         }
+<span class="lineNum">     928 </span>            :         /* update the last seen value of the key replay counter field */
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :         ni-&gt;ni_replaycnt = BE_READ_8(key-&gt;replaycnt);</span>
+<span class="lineNum">     930 </span>            : 
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_if.if_flags &amp; IFF_DEBUG)</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: received msg %d/%d of the %s handshake from %s\n&quot;,</span>
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :                     ic-&gt;ic_if.if_xname, 1, 2, &quot;group key&quot;,</span>
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :                     ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">     935 </span>            : 
+<span class="lineNum">     936 </span>            :         /* send message 2 to authenticator */
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :         (void)ieee80211_send_group_msg2(ic, ni, NULL);</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     939 </span>            :  deauth:
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :         IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_DEAUTH, reason);</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :         ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);</span>
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     943 </span>            : 
+<span class="lineNum">     944 </span>            : /*
+<span class="lineNum">     945 </span>            :  * Process Message 1 of the WPA Group Key Handshake (sent by Authenticator).
+<a name="946"><span class="lineNum">     946 </span>            :  */</a>
+<span class="lineNum">     947 </span>            : void
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 : ieee80211_recv_wpa_group_msg1(struct ieee80211com *ic,</span>
+<span class="lineNum">     949 </span>            :     struct ieee80211_eapol_key *key, struct ieee80211_node *ni)
+<span class="lineNum">     950 </span>            : {
+<span class="lineNum">     951 </span>            :         struct ieee80211_key *k;
+<span class="lineNum">     952 </span>            :         u_int16_t info;
+<span class="lineNum">     953 </span>            :         u_int8_t kid;
+<span class="lineNum">     954 </span>            :         int keylen;
+<span class="lineNum">     955 </span>            :         const uint8_t *gtk;
+<span class="lineNum">     956 </span>            : 
+<span class="lineNum">     957 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_opmode != IEEE80211_M_STA &amp;&amp;</span>
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :             ic-&gt;ic_opmode != IEEE80211_M_IBSS)</span>
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     961 </span>            : #endif
+<span class="lineNum">     962 </span>            :         /* discard if we're not expecting this message */
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsn_supp_state != RNSA_SUPP_PTKDONE) {</span>
+<span class="lineNum">     964 </span>            :                 DPRINTF((&quot;unexpected in state: %d\n&quot;, ni-&gt;ni_rsn_supp_state));
+<span class="lineNum">     965 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     966 </span>            :         }
+<span class="lineNum">     967 </span>            :         /* enforce monotonicity of key request replay counter */
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :         if (BE_READ_8(key-&gt;replaycnt) &lt;= ni-&gt;ni_replaycnt) {</span>
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_replay++;</span>
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     971 </span>            :         }
+<span class="lineNum">     972 </span>            :         /* check Key MIC field using KCK */
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :         if (ieee80211_eapol_key_check_mic(key, ni-&gt;ni_ptk.kck) != 0) {</span>
+<span class="lineNum">     974 </span>            :                 DPRINTF((&quot;key MIC failed\n&quot;));
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_badmic++;</span>
+<span class="lineNum">     976 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     977 </span>            :         }
+<span class="lineNum">     978 </span>            :         /*
+<span class="lineNum">     979 </span>            :          * EAPOL-Key data field is encrypted even though WPA doesn't set
+<span class="lineNum">     980 </span>            :          * the ENCRYPTED bit in the info field.
+<span class="lineNum">     981 </span>            :          */
+<span class="lineNum">     982 </span><span class="lineNoCov">          0 :         if (ieee80211_eapol_key_decrypt(key, ni-&gt;ni_ptk.kek) != 0) {</span>
+<span class="lineNum">     983 </span>            :                 DPRINTF((&quot;decryption failed\n&quot;));
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     985 </span>            :         }
+<span class="lineNum">     986 </span>            : 
+<span class="lineNum">     987 </span>            :         /* check that key length matches that of group cipher */
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :         keylen = ieee80211_cipher_keylen(ni-&gt;ni_rsngroupcipher);</span>
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 :         if (BE_READ_2(key-&gt;keylen) != keylen)</span>
+<span class="lineNum">     990 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     991 </span>            : 
+<span class="lineNum">     992 </span>            :         /* check that the data length is large enough to hold the key */
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :         if (BE_READ_2(key-&gt;paylen) &lt; keylen)</span>
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     995 </span>            : 
+<span class="lineNum">     996 </span><span class="lineNoCov">          0 :         info = BE_READ_2(key-&gt;info);</span>
+<span class="lineNum">     997 </span>            : 
+<span class="lineNum">     998 </span>            :         /* map GTK to 802.11 key */
+<span class="lineNum">     999 </span><span class="lineNoCov">          0 :         kid = (info &gt;&gt; EAPOL_KEY_WPA_KID_SHIFT) &amp; 3;</span>
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :         k = &amp;ic-&gt;ic_nw_keys[kid];</span>
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :         gtk = (const uint8_t *)&amp;key[1]; /* key data field contains the GTK */</span>
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 :         if (ieee80211_must_update_group_key(k, gtk, keylen)) {</span>
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :                 memset(k, 0, sizeof(*k));</span>
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :                 k-&gt;k_id = kid;       /* 0-3 */</span>
+<span class="lineNum">    1005 </span><span class="lineNoCov">          0 :                 k-&gt;k_cipher = ni-&gt;ni_rsngroupcipher;</span>
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :                 k-&gt;k_flags = IEEE80211_KEY_GROUP;</span>
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 :                 if (info &amp; EAPOL_KEY_WPA_TX)</span>
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :                         k-&gt;k_flags |= IEEE80211_KEY_TX;</span>
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 :                 k-&gt;k_rsc[0] = LE_READ_6(key-&gt;rsc);</span>
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :                 k-&gt;k_len = keylen;</span>
+<span class="lineNum">    1011 </span><span class="lineNoCov">          0 :                 memcpy(k-&gt;k_key, gtk, k-&gt;k_len);</span>
+<span class="lineNum">    1012 </span>            :                 /* install the GTK */
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                 if ((*ic-&gt;ic_set_key)(ic, ni, k) != 0) {</span>
+<span class="lineNum">    1014 </span><span class="lineNoCov">          0 :                         IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_DEAUTH,</span>
+<span class="lineNum">    1015 </span>            :                             IEEE80211_REASON_AUTH_LEAVE);
+<span class="lineNum">    1016 </span><span class="lineNoCov">          0 :                         ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);</span>
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">    1018 </span>            :                 }
+<span class="lineNum">    1019 </span>            :         } else
+<span class="lineNum">    1020 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: reused group key update received from %s\n&quot;,</span>
+<span class="lineNum">    1021 </span><span class="lineNoCov">          0 :                     ic-&gt;ic_if.if_xname, ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :         if (info &amp; EAPOL_KEY_SECURE) {</span>
+<span class="lineNum">    1023 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :                 if (ic-&gt;ic_opmode != IEEE80211_M_IBSS ||</span>
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 :                     ++ni-&gt;ni_key_count == 2)</span>
+<span class="lineNum">    1026 </span>            : #endif
+<span class="lineNum">    1027 </span>            :                 {
+<span class="lineNum">    1028 </span>            :                         DPRINTF((&quot;marking port %s valid\n&quot;,
+<span class="lineNum">    1029 </span>            :                             ether_sprintf(ni-&gt;ni_macaddr)));
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_port_valid = 1;</span>
+<span class="lineNum">    1031 </span><span class="lineNoCov">          0 :                         ieee80211_set_link_state(ic, LINK_STATE_UP);</span>
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1033 </span>            :         }
+<span class="lineNum">    1034 </span>            :         /* update the last seen value of the key replay counter field */
+<span class="lineNum">    1035 </span><span class="lineNoCov">          0 :         ni-&gt;ni_replaycnt = BE_READ_8(key-&gt;replaycnt);</span>
+<span class="lineNum">    1036 </span>            : 
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_if.if_flags &amp; IFF_DEBUG)</span>
+<span class="lineNum">    1038 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: received msg %d/%d of the %s handshake from %s\n&quot;,</span>
+<span class="lineNum">    1039 </span><span class="lineNoCov">          0 :                     ic-&gt;ic_if.if_xname, 1, 2, &quot;group key&quot;,</span>
+<span class="lineNum">    1040 </span><span class="lineNoCov">          0 :                     ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">    1041 </span>            : 
+<span class="lineNum">    1042 </span>            :         /* send message 2 to authenticator */
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :         (void)ieee80211_send_group_msg2(ic, ni, k);</span>
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1045 </span>            : 
+<span class="lineNum">    1046 </span>            : #ifndef IEEE80211_STA_ONLY
+<span class="lineNum">    1047 </span>            : /*
+<span class="lineNum">    1048 </span>            :  * Process Message 2 of the Group Key Handshake (sent by Supplicant).
+<a name="1049"><span class="lineNum">    1049 </span>            :  */</a>
+<span class="lineNum">    1050 </span>            : void
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 : ieee80211_recv_group_msg2(struct ieee80211com *ic,</span>
+<span class="lineNum">    1052 </span>            :     struct ieee80211_eapol_key *key, struct ieee80211_node *ni)
+<span class="lineNum">    1053 </span>            : {
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_opmode != IEEE80211_M_HOSTAP &amp;&amp;</span>
+<span class="lineNum">    1055 </span><span class="lineNoCov">          0 :             ic-&gt;ic_opmode != IEEE80211_M_IBSS)</span>
+<span class="lineNum">    1056 </span>            :                 return;
+<span class="lineNum">    1057 </span>            : 
+<span class="lineNum">    1058 </span>            :         /* discard if we're not expecting this message */
+<span class="lineNum">    1059 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsn_gstate != RSNA_REKEYNEGOTIATING) {</span>
+<span class="lineNum">    1060 </span>            :                 DPRINTF((&quot;%s: unexpected in state: %d\n&quot;, ic-&gt;ic_if.if_xname,
+<span class="lineNum">    1061 </span>            :                      ni-&gt;ni_rsn_gstate));
+<span class="lineNum">    1062 </span>            :                 return;
+<span class="lineNum">    1063 </span>            :         }
+<span class="lineNum">    1064 </span>            :         /* enforce monotonicity of key request replay counter */
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 :         if (BE_READ_8(key-&gt;replaycnt) != ni-&gt;ni_replaycnt) {</span>
+<span class="lineNum">    1066 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_replay++;</span>
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1068 </span>            :         }
+<span class="lineNum">    1069 </span>            :         /* check Key MIC field using KCK */
+<span class="lineNum">    1070 </span><span class="lineNoCov">          0 :         if (ieee80211_eapol_key_check_mic(key, ni-&gt;ni_ptk.kck) != 0) {</span>
+<span class="lineNum">    1071 </span>            :                 DPRINTF((&quot;key MIC failed\n&quot;));
+<span class="lineNum">    1072 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_badmic++;</span>
+<span class="lineNum">    1073 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1074 </span>            :         }
+<span class="lineNum">    1075 </span>            : 
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :         timeout_del(&amp;ni-&gt;ni_eapol_to);</span>
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :         ni-&gt;ni_rsn_gstate = RSNA_REKEYESTABLISHED;</span>
+<span class="lineNum">    1078 </span>            : 
+<span class="lineNum">    1079 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_flags &amp; IEEE80211_NODE_REKEY) {</span>
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 :                 int rekeysta = 0;</span>
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_flags &amp;= ~IEEE80211_NODE_REKEY;</span>
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :                 ieee80211_iterate_nodes(ic,</span>
+<span class="lineNum">    1083 </span>            :                     ieee80211_count_rekeysta, &amp;rekeysta);
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 :                 if (rekeysta == 0)</span>
+<span class="lineNum">    1085 </span><span class="lineNoCov">          0 :                         ieee80211_setkeysdone(ic);</span>
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :         ni-&gt;ni_flags |= IEEE80211_NODE_TXRXPROT;</span>
+<span class="lineNum">    1088 </span>            : 
+<span class="lineNum">    1089 </span><span class="lineNoCov">          0 :         ni-&gt;ni_rsn_gstate = RSNA_IDLE;</span>
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :         ni-&gt;ni_rsn_retries = 0;</span>
+<span class="lineNum">    1091 </span>            : 
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_if.if_flags &amp; IFF_DEBUG)</span>
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: received msg %d/%d of the %s handshake from %s\n&quot;,</span>
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :                     ic-&gt;ic_if.if_xname, 2, 2, &quot;group key&quot;,</span>
+<span class="lineNum">    1095 </span><span class="lineNoCov">          0 :                     ether_sprintf(ni-&gt;ni_macaddr));</span>
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1097 </span>            : 
+<span class="lineNum">    1098 </span>            : /*
+<span class="lineNum">    1099 </span>            :  * EAPOL-Key Request frames are sent by the supplicant to request that the
+<span class="lineNum">    1100 </span>            :  * authenticator initiates either a 4-Way Handshake or Group Key Handshake,
+<span class="lineNum">    1101 </span>            :  * or to report a MIC failure in a TKIP MSDU.
+<a name="1102"><span class="lineNum">    1102 </span>            :  */</a>
+<span class="lineNum">    1103 </span>            : void
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 : ieee80211_recv_eapol_key_req(struct ieee80211com *ic,</span>
+<span class="lineNum">    1105 </span>            :     struct ieee80211_eapol_key *key, struct ieee80211_node *ni)
+<span class="lineNum">    1106 </span>            : {
+<span class="lineNum">    1107 </span>            :         u_int16_t info;
+<span class="lineNum">    1108 </span>            : 
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 :         if (ic-&gt;ic_opmode != IEEE80211_M_HOSTAP &amp;&amp;</span>
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :             ic-&gt;ic_opmode != IEEE80211_M_IBSS)</span>
+<span class="lineNum">    1111 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1112 </span>            : 
+<span class="lineNum">    1113 </span>            :         /* discard if we're not expecting this message */
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_rsn_state != RSNA_PTKINITDONE) {</span>
+<span class="lineNum">    1115 </span>            :                 DPRINTF((&quot;unexpected in state: %d\n&quot;, ni-&gt;ni_rsn_state));
+<span class="lineNum">    1116 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1117 </span>            :         }
+<span class="lineNum">    1118 </span>            :         /* enforce monotonicity of key request replay counter */
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_reqreplaycnt_ok &amp;&amp;</span>
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 :             BE_READ_8(key-&gt;replaycnt) &lt;= ni-&gt;ni_reqreplaycnt) {</span>
+<span class="lineNum">    1121 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_replay++;</span>
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1123 </span>            :         }
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :         info = BE_READ_2(key-&gt;info);</span>
+<span class="lineNum">    1125 </span>            : 
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 :         if (!(info &amp; EAPOL_KEY_KEYMIC) ||</span>
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :             ieee80211_eapol_key_check_mic(key, ni-&gt;ni_ptk.kck) != 0) {</span>
+<span class="lineNum">    1128 </span>            :                 DPRINTF((&quot;key request MIC failed\n&quot;));
+<span class="lineNum">    1129 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_eapol_badmic++;</span>
+<span class="lineNum">    1130 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1131 </span>            :         }
+<span class="lineNum">    1132 </span>            :         /* update key request replay counter now that MIC is verified */
+<span class="lineNum">    1133 </span><span class="lineNoCov">          0 :         ni-&gt;ni_reqreplaycnt = BE_READ_8(key-&gt;replaycnt);</span>
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :         ni-&gt;ni_reqreplaycnt_ok = 1;</span>
+<span class="lineNum">    1135 </span>            : 
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         if (info &amp; EAPOL_KEY_ERROR) {       /* TKIP MIC failure */</span>
+<span class="lineNum">    1137 </span>            :                 /* ignore reports from STAs not using TKIP */
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :                 if (ic-&gt;ic_bss-&gt;ni_rsngroupcipher != IEEE80211_CIPHER_TKIP &amp;&amp;</span>
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :                     ni-&gt;ni_rsncipher != IEEE80211_CIPHER_TKIP) {</span>
+<span class="lineNum">    1140 </span>            :                         DPRINTF((&quot;MIC failure report from !TKIP STA: %s\n&quot;,
+<span class="lineNum">    1141 </span>            :                             ether_sprintf(ni-&gt;ni_macaddr)));
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :                         return;</span>
+<span class="lineNum">    1143 </span>            :                 }
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 :                 ic-&gt;ic_stats.is_rx_remmicfail++;</span>
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :                 ieee80211_michael_mic_failure(ic, LE_READ_6(key-&gt;rsc));</span>
+<span class="lineNum">    1146 </span>            : 
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 :         } else if (info &amp; EAPOL_KEY_PAIRWISE) {</span>
+<span class="lineNum">    1148 </span>            :                 /* initiate a 4-Way Handshake */
+<span class="lineNum">    1149 </span>            : 
+<span class="lineNum">    1150 </span>            :         } else {
+<span class="lineNum">    1151 </span>            :                 /*
+<span class="lineNum">    1152 </span>            :                  * Should change the GTK, initiate the 4-Way Handshake and
+<span class="lineNum">    1153 </span>            :                  * then execute a Group Key Handshake with all supplicants.
+<span class="lineNum">    1154 </span>            :                  */
+<span class="lineNum">    1155 </span>            :         }
+<span class="lineNum">    1156 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1157 </span>            : #endif  /* IEEE80211_STA_ONLY */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

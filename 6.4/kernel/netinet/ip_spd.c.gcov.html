@@ -1,0 +1,942 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - netinet/ip_spd.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">netinet</a> - ip_spd.c<span style="font-size: 80%;"> (source / <a href="ip_spd.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">382</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">11</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /* $OpenBSD: ip_spd.c,v 1.98 2018/06/25 11:11:41 mpi Exp $ */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
+<span class="lineNum">       4 </span>            :  *
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2000-2001 Angelos D. Keromytis.
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission to use, copy, and modify this software with or without fee
+<span class="lineNum">       8 </span>            :  * is hereby granted, provided that this entire notice is included in
+<span class="lineNum">       9 </span>            :  * all copies of any software which is or includes a copy or
+<span class="lineNum">      10 </span>            :  * modification of this software.
+<span class="lineNum">      11 </span>            :  * You may use this code under the GNU public license if you so wish. Please
+<span class="lineNum">      12 </span>            :  * contribute changes back to the authors under this freer than GPL license
+<span class="lineNum">      13 </span>            :  * so that we may further the use of strong encryption without limitations to
+<span class="lineNum">      14 </span>            :  * all.
+<span class="lineNum">      15 </span>            :  *
+<span class="lineNum">      16 </span>            :  * THIS SOFTWARE IS BEING PROVIDED &quot;AS IS&quot;, WITHOUT ANY EXPRESS OR
+<span class="lineNum">      17 </span>            :  * IMPLIED WARRANTY. IN PARTICULAR, NONE OF THE AUTHORS MAKES ANY
+<span class="lineNum">      18 </span>            :  * REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE
+<span class="lineNum">      19 </span>            :  * MERCHANTABILITY OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR
+<span class="lineNum">      20 </span>            :  * PURPOSE.
+<span class="lineNum">      21 </span>            :  */
+<span class="lineNum">      22 </span>            : 
+<span class="lineNum">      23 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/socketvar.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/domain.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/protosw.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      33 </span>            : 
+<span class="lineNum">      34 </span>            : #include &lt;net/route.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;net/netisr.h&gt;
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;netinet/ip.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;netinet/ip_var.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;netinet/in_pcb.h&gt;
+<span class="lineNum">      41 </span>            : #include &lt;netinet/ip_ipsp.h&gt;
+<span class="lineNum">      42 </span>            : #include &lt;net/pfkeyv2.h&gt;
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : int     ipsp_acquire_sa(struct ipsec_policy *, union sockaddr_union *,
+<span class="lineNum">      45 </span>            :             union sockaddr_union *, struct sockaddr_encap *, struct mbuf *);
+<span class="lineNum">      46 </span>            : struct  ipsec_acquire *ipsp_pending_acquire(struct ipsec_policy *,
+<span class="lineNum">      47 </span>            :             union sockaddr_union *);
+<span class="lineNum">      48 </span>            : void    ipsp_delete_acquire_timo(void *);
+<span class="lineNum">      49 </span>            : void    ipsp_delete_acquire(struct ipsec_acquire *);
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span>            : struct pool ipsec_policy_pool;
+<span class="lineNum">      52 </span>            : struct pool ipsec_acquire_pool;
+<span class="lineNum">      53 </span>            : int ipsec_policy_pool_initialized = 0;
+<span class="lineNum">      54 </span>            : 
+<span class="lineNum">      55 </span>            : /* Protected by the NET_LOCK(). */
+<span class="lineNum">      56 </span>            : int ipsec_acquire_pool_initialized = 0;
+<span class="lineNum">      57 </span>            : struct radix_node_head **spd_tables;
+<span class="lineNum">      58 </span>            : unsigned int spd_table_max;
+<span class="lineNum">      59 </span>            : TAILQ_HEAD(ipsec_acquire_head, ipsec_acquire) ipsec_acquire_head =
+<span class="lineNum">      60 </span>            :     TAILQ_HEAD_INITIALIZER(ipsec_acquire_head);
+<a name="61"><span class="lineNum">      61 </span>            : </a>
+<span class="lineNum">      62 </span>            : struct radix_node_head *
+<span class="lineNum">      63 </span><span class="lineNoCov">          0 : spd_table_get(unsigned int rtableid)</span>
+<span class="lineNum">      64 </span>            : {
+<span class="lineNum">      65 </span>            :         unsigned int rdomain;
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span><span class="lineNoCov">          0 :         NET_ASSERT_LOCKED();</span>
+<span class="lineNum">      68 </span>            : 
+<span class="lineNum">      69 </span><span class="lineNoCov">          0 :         if (spd_tables == NULL)</span>
+<span class="lineNum">      70 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">      71 </span>            : 
+<span class="lineNum">      72 </span><span class="lineNoCov">          0 :         rdomain = rtable_l2(rtableid);</span>
+<span class="lineNum">      73 </span><span class="lineNoCov">          0 :         if (rdomain &gt; spd_table_max)</span>
+<span class="lineNum">      74 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">      75 </span>            : 
+<span class="lineNum">      76 </span><span class="lineNoCov">          0 :         return (spd_tables[rdomain]);</span>
+<span class="lineNum">      77 </span><span class="lineNoCov">          0 : }</span>
+<a name="78"><span class="lineNum">      78 </span>            : </a>
+<span class="lineNum">      79 </span>            : struct radix_node_head *
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 : spd_table_add(unsigned int rtableid)</span>
+<span class="lineNum">      81 </span>            : {
+<span class="lineNum">      82 </span><span class="lineNoCov">          0 :         struct radix_node_head *rnh = NULL;</span>
+<span class="lineNum">      83 </span>            :         unsigned int rdomain;
+<span class="lineNum">      84 </span>            :         void *p;
+<span class="lineNum">      85 </span>            : 
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :         NET_ASSERT_LOCKED();</span>
+<span class="lineNum">      87 </span>            : 
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :         rdomain = rtable_l2(rtableid);</span>
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :         if (spd_tables == NULL || rdomain &gt; spd_table_max) {</span>
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :                 if ((p = mallocarray(rdomain + 1, sizeof(*rnh),</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :                     M_RTABLE, M_NOWAIT|M_ZERO)) == NULL)</span>
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 :                         return (NULL);</span>
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :                 if (spd_tables != NULL) {</span>
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :                         memcpy(p, spd_tables, sizeof(*rnh) * (spd_table_max+1));</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :                         free(spd_tables, M_RTABLE, 0);</span>
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 :                 spd_tables = p;</span>
+<span class="lineNum">      99 </span><span class="lineNoCov">          0 :                 spd_table_max = rdomain;</span>
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     101 </span>            : 
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :         if (spd_tables[rdomain] == NULL) {</span>
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :                 if (rn_inithead((void **)&amp;rnh,</span>
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 :                     offsetof(struct sockaddr_encap, sen_type)) == 0)</span>
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :                         rnh = NULL;</span>
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 :                 spd_tables[rdomain] = rnh;</span>
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         return (spd_tables[rdomain]);</span>
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 : }</span>
+<a name="111"><span class="lineNum">     111 </span>            : </a>
+<span class="lineNum">     112 </span>            : int
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 : spd_table_walk(unsigned int rtableid,</span>
+<span class="lineNum">     114 </span>            :     int (*func)(struct ipsec_policy *, void *, unsigned int), void *arg)
+<span class="lineNum">     115 </span>            : {
+<span class="lineNum">     116 </span>            :         struct radix_node_head *rnh;
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         int (*walker)(struct radix_node *, void *, u_int) = (void *)func;</span>
+<span class="lineNum">     118 </span>            :         int error;
+<span class="lineNum">     119 </span>            : 
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         rnh = spd_table_get(rtableid);</span>
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :         if (rnh == NULL)</span>
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     123 </span>            : 
+<span class="lineNum">     124 </span>            :         /* EGAIN means the tree changed. */
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         while ((error = rn_walktree(rnh, walker, arg)) == EAGAIN)</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :                 continue;</span>
+<span class="lineNum">     127 </span>            : 
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     130 </span>            : 
+<span class="lineNum">     131 </span>            : /*
+<span class="lineNum">     132 </span>            :  * Lookup at the SPD based on the headers contained on the mbuf. The second
+<span class="lineNum">     133 </span>            :  * argument indicates what protocol family the header at the beginning of
+<span class="lineNum">     134 </span>            :  * the mbuf is. hlen is the offset of the transport protocol header
+<span class="lineNum">     135 </span>            :  * in the mbuf.
+<span class="lineNum">     136 </span>            :  *
+<span class="lineNum">     137 </span>            :  * Return combinations (of return value and in *error):
+<span class="lineNum">     138 </span>            :  * - NULL/0 -&gt; no IPsec required on packet
+<span class="lineNum">     139 </span>            :  * - NULL/-EINVAL -&gt; silently drop the packet
+<span class="lineNum">     140 </span>            :  * - NULL/errno -&gt; drop packet and return error
+<span class="lineNum">     141 </span>            :  * or a pointer to a TDB (and 0 in *error).
+<span class="lineNum">     142 </span>            :  *
+<span class="lineNum">     143 </span>            :  * In the case of incoming flows, only the first three combinations are
+<span class="lineNum">     144 </span>            :  * returned.
+<a name="145"><span class="lineNum">     145 </span>            :  */</a>
+<span class="lineNum">     146 </span>            : struct tdb *
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 : ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,</span>
+<span class="lineNum">     148 </span>            :     struct tdb *tdbp, struct inpcb *inp, u_int32_t ipsecflowinfo)
+<span class="lineNum">     149 </span>            : {
+<span class="lineNum">     150 </span>            :         struct radix_node_head *rnh;
+<span class="lineNum">     151 </span>            :         struct radix_node *rn;
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         union sockaddr_union sdst, ssrc;</span>
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         struct sockaddr_encap *ddst, dst;</span>
+<span class="lineNum">     154 </span>            :         struct ipsec_policy *ipo;
+<span class="lineNum">     155 </span>            :         struct ipsec_ids *ids = NULL;
+<span class="lineNum">     156 </span>            :         int signore = 0, dignore = 0;
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :         u_int rdomain = rtable_l2(m-&gt;m_pkthdr.ph_rtableid);</span>
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         NET_ASSERT_LOCKED();</span>
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span>            :         /*
+<span class="lineNum">     162 </span>            :          * If there are no flows in place, there's no point
+<span class="lineNum">     163 </span>            :          * continuing with the SPD lookup.
+<span class="lineNum">     164 </span>            :          */
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :         if (!ipsec_in_use &amp;&amp; inp == NULL) {</span>
+<span class="lineNum">     166 </span><span class="lineNoCov">          0 :                 *error = 0;</span>
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     168 </span>            :         }
+<span class="lineNum">     169 </span>            : 
+<span class="lineNum">     170 </span>            :         /*
+<span class="lineNum">     171 </span>            :          * If an input packet is destined to a BYPASS socket, just accept it.
+<span class="lineNum">     172 </span>            :          */
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :         if ((inp != NULL) &amp;&amp; (direction == IPSP_DIRECTION_IN) &amp;&amp;</span>
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :             (inp-&gt;inp_seclevel[SL_ESP_TRANS] == IPSEC_LEVEL_BYPASS) &amp;&amp;</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :             (inp-&gt;inp_seclevel[SL_ESP_NETWORK] == IPSEC_LEVEL_BYPASS) &amp;&amp;</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :             (inp-&gt;inp_seclevel[SL_AUTH] == IPSEC_LEVEL_BYPASS)) {</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :                 *error = 0;</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     179 </span>            :         }
+<span class="lineNum">     180 </span>            : 
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :         memset(&amp;dst, 0, sizeof(dst));</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :         memset(&amp;sdst, 0, sizeof(union sockaddr_union));</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         memset(&amp;ssrc, 0, sizeof(union sockaddr_union));</span>
+<span class="lineNum">     184 </span>            :         ddst = (struct sockaddr_encap *)&amp;dst;
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :         ddst-&gt;sen_family = PF_KEY;</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :         ddst-&gt;sen_len = SENT_LEN;</span>
+<span class="lineNum">     187 </span>            : 
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         switch (af) {</span>
+<span class="lineNum">     189 </span>            :         case AF_INET:
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :                 if (hlen &lt; sizeof (struct ip) || m-&gt;m_pkthdr.len &lt; hlen) {</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :                         *error = EINVAL;</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                         return NULL;</span>
+<span class="lineNum">     193 </span>            :                 }
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                 ddst-&gt;sen_direction = direction;</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                 ddst-&gt;sen_type = SENT_IP4;</span>
+<span class="lineNum">     196 </span>            : 
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :                 m_copydata(m, offsetof(struct ip, ip_src),</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                     sizeof(struct in_addr), (caddr_t) &amp;(ddst-&gt;sen_ip_src));</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                 m_copydata(m, offsetof(struct ip, ip_dst),</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                     sizeof(struct in_addr), (caddr_t) &amp;(ddst-&gt;sen_ip_dst));</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                 m_copydata(m, offsetof(struct ip, ip_p), sizeof(u_int8_t),</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                     (caddr_t) &amp;(ddst-&gt;sen_proto));</span>
+<span class="lineNum">     203 </span>            : 
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                 sdst.sin.sin_family = ssrc.sin.sin_family = AF_INET;</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                 sdst.sin.sin_len = ssrc.sin.sin_len =</span>
+<span class="lineNum">     206 </span>            :                     sizeof(struct sockaddr_in);
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :                 ssrc.sin.sin_addr = ddst-&gt;sen_ip_src;</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :                 sdst.sin.sin_addr = ddst-&gt;sen_ip_dst;</span>
+<span class="lineNum">     209 </span>            : 
+<span class="lineNum">     210 </span>            :                 /*
+<span class="lineNum">     211 </span>            :                  * If TCP/UDP, extract the port numbers to use in the lookup.
+<span class="lineNum">     212 </span>            :                  */
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :                 switch (ddst-&gt;sen_proto) {</span>
+<span class="lineNum">     214 </span>            :                 case IPPROTO_UDP:
+<span class="lineNum">     215 </span>            :                 case IPPROTO_TCP:
+<span class="lineNum">     216 </span>            :                         /* Make sure there's enough data in the packet. */
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :                         if (m-&gt;m_pkthdr.len &lt; hlen + 2 * sizeof(u_int16_t)) {</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                                 *error = EINVAL;</span>
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                                 return NULL;</span>
+<span class="lineNum">     220 </span>            :                         }
+<span class="lineNum">     221 </span>            : 
+<span class="lineNum">     222 </span>            :                         /*
+<span class="lineNum">     223 </span>            :                          * Luckily, the offset of the src/dst ports in
+<span class="lineNum">     224 </span>            :                          * both the UDP and TCP headers is the same (first
+<span class="lineNum">     225 </span>            :                          * two 16-bit values in the respective headers),
+<span class="lineNum">     226 </span>            :                          * so we can just copy them.
+<span class="lineNum">     227 </span>            :                          */
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                         m_copydata(m, hlen, sizeof(u_int16_t),</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                             (caddr_t) &amp;(ddst-&gt;sen_sport));</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                         m_copydata(m, hlen + sizeof(u_int16_t), sizeof(u_int16_t),</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                             (caddr_t) &amp;(ddst-&gt;sen_dport));</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span>            :                 default:
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :                         ddst-&gt;sen_sport = 0;</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :                         ddst-&gt;sen_dport = 0;</span>
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     238 </span>            : 
+<span class="lineNum">     239 </span>            :                 break;
+<span class="lineNum">     240 </span>            : 
+<span class="lineNum">     241 </span>            : #ifdef INET6
+<span class="lineNum">     242 </span>            :         case AF_INET6:
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :                 if (hlen &lt; sizeof (struct ip6_hdr) || m-&gt;m_pkthdr.len &lt; hlen) {</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :                         *error = EINVAL;</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                         return NULL;</span>
+<span class="lineNum">     246 </span>            :                 }
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :                 ddst-&gt;sen_type = SENT_IP6;</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :                 ddst-&gt;sen_ip6_direction = direction;</span>
+<span class="lineNum">     249 </span>            : 
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :                 m_copydata(m, offsetof(struct ip6_hdr, ip6_src),</span>
+<span class="lineNum">     251 </span>            :                     sizeof(struct in6_addr),
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :                     (caddr_t) &amp;(ddst-&gt;sen_ip6_src));</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :                 m_copydata(m, offsetof(struct ip6_hdr, ip6_dst),</span>
+<span class="lineNum">     254 </span>            :                     sizeof(struct in6_addr),
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :                     (caddr_t) &amp;(ddst-&gt;sen_ip6_dst));</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :                 m_copydata(m, offsetof(struct ip6_hdr, ip6_nxt),</span>
+<span class="lineNum">     257 </span>            :                     sizeof(u_int8_t),
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :                     (caddr_t) &amp;(ddst-&gt;sen_ip6_proto));</span>
+<span class="lineNum">     259 </span>            : 
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :                 sdst.sin6.sin6_family = ssrc.sin6.sin6_family = AF_INET6;</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :                 sdst.sin6.sin6_len = ssrc.sin6.sin6_len =</span>
+<span class="lineNum">     262 </span>            :                     sizeof(struct sockaddr_in6);
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :                 in6_recoverscope(&amp;ssrc.sin6, &amp;ddst-&gt;sen_ip6_src);</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :                 in6_recoverscope(&amp;sdst.sin6, &amp;ddst-&gt;sen_ip6_dst);</span>
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span>            :                 /*
+<span class="lineNum">     267 </span>            :                  * If TCP/UDP, extract the port numbers to use in the lookup.
+<span class="lineNum">     268 </span>            :                  */
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :                 switch (ddst-&gt;sen_ip6_proto) {</span>
+<span class="lineNum">     270 </span>            :                 case IPPROTO_UDP:
+<span class="lineNum">     271 </span>            :                 case IPPROTO_TCP:
+<span class="lineNum">     272 </span>            :                         /* Make sure there's enough data in the packet. */
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                         if (m-&gt;m_pkthdr.len &lt; hlen + 2 * sizeof(u_int16_t)) {</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :                                 *error = EINVAL;</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :                                 return NULL;</span>
+<span class="lineNum">     276 </span>            :                         }
+<span class="lineNum">     277 </span>            : 
+<span class="lineNum">     278 </span>            :                         /*
+<span class="lineNum">     279 </span>            :                          * Luckily, the offset of the src/dst ports in
+<span class="lineNum">     280 </span>            :                          * both the UDP and TCP headers is the same
+<span class="lineNum">     281 </span>            :                          * (first two 16-bit values in the respective
+<span class="lineNum">     282 </span>            :                          * headers), so we can just copy them.
+<span class="lineNum">     283 </span>            :                          */
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :                         m_copydata(m, hlen, sizeof(u_int16_t),</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                             (caddr_t) &amp;(ddst-&gt;sen_ip6_sport));</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                         m_copydata(m, hlen + sizeof(u_int16_t), sizeof(u_int16_t),</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                             (caddr_t) &amp;(ddst-&gt;sen_ip6_dport));</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     289 </span>            : 
+<span class="lineNum">     290 </span>            :                 default:
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :                         ddst-&gt;sen_ip6_sport = 0;</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :                         ddst-&gt;sen_ip6_dport = 0;</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     294 </span>            : 
+<span class="lineNum">     295 </span>            :                 break;
+<span class="lineNum">     296 </span>            : #endif /* INET6 */
+<span class="lineNum">     297 </span>            : 
+<span class="lineNum">     298 </span>            :         default:
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 *error = EAFNOSUPPORT;</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     301 </span>            :         }
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span>            :         /* Actual SPD lookup. */
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         if ((rnh = spd_table_get(rdomain)) == NULL ||</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :             (rn = rn_match((caddr_t)&amp;dst, rnh)) == NULL) {</span>
+<span class="lineNum">     306 </span>            :                 /*
+<span class="lineNum">     307 </span>            :                  * Return whatever the socket requirements are, there are no
+<span class="lineNum">     308 </span>            :                  * system-wide policies.
+<span class="lineNum">     309 </span>            :                  */
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :                 *error = 0;</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 return ipsp_spd_inp(m, af, hlen, error, direction,</span>
+<span class="lineNum">     312 </span>            :                     tdbp, inp, NULL);
+<span class="lineNum">     313 </span>            :         }
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :         ipo = (struct ipsec_policy *)rn;</span>
+<span class="lineNum">     315 </span>            : 
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         switch (ipo-&gt;ipo_type) {</span>
+<span class="lineNum">     317 </span>            :         case IPSP_PERMIT:
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :                 *error = 0;</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :                 return ipsp_spd_inp(m, af, hlen, error, direction, tdbp,</span>
+<span class="lineNum">     320 </span>            :                     inp, ipo);
+<span class="lineNum">     321 </span>            : 
+<span class="lineNum">     322 </span>            :         case IPSP_DENY:
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :                 *error = EHOSTUNREACH;</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     325 </span>            : 
+<span class="lineNum">     326 </span>            :         case IPSP_IPSEC_USE:
+<span class="lineNum">     327 </span>            :         case IPSP_IPSEC_ACQUIRE:
+<span class="lineNum">     328 </span>            :         case IPSP_IPSEC_REQUIRE:
+<span class="lineNum">     329 </span>            :         case IPSP_IPSEC_DONTACQ:
+<span class="lineNum">     330 </span>            :                 /* Nothing more needed here. */
+<span class="lineNum">     331 </span>            :                 break;
+<span class="lineNum">     332 </span>            : 
+<span class="lineNum">     333 </span>            :         default:
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :                 *error = EINVAL;</span>
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     336 </span>            :         }
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span>            :         /* Check for non-specific destination in the policy. */
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         switch (ipo-&gt;ipo_dst.sa.sa_family) {</span>
+<span class="lineNum">     340 </span>            :         case AF_INET:
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :                 if ((ipo-&gt;ipo_dst.sin.sin_addr.s_addr == INADDR_ANY) ||</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :                     (ipo-&gt;ipo_dst.sin.sin_addr.s_addr == INADDR_BROADCAST))</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :                         dignore = 1;</span>
+<span class="lineNum">     344 </span>            :                 break;
+<span class="lineNum">     345 </span>            : 
+<span class="lineNum">     346 </span>            : #ifdef INET6
+<span class="lineNum">     347 </span>            :         case AF_INET6:
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :                 if ((IN6_IS_ADDR_UNSPECIFIED(&amp;ipo-&gt;ipo_dst.sin6.sin6_addr)) ||</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                     (memcmp(&amp;ipo-&gt;ipo_dst.sin6.sin6_addr, &amp;in6mask128,</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                     sizeof(in6mask128)) == 0))</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                         dignore = 1;</span>
+<span class="lineNum">     352 </span>            :                 break;
+<span class="lineNum">     353 </span>            : #endif /* INET6 */
+<span class="lineNum">     354 </span>            :         }
+<span class="lineNum">     355 </span>            : 
+<span class="lineNum">     356 </span>            :         /* Likewise for source. */
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :         switch (ipo-&gt;ipo_src.sa.sa_family) {</span>
+<span class="lineNum">     358 </span>            :         case AF_INET:
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :                 if (ipo-&gt;ipo_src.sin.sin_addr.s_addr == INADDR_ANY)</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :                         signore = 1;</span>
+<span class="lineNum">     361 </span>            :                 break;
+<span class="lineNum">     362 </span>            : 
+<span class="lineNum">     363 </span>            : #ifdef INET6
+<span class="lineNum">     364 </span>            :         case AF_INET6:
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                 if (IN6_IS_ADDR_UNSPECIFIED(&amp;ipo-&gt;ipo_src.sin6.sin6_addr))</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :                         signore = 1;</span>
+<span class="lineNum">     367 </span>            :                 break;
+<span class="lineNum">     368 </span>            : #endif /* INET6 */
+<span class="lineNum">     369 </span>            :         }
+<span class="lineNum">     370 </span>            : 
+<span class="lineNum">     371 </span>            :         /* Do we have a cached entry ? If so, check if it's still valid. */
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :         if ((ipo-&gt;ipo_tdb) &amp;&amp; (ipo-&gt;ipo_tdb-&gt;tdb_flags &amp; TDBF_INVALID)) {</span>
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                 TAILQ_REMOVE(&amp;ipo-&gt;ipo_tdb-&gt;tdb_policy_head, ipo,</span>
+<span class="lineNum">     374 </span>            :                     ipo_tdb_next);
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                 ipo-&gt;ipo_tdb = NULL;</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     377 </span>            : 
+<span class="lineNum">     378 </span>            :         /* Outgoing packet policy check. */
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :         if (direction == IPSP_DIRECTION_OUT) {</span>
+<span class="lineNum">     380 </span>            :                 /*
+<span class="lineNum">     381 </span>            :                  * If the packet is destined for the policy-specified
+<span class="lineNum">     382 </span>            :                  * gateway/endhost, and the socket has the BYPASS
+<span class="lineNum">     383 </span>            :                  * option set, skip IPsec processing.
+<span class="lineNum">     384 </span>            :                  */
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                 if ((inp != NULL) &amp;&amp;</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                     (inp-&gt;inp_seclevel[SL_ESP_TRANS] == IPSEC_LEVEL_BYPASS) &amp;&amp;</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :                     (inp-&gt;inp_seclevel[SL_ESP_NETWORK] ==</span>
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :                         IPSEC_LEVEL_BYPASS) &amp;&amp;</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :                     (inp-&gt;inp_seclevel[SL_AUTH] == IPSEC_LEVEL_BYPASS)) {</span>
+<span class="lineNum">     390 </span>            :                         /* Direct match. */
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :                         if (dignore ||</span>
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                             !memcmp(&amp;sdst, &amp;ipo-&gt;ipo_dst, sdst.sa.sa_len)) {</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :                                 *error = 0;</span>
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :                                 return NULL;</span>
+<span class="lineNum">     395 </span>            :                         }
+<span class="lineNum">     396 </span>            :                 }
+<span class="lineNum">     397 </span>            : 
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                 if (ipsecflowinfo)</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                         ids = ipsp_ids_lookup(ipsecflowinfo);</span>
+<span class="lineNum">     400 </span>            : 
+<span class="lineNum">     401 </span>            :                 /* Check that the cached TDB (if present), is appropriate. */
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                 if (ipo-&gt;ipo_tdb) {</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                         if ((ipo-&gt;ipo_last_searched &lt;= ipsec_last_added) ||</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                             (ipo-&gt;ipo_sproto != ipo-&gt;ipo_tdb-&gt;tdb_sproto) ||</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                             memcmp(dignore ? &amp;sdst : &amp;ipo-&gt;ipo_dst,</span>
+<span class="lineNum">     406 </span>            :                             &amp;ipo-&gt;ipo_tdb-&gt;tdb_dst,
+<span class="lineNum">     407 </span>            :                             ipo-&gt;ipo_tdb-&gt;tdb_dst.sa.sa_len))
+<span class="lineNum">     408 </span>            :                                 goto nomatchout;
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :                         if (!ipsp_aux_match(ipo-&gt;ipo_tdb,</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                             ids ? ids : ipo-&gt;ipo_ids,</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :                             &amp;ipo-&gt;ipo_addr, &amp;ipo-&gt;ipo_mask))</span>
+<span class="lineNum">     413 </span>            :                                 goto nomatchout;
+<span class="lineNum">     414 </span>            : 
+<span class="lineNum">     415 </span>            :                         /* Cached entry is good. */
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :                         *error = 0;</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                         return ipsp_spd_inp(m, af, hlen, error, direction,</span>
+<span class="lineNum">     418 </span>            :                             tdbp, inp, ipo);
+<span class="lineNum">     419 </span>            : 
+<span class="lineNum">     420 </span>            :   nomatchout:
+<span class="lineNum">     421 </span>            :                         /* Cached TDB was not good. */
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :                         TAILQ_REMOVE(&amp;ipo-&gt;ipo_tdb-&gt;tdb_policy_head, ipo,</span>
+<span class="lineNum">     423 </span>            :                             ipo_tdb_next);
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :                         ipo-&gt;ipo_tdb = NULL;</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :                         ipo-&gt;ipo_last_searched = 0;</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     427 </span>            : 
+<span class="lineNum">     428 </span>            :                 /*
+<span class="lineNum">     429 </span>            :                  * If no SA has been added since the last time we did a
+<span class="lineNum">     430 </span>            :                  * lookup, there's no point searching for one. However, if the
+<span class="lineNum">     431 </span>            :                  * destination gateway is left unspecified (or is all-1's),
+<span class="lineNum">     432 </span>            :                  * always lookup since this is a generic-match rule
+<span class="lineNum">     433 </span>            :                  * (otherwise, we can have situations where SAs to some
+<span class="lineNum">     434 </span>            :                  * destinations exist but are not used, possibly leading to an
+<span class="lineNum">     435 </span>            :                  * explosion in the number of acquired SAs).
+<span class="lineNum">     436 </span>            :                  */
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :                 if (ipo-&gt;ipo_last_searched &lt;= ipsec_last_added)   {</span>
+<span class="lineNum">     438 </span>            :                         /* &quot;Touch&quot; the entry. */
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :                         if (dignore == 0)</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :                                 ipo-&gt;ipo_last_searched = time_second;</span>
+<span class="lineNum">     441 </span>            : 
+<span class="lineNum">     442 </span>            :                         /* Find an appropriate SA from the existing ones. */
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :                         ipo-&gt;ipo_tdb =</span>
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :                             gettdbbydst(rdomain,</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                                 dignore ? &amp;sdst : &amp;ipo-&gt;ipo_dst,</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                                 ipo-&gt;ipo_sproto,</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                                 ids ? ids: ipo-&gt;ipo_ids,</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                                 &amp;ipo-&gt;ipo_addr, &amp;ipo-&gt;ipo_mask);</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                         if (ipo-&gt;ipo_tdb) {</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                                 TAILQ_INSERT_TAIL(&amp;ipo-&gt;ipo_tdb-&gt;tdb_policy_head,</span>
+<span class="lineNum">     451 </span>            :                                     ipo, ipo_tdb_next);
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                                 *error = 0;</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                                 return ipsp_spd_inp(m, af, hlen, error,</span>
+<span class="lineNum">     454 </span>            :                                     direction, tdbp, inp, ipo);
+<span class="lineNum">     455 </span>            :                         }
+<span class="lineNum">     456 </span>            :                 }
+<span class="lineNum">     457 </span>            : 
+<span class="lineNum">     458 </span>            :                 /* So, we don't have an SA -- just a policy. */
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :                 switch (ipo-&gt;ipo_type) {</span>
+<span class="lineNum">     460 </span>            :                 case IPSP_IPSEC_REQUIRE:
+<span class="lineNum">     461 </span>            :                         /* Acquire SA through key management. */
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                         if (ipsp_acquire_sa(ipo,</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                             dignore ? &amp;sdst : &amp;ipo-&gt;ipo_dst,</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :                             signore ? NULL : &amp;ipo-&gt;ipo_src, ddst, m) != 0) {</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                                 *error = EACCES;</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                                 return NULL;</span>
+<span class="lineNum">     467 </span>            :                         }
+<span class="lineNum">     468 </span>            : 
+<span class="lineNum">     469 </span>            :                         /* FALLTHROUGH */
+<span class="lineNum">     470 </span>            :                 case IPSP_IPSEC_DONTACQ:
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                         *error = -EINVAL; /* Silently drop packet. */</span>
+<span class="lineNum">     472 </span><span class="lineNoCov">          0 :                         return NULL;</span>
+<span class="lineNum">     473 </span>            : 
+<span class="lineNum">     474 </span>            :                 case IPSP_IPSEC_ACQUIRE:
+<span class="lineNum">     475 </span>            :                         /* Acquire SA through key management. */
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :                         ipsp_acquire_sa(ipo, dignore ? &amp;sdst : &amp;ipo-&gt;ipo_dst,</span>
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :                             signore ? NULL : &amp;ipo-&gt;ipo_src, ddst, NULL);</span>
+<span class="lineNum">     478 </span>            : 
+<span class="lineNum">     479 </span>            :                         /* FALLTHROUGH */
+<span class="lineNum">     480 </span>            :                 case IPSP_IPSEC_USE:
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :                         *error = 0;</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :                         return ipsp_spd_inp(m, af, hlen, error, direction,</span>
+<span class="lineNum">     483 </span>            :                             tdbp, inp, ipo);
+<span class="lineNum">     484 </span>            :                 }
+<span class="lineNum">     485 </span>            :         } else { /* IPSP_DIRECTION_IN */
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :                 if (tdbp != NULL) {</span>
+<span class="lineNum">     487 </span>            :                         /* Direct match in the cache. */
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :                         if (ipo-&gt;ipo_tdb == tdbp) {</span>
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                                 *error = 0;</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :                                 return ipsp_spd_inp(m, af, hlen, error,</span>
+<span class="lineNum">     491 </span>            :                                     direction, tdbp, inp, ipo);
+<span class="lineNum">     492 </span>            :                         }
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                         if (memcmp(dignore ? &amp;ssrc : &amp;ipo-&gt;ipo_dst,</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :                             &amp;tdbp-&gt;tdb_src, tdbp-&gt;tdb_src.sa.sa_len) ||</span>
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                             (ipo-&gt;ipo_sproto != tdbp-&gt;tdb_sproto))</span>
+<span class="lineNum">     497 </span>            :                                 goto nomatchin;
+<span class="lineNum">     498 </span>            : 
+<span class="lineNum">     499 </span>            :                         /* Match source/dest IDs. */
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :                         if (ipo-&gt;ipo_ids)</span>
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :                                 if (tdbp-&gt;tdb_ids == NULL ||</span>
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                                     !ipsp_ids_match(ipo-&gt;ipo_ids, tdbp-&gt;tdb_ids))</span>
+<span class="lineNum">     503 </span>            :                                         goto nomatchin;
+<span class="lineNum">     504 </span>            : 
+<span class="lineNum">     505 </span>            :                         /* Add it to the cache. */
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :                         if (ipo-&gt;ipo_tdb)</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :                                 TAILQ_REMOVE(&amp;ipo-&gt;ipo_tdb-&gt;tdb_policy_head,</span>
+<span class="lineNum">     508 </span>            :                                     ipo, ipo_tdb_next);
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :                         ipo-&gt;ipo_tdb = tdbp;</span>
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :                         TAILQ_INSERT_TAIL(&amp;tdbp-&gt;tdb_policy_head, ipo,</span>
+<span class="lineNum">     511 </span>            :                             ipo_tdb_next);
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :                         *error = 0;</span>
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :                         return ipsp_spd_inp(m, af, hlen, error, direction,</span>
+<span class="lineNum">     514 </span>            :                             tdbp, inp, ipo);
+<span class="lineNum">     515 </span>            : 
+<span class="lineNum">     516 </span>            :   nomatchin: /* Nothing needed here, falling through */
+<span class="lineNum">     517 </span>            :         ;
+<span class="lineNum">     518 </span>            :                 }
+<span class="lineNum">     519 </span>            : 
+<span class="lineNum">     520 </span>            :                 /* Check whether cached entry applies. */
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                 if (ipo-&gt;ipo_tdb) {</span>
+<span class="lineNum">     522 </span>            :                         /*
+<span class="lineNum">     523 </span>            :                          * We only need to check that the correct
+<span class="lineNum">     524 </span>            :                          * security protocol and security gateway are
+<span class="lineNum">     525 </span>            :                          * set; IDs will be the same since the cached
+<span class="lineNum">     526 </span>            :                          * entry is linked on this policy.
+<span class="lineNum">     527 </span>            :                          */
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :                         if (ipo-&gt;ipo_sproto == ipo-&gt;ipo_tdb-&gt;tdb_sproto &amp;&amp;</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                             !memcmp(&amp;ipo-&gt;ipo_tdb-&gt;tdb_src,</span>
+<span class="lineNum">     530 </span>            :                             dignore ? &amp;ssrc : &amp;ipo-&gt;ipo_dst,
+<span class="lineNum">     531 </span>            :                             ipo-&gt;ipo_tdb-&gt;tdb_src.sa.sa_len))
+<span class="lineNum">     532 </span>            :                                 goto skipinputsearch;
+<span class="lineNum">     533 </span>            : 
+<span class="lineNum">     534 </span>            :                         /* Not applicable, unlink. */
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                         TAILQ_REMOVE(&amp;ipo-&gt;ipo_tdb-&gt;tdb_policy_head, ipo,</span>
+<span class="lineNum">     536 </span>            :                             ipo_tdb_next);
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                         ipo-&gt;ipo_last_searched = 0;</span>
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :                         ipo-&gt;ipo_tdb = NULL;</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     540 </span>            : 
+<span class="lineNum">     541 </span>            :                 /* Find whether there exists an appropriate SA. */
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                 if (ipo-&gt;ipo_last_searched &lt;= ipsec_last_added)   {</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :                         if (dignore == 0)</span>
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :                                 ipo-&gt;ipo_last_searched = time_second;</span>
+<span class="lineNum">     545 </span>            : 
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :                         ipo-&gt;ipo_tdb =</span>
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 :                             gettdbbysrc(rdomain,</span>
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :                                 dignore ? &amp;ssrc : &amp;ipo-&gt;ipo_dst,</span>
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :                                 ipo-&gt;ipo_sproto, ipo-&gt;ipo_ids,</span>
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :                                 &amp;ipo-&gt;ipo_addr, &amp;ipo-&gt;ipo_mask);</span>
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :                         if (ipo-&gt;ipo_tdb)</span>
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :                                 TAILQ_INSERT_TAIL(&amp;ipo-&gt;ipo_tdb-&gt;tdb_policy_head,</span>
+<span class="lineNum">     553 </span>            :                                     ipo, ipo_tdb_next);
+<span class="lineNum">     554 </span>            :                 }
+<span class="lineNum">     555 </span>            :   skipinputsearch:
+<span class="lineNum">     556 </span>            : 
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :                 switch (ipo-&gt;ipo_type) {</span>
+<span class="lineNum">     558 </span>            :                 case IPSP_IPSEC_REQUIRE:
+<span class="lineNum">     559 </span>            :                         /* If appropriate SA exists, don't acquire another. */
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :                         if (ipo-&gt;ipo_tdb) {</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                                 *error = -EINVAL;</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :                                 return NULL;</span>
+<span class="lineNum">     563 </span>            :                         }
+<span class="lineNum">     564 </span>            : 
+<span class="lineNum">     565 </span>            :                         /* Acquire SA through key management. */
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :                         if ((*error = ipsp_acquire_sa(ipo,</span>
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :                             dignore ? &amp;ssrc : &amp;ipo-&gt;ipo_dst,</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                             signore ? NULL : &amp;ipo-&gt;ipo_src, ddst, m)) != 0)</span>
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :                                 return NULL;</span>
+<span class="lineNum">     570 </span>            : 
+<span class="lineNum">     571 </span>            :                         /* FALLTHROUGH */
+<span class="lineNum">     572 </span>            :                 case IPSP_IPSEC_DONTACQ:
+<span class="lineNum">     573 </span>            :                         /* Drop packet. */
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :                         *error = -EINVAL;</span>
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 :                         return NULL;</span>
+<span class="lineNum">     576 </span>            : 
+<span class="lineNum">     577 </span>            :                 case IPSP_IPSEC_ACQUIRE:
+<span class="lineNum">     578 </span>            :                         /* If appropriate SA exists, don't acquire another. */
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :                         if (ipo-&gt;ipo_tdb) {</span>
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :                                 *error = 0;</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :                                 return ipsp_spd_inp(m, af, hlen, error,</span>
+<span class="lineNum">     582 </span>            :                                     direction, tdbp, inp, ipo);
+<span class="lineNum">     583 </span>            :                         }
+<span class="lineNum">     584 </span>            : 
+<span class="lineNum">     585 </span>            :                         /* Acquire SA through key management. */
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                         ipsp_acquire_sa(ipo, dignore ? &amp;ssrc : &amp;ipo-&gt;ipo_dst,</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :                             signore ? NULL : &amp;ipo-&gt;ipo_src, ddst, NULL);</span>
+<span class="lineNum">     588 </span>            : 
+<span class="lineNum">     589 </span>            :                         /* FALLTHROUGH */
+<span class="lineNum">     590 </span>            :                 case IPSP_IPSEC_USE:
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :                         *error = 0;</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :                         return ipsp_spd_inp(m, af, hlen, error, direction,</span>
+<span class="lineNum">     593 </span>            :                             tdbp, inp, ipo);
+<span class="lineNum">     594 </span>            :                 }
+<span class="lineNum">     595 </span>            :         }
+<span class="lineNum">     596 </span>            : 
+<span class="lineNum">     597 </span>            :         /* Shouldn't ever get this far. */
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :         *error = EINVAL;</span>
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     601 </span>            : 
+<span class="lineNum">     602 </span>            : /*
+<span class="lineNum">     603 </span>            :  * Delete a policy from the SPD.
+<a name="604"><span class="lineNum">     604 </span>            :  */</a>
+<span class="lineNum">     605 </span>            : int
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 : ipsec_delete_policy(struct ipsec_policy *ipo)</span>
+<span class="lineNum">     607 </span>            : {
+<span class="lineNum">     608 </span>            :         struct ipsec_acquire *ipa;
+<span class="lineNum">     609 </span>            :         struct radix_node_head *rnh;
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :         struct radix_node *rn = (struct radix_node *)ipo;</span>
+<span class="lineNum">     611 </span>            :         int err = 0;
+<span class="lineNum">     612 </span>            : 
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         NET_ASSERT_LOCKED();</span>
+<span class="lineNum">     614 </span>            : 
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :         if (--ipo-&gt;ipo_ref_count &gt; 0)</span>
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     617 </span>            : 
+<span class="lineNum">     618 </span>            :         /* Delete from SPD. */
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :         if ((rnh = spd_table_get(ipo-&gt;ipo_rdomain)) == NULL ||</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :             rn_delete(&amp;ipo-&gt;ipo_addr, &amp;ipo-&gt;ipo_mask, rnh, rn) == NULL)</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :                 return (ESRCH);</span>
+<span class="lineNum">     622 </span>            : 
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :         if (ipo-&gt;ipo_tdb != NULL)</span>
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :                 TAILQ_REMOVE(&amp;ipo-&gt;ipo_tdb-&gt;tdb_policy_head, ipo,</span>
+<span class="lineNum">     625 </span>            :                     ipo_tdb_next);
+<span class="lineNum">     626 </span>            : 
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :         while ((ipa = TAILQ_FIRST(&amp;ipo-&gt;ipo_acquires)) != NULL)</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                 ipsp_delete_acquire(ipa);</span>
+<span class="lineNum">     629 </span>            : 
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :         TAILQ_REMOVE(&amp;ipsec_policy_head, ipo, ipo_list);</span>
+<span class="lineNum">     631 </span>            : 
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :         if (ipo-&gt;ipo_ids)</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :                 ipsp_ids_free(ipo-&gt;ipo_ids);</span>
+<span class="lineNum">     634 </span>            : 
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :         ipsec_in_use--;</span>
+<span class="lineNum">     636 </span>            : 
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :         pool_put(&amp;ipsec_policy_pool, ipo);</span>
+<span class="lineNum">     638 </span>            : 
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :         return err;</span>
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 : }</span>
+<a name="641"><span class="lineNum">     641 </span>            : </a>
+<span class="lineNum">     642 </span>            : void
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 : ipsp_delete_acquire_timo(void *v)</span>
+<span class="lineNum">     644 </span>            : {
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :         struct ipsec_acquire *ipa = v;</span>
+<span class="lineNum">     646 </span>            : 
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         NET_LOCK();</span>
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :         ipsp_delete_acquire(ipa);</span>
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :         NET_UNLOCK();</span>
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     651 </span>            : 
+<span class="lineNum">     652 </span>            : /*
+<span class="lineNum">     653 </span>            :  * Delete a pending IPsec acquire record.
+<a name="654"><span class="lineNum">     654 </span>            :  */</a>
+<span class="lineNum">     655 </span>            : void
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 : ipsp_delete_acquire(struct ipsec_acquire *ipa)</span>
+<span class="lineNum">     657 </span>            : {
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :         NET_ASSERT_LOCKED();</span>
+<span class="lineNum">     659 </span>            : 
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         timeout_del(&amp;ipa-&gt;ipa_timeout);</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :         TAILQ_REMOVE(&amp;ipsec_acquire_head, ipa, ipa_next);</span>
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :         if (ipa-&gt;ipa_policy != NULL)</span>
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                 TAILQ_REMOVE(&amp;ipa-&gt;ipa_policy-&gt;ipo_acquires, ipa,</span>
+<span class="lineNum">     664 </span>            :                     ipa_ipo_next);
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :         pool_put(&amp;ipsec_acquire_pool, ipa);</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     667 </span>            : 
+<span class="lineNum">     668 </span>            : /*
+<span class="lineNum">     669 </span>            :  * Find out if there's an ACQUIRE pending.
+<span class="lineNum">     670 </span>            :  * XXX Need a better structure.
+<a name="671"><span class="lineNum">     671 </span>            :  */</a>
+<span class="lineNum">     672 </span>            : struct ipsec_acquire *
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 : ipsp_pending_acquire(struct ipsec_policy *ipo, union sockaddr_union *gw)</span>
+<span class="lineNum">     674 </span>            : {
+<span class="lineNum">     675 </span>            :         struct ipsec_acquire *ipa;
+<span class="lineNum">     676 </span>            : 
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :         NET_ASSERT_LOCKED();</span>
+<span class="lineNum">     678 </span>            : 
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH (ipa, &amp;ipo-&gt;ipo_acquires, ipa_ipo_next) {</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :                 if (!memcmp(gw, &amp;ipa-&gt;ipa_addr, gw-&gt;sa.sa_len))</span>
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :                         return ipa;</span>
+<span class="lineNum">     682 </span>            :         }
+<span class="lineNum">     683 </span>            : 
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     686 </span>            : 
+<span class="lineNum">     687 </span>            : /*
+<span class="lineNum">     688 </span>            :  * Signal key management that we need an SA.
+<span class="lineNum">     689 </span>            :  * XXX For outgoing policies, we could try to hold on to the mbuf.
+<a name="690"><span class="lineNum">     690 </span>            :  */</a>
+<span class="lineNum">     691 </span>            : int
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 : ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,</span>
+<span class="lineNum">     693 </span>            :     union sockaddr_union *laddr, struct sockaddr_encap *ddst, struct mbuf *m)
+<span class="lineNum">     694 </span>            : {
+<span class="lineNum">     695 </span>            :         struct ipsec_acquire *ipa;
+<span class="lineNum">     696 </span>            : 
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :         NET_ASSERT_LOCKED();</span>
+<span class="lineNum">     698 </span>            : 
+<span class="lineNum">     699 </span>            :         /* Check whether request has been made already. */
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 :         if ((ipa = ipsp_pending_acquire(ipo, gw)) != NULL)</span>
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     702 </span>            : 
+<span class="lineNum">     703 </span>            :         /* Add request in cache and proceed. */
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :         if (ipsec_acquire_pool_initialized == 0) {</span>
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :                 ipsec_acquire_pool_initialized = 1;</span>
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :                 pool_init(&amp;ipsec_acquire_pool, sizeof(struct ipsec_acquire),</span>
+<span class="lineNum">     707 </span>            :                     0, IPL_SOFTNET, 0, &quot;ipsec acquire&quot;, NULL);
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     709 </span>            : 
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :         ipa = pool_get(&amp;ipsec_acquire_pool, PR_NOWAIT|PR_ZERO);</span>
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :         if (ipa == NULL)</span>
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     713 </span>            : 
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 :         ipa-&gt;ipa_addr = *gw;</span>
+<span class="lineNum">     715 </span>            : 
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :         timeout_set_proc(&amp;ipa-&gt;ipa_timeout, ipsp_delete_acquire_timo, ipa);</span>
+<span class="lineNum">     717 </span>            : 
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :         ipa-&gt;ipa_info.sen_len = ipa-&gt;ipa_mask.sen_len = SENT_LEN;</span>
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :         ipa-&gt;ipa_info.sen_family = ipa-&gt;ipa_mask.sen_family = PF_KEY;</span>
+<span class="lineNum">     720 </span>            : 
+<span class="lineNum">     721 </span>            :         /* Just copy the right information. */
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :         switch (ipo-&gt;ipo_addr.sen_type) {</span>
+<span class="lineNum">     723 </span>            :         case SENT_IP4:
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :                 ipa-&gt;ipa_info.sen_type = ipa-&gt;ipa_mask.sen_type = SENT_IP4;</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :                 ipa-&gt;ipa_info.sen_direction = ipo-&gt;ipo_addr.sen_direction;</span>
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 :                 ipa-&gt;ipa_mask.sen_direction = ipo-&gt;ipo_mask.sen_direction;</span>
+<span class="lineNum">     727 </span>            : 
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :                 if (ipsp_is_unspecified(ipo-&gt;ipo_dst)) {</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_ip_src = ddst-&gt;sen_ip_src;</span>
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_ip_src.s_addr = INADDR_BROADCAST;</span>
+<span class="lineNum">     731 </span>            : 
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_ip_dst = ddst-&gt;sen_ip_dst;</span>
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_ip_dst.s_addr = INADDR_BROADCAST;</span>
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     735 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_ip_src = ipo-&gt;ipo_addr.sen_ip_src;</span>
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_ip_src = ipo-&gt;ipo_mask.sen_ip_src;</span>
+<span class="lineNum">     737 </span>            : 
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_ip_dst = ipo-&gt;ipo_addr.sen_ip_dst;</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_ip_dst = ipo-&gt;ipo_mask.sen_ip_dst;</span>
+<span class="lineNum">     740 </span>            :                 }
+<span class="lineNum">     741 </span>            : 
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :                 ipa-&gt;ipa_info.sen_proto = ipo-&gt;ipo_addr.sen_proto;</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :                 ipa-&gt;ipa_mask.sen_proto = ipo-&gt;ipo_mask.sen_proto;</span>
+<span class="lineNum">     744 </span>            : 
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :                 if (ipo-&gt;ipo_addr.sen_proto) {</span>
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_sport = ipo-&gt;ipo_addr.sen_sport;</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_sport = ipo-&gt;ipo_mask.sen_sport;</span>
+<span class="lineNum">     748 </span>            : 
+<span class="lineNum">     749 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_dport = ipo-&gt;ipo_addr.sen_dport;</span>
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_dport = ipo-&gt;ipo_mask.sen_dport;</span>
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     752 </span>            :                 break;
+<span class="lineNum">     753 </span>            : 
+<span class="lineNum">     754 </span>            : #ifdef INET6
+<span class="lineNum">     755 </span>            :         case SENT_IP6:
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :                 ipa-&gt;ipa_info.sen_type = ipa-&gt;ipa_mask.sen_type = SENT_IP6;</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :                 ipa-&gt;ipa_info.sen_ip6_direction =</span>
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :                     ipo-&gt;ipo_addr.sen_ip6_direction;</span>
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :                 ipa-&gt;ipa_mask.sen_ip6_direction =</span>
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :                     ipo-&gt;ipo_mask.sen_ip6_direction;</span>
+<span class="lineNum">     761 </span>            : 
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :                 if (ipsp_is_unspecified(ipo-&gt;ipo_dst)) {</span>
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_ip6_src = ddst-&gt;sen_ip6_src;</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_ip6_src = in6mask128;</span>
+<span class="lineNum">     765 </span>            : 
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_ip6_dst = ddst-&gt;sen_ip6_dst;</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_ip6_dst = in6mask128;</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_ip6_src = ipo-&gt;ipo_addr.sen_ip6_src;</span>
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_ip6_src = ipo-&gt;ipo_mask.sen_ip6_src;</span>
+<span class="lineNum">     771 </span>            : 
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_ip6_dst = ipo-&gt;ipo_addr.sen_ip6_dst;</span>
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_ip6_dst = ipo-&gt;ipo_mask.sen_ip6_dst;</span>
+<span class="lineNum">     774 </span>            :                 }
+<span class="lineNum">     775 </span>            : 
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :                 ipa-&gt;ipa_info.sen_ip6_proto = ipo-&gt;ipo_addr.sen_ip6_proto;</span>
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :                 ipa-&gt;ipa_mask.sen_ip6_proto = ipo-&gt;ipo_mask.sen_ip6_proto;</span>
+<span class="lineNum">     778 </span>            : 
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :                 if (ipo-&gt;ipo_mask.sen_ip6_proto) {</span>
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_ip6_sport =</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :                             ipo-&gt;ipo_addr.sen_ip6_sport;</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_ip6_sport =</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :                             ipo-&gt;ipo_mask.sen_ip6_sport;</span>
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_info.sen_ip6_dport =</span>
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :                             ipo-&gt;ipo_addr.sen_ip6_dport;</span>
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :                         ipa-&gt;ipa_mask.sen_ip6_dport =</span>
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :                             ipo-&gt;ipo_mask.sen_ip6_dport;</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     789 </span>            :                 break;
+<span class="lineNum">     790 </span>            : #endif /* INET6 */
+<span class="lineNum">     791 </span>            : 
+<span class="lineNum">     792 </span>            :         default:
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :                 pool_put(&amp;ipsec_acquire_pool, ipa);</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     795 </span>            :         }
+<span class="lineNum">     796 </span>            : 
+<span class="lineNum">     797 </span>            : #ifdef IPSEC
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :         timeout_add_sec(&amp;ipa-&gt;ipa_timeout, ipsec_expire_acquire);</span>
+<span class="lineNum">     799 </span>            : #endif
+<span class="lineNum">     800 </span>            : 
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :         TAILQ_INSERT_TAIL(&amp;ipsec_acquire_head, ipa, ipa_next);</span>
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :         TAILQ_INSERT_TAIL(&amp;ipo-&gt;ipo_acquires, ipa, ipa_ipo_next);</span>
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :         ipa-&gt;ipa_policy = ipo;</span>
+<span class="lineNum">     804 </span>            : 
+<span class="lineNum">     805 </span>            :         /* PF_KEYv2 notification message. */
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         return pfkeyv2_acquire(ipo, gw, laddr, &amp;ipa-&gt;ipa_seq, ddst);</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     808 </span>            : 
+<span class="lineNum">     809 </span>            : /*
+<span class="lineNum">     810 </span>            :  * Deal with PCB security requirements.
+<a name="811"><span class="lineNum">     811 </span>            :  */</a>
+<span class="lineNum">     812 </span>            : struct tdb *
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 : ipsp_spd_inp(struct mbuf *m, int af, int hlen, int *error, int direction,</span>
+<span class="lineNum">     814 </span>            :     struct tdb *tdbp, struct inpcb *inp, struct ipsec_policy *ipo)
+<span class="lineNum">     815 </span>            : {
+<span class="lineNum">     816 </span>            :         /* Sanity check. */
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 :         if (inp == NULL)</span>
+<span class="lineNum">     818 </span>            :                 goto justreturn;
+<span class="lineNum">     819 </span>            : 
+<span class="lineNum">     820 </span>            :         /* We only support IPSEC_LEVEL_BYPASS or IPSEC_LEVEL_AVAIL */
+<span class="lineNum">     821 </span>            : 
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :         if (inp-&gt;inp_seclevel[SL_ESP_TRANS] == IPSEC_LEVEL_BYPASS &amp;&amp;</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :             inp-&gt;inp_seclevel[SL_ESP_NETWORK] == IPSEC_LEVEL_BYPASS &amp;&amp;</span>
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :             inp-&gt;inp_seclevel[SL_AUTH] == IPSEC_LEVEL_BYPASS)</span>
+<span class="lineNum">     825 </span>            :                 goto justreturn;
+<span class="lineNum">     826 </span>            : 
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :         if (inp-&gt;inp_seclevel[SL_ESP_TRANS] == IPSEC_LEVEL_AVAIL &amp;&amp;</span>
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :             inp-&gt;inp_seclevel[SL_ESP_NETWORK] == IPSEC_LEVEL_AVAIL &amp;&amp;</span>
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :             inp-&gt;inp_seclevel[SL_AUTH] == IPSEC_LEVEL_AVAIL)</span>
+<span class="lineNum">     830 </span>            :                 goto justreturn;
+<span class="lineNum">     831 </span>            : 
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :         *error = -EINVAL;</span>
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     834 </span>            : 
+<span class="lineNum">     835 </span>            :  justreturn:
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :         if (ipo != NULL)</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :                 return ipo-&gt;ipo_tdb;</span>
+<span class="lineNum">     838 </span>            :         else
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     841 </span>            : 
+<span class="lineNum">     842 </span>            : /*
+<span class="lineNum">     843 </span>            :  * Find a pending ACQUIRE record based on its sequence number.
+<span class="lineNum">     844 </span>            :  * XXX Need to use a better data structure.
+<a name="845"><span class="lineNum">     845 </span>            :  */</a>
+<span class="lineNum">     846 </span>            : struct ipsec_acquire *
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 : ipsec_get_acquire(u_int32_t seq)</span>
+<span class="lineNum">     848 </span>            : {
+<span class="lineNum">     849 </span>            :         struct ipsec_acquire *ipa;
+<span class="lineNum">     850 </span>            : 
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :         NET_ASSERT_LOCKED();</span>
+<span class="lineNum">     852 </span>            : 
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH (ipa, &amp;ipsec_acquire_head, ipa_next)</span>
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :                 if (ipa-&gt;ipa_seq == seq)</span>
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :                         return ipa;</span>
+<span class="lineNum">     856 </span>            : 
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

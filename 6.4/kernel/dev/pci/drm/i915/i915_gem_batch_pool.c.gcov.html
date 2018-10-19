@@ -1,0 +1,235 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/i915/i915_gem_batch_pool.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">dev/pci/drm/i915</a> - i915_gem_batch_pool.c<span style="font-size: 80%;"> (source / <a href="i915_gem_batch_pool.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">39</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * Copyright © 2014 Intel Corporation
+<span class="lineNum">       3 </span>            :  *
+<span class="lineNum">       4 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       5 </span>            :  * copy of this software and associated documentation files (the &quot;Software&quot;),
+<span class="lineNum">       6 </span>            :  * to deal in the Software without restriction, including without limitation
+<span class="lineNum">       7 </span>            :  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+<span class="lineNum">       8 </span>            :  * and/or sell copies of the Software, and to permit persons to whom the
+<span class="lineNum">       9 </span>            :  * Software is furnished to do so, subject to the following conditions:
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * The above copyright notice and this permission notice (including the next
+<span class="lineNum">      12 </span>            :  * paragraph) shall be included in all copies or substantial portions of the
+<span class="lineNum">      13 </span>            :  * Software.
+<span class="lineNum">      14 </span>            :  *
+<span class="lineNum">      15 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      16 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      17 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+<span class="lineNum">      18 </span>            :  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+<span class="lineNum">      19 </span>            :  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+<span class="lineNum">      20 </span>            :  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+<span class="lineNum">      21 </span>            :  * IN THE SOFTWARE.
+<span class="lineNum">      22 </span>            :  *
+<span class="lineNum">      23 </span>            :  */
+<span class="lineNum">      24 </span>            : 
+<span class="lineNum">      25 </span>            : #include &quot;i915_drv.h&quot;
+<span class="lineNum">      26 </span>            : #include &quot;i915_gem_batch_pool.h&quot;
+<span class="lineNum">      27 </span>            : 
+<span class="lineNum">      28 </span>            : /**
+<span class="lineNum">      29 </span>            :  * DOC: batch pool
+<span class="lineNum">      30 </span>            :  *
+<span class="lineNum">      31 </span>            :  * In order to submit batch buffers as 'secure', the software command parser
+<span class="lineNum">      32 </span>            :  * must ensure that a batch buffer cannot be modified after parsing. It does
+<span class="lineNum">      33 </span>            :  * this by copying the user provided batch buffer contents to a kernel owned
+<span class="lineNum">      34 </span>            :  * buffer from which the hardware will actually execute, and by carefully
+<span class="lineNum">      35 </span>            :  * managing the address space bindings for such buffers.
+<span class="lineNum">      36 </span>            :  *
+<span class="lineNum">      37 </span>            :  * The batch pool framework provides a mechanism for the driver to manage a
+<span class="lineNum">      38 </span>            :  * set of scratch buffers to use for this purpose. The framework can be
+<span class="lineNum">      39 </span>            :  * extended to support other uses cases should they arise.
+<span class="lineNum">      40 </span>            :  */
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : /**
+<span class="lineNum">      43 </span>            :  * i915_gem_batch_pool_init() - initialize a batch buffer pool
+<span class="lineNum">      44 </span>            :  * @dev: the drm device
+<a name="45"><span class="lineNum">      45 </span>            :  * @pool: the batch buffer pool</a>
+<span class="lineNum">      46 </span>            :  */
+<span class="lineNum">      47 </span><span class="lineNoCov">          0 : void i915_gem_batch_pool_init(struct drm_device *dev,</span>
+<span class="lineNum">      48 </span>            :                               struct i915_gem_batch_pool *pool)
+<span class="lineNum">      49 </span>            : {
+<span class="lineNum">      50 </span>            :         int n;
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span><span class="lineNoCov">          0 :         pool-&gt;dev = dev;</span>
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span><span class="lineNoCov">          0 :         for (n = 0; n &lt; ARRAY_SIZE(pool-&gt;cache_list); n++)</span>
+<span class="lineNum">      55 </span><span class="lineNoCov">          0 :                 INIT_LIST_HEAD(&amp;pool-&gt;cache_list[n]);</span>
+<span class="lineNum">      56 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      57 </span>            : 
+<span class="lineNum">      58 </span>            : /**
+<span class="lineNum">      59 </span>            :  * i915_gem_batch_pool_fini() - clean up a batch buffer pool
+<span class="lineNum">      60 </span>            :  * @pool: the pool to clean up
+<span class="lineNum">      61 </span>            :  *
+<a name="62"><span class="lineNum">      62 </span>            :  * Note: Callers must hold the struct_mutex.</a>
+<span class="lineNum">      63 </span>            :  */
+<span class="lineNum">      64 </span><span class="lineNoCov">          0 : void i915_gem_batch_pool_fini(struct i915_gem_batch_pool *pool)</span>
+<span class="lineNum">      65 </span>            : {
+<span class="lineNum">      66 </span>            :         int n;
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span><span class="lineNoCov">          0 :         WARN_ON(!mutex_is_locked(&amp;pool-&gt;dev-&gt;struct_mutex));</span>
+<span class="lineNum">      69 </span>            : 
+<span class="lineNum">      70 </span><span class="lineNoCov">          0 :         for (n = 0; n &lt; ARRAY_SIZE(pool-&gt;cache_list); n++) {</span>
+<span class="lineNum">      71 </span><span class="lineNoCov">          0 :                 while (!list_empty(&amp;pool-&gt;cache_list[n])) {</span>
+<span class="lineNum">      72 </span>            :                         struct drm_i915_gem_object *obj =
+<span class="lineNum">      73 </span><span class="lineNoCov">          0 :                                 list_first_entry(&amp;pool-&gt;cache_list[n],</span>
+<span class="lineNum">      74 </span>            :                                                  struct drm_i915_gem_object,
+<span class="lineNum">      75 </span>            :                                                  batch_pool_link);
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span><span class="lineNoCov">          0 :                         list_del(&amp;obj-&gt;batch_pool_link);</span>
+<span class="lineNum">      78 </span><span class="lineNoCov">          0 :                         drm_gem_object_unreference(&amp;obj-&gt;base);</span>
+<span class="lineNum">      79 </span>            :                 }
+<span class="lineNum">      80 </span>            :         }
+<span class="lineNum">      81 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      82 </span>            : 
+<span class="lineNum">      83 </span>            : /**
+<span class="lineNum">      84 </span>            :  * i915_gem_batch_pool_get() - allocate a buffer from the pool
+<span class="lineNum">      85 </span>            :  * @pool: the batch buffer pool
+<span class="lineNum">      86 </span>            :  * @size: the minimum desired size of the returned buffer
+<span class="lineNum">      87 </span>            :  *
+<span class="lineNum">      88 </span>            :  * Returns an inactive buffer from @pool with at least @size bytes,
+<span class="lineNum">      89 </span>            :  * with the pages pinned. The caller must i915_gem_object_unpin_pages()
+<span class="lineNum">      90 </span>            :  * on the returned object.
+<span class="lineNum">      91 </span>            :  *
+<span class="lineNum">      92 </span>            :  * Note: Callers must hold the struct_mutex
+<span class="lineNum">      93 </span>            :  *
+<span class="lineNum">      94 </span>            :  * Return: the buffer object or an error pointer
+<a name="95"><span class="lineNum">      95 </span>            :  */</a>
+<span class="lineNum">      96 </span>            : struct drm_i915_gem_object *
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 : i915_gem_batch_pool_get(struct i915_gem_batch_pool *pool,</span>
+<span class="lineNum">      98 </span>            :                         size_t size)
+<span class="lineNum">      99 </span>            : {
+<span class="lineNum">     100 </span>            :         struct drm_i915_gem_object *obj = NULL;
+<span class="lineNum">     101 </span>            :         struct drm_i915_gem_object *tmp, *next;
+<span class="lineNum">     102 </span>            :         struct list_head *list;
+<span class="lineNum">     103 </span>            :         int n;
+<span class="lineNum">     104 </span>            : 
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :         WARN_ON(!mutex_is_locked(&amp;pool-&gt;dev-&gt;struct_mutex));</span>
+<span class="lineNum">     106 </span>            : 
+<span class="lineNum">     107 </span>            :         /* Compute a power-of-two bucket, but throw everything greater than
+<span class="lineNum">     108 </span>            :          * 16KiB into the same bucket: i.e. the the buckets hold objects of
+<span class="lineNum">     109 </span>            :          * (1 page, 2 pages, 4 pages, 8+ pages).
+<span class="lineNum">     110 </span>            :          */
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :         n = fls(size &gt;&gt; PAGE_SHIFT) - 1;</span>
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :         if (n &gt;= ARRAY_SIZE(pool-&gt;cache_list))</span>
+<span class="lineNum">     113 </span>            :                 n = ARRAY_SIZE(pool-&gt;cache_list) - 1;
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         list = &amp;pool-&gt;cache_list[n];</span>
+<span class="lineNum">     115 </span>            : 
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         list_for_each_entry_safe(tmp, next, list, batch_pool_link) {</span>
+<span class="lineNum">     117 </span>            :                 /* The batches are strictly LRU ordered */
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :                 if (tmp-&gt;active)</span>
+<span class="lineNum">     119 </span>            :                         break;
+<span class="lineNum">     120 </span>            : 
+<span class="lineNum">     121 </span>            :                 /* While we're looping, do some clean up */
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :                 if (tmp-&gt;madv == __I915_MADV_PURGED) {</span>
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :                         list_del(&amp;tmp-&gt;batch_pool_link);</span>
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :                         drm_gem_object_unreference(&amp;tmp-&gt;base);</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     126 </span>            :                 }
+<span class="lineNum">     127 </span>            : 
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :                 if (tmp-&gt;base.size &gt;= size) {</span>
+<span class="lineNum">     129 </span>            :                         obj = tmp;
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     131 </span>            :                 }
+<span class="lineNum">     132 </span>            :         }
+<span class="lineNum">     133 </span>            : 
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         if (obj == NULL) {</span>
+<span class="lineNum">     135 </span>            :                 int ret;
+<span class="lineNum">     136 </span>            : 
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :                 obj = i915_gem_alloc_object(pool-&gt;dev, size);</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :                 if (obj == NULL)</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :                         return ERR_PTR(-ENOMEM);</span>
+<span class="lineNum">     140 </span>            : 
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :                 ret = i915_gem_object_get_pages(obj);</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :                         return ERR_PTR(ret);</span>
+<span class="lineNum">     144 </span>            : 
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :                 obj-&gt;madv = I915_MADV_DONTNEED;</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     147 </span>            : 
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         list_move_tail(&amp;obj-&gt;batch_pool_link, list);</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         i915_gem_object_pin_pages(obj);</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         return obj;</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

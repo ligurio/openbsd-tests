@@ -1,0 +1,1065 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/drm_linux.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../index.html">top level</a> - <a href="index.html">dev/pci/drm</a> - drm_linux.c<span style="font-size: 80%;"> (source / <a href="drm_linux.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">470</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">81</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: drm_linux.c,v 1.32 2018/09/11 20:25:58 kettenis Exp $ */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2013 Jonathan Gray &lt;jsg@openbsd.org&gt;
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2015, 2016 Mark Kettenis &lt;kettenis@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : #include &lt;dev/pci/drm/drmP.h&gt;
+<span class="lineNum">      20 </span>            : #include &lt;dev/pci/ppbreg.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;sys/event.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/file.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/filedesc.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/stat.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/unistd.h&gt;
+<span class="lineNum">      26 </span>            : 
+<span class="lineNum">      27 </span>            : struct mutex sch_mtx = MUTEX_INITIALIZER(IPL_SCHED);
+<span class="lineNum">      28 </span>            : void *sch_ident;
+<span class="lineNum">      29 </span>            : int sch_priority;
+<a name="30"><span class="lineNum">      30 </span>            : </a>
+<span class="lineNum">      31 </span>            : void
+<span class="lineNum">      32 </span><span class="lineNoCov">          0 : flush_barrier(void *arg)</span>
+<span class="lineNum">      33 </span>            : {
+<span class="lineNum">      34 </span><span class="lineNoCov">          0 :         int *barrier = arg;</span>
+<span class="lineNum">      35 </span>            : 
+<span class="lineNum">      36 </span><span class="lineNoCov">          0 :         *barrier = 1;</span>
+<span class="lineNum">      37 </span><span class="lineNoCov">          0 :         wakeup(barrier);</span>
+<span class="lineNum">      38 </span><span class="lineNoCov">          0 : }</span>
+<a name="39"><span class="lineNum">      39 </span>            : </a>
+<span class="lineNum">      40 </span>            : void
+<span class="lineNum">      41 </span><span class="lineNoCov">          0 : flush_workqueue(struct workqueue_struct *wq)</span>
+<span class="lineNum">      42 </span>            : {
+<span class="lineNum">      43 </span><span class="lineNoCov">          0 :         struct sleep_state sls;</span>
+<span class="lineNum">      44 </span><span class="lineNoCov">          0 :         struct task task;</span>
+<span class="lineNum">      45 </span><span class="lineNoCov">          0 :         int barrier = 0;</span>
+<span class="lineNum">      46 </span>            : 
+<span class="lineNum">      47 </span><span class="lineNoCov">          0 :         if (cold)</span>
+<span class="lineNum">      48 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">      49 </span>            : 
+<span class="lineNum">      50 </span><span class="lineNoCov">          0 :         task_set(&amp;task, flush_barrier, &amp;barrier);</span>
+<span class="lineNum">      51 </span><span class="lineNoCov">          0 :         task_add((struct taskq *)wq, &amp;task);</span>
+<span class="lineNum">      52 </span><span class="lineNoCov">          0 :         while (!barrier) {</span>
+<span class="lineNum">      53 </span><span class="lineNoCov">          0 :                 sleep_setup(&amp;sls, &amp;barrier, PWAIT, &quot;flwqbar&quot;);</span>
+<span class="lineNum">      54 </span><span class="lineNoCov">          0 :                 sleep_finish(&amp;sls, !barrier);</span>
+<span class="lineNum">      55 </span>            :         }
+<span class="lineNum">      56 </span><span class="lineNoCov">          0 : }</span>
+<a name="57"><span class="lineNum">      57 </span>            : </a>
+<span class="lineNum">      58 </span>            : void
+<span class="lineNum">      59 </span><span class="lineNoCov">          0 : flush_work(struct work_struct *work)</span>
+<span class="lineNum">      60 </span>            : {
+<span class="lineNum">      61 </span><span class="lineNoCov">          0 :         struct sleep_state sls;</span>
+<span class="lineNum">      62 </span><span class="lineNoCov">          0 :         struct task task;</span>
+<span class="lineNum">      63 </span><span class="lineNoCov">          0 :         int barrier = 0;</span>
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span><span class="lineNoCov">          0 :         if (cold)</span>
+<span class="lineNum">      66 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span><span class="lineNoCov">          0 :         task_set(&amp;task, flush_barrier, &amp;barrier);</span>
+<span class="lineNum">      69 </span><span class="lineNoCov">          0 :         task_add(work-&gt;tq, &amp;task);</span>
+<span class="lineNum">      70 </span><span class="lineNoCov">          0 :         while (!barrier) {</span>
+<span class="lineNum">      71 </span><span class="lineNoCov">          0 :                 sleep_setup(&amp;sls, &amp;barrier, PWAIT, &quot;flwkbar&quot;);</span>
+<span class="lineNum">      72 </span><span class="lineNoCov">          0 :                 sleep_finish(&amp;sls, !barrier);</span>
+<span class="lineNum">      73 </span>            :         }
+<span class="lineNum">      74 </span><span class="lineNoCov">          0 : }</span>
+<a name="75"><span class="lineNum">      75 </span>            : </a>
+<span class="lineNum">      76 </span>            : void
+<span class="lineNum">      77 </span><span class="lineNoCov">          0 : flush_delayed_work(struct delayed_work *dwork)</span>
+<span class="lineNum">      78 </span>            : {
+<span class="lineNum">      79 </span><span class="lineNoCov">          0 :         struct sleep_state sls;</span>
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 :         struct task task;</span>
+<span class="lineNum">      81 </span><span class="lineNoCov">          0 :         int barrier = 0;</span>
+<span class="lineNum">      82 </span>            : 
+<span class="lineNum">      83 </span><span class="lineNoCov">          0 :         if (cold)</span>
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">      85 </span>            : 
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :         while (timeout_pending(&amp;dwork-&gt;to))</span>
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :                 tsleep(&amp;barrier, PWAIT, &quot;fldwto&quot;, 1);</span>
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :         task_set(&amp;task, flush_barrier, &amp;barrier);</span>
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :         task_add(dwork-&gt;tq ? dwork-&gt;tq : systq, &amp;task);</span>
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :         while (!barrier) {</span>
+<span class="lineNum">      92 </span><span class="lineNoCov">          0 :                 sleep_setup(&amp;sls, &amp;barrier, PWAIT, &quot;fldwbar&quot;);</span>
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :                 sleep_finish(&amp;sls, !barrier);</span>
+<span class="lineNum">      94 </span>            :         }
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 : }</span>
+<a name="96"><span class="lineNum">      96 </span>            : </a>
+<span class="lineNum">      97 </span>            : struct timespec
+<span class="lineNum">      98 </span><span class="lineNoCov">          0 : ns_to_timespec(const int64_t nsec)</span>
+<span class="lineNum">      99 </span>            : {
+<span class="lineNum">     100 </span>            :         struct timespec ts;
+<span class="lineNum">     101 </span>            :         int32_t rem;
+<span class="lineNum">     102 </span>            : 
+<span class="lineNum">     103 </span><span class="lineNoCov">          0 :         if (nsec == 0) {</span>
+<span class="lineNum">     104 </span>            :                 ts.tv_sec = 0;
+<span class="lineNum">     105 </span>            :                 ts.tv_nsec = 0;
+<span class="lineNum">     106 </span><span class="lineNoCov">          0 :                 return (ts);</span>
+<span class="lineNum">     107 </span>            :         }
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         ts.tv_sec = nsec / NSEC_PER_SEC;</span>
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :         rem = nsec % NSEC_PER_SEC;</span>
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :         if (rem &lt; 0) {</span>
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :                 ts.tv_sec--;</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :                 rem += NSEC_PER_SEC;</span>
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         ts.tv_nsec = rem;</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         return (ts);</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 : }</span>
+<a name="118"><span class="lineNum">     118 </span>            : </a>
+<span class="lineNum">     119 </span>            : int64_t
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 : timeval_to_ns(const struct timeval *tv)</span>
+<span class="lineNum">     121 </span>            : {
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :         return ((int64_t)tv-&gt;tv_sec * NSEC_PER_SEC) +</span>
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :                 tv-&gt;tv_usec * NSEC_PER_USEC;</span>
+<span class="lineNum">     124 </span>            : }
+<a name="125"><span class="lineNum">     125 </span>            : </a>
+<span class="lineNum">     126 </span>            : struct timeval
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 : ns_to_timeval(const int64_t nsec)</span>
+<span class="lineNum">     128 </span>            : {
+<span class="lineNum">     129 </span>            :         struct timeval tv;
+<span class="lineNum">     130 </span>            :         int32_t rem;
+<span class="lineNum">     131 </span>            : 
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :         if (nsec == 0) {</span>
+<span class="lineNum">     133 </span>            :                 tv.tv_sec = 0;
+<span class="lineNum">     134 </span>            :                 tv.tv_usec = 0;
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :                 return (tv);</span>
+<span class="lineNum">     136 </span>            :         }
+<span class="lineNum">     137 </span>            : 
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :         tv.tv_sec = nsec / NSEC_PER_SEC;</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         rem = nsec % NSEC_PER_SEC;</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :         if (rem &lt; 0) {</span>
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :                 tv.tv_sec--;</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                 rem += NSEC_PER_SEC;</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         tv.tv_usec = rem / 1000;</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :         return (tv);</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 : }</span>
+<a name="147"><span class="lineNum">     147 </span>            : </a>
+<span class="lineNum">     148 </span>            : int64_t
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 : timeval_to_us(const struct timeval *tv)</span>
+<span class="lineNum">     150 </span>            : {
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         return ((int64_t)tv-&gt;tv_sec * 1000000) + tv-&gt;tv_usec;</span>
+<span class="lineNum">     152 </span>            : }
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span>            : extern char *hw_vendor, *hw_prod, *hw_ver;
+<a name="155"><span class="lineNum">     155 </span>            : </a>
+<span class="lineNum">     156 </span>            : bool
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 : dmi_match(int slot, const char *str)</span>
+<span class="lineNum">     158 </span>            : {
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :         switch (slot) {</span>
+<span class="lineNum">     160 </span>            :         case DMI_SYS_VENDOR:
+<span class="lineNum">     161 </span>            :         case DMI_BOARD_VENDOR:
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                 if (hw_vendor != NULL &amp;&amp;</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                     !strcmp(hw_vendor, str))</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                         return true;</span>
+<span class="lineNum">     165 </span>            :                 break;
+<span class="lineNum">     166 </span>            :         case DMI_PRODUCT_NAME:
+<span class="lineNum">     167 </span>            :         case DMI_BOARD_NAME:
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                 if (hw_prod != NULL &amp;&amp;</span>
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :                     !strcmp(hw_prod, str))</span>
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :                         return true;</span>
+<span class="lineNum">     171 </span>            :                 break;
+<span class="lineNum">     172 </span>            :         case DMI_PRODUCT_VERSION:
+<span class="lineNum">     173 </span>            :         case DMI_BOARD_VERSION:
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :                 if (hw_ver != NULL &amp;&amp;</span>
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                     !strcmp(hw_ver, str))</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                         return true;</span>
+<span class="lineNum">     177 </span>            :                 break;
+<span class="lineNum">     178 </span>            :         case DMI_NONE:
+<span class="lineNum">     179 </span>            :         default:
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     181 </span>            :         }
+<span class="lineNum">     182 </span>            : 
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 : }</span>
+<a name="185"><span class="lineNum">     185 </span>            : </a>
+<span class="lineNum">     186 </span>            : static bool
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 : dmi_found(const struct dmi_system_id *dsi)</span>
+<span class="lineNum">     188 </span>            : {
+<span class="lineNum">     189 </span>            :         int i, slot;
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; nitems(dsi-&gt;matches); i++) {</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                 slot = dsi-&gt;matches[i].slot;</span>
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :                 if (slot == DMI_NONE)</span>
+<span class="lineNum">     194 </span>            :                         break;
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                 if (!dmi_match(slot, dsi-&gt;matches[i].substr))</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :                         return false;</span>
+<span class="lineNum">     197 </span>            :         }
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         return true;</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 : }</span>
+<a name="201"><span class="lineNum">     201 </span>            : </a>
+<span class="lineNum">     202 </span>            : int
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 : dmi_check_system(const struct dmi_system_id *sysid)</span>
+<span class="lineNum">     204 </span>            : {
+<span class="lineNum">     205 </span>            :         const struct dmi_system_id *dsi;
+<span class="lineNum">     206 </span>            :         int num = 0;
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         for (dsi = sysid; dsi-&gt;matches[0].slot != 0 ; dsi++) {</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :                 if (dmi_found(dsi)) {</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                         num++;</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                         if (dsi-&gt;callback &amp;&amp; dsi-&gt;callback(dsi))</span>
+<span class="lineNum">     212 </span>            :                                 break;
+<span class="lineNum">     213 </span>            :                 }
+<span class="lineNum">     214 </span>            :         }
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         return (num);</span>
+<span class="lineNum">     216 </span>            : }
+<a name="217"><span class="lineNum">     217 </span>            : </a>
+<span class="lineNum">     218 </span>            : struct vm_page *
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 : alloc_pages(unsigned int gfp_mask, unsigned int order)</span>
+<span class="lineNum">     220 </span>            : {
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :         int flags = (gfp_mask &amp; M_NOWAIT) ? UVM_PLA_NOWAIT : UVM_PLA_WAITOK;</span>
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :         struct pglist mlist;</span>
+<span class="lineNum">     223 </span>            : 
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :         if (gfp_mask &amp; M_CANFAIL)</span>
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                 flags |= UVM_PLA_FAILOK;</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :         if (gfp_mask &amp; M_ZERO)</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                 flags |= UVM_PLA_ZERO;</span>
+<span class="lineNum">     228 </span>            : 
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         TAILQ_INIT(&amp;mlist);</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         if (uvm_pglistalloc(PAGE_SIZE &lt;&lt; order, dma_constraint.ucr_low,</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :             dma_constraint.ucr_high, PAGE_SIZE, 0, &amp;mlist, 1, flags))</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :         return TAILQ_FIRST(&amp;mlist);</span>
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 : }</span>
+<a name="235"><span class="lineNum">     235 </span>            : </a>
+<span class="lineNum">     236 </span>            : void
+<span class="lineNum">     237 </span><span class="lineNoCov">          0 : __free_pages(struct vm_page *page, unsigned int order)</span>
+<span class="lineNum">     238 </span>            : {
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :         struct pglist mlist;</span>
+<span class="lineNum">     240 </span>            :         int i;
+<span class="lineNum">     241 </span>            :         
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         TAILQ_INIT(&amp;mlist);</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; (1 &lt;&lt; order); i++)</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :                 TAILQ_INSERT_TAIL(&amp;mlist, &amp;page[i], pageq);</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :         uvm_pglistfree(&amp;mlist);</span>
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 : }</span>
+<a name="247"><span class="lineNum">     247 </span>            : </a>
+<span class="lineNum">     248 </span>            : void *
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 : kmap(struct vm_page *pg)</span>
+<span class="lineNum">     250 </span>            : {
+<span class="lineNum">     251 </span>            :         vaddr_t va;
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span>            : #if defined (__HAVE_PMAP_DIRECT)
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         va = pmap_map_direct(pg);</span>
+<span class="lineNum">     255 </span>            : #else
+<span class="lineNum">     256 </span>            :         va = uvm_km_valloc_wait(phys_map, PAGE_SIZE);
+<span class="lineNum">     257 </span>            :         pmap_kenter_pa(va, VM_PAGE_TO_PHYS(pg), PROT_READ | PROT_WRITE);
+<span class="lineNum">     258 </span>            :         pmap_update(pmap_kernel());
+<span class="lineNum">     259 </span>            : #endif
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         return (void *)va;</span>
+<span class="lineNum">     261 </span>            : }
+<a name="262"><span class="lineNum">     262 </span>            : </a>
+<span class="lineNum">     263 </span>            : void
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 : kunmap(void *addr)</span>
+<span class="lineNum">     265 </span>            : {
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         vaddr_t va = (vaddr_t)addr;</span>
+<span class="lineNum">     267 </span>            : 
+<span class="lineNum">     268 </span>            : #if defined (__HAVE_PMAP_DIRECT)
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         pmap_unmap_direct(va);</span>
+<span class="lineNum">     270 </span>            : #else
+<span class="lineNum">     271 </span>            :         pmap_kremove(va, PAGE_SIZE);
+<span class="lineNum">     272 </span>            :         pmap_update(pmap_kernel());
+<span class="lineNum">     273 </span>            :         uvm_km_free_wakeup(phys_map, va, PAGE_SIZE);
+<span class="lineNum">     274 </span>            : #endif
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 : }</span>
+<a name="276"><span class="lineNum">     276 </span>            : </a>
+<span class="lineNum">     277 </span>            : void *
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 : vmap(struct vm_page **pages, unsigned int npages, unsigned long flags,</span>
+<span class="lineNum">     279 </span>            :      pgprot_t prot)
+<span class="lineNum">     280 </span>            : {
+<span class="lineNum">     281 </span>            :         vaddr_t va;
+<span class="lineNum">     282 </span>            :         paddr_t pa;
+<span class="lineNum">     283 </span>            :         int i;
+<span class="lineNum">     284 </span>            : 
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         va = uvm_km_valloc(kernel_map, PAGE_SIZE * npages);</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :         if (va == 0)</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; npages; i++) {</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :                 pa = VM_PAGE_TO_PHYS(pages[i]) | prot;</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                 pmap_enter(pmap_kernel(), va + (i * PAGE_SIZE), pa,</span>
+<span class="lineNum">     291 </span>            :                     PROT_READ | PROT_WRITE,
+<span class="lineNum">     292 </span>            :                     PROT_READ | PROT_WRITE | PMAP_WIRED);
+<span class="lineNum">     293 </span>            :                 pmap_update(pmap_kernel());
+<span class="lineNum">     294 </span>            :         }
+<span class="lineNum">     295 </span>            : 
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         return (void *)va;</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 : }</span>
+<a name="298"><span class="lineNum">     298 </span>            : </a>
+<span class="lineNum">     299 </span>            : void
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 : vunmap(void *addr, size_t size)</span>
+<span class="lineNum">     301 </span>            : {
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :         vaddr_t va = (vaddr_t)addr;</span>
+<span class="lineNum">     303 </span>            : 
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         pmap_remove(pmap_kernel(), va, va + size);</span>
+<span class="lineNum">     305 </span>            :         pmap_update(pmap_kernel());
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :         uvm_km_free(kernel_map, va, size);</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 : }</span>
+<a name="308"><span class="lineNum">     308 </span>            : </a>
+<span class="lineNum">     309 </span>            : void
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 : print_hex_dump(const char *level, const char *prefix_str, int prefix_type,</span>
+<span class="lineNum">     311 </span>            :     int rowsize, int groupsize, const void *buf, size_t len, bool ascii)
+<span class="lineNum">     312 </span>            : {
+<span class="lineNum">     313 </span>            :         const uint8_t *cbuf = buf;
+<span class="lineNum">     314 </span>            :         int i;
+<span class="lineNum">     315 </span>            : 
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; len; i++) {</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :                 if ((i % rowsize) == 0)</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :                         printf(&quot;%s&quot;, prefix_str);</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :                 printf(&quot;%02x&quot;, cbuf[i]);</span>
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :                 if ((i % rowsize) == (rowsize - 1))</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :                         printf(&quot;\n&quot;);</span>
+<span class="lineNum">     322 </span>            :                 else
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :                         printf(&quot; &quot;);</span>
+<span class="lineNum">     324 </span>            :         }
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 : }</span>
+<a name="326"><span class="lineNum">     326 </span>            : </a>
+<span class="lineNum">     327 </span>            : void *
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 : memchr_inv(const void *s, int c, size_t n)</span>
+<span class="lineNum">     329 </span>            : {
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         if (n != 0) {</span>
+<span class="lineNum">     331 </span>            :                 const unsigned char *p = s;
+<span class="lineNum">     332 </span>            : 
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :                 do {</span>
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :                         if (*p++ != (unsigned char)c)</span>
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                                 return ((void *)(p - 1));</span>
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :                 }while (--n != 0);</span>
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 : }</span>
+<a name="340"><span class="lineNum">     340 </span>            : </a>
+<span class="lineNum">     341 </span>            : int
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 : panic_cmp(struct rb_node *a, struct rb_node *b)</span>
+<span class="lineNum">     343 </span>            : {
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         panic(__func__);</span>
+<span class="lineNum">     345 </span>            : }
+<span class="lineNum">     346 </span>            : 
+<span class="lineNum">     347 </span>            : #undef RB_ROOT
+<a name="348"><span class="lineNum">     348 </span>            : #define RB_ROOT(head)   (head)-&gt;rbh_root</a>
+<span class="lineNum">     349 </span>            : 
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 : RB_GENERATE(linux_root, rb_node, __entry, panic_cmp);</span>
+<span class="lineNum">     351 </span>            : 
+<span class="lineNum">     352 </span>            : /*
+<span class="lineNum">     353 </span>            :  * This is a fairly minimal implementation of the Linux &quot;idr&quot; API.  It
+<span class="lineNum">     354 </span>            :  * probably isn't very efficient, and defenitely isn't RCU safe.  The
+<span class="lineNum">     355 </span>            :  * pre-load buffer is global instead of per-cpu; we rely on the kernel
+<span class="lineNum">     356 </span>            :  * lock to make this work.  We do randomize our IDs in order to make
+<span class="lineNum">     357 </span>            :  * them harder to guess.
+<span class="lineNum">     358 </span>            :  */
+<a name="359"><span class="lineNum">     359 </span>            : </a>
+<span class="lineNum">     360 </span>            : int idr_cmp(struct idr_entry *, struct idr_entry *);
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 : SPLAY_PROTOTYPE(idr_tree, idr_entry, entry, idr_cmp);</span>
+<span class="lineNum">     362 </span>            : 
+<span class="lineNum">     363 </span>            : struct pool idr_pool;
+<span class="lineNum">     364 </span>            : struct idr_entry *idr_entry_cache;
+<a name="365"><span class="lineNum">     365 </span>            : </a>
+<span class="lineNum">     366 </span>            : void
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 : idr_init(struct idr *idr)</span>
+<span class="lineNum">     368 </span>            : {
+<span class="lineNum">     369 </span>            :         static int initialized;
+<span class="lineNum">     370 </span>            : 
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :         if (!initialized) {</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                 pool_init(&amp;idr_pool, sizeof(struct idr_entry), 0, IPL_TTY, 0,</span>
+<span class="lineNum">     373 </span>            :                     &quot;idrpl&quot;, NULL);
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                 initialized = 1;</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :         SPLAY_INIT(&amp;idr-&gt;tree);</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 : }</span>
+<a name="378"><span class="lineNum">     378 </span>            : </a>
+<span class="lineNum">     379 </span>            : void
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 : idr_destroy(struct idr *idr)</span>
+<span class="lineNum">     381 </span>            : {
+<span class="lineNum">     382 </span>            :         struct idr_entry *id;
+<span class="lineNum">     383 </span>            : 
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :         while ((id = SPLAY_MIN(idr_tree, &amp;idr-&gt;tree))) {</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                 SPLAY_REMOVE(idr_tree, &amp;idr-&gt;tree, id);</span>
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :                 pool_put(&amp;idr_pool, id);</span>
+<span class="lineNum">     387 </span>            :         }
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 : }</span>
+<a name="389"><span class="lineNum">     389 </span>            : </a>
+<span class="lineNum">     390 </span>            : void
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 : idr_preload(unsigned int gfp_mask)</span>
+<span class="lineNum">     392 </span>            : {
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         int flags = (gfp_mask &amp; GFP_NOWAIT) ? PR_NOWAIT : PR_WAITOK;</span>
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         KERNEL_ASSERT_LOCKED();</span>
+<span class="lineNum">     396 </span>            : 
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :         if (idr_entry_cache == NULL)</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                 idr_entry_cache = pool_get(&amp;idr_pool, flags);</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 : }</span>
+<a name="400"><span class="lineNum">     400 </span>            : </a>
+<span class="lineNum">     401 </span>            : int
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 : idr_alloc(struct idr *idr, void *ptr, int start, int end,</span>
+<span class="lineNum">     403 </span>            :     unsigned int gfp_mask)
+<span class="lineNum">     404 </span>            : {
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         int flags = (gfp_mask &amp; GFP_NOWAIT) ? PR_NOWAIT : PR_WAITOK;</span>
+<span class="lineNum">     406 </span>            :         struct idr_entry *id;
+<span class="lineNum">     407 </span>            :         int begin;
+<span class="lineNum">     408 </span>            : 
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :         KERNEL_ASSERT_LOCKED();</span>
+<span class="lineNum">     410 </span>            : 
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         if (idr_entry_cache) {</span>
+<span class="lineNum">     412 </span>            :                 id = idr_entry_cache;
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :                 idr_entry_cache = NULL;</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :                 id = pool_get(&amp;idr_pool, flags);</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :                 if (id == NULL)</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                         return -ENOMEM;</span>
+<span class="lineNum">     418 </span>            :         }
+<span class="lineNum">     419 </span>            : 
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         if (end &lt;= 0)</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                 end = INT_MAX;</span>
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span>            : #ifdef notyet
+<span class="lineNum">     424 </span>            :         id-&gt;id = begin = start + arc4random_uniform(end - start);
+<span class="lineNum">     425 </span>            : #else
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :         id-&gt;id = begin = start;</span>
+<span class="lineNum">     427 </span>            : #endif
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :         while (SPLAY_INSERT(idr_tree, &amp;idr-&gt;tree, id)) {</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :                 if (++id-&gt;id == end)</span>
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :                         id-&gt;id = start;</span>
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :                 if (id-&gt;id == begin) {</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                         pool_put(&amp;idr_pool, id);</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :                         return -ENOSPC;</span>
+<span class="lineNum">     434 </span>            :                 }
+<span class="lineNum">     435 </span>            :         }
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :         id-&gt;ptr = ptr;</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         return id-&gt;id;</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 : }</span>
+<a name="439"><span class="lineNum">     439 </span>            : </a>
+<span class="lineNum">     440 </span>            : void *
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 : idr_replace(struct idr *idr, void *ptr, int id)</span>
+<span class="lineNum">     442 </span>            : {
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :         struct idr_entry find, *res;</span>
+<span class="lineNum">     444 </span>            :         void *old;
+<span class="lineNum">     445 </span>            : 
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :         find.id = id;</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :         res = SPLAY_FIND(idr_tree, &amp;idr-&gt;tree, &amp;find);</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :         if (res == NULL)</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :                 return ERR_PTR(-ENOENT);</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :         old = res-&gt;ptr;</span>
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :         res-&gt;ptr = ptr;</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :         return old;</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 : }</span>
+<a name="454"><span class="lineNum">     454 </span>            : </a>
+<span class="lineNum">     455 </span>            : void
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 : idr_remove(struct idr *idr, int id)</span>
+<span class="lineNum">     457 </span>            : {
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :         struct idr_entry find, *res;</span>
+<span class="lineNum">     459 </span>            : 
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :         find.id = id;</span>
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :         res = SPLAY_FIND(idr_tree, &amp;idr-&gt;tree, &amp;find);</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :         if (res) {</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                 SPLAY_REMOVE(idr_tree, &amp;idr-&gt;tree, res);</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :                 pool_put(&amp;idr_pool, res);</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 : }</span>
+<a name="467"><span class="lineNum">     467 </span>            : </a>
+<span class="lineNum">     468 </span>            : void *
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 : idr_find(struct idr *idr, int id)</span>
+<span class="lineNum">     470 </span>            : {
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :         struct idr_entry find, *res;</span>
+<span class="lineNum">     472 </span>            : 
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :         find.id = id;</span>
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :         res = SPLAY_FIND(idr_tree, &amp;idr-&gt;tree, &amp;find);</span>
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :         if (res == NULL)</span>
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :         return res-&gt;ptr;</span>
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 : }</span>
+<a name="479"><span class="lineNum">     479 </span>            : </a>
+<span class="lineNum">     480 </span>            : void *
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 : idr_get_next(struct idr *idr, int *id)</span>
+<span class="lineNum">     482 </span>            : {
+<span class="lineNum">     483 </span>            :         struct idr_entry *res;
+<span class="lineNum">     484 </span>            : 
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :         res = idr_find(idr, *id);</span>
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :         if (res == NULL)</span>
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :                 res = SPLAY_MIN(idr_tree, &amp;idr-&gt;tree);</span>
+<span class="lineNum">     488 </span>            :         else
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                 res = SPLAY_NEXT(idr_tree, &amp;idr-&gt;tree, res);</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :         if (res == NULL)</span>
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :         *id = res-&gt;id;</span>
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         return res-&gt;ptr;</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 : }</span>
+<a name="495"><span class="lineNum">     495 </span>            : </a>
+<span class="lineNum">     496 </span>            : int
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 : idr_for_each(struct idr *idr, int (*func)(int, void *, void *), void *data)</span>
+<span class="lineNum">     498 </span>            : {
+<span class="lineNum">     499 </span>            :         struct idr_entry *id;
+<span class="lineNum">     500 </span>            :         int ret;
+<span class="lineNum">     501 </span>            : 
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :         SPLAY_FOREACH(id, idr_tree, &amp;idr-&gt;tree) {</span>
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :                 ret = func(id-&gt;id, id-&gt;ptr, data);</span>
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :                 if (ret)</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :                         return ret;</span>
+<span class="lineNum">     506 </span>            :         }
+<span class="lineNum">     507 </span>            : 
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 : }</span>
+<a name="510"><span class="lineNum">     510 </span>            : </a>
+<span class="lineNum">     511 </span>            : int
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 : idr_cmp(struct idr_entry *a, struct idr_entry *b)</span>
+<span class="lineNum">     513 </span>            : {
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :         return (a-&gt;id &lt; b-&gt;id ? -1 : a-&gt;id &gt; b-&gt;id);</span>
+<a name="515"><span class="lineNum">     515 </span>            : }</a>
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 : SPLAY_GENERATE(idr_tree, idr_entry, entry, idr_cmp);</span>
+<a name="518"><span class="lineNum">     518 </span>            : </a>
+<span class="lineNum">     519 </span>            : void
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 : ida_init(struct ida *ida)</span>
+<span class="lineNum">     521 </span>            : {
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :         ida-&gt;counter = 0;</span>
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 : }</span>
+<a name="524"><span class="lineNum">     524 </span>            : </a>
+<span class="lineNum">     525 </span>            : void
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 : ida_destroy(struct ida *ida)</span>
+<span class="lineNum">     527 </span>            : {
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 : }</span>
+<a name="529"><span class="lineNum">     529 </span>            : </a>
+<span class="lineNum">     530 </span>            : void
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 : ida_remove(struct ida *ida, int id)</span>
+<span class="lineNum">     532 </span>            : {
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 : }</span>
+<a name="534"><span class="lineNum">     534 </span>            : </a>
+<span class="lineNum">     535 </span>            : int
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 : ida_simple_get(struct ida *ida, unsigned int start, unsigned int end,</span>
+<span class="lineNum">     537 </span>            :     int flags)
+<span class="lineNum">     538 </span>            : {
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :         if (end &lt;= 0)</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :                 end = INT_MAX;</span>
+<span class="lineNum">     541 </span>            : 
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :         if (start &gt; ida-&gt;counter)</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :                 ida-&gt;counter = start;</span>
+<span class="lineNum">     544 </span>            : 
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         if (ida-&gt;counter &gt;= end)</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :                 return -ENOSPC;</span>
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         return ida-&gt;counter++;</span>
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 : }</span>
+<a name="550"><span class="lineNum">     550 </span>            : </a>
+<span class="lineNum">     551 </span>            : int
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 : sg_alloc_table(struct sg_table *table, unsigned int nents, gfp_t gfp_mask)</span>
+<span class="lineNum">     553 </span>            : {
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :         table-&gt;sgl = mallocarray(nents, sizeof(struct scatterlist),</span>
+<span class="lineNum">     555 </span>            :             M_DRM, gfp_mask);
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :         if (table-&gt;sgl == NULL)</span>
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :                 return -ENOMEM;</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :         table-&gt;nents = table-&gt;orig_nents = nents;</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 : }</span>
+<a name="561"><span class="lineNum">     561 </span>            : </a>
+<span class="lineNum">     562 </span>            : void
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 : sg_free_table(struct sg_table *table)</span>
+<span class="lineNum">     564 </span>            : {
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :         free(table-&gt;sgl, M_DRM,</span>
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :             table-&gt;orig_nents * sizeof(struct scatterlist));</span>
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 : }</span>
+<a name="568"><span class="lineNum">     568 </span>            : </a>
+<span class="lineNum">     569 </span>            : size_t
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 : sg_copy_from_buffer(struct scatterlist *sgl, unsigned int nents,</span>
+<span class="lineNum">     571 </span>            :     const void *buf, size_t buflen)
+<span class="lineNum">     572 </span>            : {
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :         panic(&quot;%s&quot;, __func__);</span>
+<span class="lineNum">     574 </span>            : }
+<a name="575"><span class="lineNum">     575 </span>            : </a>
+<span class="lineNum">     576 </span>            : int
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 : i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)</span>
+<span class="lineNum">     578 </span>            : {
+<span class="lineNum">     579 </span>            :         void *cmd = NULL;
+<span class="lineNum">     580 </span>            :         int cmdlen = 0;
+<span class="lineNum">     581 </span>            :         int err, ret = 0;
+<span class="lineNum">     582 </span>            :         int op;
+<span class="lineNum">     583 </span>            : 
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :         iic_acquire_bus(&amp;adap-&gt;ic, 0);</span>
+<span class="lineNum">     585 </span>            : 
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :         while (num &gt; 2) {</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :                 op = (msgs-&gt;flags &amp; I2C_M_RD) ? I2C_OP_READ : I2C_OP_WRITE;</span>
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :                 err = iic_exec(&amp;adap-&gt;ic, op, msgs-&gt;addr, NULL, 0,</span>
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :                     msgs-&gt;buf, msgs-&gt;len, 0);</span>
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :                 if (err) {</span>
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :                         ret = -err;</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :                         goto fail;</span>
+<span class="lineNum">     593 </span>            :                 }
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :                 msgs++;</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                 num--;</span>
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :                 ret++;</span>
+<span class="lineNum">     597 </span>            :         }
+<span class="lineNum">     598 </span>            : 
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :         if (num &gt; 1) {</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :                 cmd = msgs-&gt;buf;</span>
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :                 cmdlen = msgs-&gt;len;</span>
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :                 msgs++;</span>
+<span class="lineNum">     603 </span>            :                 num--;
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :                 ret++;</span>
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     606 </span>            : 
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :         op = (msgs-&gt;flags &amp; I2C_M_RD) ?</span>
+<span class="lineNum">     608 </span>            :             I2C_OP_READ_WITH_STOP : I2C_OP_WRITE_WITH_STOP;
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         err = iic_exec(&amp;adap-&gt;ic, op, msgs-&gt;addr, cmd, cmdlen,</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :             msgs-&gt;buf, msgs-&gt;len, 0);</span>
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :         if (err) {</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                 ret = -err;</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :                 goto fail;</span>
+<span class="lineNum">     614 </span>            :         }
+<span class="lineNum">     615 </span>            :         msgs++;
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :         ret++;</span>
+<span class="lineNum">     617 </span>            : 
+<span class="lineNum">     618 </span>            : fail:
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :         iic_release_bus(&amp;adap-&gt;ic, 0);</span>
+<span class="lineNum">     620 </span>            : 
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :         return ret;</span>
+<span class="lineNum">     622 </span>            : }
+<a name="623"><span class="lineNum">     623 </span>            : </a>
+<span class="lineNum">     624 </span>            : int
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 : i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)</span>
+<span class="lineNum">     626 </span>            : {
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :         if (adap-&gt;algo)</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                 return adap-&gt;algo-&gt;master_xfer(adap, msgs, num);</span>
+<span class="lineNum">     629 </span>            : 
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :         return i2c_master_xfer(adap, msgs, num);</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 : }</span>
+<a name="632"><span class="lineNum">     632 </span>            : </a>
+<span class="lineNum">     633 </span>            : int
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 : i2c_bb_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)</span>
+<span class="lineNum">     635 </span>            : {
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :         struct i2c_algo_bit_data *algo = adap-&gt;algo_data;</span>
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :         struct i2c_adapter bb;</span>
+<span class="lineNum">     638 </span>            : 
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :         memset(&amp;bb, 0, sizeof(bb));</span>
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :         bb.ic = algo-&gt;ic;</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :         bb.retries = adap-&gt;retries;</span>
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         return i2c_master_xfer(&amp;bb, msgs, num);</span>
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 : }</span>
+<a name="644"><span class="lineNum">     644 </span>            : </a>
+<span class="lineNum">     645 </span>            : uint32_t
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 : i2c_bb_functionality(struct i2c_adapter *adap)</span>
+<span class="lineNum">     647 </span>            : {
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :         return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;</span>
+<span class="lineNum">     649 </span>            : }
+<span class="lineNum">     650 </span>            : 
+<span class="lineNum">     651 </span>            : struct i2c_algorithm i2c_bit_algo = {
+<span class="lineNum">     652 </span>            :         .master_xfer = i2c_bb_master_xfer,
+<span class="lineNum">     653 </span>            :         .functionality = i2c_bb_functionality
+<span class="lineNum">     654 </span>            : };
+<a name="655"><span class="lineNum">     655 </span>            : </a>
+<span class="lineNum">     656 </span>            : int
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 : i2c_bit_add_bus(struct i2c_adapter *adap)</span>
+<span class="lineNum">     658 </span>            : {
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :         adap-&gt;algo = &amp;i2c_bit_algo;</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         adap-&gt;retries = 3;</span>
+<span class="lineNum">     661 </span>            : 
+<span class="lineNum">     662 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     663 </span>            : }
+<span class="lineNum">     664 </span>            : 
+<span class="lineNum">     665 </span>            : #if defined(__amd64__) || defined(__i386__)
+<span class="lineNum">     666 </span>            : 
+<span class="lineNum">     667 </span>            : /*
+<span class="lineNum">     668 </span>            :  * This is a minimal implementation of the Linux vga_get/vga_put
+<span class="lineNum">     669 </span>            :  * interface.  In all likelyhood, it will only work for inteldrm(4) as
+<span class="lineNum">     670 </span>            :  * it assumes that if there is another active VGA device in the
+<span class="lineNum">     671 </span>            :  * system, it is sitting behind a PCI bridge.
+<span class="lineNum">     672 </span>            :  */
+<span class="lineNum">     673 </span>            : 
+<span class="lineNum">     674 </span>            : extern int pci_enumerate_bus(struct pci_softc *,
+<span class="lineNum">     675 </span>            :     int (*)(struct pci_attach_args *), struct pci_attach_args *);
+<span class="lineNum">     676 </span>            : 
+<span class="lineNum">     677 </span>            : pcitag_t vga_bridge_tag;
+<span class="lineNum">     678 </span>            : int vga_bridge_disabled;
+<a name="679"><span class="lineNum">     679 </span>            : </a>
+<span class="lineNum">     680 </span>            : int
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 : vga_disable_bridge(struct pci_attach_args *pa)</span>
+<span class="lineNum">     682 </span>            : {
+<span class="lineNum">     683 </span>            :         pcireg_t bhlc, bc;
+<span class="lineNum">     684 </span>            : 
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :         if (pa-&gt;pa_domain != 0)</span>
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     687 </span>            : 
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :         bhlc = pci_conf_read(pa-&gt;pa_pc, pa-&gt;pa_tag, PCI_BHLC_REG);</span>
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :         if (PCI_HDRTYPE_TYPE(bhlc) != 1)</span>
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     691 </span>            : 
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :         bc = pci_conf_read(pa-&gt;pa_pc, pa-&gt;pa_tag, PPB_REG_BRIDGECONTROL);</span>
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :         if ((bc &amp; PPB_BC_VGA_ENABLE) == 0)</span>
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :         bc &amp;= ~PPB_BC_VGA_ENABLE;</span>
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :         pci_conf_write(pa-&gt;pa_pc, pa-&gt;pa_tag, PPB_REG_BRIDGECONTROL, bc);</span>
+<span class="lineNum">     697 </span>            : 
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :         vga_bridge_tag = pa-&gt;pa_tag;</span>
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :         vga_bridge_disabled = 1;</span>
+<span class="lineNum">     700 </span>            : 
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :         return 1;</span>
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 : }</span>
+<a name="703"><span class="lineNum">     703 </span>            : </a>
+<span class="lineNum">     704 </span>            : void
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 : vga_get_uninterruptible(struct pci_dev *pdev, int rsrc)</span>
+<span class="lineNum">     706 </span>            : {
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :         KASSERT(pdev-&gt;pci-&gt;sc_bridgetag == NULL);</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :         pci_enumerate_bus(pdev-&gt;pci, vga_disable_bridge, NULL);</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 : }</span>
+<a name="710"><span class="lineNum">     710 </span>            : </a>
+<span class="lineNum">     711 </span>            : void
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 : vga_put(struct pci_dev *pdev, int rsrc)</span>
+<span class="lineNum">     713 </span>            : {
+<span class="lineNum">     714 </span>            :         pcireg_t bc;
+<span class="lineNum">     715 </span>            : 
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :         if (!vga_bridge_disabled)</span>
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     718 </span>            : 
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :         bc = pci_conf_read(pdev-&gt;pc, vga_bridge_tag, PPB_REG_BRIDGECONTROL);</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :         bc |= PPB_BC_VGA_ENABLE;</span>
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :         pci_conf_write(pdev-&gt;pc, vga_bridge_tag, PPB_REG_BRIDGECONTROL, bc);</span>
+<span class="lineNum">     722 </span>            : 
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :         vga_bridge_disabled = 0;</span>
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     725 </span>            : 
+<span class="lineNum">     726 </span>            : #endif
+<span class="lineNum">     727 </span>            : 
+<span class="lineNum">     728 </span>            : /*
+<span class="lineNum">     729 </span>            :  * ACPI types and interfaces.
+<span class="lineNum">     730 </span>            :  */
+<span class="lineNum">     731 </span>            : 
+<span class="lineNum">     732 </span>            : #ifdef __HAVE_ACPI
+<span class="lineNum">     733 </span>            : #include &quot;acpi.h&quot;
+<span class="lineNum">     734 </span>            : #endif
+<span class="lineNum">     735 </span>            : 
+<span class="lineNum">     736 </span>            : #if NACPI &gt; 0
+<span class="lineNum">     737 </span>            : 
+<span class="lineNum">     738 </span>            : #include &lt;dev/acpi/acpireg.h&gt;
+<span class="lineNum">     739 </span>            : #include &lt;dev/acpi/acpivar.h&gt;
+<a name="740"><span class="lineNum">     740 </span>            : </a>
+<span class="lineNum">     741 </span>            : acpi_status
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 : acpi_get_table_with_size(const char *sig, int instance,</span>
+<span class="lineNum">     743 </span>            :     struct acpi_table_header **hdr, acpi_size *size)
+<span class="lineNum">     744 </span>            : {
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :         struct acpi_softc *sc = acpi_softc;</span>
+<span class="lineNum">     746 </span>            :         struct acpi_q *entry;
+<span class="lineNum">     747 </span>            : 
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :         KASSERT(instance == 1);</span>
+<span class="lineNum">     749 </span>            : 
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :         if (sc == NULL)</span>
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :                 return AE_NOT_FOUND;</span>
+<span class="lineNum">     752 </span>            : 
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :         SIMPLEQ_FOREACH(entry, &amp;sc-&gt;sc_tables, q_next) {</span>
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :                 if (memcmp(entry-&gt;q_table, sig, strlen(sig)) == 0) {</span>
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :                         *hdr = entry-&gt;q_table;</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :                         *size = (*hdr)-&gt;length;</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">     758 </span>            :                 }
+<span class="lineNum">     759 </span>            :         }
+<span class="lineNum">     760 </span>            : 
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :         return AE_NOT_FOUND;</span>
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     763 </span>            : 
+<span class="lineNum">     764 </span>            : #endif
+<a name="765"><span class="lineNum">     765 </span>            : </a>
+<span class="lineNum">     766 </span>            : void
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 : backlight_do_update_status(void *arg)</span>
+<span class="lineNum">     768 </span>            : {
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :         backlight_update_status(arg);</span>
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 : }</span>
+<a name="771"><span class="lineNum">     771 </span>            : </a>
+<span class="lineNum">     772 </span>            : struct backlight_device *
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 : backlight_device_register(const char *name, void *kdev, void *data,</span>
+<span class="lineNum">     774 </span>            :     const struct backlight_ops *ops, struct backlight_properties *props)
+<span class="lineNum">     775 </span>            : {
+<span class="lineNum">     776 </span>            :         struct backlight_device *bd;
+<span class="lineNum">     777 </span>            : 
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :         bd = malloc(sizeof(*bd), M_DRM, M_WAITOK);</span>
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :         bd-&gt;ops = ops;</span>
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :         bd-&gt;props = *props;</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :         bd-&gt;data = data;</span>
+<span class="lineNum">     782 </span>            : 
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :         task_set(&amp;bd-&gt;task, backlight_do_update_status, bd);</span>
+<span class="lineNum">     784 </span>            :         
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         return bd;</span>
+<span class="lineNum">     786 </span>            : }
+<a name="787"><span class="lineNum">     787 </span>            : </a>
+<span class="lineNum">     788 </span>            : void
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 : backlight_device_unregister(struct backlight_device *bd)</span>
+<span class="lineNum">     790 </span>            : {
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :         free(bd, M_DRM, sizeof(*bd));</span>
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 : }</span>
+<a name="793"><span class="lineNum">     793 </span>            : </a>
+<span class="lineNum">     794 </span>            : void
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 : backlight_schedule_update_status(struct backlight_device *bd)</span>
+<span class="lineNum">     796 </span>            : {
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :         task_add(systq, &amp;bd-&gt;task);</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 : }</span>
+<a name="799"><span class="lineNum">     799 </span>            : </a>
+<span class="lineNum">     800 </span>            : void
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 : drm_sysfs_hotplug_event(struct drm_device *dev)</span>
+<span class="lineNum">     802 </span>            : {
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :         KNOTE(&amp;dev-&gt;note, NOTE_CHANGE);</span>
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     805 </span>            : 
+<span class="lineNum">     806 </span>            : unsigned int drm_fence_count;
+<a name="807"><span class="lineNum">     807 </span>            : </a>
+<span class="lineNum">     808 </span>            : unsigned int
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 : fence_context_alloc(unsigned int num)</span>
+<span class="lineNum">     810 </span>            : {
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :         return __sync_add_and_fetch(&amp;drm_fence_count, num) - num;</span>
+<span class="lineNum">     812 </span>            : }
+<a name="813"><span class="lineNum">     813 </span>            : </a>
+<span class="lineNum">     814 </span>            : int
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 : dmabuf_read(struct file *fp, struct uio *uio, int fflags)</span>
+<span class="lineNum">     816 </span>            : {
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 :         return (ENXIO);</span>
+<span class="lineNum">     818 </span>            : }
+<a name="819"><span class="lineNum">     819 </span>            : </a>
+<span class="lineNum">     820 </span>            : int
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 : dmabuf_write(struct file *fp, struct uio *uio, int fflags)</span>
+<span class="lineNum">     822 </span>            : {
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :         return (ENXIO);</span>
+<span class="lineNum">     824 </span>            : }
+<a name="825"><span class="lineNum">     825 </span>            : </a>
+<span class="lineNum">     826 </span>            : int
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 : dmabuf_ioctl(struct file *fp, u_long com, caddr_t data, struct proc *p)</span>
+<span class="lineNum">     828 </span>            : {
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :         return (ENOTTY);</span>
+<span class="lineNum">     830 </span>            : }
+<a name="831"><span class="lineNum">     831 </span>            : </a>
+<span class="lineNum">     832 </span>            : int
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 : dmabuf_poll(struct file *fp, int events, struct proc *p)</span>
+<span class="lineNum">     834 </span>            : {
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     836 </span>            : }
+<a name="837"><span class="lineNum">     837 </span>            : </a>
+<span class="lineNum">     838 </span>            : int
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 : dmabuf_kqfilter(struct file *fp, struct knote *kn)</span>
+<span class="lineNum">     840 </span>            : {
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :         return (EINVAL);</span>
+<span class="lineNum">     842 </span>            : }
+<a name="843"><span class="lineNum">     843 </span>            : </a>
+<span class="lineNum">     844 </span>            : int
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 : dmabuf_stat(struct file *fp, struct stat *st, struct proc *p)</span>
+<span class="lineNum">     846 </span>            : {
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :         struct dma_buf *dmabuf = fp-&gt;f_data;</span>
+<span class="lineNum">     848 </span>            : 
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :         memset(st, 0, sizeof(*st));</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :         st-&gt;st_size = dmabuf-&gt;size;</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :         st-&gt;st_mode = S_IFIFO;       /* XXX */</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     853 </span>            : }
+<a name="854"><span class="lineNum">     854 </span>            : </a>
+<span class="lineNum">     855 </span>            : int
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 : dmabuf_close(struct file *fp, struct proc *p)</span>
+<span class="lineNum">     857 </span>            : {
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :         struct dma_buf *dmabuf = fp-&gt;f_data;</span>
+<span class="lineNum">     859 </span>            : 
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :         fp-&gt;f_data = NULL;</span>
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :         KERNEL_LOCK();</span>
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :         dmabuf-&gt;ops-&gt;release(dmabuf);</span>
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :         KERNEL_UNLOCK();</span>
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :         free(dmabuf, M_DRM, sizeof(struct dma_buf));</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     866 </span>            : }
+<a name="867"><span class="lineNum">     867 </span>            : </a>
+<span class="lineNum">     868 </span>            : int
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 : dmabuf_seek(struct file *fp, off_t *offset, int whence, struct proc *p)</span>
+<span class="lineNum">     870 </span>            : {
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :         struct dma_buf *dmabuf = fp-&gt;f_data;</span>
+<span class="lineNum">     872 </span>            :         off_t newoff;
+<span class="lineNum">     873 </span>            : 
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :         if (*offset != 0)</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     876 </span>            : 
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :         switch (whence) {</span>
+<span class="lineNum">     878 </span>            :         case SEEK_SET:
+<span class="lineNum">     879 </span>            :                 newoff = 0;
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     881 </span>            :         case SEEK_END:
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :                 newoff = dmabuf-&gt;size;</span>
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     884 </span>            :         default:
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     886 </span>            :         }
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :         fp-&gt;f_offset = *offset = newoff;</span>
+<span class="lineNum">     888 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     890 </span>            : 
+<span class="lineNum">     891 </span>            : struct fileops dmabufops = {
+<span class="lineNum">     892 </span>            :         .fo_read        = dmabuf_read,
+<span class="lineNum">     893 </span>            :         .fo_write       = dmabuf_write,
+<span class="lineNum">     894 </span>            :         .fo_ioctl       = dmabuf_ioctl,
+<span class="lineNum">     895 </span>            :         .fo_poll        = dmabuf_poll,
+<span class="lineNum">     896 </span>            :         .fo_kqfilter    = dmabuf_kqfilter,
+<span class="lineNum">     897 </span>            :         .fo_stat        = dmabuf_stat,
+<span class="lineNum">     898 </span>            :         .fo_close       = dmabuf_close,
+<span class="lineNum">     899 </span>            :         .fo_seek        = dmabuf_seek,
+<span class="lineNum">     900 </span>            : };
+<a name="901"><span class="lineNum">     901 </span>            : </a>
+<span class="lineNum">     902 </span>            : struct dma_buf *
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 : dma_buf_export(const struct dma_buf_export_info *info)</span>
+<span class="lineNum">     904 </span>            : {
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :         struct proc *p = curproc;</span>
+<span class="lineNum">     906 </span>            :         struct dma_buf *dmabuf;
+<span class="lineNum">     907 </span>            :         struct file *fp;
+<span class="lineNum">     908 </span>            : 
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :         fp = fnew(p);</span>
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :         if (fp == NULL)</span>
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :                 return ERR_PTR(-ENFILE);</span>
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :         fp-&gt;f_type = DTYPE_DMABUF;</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :         fp-&gt;f_ops = &amp;dmabufops;</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :         dmabuf = malloc(sizeof(struct dma_buf), M_DRM, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :         dmabuf-&gt;priv = info-&gt;priv;</span>
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :         dmabuf-&gt;ops = info-&gt;ops;</span>
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 :         dmabuf-&gt;size = info-&gt;size;</span>
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :         dmabuf-&gt;file = fp;</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :         fp-&gt;f_data = dmabuf;</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :         return dmabuf;</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 : }</span>
+<a name="922"><span class="lineNum">     922 </span>            : </a>
+<span class="lineNum">     923 </span>            : struct dma_buf *
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 : dma_buf_get(int fd)</span>
+<span class="lineNum">     925 </span>            : {
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :         struct proc *p = curproc;</span>
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :         struct filedesc *fdp = p-&gt;p_fd;</span>
+<span class="lineNum">     928 </span>            :         struct file *fp;
+<span class="lineNum">     929 </span>            : 
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :         if ((fp = fd_getfile(fdp, fd)) == NULL)</span>
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :                 return ERR_PTR(-EBADF);</span>
+<span class="lineNum">     932 </span>            : 
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :         if (fp-&gt;f_type != DTYPE_DMABUF) {</span>
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :                 FRELE(fp, p);</span>
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :                 return ERR_PTR(-EINVAL);</span>
+<span class="lineNum">     936 </span>            :         }
+<span class="lineNum">     937 </span>            : 
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :         return fp-&gt;f_data;</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 : }</span>
+<a name="940"><span class="lineNum">     940 </span>            : </a>
+<span class="lineNum">     941 </span>            : void
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 : dma_buf_put(struct dma_buf *dmabuf)</span>
+<span class="lineNum">     943 </span>            : {
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         KASSERT(dmabuf);</span>
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 :         KASSERT(dmabuf-&gt;file);</span>
+<span class="lineNum">     946 </span>            : 
+<span class="lineNum">     947 </span><span class="lineNoCov">          0 :         FRELE(dmabuf-&gt;file, curproc);</span>
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 : }</span>
+<a name="949"><span class="lineNum">     949 </span>            : </a>
+<span class="lineNum">     950 </span>            : int
+<span class="lineNum">     951 </span><span class="lineNoCov">          0 : dma_buf_fd(struct dma_buf *dmabuf, int flags)</span>
+<span class="lineNum">     952 </span>            : {
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 :         struct proc *p = curproc;</span>
+<span class="lineNum">     954 </span><span class="lineNoCov">          0 :         struct filedesc *fdp = p-&gt;p_fd;</span>
+<span class="lineNum">     955 </span><span class="lineNoCov">          0 :         struct file *fp = dmabuf-&gt;file;</span>
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :         int fd, cloexec, error;</span>
+<span class="lineNum">     957 </span>            : 
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :         cloexec = (flags &amp; O_CLOEXEC) ? UF_EXCLOSE : 0;</span>
+<span class="lineNum">     959 </span>            : 
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :         fdplock(fdp);</span>
+<span class="lineNum">     961 </span>            : restart:
+<span class="lineNum">     962 </span><span class="lineNoCov">          0 :         if ((error = fdalloc(p, 0, &amp;fd)) != 0) {</span>
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :                 if (error == ENOSPC) {</span>
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :                         fdexpand(p);</span>
+<span class="lineNum">     965 </span><span class="lineNoCov">          0 :                         goto restart;</span>
+<span class="lineNum">     966 </span>            :                 }
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :                 fdpunlock(fdp);</span>
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :                 return -error;</span>
+<span class="lineNum">     969 </span>            :         }
+<span class="lineNum">     970 </span>            : 
+<span class="lineNum">     971 </span><span class="lineNoCov">          0 :         fdinsert(fdp, fd, cloexec, fp);</span>
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :         fdpunlock(fdp);</span>
+<span class="lineNum">     973 </span>            : 
+<span class="lineNum">     974 </span><span class="lineNoCov">          0 :         return fd;</span>
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 : }</span>
+<a name="976"><span class="lineNum">     976 </span>            : </a>
+<span class="lineNum">     977 </span>            : void
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 : get_dma_buf(struct dma_buf *dmabuf)</span>
+<span class="lineNum">     979 </span>            : {
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 :         FREF(dmabuf-&gt;file);</span>
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

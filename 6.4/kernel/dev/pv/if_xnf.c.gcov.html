@@ -1,0 +1,1311 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pv/if_xnf.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/pv</a> - if_xnf.c<span style="font-size: 80%;"> (source / <a href="if_xnf.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">543</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">27</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: if_xnf.c,v 1.63 2018/01/20 20:03:45 mikeb Exp $       */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2015, 2016 Mike Belopuhov
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : #include &quot;bpfilter.h&quot;
+<span class="lineNum">      20 </span>            : #include &quot;vlan.h&quot;
+<span class="lineNum">      21 </span>            : #include &quot;xen.h&quot;
+<span class="lineNum">      22 </span>            : 
+<span class="lineNum">      23 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/atomic.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;sys/sockio.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;sys/task.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span>            : #include &lt;machine/bus.h&gt;
+<span class="lineNum">      38 </span>            : 
+<span class="lineNum">      39 </span>            : #include &lt;dev/pv/xenreg.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;dev/pv/xenvar.h&gt;
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      43 </span>            : #include &lt;net/if_media.h&gt;
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      46 </span>            : #include &lt;netinet/if_ether.h&gt;
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : #ifdef INET6
+<span class="lineNum">      49 </span>            : #include &lt;netinet/ip6.h&gt;
+<span class="lineNum">      50 </span>            : #endif
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">      53 </span>            : #include &lt;net/bpf.h&gt;
+<span class="lineNum">      54 </span>            : #endif
+<span class="lineNum">      55 </span>            : 
+<span class="lineNum">      56 </span>            : /* #define XNF_DEBUG */
+<span class="lineNum">      57 </span>            : 
+<span class="lineNum">      58 </span>            : #ifdef XNF_DEBUG
+<span class="lineNum">      59 </span>            : #define DPRINTF(x...)           printf(x)
+<span class="lineNum">      60 </span>            : #else
+<span class="lineNum">      61 </span>            : #define DPRINTF(x...)
+<span class="lineNum">      62 </span>            : #endif
+<span class="lineNum">      63 </span>            : 
+<span class="lineNum">      64 </span>            : /*
+<span class="lineNum">      65 </span>            :  * Rx ring
+<span class="lineNum">      66 </span>            :  */
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            : struct xnf_rx_req {
+<span class="lineNum">      69 </span>            :         uint16_t                 rxq_id;
+<span class="lineNum">      70 </span>            :         uint16_t                 rxq_pad;
+<span class="lineNum">      71 </span>            :         uint32_t                 rxq_ref;
+<span class="lineNum">      72 </span>            : } __packed;
+<span class="lineNum">      73 </span>            : 
+<span class="lineNum">      74 </span>            : struct xnf_rx_rsp {
+<span class="lineNum">      75 </span>            :         uint16_t                 rxp_id;
+<span class="lineNum">      76 </span>            :         uint16_t                 rxp_offset;
+<span class="lineNum">      77 </span>            :         uint16_t                 rxp_flags;
+<span class="lineNum">      78 </span>            : #define  XNF_RXF_CSUM_VALID       0x0001
+<span class="lineNum">      79 </span>            : #define  XNF_RXF_CSUM_BLANK       0x0002
+<span class="lineNum">      80 </span>            : #define  XNF_RXF_CHUNK            0x0004
+<span class="lineNum">      81 </span>            : #define  XNF_RXF_MGMT             0x0008
+<span class="lineNum">      82 </span>            :         int16_t                  rxp_status;
+<span class="lineNum">      83 </span>            : } __packed;
+<span class="lineNum">      84 </span>            : 
+<span class="lineNum">      85 </span>            : union xnf_rx_desc {
+<span class="lineNum">      86 </span>            :         struct xnf_rx_req        rxd_req;
+<span class="lineNum">      87 </span>            :         struct xnf_rx_rsp        rxd_rsp;
+<span class="lineNum">      88 </span>            : } __packed;
+<span class="lineNum">      89 </span>            : 
+<span class="lineNum">      90 </span>            : #define XNF_RX_DESC             256
+<span class="lineNum">      91 </span>            : #define XNF_MCLEN               PAGE_SIZE
+<span class="lineNum">      92 </span>            : #define XNF_RX_MIN              32
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span>            : struct xnf_rx_ring {
+<span class="lineNum">      95 </span>            :         volatile uint32_t        rxr_prod;
+<span class="lineNum">      96 </span>            :         volatile uint32_t        rxr_prod_event;
+<span class="lineNum">      97 </span>            :         volatile uint32_t        rxr_cons;
+<span class="lineNum">      98 </span>            :         volatile uint32_t        rxr_cons_event;
+<span class="lineNum">      99 </span>            :         uint32_t                 rxr_reserved[12];
+<span class="lineNum">     100 </span>            :         union xnf_rx_desc        rxr_desc[XNF_RX_DESC];
+<span class="lineNum">     101 </span>            : } __packed;
+<span class="lineNum">     102 </span>            : 
+<span class="lineNum">     103 </span>            : 
+<span class="lineNum">     104 </span>            : /*
+<span class="lineNum">     105 </span>            :  * Tx ring
+<span class="lineNum">     106 </span>            :  */
+<span class="lineNum">     107 </span>            : 
+<span class="lineNum">     108 </span>            : struct xnf_tx_req {
+<span class="lineNum">     109 </span>            :         uint32_t                 txq_ref;
+<span class="lineNum">     110 </span>            :         uint16_t                 txq_offset;
+<span class="lineNum">     111 </span>            :         uint16_t                 txq_flags;
+<span class="lineNum">     112 </span>            : #define  XNF_TXF_CSUM_BLANK       0x0001
+<span class="lineNum">     113 </span>            : #define  XNF_TXF_CSUM_VALID       0x0002
+<span class="lineNum">     114 </span>            : #define  XNF_TXF_CHUNK            0x0004
+<span class="lineNum">     115 </span>            : #define  XNF_TXF_ETXRA            0x0008
+<span class="lineNum">     116 </span>            :         uint16_t                 txq_id;
+<span class="lineNum">     117 </span>            :         uint16_t                 txq_size;
+<span class="lineNum">     118 </span>            : } __packed;
+<span class="lineNum">     119 </span>            : 
+<span class="lineNum">     120 </span>            : struct xnf_tx_rsp {
+<span class="lineNum">     121 </span>            :         uint16_t                 txp_id;
+<span class="lineNum">     122 </span>            :         int16_t                  txp_status;
+<span class="lineNum">     123 </span>            : } __packed;
+<span class="lineNum">     124 </span>            : 
+<span class="lineNum">     125 </span>            : union xnf_tx_desc {
+<span class="lineNum">     126 </span>            :         struct xnf_tx_req        txd_req;
+<span class="lineNum">     127 </span>            :         struct xnf_tx_rsp        txd_rsp;
+<span class="lineNum">     128 </span>            : } __packed;
+<span class="lineNum">     129 </span>            : 
+<span class="lineNum">     130 </span>            : #define XNF_TX_DESC             256
+<span class="lineNum">     131 </span>            : #define XNF_TX_FRAG             18
+<span class="lineNum">     132 </span>            : 
+<span class="lineNum">     133 </span>            : struct xnf_tx_ring {
+<span class="lineNum">     134 </span>            :         volatile uint32_t        txr_prod;
+<span class="lineNum">     135 </span>            :         volatile uint32_t        txr_prod_event;
+<span class="lineNum">     136 </span>            :         volatile uint32_t        txr_cons;
+<span class="lineNum">     137 </span>            :         volatile uint32_t        txr_cons_event;
+<span class="lineNum">     138 </span>            :         uint32_t                 txr_reserved[12];
+<span class="lineNum">     139 </span>            :         union xnf_tx_desc        txr_desc[XNF_TX_DESC];
+<span class="lineNum">     140 </span>            : } __packed;
+<span class="lineNum">     141 </span>            : 
+<span class="lineNum">     142 </span>            : struct xnf_tx_buf {
+<span class="lineNum">     143 </span>            :         uint32_t                 txb_ndesc;
+<span class="lineNum">     144 </span>            :         bus_dmamap_t             txb_dmap;
+<span class="lineNum">     145 </span>            :         struct mbuf             *txb_mbuf;
+<span class="lineNum">     146 </span>            : };
+<span class="lineNum">     147 </span>            : 
+<span class="lineNum">     148 </span>            : /* Management frame, &quot;extra info&quot; in Xen parlance */
+<span class="lineNum">     149 </span>            : struct xnf_mgmt {
+<span class="lineNum">     150 </span>            :         uint8_t                  mg_type;
+<span class="lineNum">     151 </span>            : #define  XNF_MGMT_MCAST_ADD     2
+<span class="lineNum">     152 </span>            : #define  XNF_MGMT_MCAST_DEL     3
+<span class="lineNum">     153 </span>            :         uint8_t                  mg_flags;
+<span class="lineNum">     154 </span>            :         union {
+<span class="lineNum">     155 </span>            :                 uint8_t          mgu_mcaddr[ETHER_ADDR_LEN];
+<span class="lineNum">     156 </span>            :                 uint16_t         mgu_pad[3];
+<span class="lineNum">     157 </span>            :         } u;
+<span class="lineNum">     158 </span>            : #define mg_mcaddr                u.mgu_mcaddr
+<span class="lineNum">     159 </span>            : } __packed;
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span>            : 
+<span class="lineNum">     162 </span>            : struct xnf_softc {
+<span class="lineNum">     163 </span>            :         struct device            sc_dev;
+<span class="lineNum">     164 </span>            :         struct device           *sc_parent;
+<span class="lineNum">     165 </span>            :         char                     sc_node[XEN_MAX_NODE_LEN];
+<span class="lineNum">     166 </span>            :         char                     sc_backend[XEN_MAX_BACKEND_LEN];
+<span class="lineNum">     167 </span>            :         bus_dma_tag_t            sc_dmat;
+<span class="lineNum">     168 </span>            :         int                      sc_domid;
+<span class="lineNum">     169 </span>            : 
+<span class="lineNum">     170 </span>            :         struct arpcom            sc_ac;
+<span class="lineNum">     171 </span>            :         struct ifmedia           sc_media;
+<span class="lineNum">     172 </span>            : 
+<span class="lineNum">     173 </span>            :         xen_intr_handle_t        sc_xih;
+<span class="lineNum">     174 </span>            : 
+<span class="lineNum">     175 </span>            :         int                      sc_caps;
+<span class="lineNum">     176 </span>            : #define  XNF_CAP_SG               0x0001
+<span class="lineNum">     177 </span>            : #define  XNF_CAP_CSUM4            0x0002
+<span class="lineNum">     178 </span>            : #define  XNF_CAP_CSUM6            0x0004
+<span class="lineNum">     179 </span>            : #define  XNF_CAP_MCAST            0x0008
+<span class="lineNum">     180 </span>            : #define  XNF_CAP_SPLIT            0x0010
+<span class="lineNum">     181 </span>            : #define  XNF_CAP_MULTIQ           0x0020
+<span class="lineNum">     182 </span>            : 
+<span class="lineNum">     183 </span>            :         /* Rx ring */
+<span class="lineNum">     184 </span>            :         struct xnf_rx_ring      *sc_rx_ring;
+<span class="lineNum">     185 </span>            :         bus_dmamap_t             sc_rx_rmap;              /* map for the ring */
+<span class="lineNum">     186 </span>            :         bus_dma_segment_t        sc_rx_seg;
+<span class="lineNum">     187 </span>            :         uint32_t                 sc_rx_ref;               /* grant table ref */
+<span class="lineNum">     188 </span>            :         uint32_t                 sc_rx_cons;
+<span class="lineNum">     189 </span>            :         struct mbuf             *sc_rx_buf[XNF_RX_DESC];
+<span class="lineNum">     190 </span>            :         bus_dmamap_t             sc_rx_dmap[XNF_RX_DESC]; /* maps for packets */
+<span class="lineNum">     191 </span>            :         struct mbuf             *sc_rx_cbuf[2];           /* chain handling */
+<span class="lineNum">     192 </span>            : 
+<span class="lineNum">     193 </span>            :         /* Tx ring */
+<span class="lineNum">     194 </span>            :         struct xnf_tx_ring      *sc_tx_ring;
+<span class="lineNum">     195 </span>            :         bus_dmamap_t             sc_tx_rmap;              /* map for the ring */
+<span class="lineNum">     196 </span>            :         bus_dma_segment_t        sc_tx_seg;
+<span class="lineNum">     197 </span>            :         uint32_t                 sc_tx_ref;               /* grant table ref */
+<span class="lineNum">     198 </span>            :         uint32_t                 sc_tx_cons;
+<span class="lineNum">     199 </span>            :         int                      sc_tx_frags;
+<span class="lineNum">     200 </span>            :         uint32_t                 sc_tx_next;              /* next buffer */
+<span class="lineNum">     201 </span>            :         volatile unsigned int    sc_tx_avail;
+<span class="lineNum">     202 </span>            :         struct xnf_tx_buf        sc_tx_buf[XNF_TX_DESC];
+<span class="lineNum">     203 </span>            : };
+<span class="lineNum">     204 </span>            : 
+<span class="lineNum">     205 </span>            : int     xnf_match(struct device *, void *, void *);
+<span class="lineNum">     206 </span>            : void    xnf_attach(struct device *, struct device *, void *);
+<span class="lineNum">     207 </span>            : int     xnf_detach(struct device *, int);
+<span class="lineNum">     208 </span>            : int     xnf_lladdr(struct xnf_softc *);
+<span class="lineNum">     209 </span>            : int     xnf_ioctl(struct ifnet *, u_long, caddr_t);
+<span class="lineNum">     210 </span>            : int     xnf_media_change(struct ifnet *);
+<span class="lineNum">     211 </span>            : void    xnf_media_status(struct ifnet *, struct ifmediareq *);
+<span class="lineNum">     212 </span>            : int     xnf_iff(struct xnf_softc *);
+<span class="lineNum">     213 </span>            : void    xnf_init(struct xnf_softc *);
+<span class="lineNum">     214 </span>            : void    xnf_stop(struct xnf_softc *);
+<span class="lineNum">     215 </span>            : void    xnf_start(struct ifqueue *);
+<span class="lineNum">     216 </span>            : int     xnf_encap(struct xnf_softc *, struct mbuf *, uint32_t *);
+<span class="lineNum">     217 </span>            : void    xnf_intr(void *);
+<span class="lineNum">     218 </span>            : void    xnf_watchdog(struct ifnet *);
+<span class="lineNum">     219 </span>            : void    xnf_txeof(struct xnf_softc *);
+<span class="lineNum">     220 </span>            : void    xnf_rxeof(struct xnf_softc *);
+<span class="lineNum">     221 </span>            : int     xnf_rx_ring_fill(struct xnf_softc *);
+<span class="lineNum">     222 </span>            : int     xnf_rx_ring_create(struct xnf_softc *);
+<span class="lineNum">     223 </span>            : void    xnf_rx_ring_drain(struct xnf_softc *);
+<span class="lineNum">     224 </span>            : void    xnf_rx_ring_destroy(struct xnf_softc *);
+<span class="lineNum">     225 </span>            : int     xnf_tx_ring_create(struct xnf_softc *);
+<span class="lineNum">     226 </span>            : void    xnf_tx_ring_drain(struct xnf_softc *);
+<span class="lineNum">     227 </span>            : void    xnf_tx_ring_destroy(struct xnf_softc *);
+<span class="lineNum">     228 </span>            : int     xnf_capabilities(struct xnf_softc *sc);
+<span class="lineNum">     229 </span>            : int     xnf_init_backend(struct xnf_softc *);
+<span class="lineNum">     230 </span>            : 
+<span class="lineNum">     231 </span>            : struct cfdriver xnf_cd = {
+<span class="lineNum">     232 </span>            :         NULL, &quot;xnf&quot;, DV_IFNET
+<span class="lineNum">     233 </span>            : };
+<span class="lineNum">     234 </span>            : 
+<span class="lineNum">     235 </span>            : const struct cfattach xnf_ca = {
+<span class="lineNum">     236 </span>            :         sizeof(struct xnf_softc), xnf_match, xnf_attach, xnf_detach
+<span class="lineNum">     237 </span>            : };
+<a name="238"><span class="lineNum">     238 </span>            : </a>
+<span class="lineNum">     239 </span>            : int
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 : xnf_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     241 </span>            : {
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         struct xen_attach_args *xa = aux;</span>
+<span class="lineNum">     243 </span>            : 
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :         if (strcmp(&quot;vif&quot;, xa-&gt;xa_name))</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     246 </span>            : 
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 : }</span>
+<a name="249"><span class="lineNum">     249 </span>            : </a>
+<span class="lineNum">     250 </span>            : void
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 : xnf_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     252 </span>            : {
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         struct xen_attach_args *xa = aux;</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         struct xnf_softc *sc = (struct xnf_softc *)self;</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     256 </span>            : 
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         sc-&gt;sc_parent = parent;</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :         sc-&gt;sc_dmat = xa-&gt;xa_dmat;</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         sc-&gt;sc_domid = xa-&gt;xa_domid;</span>
+<span class="lineNum">     260 </span>            : 
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         memcpy(sc-&gt;sc_node, xa-&gt;xa_node, XEN_MAX_NODE_LEN);</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :         memcpy(sc-&gt;sc_backend, xa-&gt;xa_backend, XEN_MAX_BACKEND_LEN);</span>
+<span class="lineNum">     263 </span>            : 
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         strlcpy(ifp-&gt;if_xname, sc-&gt;sc_dev.dv_xname, IFNAMSIZ);</span>
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         if (xnf_lladdr(sc)) {</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :                 printf(&quot;: failed to obtain MAC address\n&quot;);</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     269 </span>            :         }
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         if (xen_intr_establish(0, &amp;sc-&gt;sc_xih, sc-&gt;sc_domid, xnf_intr, sc,</span>
+<span class="lineNum">     272 </span>            :             ifp-&gt;if_xname)) {
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                 printf(&quot;: failed to establish an interrupt\n&quot;);</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     275 </span>            :         }
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :         xen_intr_mask(sc-&gt;sc_xih);</span>
+<span class="lineNum">     277 </span>            : 
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :         printf(&quot; backend %d channel %u: address %s\n&quot;, sc-&gt;sc_domid,</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :             sc-&gt;sc_xih, ether_sprintf(sc-&gt;sc_ac.ac_enaddr));</span>
+<span class="lineNum">     280 </span>            : 
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         if (xnf_capabilities(sc)) {</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :                 xen_intr_disestablish(sc-&gt;sc_xih);</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     284 </span>            :         }
+<span class="lineNum">     285 </span>            : 
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_caps &amp; XNF_CAP_SG)</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_hardmtu = 9000;</span>
+<span class="lineNum">     288 </span>            : 
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :         if (xnf_rx_ring_create(sc)) {</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                 xen_intr_disestablish(sc-&gt;sc_xih);</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     292 </span>            :         }
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :         if (xnf_tx_ring_create(sc)) {</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :                 xen_intr_disestablish(sc-&gt;sc_xih);</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :                 xnf_rx_ring_destroy(sc);</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     297 </span>            :         }
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         if (xnf_init_backend(sc)) {</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :                 xen_intr_disestablish(sc-&gt;sc_xih);</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                 xnf_rx_ring_destroy(sc);</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :                 xnf_tx_ring_destroy(sc);</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     303 </span>            :         }
+<span class="lineNum">     304 </span>            : 
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :         ifp-&gt;if_xflags = IFXF_MPSAFE;</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ioctl = xnf_ioctl;</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         ifp-&gt;if_qstart = xnf_start;</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         ifp-&gt;if_watchdog = xnf_watchdog;</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         ifp-&gt;if_softc = sc;</span>
+<span class="lineNum">     311 </span>            : 
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :         ifp-&gt;if_capabilities = IFCAP_VLAN_MTU;</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_caps &amp; XNF_CAP_CSUM4)</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_capabilities |= IFCAP_CSUM_TCPv4 | IFCAP_CSUM_UDPv4;</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_caps &amp; XNF_CAP_CSUM6)</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_capabilities |= IFCAP_CSUM_TCPv6 | IFCAP_CSUM_UDPv6;</span>
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :         IFQ_SET_MAXLEN(&amp;ifp-&gt;if_snd, XNF_TX_DESC - 1);</span>
+<span class="lineNum">     319 </span>            : 
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         ifmedia_init(&amp;sc-&gt;sc_media, IFM_IMASK, xnf_media_change,</span>
+<span class="lineNum">     321 </span>            :             xnf_media_status);
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :         ifmedia_add(&amp;sc-&gt;sc_media, IFM_ETHER | IFM_MANUAL, 0, NULL);</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         ifmedia_set(&amp;sc-&gt;sc_media, IFM_ETHER | IFM_MANUAL);</span>
+<span class="lineNum">     324 </span>            : 
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         if_attach(ifp);</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :         ether_ifattach(ifp);</span>
+<span class="lineNum">     327 </span>            : 
+<span class="lineNum">     328 </span>            :         /* Kick out emulated em's and re's */
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :         xen_unplug_emulated(parent, XEN_UNPLUG_NIC);</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 : }</span>
+<a name="331"><span class="lineNum">     331 </span>            : </a>
+<span class="lineNum">     332 </span>            : int
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 : xnf_detach(struct device *self, int flags)</span>
+<span class="lineNum">     334 </span>            : {
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         struct xnf_softc *sc = (struct xnf_softc *)self;</span>
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         xnf_stop(sc);</span>
+<span class="lineNum">     339 </span>            : 
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :         ether_ifdetach(ifp);</span>
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         if_detach(ifp);</span>
+<span class="lineNum">     342 </span>            : 
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :         xen_intr_disestablish(sc-&gt;sc_xih);</span>
+<span class="lineNum">     344 </span>            : 
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tx_ring)</span>
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :                 xnf_tx_ring_destroy(sc);</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_rx_ring)</span>
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :                 xnf_rx_ring_destroy(sc);</span>
+<span class="lineNum">     349 </span>            : 
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     351 </span>            : }
+<a name="352"><span class="lineNum">     352 </span>            : </a>
+<span class="lineNum">     353 </span>            : static int
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 : nibble(int ch)</span>
+<span class="lineNum">     355 </span>            : {
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :         if (ch &gt;= '0' &amp;&amp; ch &lt;= '9')</span>
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :                 return (ch - '0');</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :         if (ch &gt;= 'A' &amp;&amp; ch &lt;= 'F')</span>
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :                 return (10 + ch - 'A');</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         if (ch &gt;= 'a' &amp;&amp; ch &lt;= 'f')</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :                 return (10 + ch - 'a');</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :         return (-1);</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 : }</span>
+<a name="364"><span class="lineNum">     364 </span>            : </a>
+<span class="lineNum">     365 </span>            : int
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 : xnf_lladdr(struct xnf_softc *sc)</span>
+<span class="lineNum">     367 </span>            : {
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         char enaddr[ETHER_ADDR_LEN];</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :         char mac[32];</span>
+<span class="lineNum">     370 </span>            :         int i, j, lo, hi;
+<span class="lineNum">     371 </span>            : 
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :         if (xs_getprop(sc-&gt;sc_parent, sc-&gt;sc_backend, &quot;mac&quot;, mac, sizeof(mac)))</span>
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     374 </span>            : 
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :         for (i = 0, j = 0; j &lt; ETHER_ADDR_LEN; i += 3, j++) {</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                 if ((hi = nibble(mac[i])) == -1 ||</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                     (lo = nibble(mac[i+1])) == -1)</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                         return (-1);</span>
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :                 enaddr[j] = hi &lt;&lt; 4 | lo;</span>
+<span class="lineNum">     380 </span>            :         }
+<span class="lineNum">     381 </span>            : 
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :         memcpy(sc-&gt;sc_ac.ac_enaddr, enaddr, ETHER_ADDR_LEN);</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 : }</span>
+<a name="385"><span class="lineNum">     385 </span>            : </a>
+<span class="lineNum">     386 </span>            : int
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 : xnf_ioctl(struct ifnet *ifp, u_long command, caddr_t data)</span>
+<span class="lineNum">     388 </span>            : {
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         struct xnf_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         struct ifreq *ifr = (struct ifreq *)data;</span>
+<span class="lineNum">     391 </span>            :         int s, error = 0;
+<span class="lineNum">     392 </span>            : 
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         switch (command) {</span>
+<span class="lineNum">     396 </span>            :         case SIOCSIFADDR:
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_flags |= IFF_UP;</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :                 if (!(ifp-&gt;if_flags &amp; IFF_RUNNING))</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                         xnf_init(sc);</span>
+<span class="lineNum">     400 </span>            :                 break;
+<span class="lineNum">     401 </span>            :         case SIOCSIFFLAGS:
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_flags &amp; IFF_UP) {</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                                 error = ENETRESET;</span>
+<span class="lineNum">     405 </span>            :                         else
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :                                 xnf_init(sc);</span>
+<span class="lineNum">     407 </span>            :                 } else {
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                                 xnf_stop(sc);</span>
+<span class="lineNum">     410 </span>            :                 }
+<span class="lineNum">     411 </span>            :                 break;
+<span class="lineNum">     412 </span>            :         case SIOCGIFMEDIA:
+<span class="lineNum">     413 </span>            :         case SIOCSIFMEDIA:
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :                 error = ifmedia_ioctl(ifp, ifr, &amp;sc-&gt;sc_media, command);</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     416 </span>            :         default:
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 error = ether_ioctl(ifp, &amp;sc-&gt;sc_ac, command, data);</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     419 </span>            :         }
+<span class="lineNum">     420 </span>            : 
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         if (error == ENETRESET) {</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :                         xnf_iff(sc);</span>
+<span class="lineNum">     424 </span>            :                 error = 0;
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     426 </span>            : 
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">     428 </span>            : 
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     430 </span>            : }
+<a name="431"><span class="lineNum">     431 </span>            : </a>
+<span class="lineNum">     432 </span>            : int
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 : xnf_media_change(struct ifnet *ifp)</span>
+<span class="lineNum">     434 </span>            : {
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     436 </span>            : }
+<a name="437"><span class="lineNum">     437 </span>            : </a>
+<span class="lineNum">     438 </span>            : void
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 : xnf_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)</span>
+<span class="lineNum">     440 </span>            : {
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :         ifmr-&gt;ifm_status = IFM_ACTIVE | IFM_AVALID;</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         ifmr-&gt;ifm_active = IFM_ETHER | IFM_MANUAL;</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 : }</span>
+<a name="444"><span class="lineNum">     444 </span>            : </a>
+<span class="lineNum">     445 </span>            : int
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 : xnf_iff(struct xnf_softc *sc)</span>
+<span class="lineNum">     447 </span>            : {
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     449 </span>            : }
+<a name="450"><span class="lineNum">     450 </span>            : </a>
+<span class="lineNum">     451 </span>            : void
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 : xnf_init(struct xnf_softc *sc)</span>
+<span class="lineNum">     453 </span>            : {
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     455 </span>            : 
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :         xnf_stop(sc);</span>
+<span class="lineNum">     457 </span>            : 
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :         xnf_iff(sc);</span>
+<span class="lineNum">     459 </span>            : 
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :         xnf_rx_ring_fill(sc);</span>
+<span class="lineNum">     461 </span>            : 
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :         if (xen_intr_unmask(sc-&gt;sc_xih)) {</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to enable interrupts\n&quot;, ifp-&gt;if_xname);</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :                 xnf_stop(sc);</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     466 </span>            :         }
+<span class="lineNum">     467 </span>            : 
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags |= IFF_RUNNING;</span>
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 : }</span>
+<a name="471"><span class="lineNum">     471 </span>            : </a>
+<span class="lineNum">     472 </span>            : void
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 : xnf_stop(struct xnf_softc *sc)</span>
+<span class="lineNum">     474 </span>            : {
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     476 </span>            : 
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags &amp;= ~IFF_RUNNING;</span>
+<span class="lineNum">     478 </span>            : 
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :         xen_intr_mask(sc-&gt;sc_xih);</span>
+<span class="lineNum">     480 </span>            : 
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :         ifp-&gt;if_timer = 0;</span>
+<span class="lineNum">     482 </span>            : 
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :         ifq_barrier(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         xen_intr_barrier(sc-&gt;sc_xih);</span>
+<span class="lineNum">     485 </span>            : 
+<span class="lineNum">     486 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">     487 </span>            : 
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tx_ring)</span>
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                 xnf_tx_ring_drain(sc);</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_rx_ring)</span>
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :                 xnf_rx_ring_drain(sc);</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 : }</span>
+<a name="493"><span class="lineNum">     493 </span>            : </a>
+<span class="lineNum">     494 </span>            : void
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 : xnf_start(struct ifqueue *ifq)</span>
+<span class="lineNum">     496 </span>            : {
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = ifq-&gt;ifq_if;</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :         struct xnf_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :         struct xnf_tx_ring *txr = sc-&gt;sc_tx_ring;</span>
+<span class="lineNum">     500 </span>            :         struct mbuf *m;
+<span class="lineNum">     501 </span>            :         int pkts = 0;
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :         uint32_t prod, oprod;</span>
+<span class="lineNum">     503 </span>            : 
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_tx_rmap, 0, 0,</span>
+<span class="lineNum">     505 </span>            :             BUS_DMASYNC_POSTREAD);
+<span class="lineNum">     506 </span>            : 
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :         prod = oprod = txr-&gt;txr_prod;</span>
+<span class="lineNum">     508 </span>            : 
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :         for (;;) {</span>
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :                 if (((XNF_TX_DESC - (prod - sc-&gt;sc_tx_cons)) &lt;</span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_tx_frags) || !sc-&gt;sc_tx_avail) {</span>
+<span class="lineNum">     512 </span>            :                         /* transient */
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :                         ifq_set_oactive(ifq);</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     515 </span>            :                 }
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :                 m = ifq_dequeue(ifq);</span>
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 :                 if (m == NULL)</span>
+<span class="lineNum">     519 </span>            :                         break;
+<span class="lineNum">     520 </span>            : 
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :                 if (xnf_encap(sc, m, &amp;prod)) {</span>
+<span class="lineNum">     522 </span>            :                         /* the chain is too large */
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_oerrors++;</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :                         m_freem(m);</span>
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     526 </span>            :                 }
+<span class="lineNum">     527 </span>            : 
+<span class="lineNum">     528 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_bpf)</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :                         bpf_mtap_ether(ifp-&gt;if_bpf, m, BPF_DIRECTION_OUT);</span>
+<span class="lineNum">     531 </span>            : #endif
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :                 pkts++;</span>
+<span class="lineNum">     533 </span>            :         }
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :         if (pkts &gt; 0) {</span>
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                 txr-&gt;txr_prod = prod;</span>
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :                 if (txr-&gt;txr_cons_event &lt;= txr-&gt;txr_cons)</span>
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                         txr-&gt;txr_cons_event = txr-&gt;txr_cons +</span>
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :                             ((txr-&gt;txr_prod - txr-&gt;txr_cons) &gt;&gt; 1) + 1;</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_tx_rmap, 0, 0,</span>
+<span class="lineNum">     540 </span>            :                     BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                 if (prod - txr-&gt;txr_prod_event &lt; prod - oprod)</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                         xen_intr_signal(sc-&gt;sc_xih);</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_timer = 5;</span>
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 : }</span>
+<a name="546"><span class="lineNum">     546 </span>            : </a>
+<span class="lineNum">     547 </span>            : static inline int
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 : xnf_fragcount(struct mbuf *m_head)</span>
+<span class="lineNum">     549 </span>            : {
+<span class="lineNum">     550 </span>            :         struct mbuf *m;
+<span class="lineNum">     551 </span>            :         vaddr_t va, va0;
+<span class="lineNum">     552 </span>            :         int n = 0;
+<span class="lineNum">     553 </span>            : 
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :         for (m = m_head; m != NULL; m = m-&gt;m_next) {</span>
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 :                 if (m-&gt;m_len == 0)</span>
+<span class="lineNum">     556 </span>            :                         continue;
+<span class="lineNum">     557 </span>            :                      /* start of the buffer */
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :                 for (va0 = va = mtod(m, vaddr_t);</span>
+<span class="lineNum">     559 </span>            :                      /* does the buffer end on this page? */
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :                      va + (PAGE_SIZE - (va &amp; PAGE_MASK)) &lt; va0 + m-&gt;m_len;</span>
+<span class="lineNum">     561 </span>            :                      /* move on to the next page */
+<span class="lineNum">     562 </span>            :                      va += PAGE_SIZE - (va &amp; PAGE_MASK))
+<span class="lineNum">     563 </span>            :                         n++;
+<span class="lineNum">     564 </span>            :                 n++;
+<span class="lineNum">     565 </span>            :         }
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :         return (n);</span>
+<span class="lineNum">     567 </span>            : }
+<a name="568"><span class="lineNum">     568 </span>            : </a>
+<span class="lineNum">     569 </span>            : int
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 : xnf_encap(struct xnf_softc *sc, struct mbuf *m_head, uint32_t *prod)</span>
+<span class="lineNum">     571 </span>            : {
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :         struct xnf_tx_ring *txr = sc-&gt;sc_tx_ring;</span>
+<span class="lineNum">     573 </span>            :         struct xnf_tx_buf *txb = NULL;
+<span class="lineNum">     574 </span>            :         union xnf_tx_desc *txd = NULL;
+<span class="lineNum">     575 </span>            :         struct mbuf *m;
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :         uint32_t oprod = *prod;</span>
+<span class="lineNum">     577 </span>            :         uint16_t id;
+<span class="lineNum">     578 </span>            :         int i, flags, n, used = 0;
+<span class="lineNum">     579 </span>            : 
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         if ((xnf_fragcount(m_head) &gt; sc-&gt;sc_tx_frags) &amp;&amp;</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :             m_defrag(m_head, M_DONTWAIT))</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">     583 </span>            : 
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :         flags = (sc-&gt;sc_domid &lt;&lt; 16) | BUS_DMA_WRITE | BUS_DMA_NOWAIT;</span>
+<span class="lineNum">     585 </span>            : 
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :         for (m = m_head; m != NULL &amp;&amp; m-&gt;m_len &gt; 0; m = m-&gt;m_next) {</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :                 i = *prod &amp; (XNF_TX_DESC - 1);</span>
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :                 txd = &amp;txr-&gt;txr_desc[i];</span>
+<span class="lineNum">     589 </span>            : 
+<span class="lineNum">     590 </span>            :                 /*
+<span class="lineNum">     591 </span>            :                  * Find an unused TX buffer.  We're guaranteed to find one
+<span class="lineNum">     592 </span>            :                  * because xnf_encap cannot be called with sc_tx_avail == 0.
+<span class="lineNum">     593 </span>            :                  */
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :                 do {</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                         id = sc-&gt;sc_tx_next++ &amp; (XNF_TX_DESC - 1);</span>
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :                         txb = &amp;sc-&gt;sc_tx_buf[id];</span>
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :                 } while (txb-&gt;txb_mbuf);</span>
+<span class="lineNum">     598 </span>            : 
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :                 if (bus_dmamap_load(sc-&gt;sc_dmat, txb-&gt;txb_dmap, m-&gt;m_data,</span>
+<span class="lineNum">     600 </span>            :                     m-&gt;m_len, NULL, flags)) {
+<span class="lineNum">     601 </span>            :                         DPRINTF(&quot;%s: failed to load %u bytes @%lu\n&quot;,
+<span class="lineNum">     602 </span>            :                             sc-&gt;sc_dev.dv_xname, m-&gt;m_len,
+<span class="lineNum">     603 </span>            :                             mtod(m, vaddr_t) &amp; PAGE_MASK);
+<span class="lineNum">     604 </span>            :                         goto unroll;
+<span class="lineNum">     605 </span>            :                 }
+<span class="lineNum">     606 </span>            : 
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :                 for (n = 0; n &lt; txb-&gt;txb_dmap-&gt;dm_nsegs; n++) {</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                         i = *prod &amp; (XNF_TX_DESC - 1);</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :                         txd = &amp;txr-&gt;txr_desc[i];</span>
+<span class="lineNum">     610 </span>            : 
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :                         if (m == m_head &amp;&amp; n == 0) {</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                                 if (m-&gt;m_pkthdr.csum_flags &amp;</span>
+<span class="lineNum">     613 </span>            :                                     (M_TCP_CSUM_OUT | M_UDP_CSUM_OUT))
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                                         txd-&gt;txd_req.txq_flags =</span>
+<span class="lineNum">     615 </span>            :                                             XNF_TXF_CSUM_BLANK |
+<span class="lineNum">     616 </span>            :                                             XNF_TXF_CSUM_VALID;
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                                 txd-&gt;txd_req.txq_size = m-&gt;m_pkthdr.len;</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                         } else {</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :                                 txd-&gt;txd_req.txq_size =</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :                                     txb-&gt;txb_dmap-&gt;dm_segs[n].ds_len;</span>
+<span class="lineNum">     621 </span>            :                         }
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :                         txd-&gt;txd_req.txq_ref =</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :                             txb-&gt;txb_dmap-&gt;dm_segs[n].ds_addr;</span>
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :                         if (n == 0)</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :                                 txd-&gt;txd_req.txq_offset =</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                                     mtod(m, vaddr_t) &amp; PAGE_MASK;</span>
+<span class="lineNum">     627 </span>            :                         /* The chunk flag will be removed from the last one */
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                         txd-&gt;txd_req.txq_flags |= XNF_TXF_CHUNK;</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                         txd-&gt;txd_req.txq_id = id;</span>
+<span class="lineNum">     630 </span>            : 
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                         txb-&gt;txb_ndesc++;</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :                         (*prod)++;</span>
+<span class="lineNum">     633 </span>            :                 }
+<span class="lineNum">     634 </span>            : 
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :                 txb-&gt;txb_mbuf = m;</span>
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :                 used++;</span>
+<span class="lineNum">     637 </span>            :         }
+<span class="lineNum">     638 </span>            : 
+<span class="lineNum">     639 </span>            :         /* Clear the chunk flag from the last segment */
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :         txd-&gt;txd_req.txq_flags &amp;= ~XNF_TXF_CHUNK;</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_tx_rmap, 0, 0,</span>
+<span class="lineNum">     642 </span>            :             BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     643 </span>            : 
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :         KASSERT(sc-&gt;sc_tx_avail &gt; used);</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :         atomic_sub_int(&amp;sc-&gt;sc_tx_avail, used);</span>
+<span class="lineNum">     646 </span>            : 
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     648 </span>            : 
+<span class="lineNum">     649 </span>            :  unroll:
+<span class="lineNum">     650 </span>            :         DPRINTF(&quot;%s: unrolling from %u to %u\n&quot;, sc-&gt;sc_dev.dv_xname,
+<span class="lineNum">     651 </span>            :             *prod, oprod);
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :         for (; *prod != oprod; (*prod)--) {</span>
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :                 i = (*prod - 1) &amp; (XNF_TX_DESC - 1);</span>
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :                 txd = &amp;txr-&gt;txr_desc[i];</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                 id = txd-&gt;txd_req.txq_id;</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :                 txb = &amp;sc-&gt;sc_tx_buf[id];</span>
+<span class="lineNum">     657 </span>            : 
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                 memset(txd, 0, sizeof(*txd));</span>
+<span class="lineNum">     659 </span>            : 
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :                 if (txb-&gt;txb_mbuf) {</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                         bus_dmamap_sync(sc-&gt;sc_dmat, txb-&gt;txb_dmap, 0, 0,</span>
+<span class="lineNum">     662 </span>            :                             BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                         bus_dmamap_unload(sc-&gt;sc_dmat, txb-&gt;txb_dmap);</span>
+<span class="lineNum">     664 </span>            : 
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :                         txb-&gt;txb_mbuf = NULL;</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :                         txb-&gt;txb_ndesc = 0;</span>
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     668 </span>            :         }
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :         return (ENOBUFS);</span>
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 : }</span>
+<a name="671"><span class="lineNum">     671 </span>            : </a>
+<span class="lineNum">     672 </span>            : void
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 : xnf_intr(void *arg)</span>
+<span class="lineNum">     674 </span>            : {
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         struct xnf_softc *sc = arg;</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     677 </span>            : 
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_flags &amp; IFF_RUNNING) {</span>
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :                 xnf_txeof(sc);</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :                 xnf_rxeof(sc);</span>
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 : }</span>
+<a name="683"><span class="lineNum">     683 </span>            : </a>
+<span class="lineNum">     684 </span>            : void
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 : xnf_watchdog(struct ifnet *ifp)</span>
+<span class="lineNum">     686 </span>            : {
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :         struct xnf_softc *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :         struct xnf_tx_ring *txr = sc-&gt;sc_tx_ring;</span>
+<span class="lineNum">     689 </span>            : 
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :         printf(&quot;%s: tx stuck: prod %u cons %u,%u evt %u,%u\n&quot;,</span>
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :             ifp-&gt;if_xname, txr-&gt;txr_prod, txr-&gt;txr_cons, sc-&gt;sc_tx_cons,</span>
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :             txr-&gt;txr_prod_event, txr-&gt;txr_cons_event);</span>
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 : }</span>
+<a name="694"><span class="lineNum">     694 </span>            : </a>
+<span class="lineNum">     695 </span>            : void
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 : xnf_txeof(struct xnf_softc *sc)</span>
+<span class="lineNum">     697 </span>            : {
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :         struct xnf_tx_ring *txr = sc-&gt;sc_tx_ring;</span>
+<span class="lineNum">     700 </span>            :         struct xnf_tx_buf *txb;
+<span class="lineNum">     701 </span>            :         union xnf_tx_desc *txd;
+<span class="lineNum">     702 </span>            :         uint done = 0;
+<span class="lineNum">     703 </span>            :         uint32_t cons;
+<span class="lineNum">     704 </span>            :         uint16_t id;
+<span class="lineNum">     705 </span>            :         int i;
+<span class="lineNum">     706 </span>            : 
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_tx_rmap, 0, 0,</span>
+<span class="lineNum">     708 </span>            :             BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     709 </span>            : 
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :         for (cons = sc-&gt;sc_tx_cons; cons != txr-&gt;txr_cons; cons++) {</span>
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                 i = cons &amp; (XNF_TX_DESC - 1);</span>
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :                 txd = &amp;txr-&gt;txr_desc[i];</span>
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 :                 id = txd-&gt;txd_rsp.txp_id;</span>
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 :                 txb = &amp;sc-&gt;sc_tx_buf[id];</span>
+<span class="lineNum">     715 </span>            : 
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :                 KASSERT(txb-&gt;txb_ndesc &gt; 0);</span>
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :                 if (--txb-&gt;txb_ndesc == 0) {</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :                         bus_dmamap_sync(sc-&gt;sc_dmat, txb-&gt;txb_dmap, 0, 0,</span>
+<span class="lineNum">     719 </span>            :                             BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :                         bus_dmamap_unload(sc-&gt;sc_dmat, txb-&gt;txb_dmap);</span>
+<span class="lineNum">     721 </span>            : 
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 :                         m_free(txb-&gt;txb_mbuf);</span>
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :                         txb-&gt;txb_mbuf = NULL;</span>
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :                         done++;</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     726 </span>            : 
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :                 memset(txd, 0, sizeof(*txd));</span>
+<span class="lineNum">     728 </span>            :         }
+<span class="lineNum">     729 </span>            : 
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_cons = cons;</span>
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :         txr-&gt;txr_cons_event = sc-&gt;sc_tx_cons +</span>
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :             ((txr-&gt;txr_prod - sc-&gt;sc_tx_cons) &gt;&gt; 1) + 1;</span>
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_tx_rmap, 0, 0,</span>
+<span class="lineNum">     734 </span>            :             BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     735 </span>            : 
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :         atomic_add_int(&amp;sc-&gt;sc_tx_avail, done);</span>
+<span class="lineNum">     737 </span>            : 
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tx_cons == txr-&gt;txr_prod)</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_timer = 0;</span>
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :         if (ifq_is_oactive(&amp;ifp-&gt;if_snd))</span>
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 :                 ifq_restart(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 : }</span>
+<a name="743"><span class="lineNum">     743 </span>            : </a>
+<span class="lineNum">     744 </span>            : void
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 : xnf_rxeof(struct xnf_softc *sc)</span>
+<span class="lineNum">     746 </span>            : {
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :         struct xnf_rx_ring *rxr = sc-&gt;sc_rx_ring;</span>
+<span class="lineNum">     749 </span>            :         union xnf_rx_desc *rxd;
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :         struct mbuf_list ml = MBUF_LIST_INITIALIZER();</span>
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :         struct mbuf *fmp = sc-&gt;sc_rx_cbuf[0];</span>
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :         struct mbuf *lmp = sc-&gt;sc_rx_cbuf[1];</span>
+<span class="lineNum">     753 </span>            :         struct mbuf *m;
+<span class="lineNum">     754 </span>            :         bus_dmamap_t dmap;
+<span class="lineNum">     755 </span>            :         uint32_t cons;
+<span class="lineNum">     756 </span>            :         uint16_t id;
+<span class="lineNum">     757 </span>            :         int i, flags, len, offset;
+<span class="lineNum">     758 </span>            : 
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_rx_rmap, 0, 0,</span>
+<span class="lineNum">     760 </span>            :             BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     761 </span>            : 
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :         for (cons = sc-&gt;sc_rx_cons; cons != rxr-&gt;rxr_cons; cons++) {</span>
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :                 i = cons &amp; (XNF_RX_DESC - 1);</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :                 rxd = &amp;rxr-&gt;rxr_desc[i];</span>
+<span class="lineNum">     765 </span>            : 
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :                 id = rxd-&gt;rxd_rsp.rxp_id;</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :                 len = rxd-&gt;rxd_rsp.rxp_status;</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :                 flags = rxd-&gt;rxd_rsp.rxp_flags;</span>
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :                 offset = rxd-&gt;rxd_rsp.rxp_offset;</span>
+<span class="lineNum">     770 </span>            : 
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :                 dmap = sc-&gt;sc_rx_dmap[id];</span>
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, dmap, 0, 0,</span>
+<span class="lineNum">     773 </span>            :                     BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :                 bus_dmamap_unload(sc-&gt;sc_dmat, dmap);</span>
+<span class="lineNum">     775 </span>            : 
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :                 m = sc-&gt;sc_rx_buf[id];</span>
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :                 KASSERT(m != NULL);</span>
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rx_buf[id] = NULL;</span>
+<span class="lineNum">     779 </span>            : 
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :                 if (flags &amp; XNF_RXF_MGMT) {</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: management data present\n&quot;,</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :                             ifp-&gt;if_xname);</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :                         m_freem(m);</span>
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     785 </span>            :                 }
+<span class="lineNum">     786 </span>            : 
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :                 if (flags &amp; XNF_RXF_CSUM_VALID)</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :                         m-&gt;m_pkthdr.csum_flags = M_TCP_CSUM_IN_OK |</span>
+<span class="lineNum">     789 </span>            :                             M_UDP_CSUM_IN_OK;
+<span class="lineNum">     790 </span>            : 
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :                 if (len &lt; 0 || (len + offset &gt; PAGE_SIZE)) {</span>
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_ierrors++;</span>
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :                         m_freem(m);</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     795 </span>            :                 }
+<span class="lineNum">     796 </span>            : 
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :                 m-&gt;m_len = len;</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :                 m-&gt;m_data += offset;</span>
+<span class="lineNum">     799 </span>            : 
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :                 if (fmp == NULL) {</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 :                         m-&gt;m_pkthdr.len = len;</span>
+<span class="lineNum">     802 </span>            :                         fmp = m;
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :                         m-&gt;m_flags &amp;= ~M_PKTHDR;</span>
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :                         lmp-&gt;m_next = m;</span>
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :                         fmp-&gt;m_pkthdr.len += m-&gt;m_len;</span>
+<span class="lineNum">     807 </span>            :                 }
+<span class="lineNum">     808 </span>            :                 lmp = m;
+<span class="lineNum">     809 </span>            : 
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :                 if (flags &amp; XNF_RXF_CHUNK) {</span>
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rx_cbuf[0] = fmp;</span>
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :                         sc-&gt;sc_rx_cbuf[1] = lmp;</span>
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     814 </span>            :                 }
+<span class="lineNum">     815 </span>            : 
+<span class="lineNum">     816 </span>            :                 m = fmp;
+<span class="lineNum">     817 </span>            : 
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :                 ml_enqueue(&amp;ml, m);</span>
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rx_cbuf[0] = sc-&gt;sc_rx_cbuf[1] = fmp = lmp = NULL;</span>
+<span class="lineNum">     820 </span>            : 
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :                 memset(rxd, 0, sizeof(*rxd));</span>
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :                 rxd-&gt;rxd_req.rxq_id = id;</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     824 </span>            : 
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :         sc-&gt;sc_rx_cons = cons;</span>
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         rxr-&gt;rxr_cons_event = sc-&gt;sc_rx_cons + 1;</span>
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_rx_rmap, 0, 0,</span>
+<span class="lineNum">     828 </span>            :             BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     829 </span>            : 
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :         if_input(ifp, &amp;ml);</span>
+<span class="lineNum">     831 </span>            : 
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :         if (xnf_rx_ring_fill(sc) || (sc-&gt;sc_rx_cons != rxr-&gt;rxr_cons))</span>
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 :                 xen_intr_schedule(sc-&gt;sc_xih);</span>
+<span class="lineNum">     834 </span><span class="lineNoCov">          0 : }</span>
+<a name="835"><span class="lineNum">     835 </span>            : </a>
+<span class="lineNum">     836 </span>            : int
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 : xnf_rx_ring_fill(struct xnf_softc *sc)</span>
+<span class="lineNum">     838 </span>            : {
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 :         struct xnf_rx_ring *rxr = sc-&gt;sc_rx_ring;</span>
+<span class="lineNum">     841 </span>            :         union xnf_rx_desc *rxd;
+<span class="lineNum">     842 </span>            :         bus_dmamap_t dmap;
+<span class="lineNum">     843 </span>            :         struct mbuf *m;
+<span class="lineNum">     844 </span>            :         uint32_t cons, prod, oprod;
+<span class="lineNum">     845 </span>            :         uint16_t id;
+<span class="lineNum">     846 </span>            :         int i, flags, resched = 0;
+<span class="lineNum">     847 </span>            : 
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :         cons = rxr-&gt;rxr_cons;</span>
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :         prod = oprod = rxr-&gt;rxr_prod;</span>
+<span class="lineNum">     850 </span>            : 
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :         while (prod - cons &lt; XNF_RX_DESC) {</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :                 i = prod &amp; (XNF_RX_DESC - 1);</span>
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :                 rxd = &amp;rxr-&gt;rxr_desc[i];</span>
+<span class="lineNum">     854 </span>            : 
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :                 id = rxd-&gt;rxd_rsp.rxp_id;</span>
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_rx_buf[id])</span>
+<span class="lineNum">     857 </span>            :                         break;
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :                 m = MCLGETI(NULL, M_DONTWAIT, NULL, XNF_MCLEN);</span>
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                 if (m == NULL)</span>
+<span class="lineNum">     860 </span>            :                         break;
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :                 m-&gt;m_len = m-&gt;m_pkthdr.len = XNF_MCLEN;</span>
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :                 dmap = sc-&gt;sc_rx_dmap[id];</span>
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :                 flags = (sc-&gt;sc_domid &lt;&lt; 16) | BUS_DMA_READ | BUS_DMA_NOWAIT;</span>
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :                 if (bus_dmamap_load_mbuf(sc-&gt;sc_dmat, dmap, m, flags)) {</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :                         m_freem(m);</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     867 </span>            :                 }
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rx_buf[id] = m;</span>
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :                 rxd-&gt;rxd_req.rxq_ref = dmap-&gt;dm_segs[0].ds_addr;</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, dmap, 0, 0, BUS_DMASYNC_PREWRITE);</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :                 prod++;</span>
+<span class="lineNum">     872 </span>            :         }
+<span class="lineNum">     873 </span>            : 
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :         rxr-&gt;rxr_prod = prod;</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_rx_rmap, 0, 0,</span>
+<span class="lineNum">     876 </span>            :             BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
+<span class="lineNum">     877 </span>            : 
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :         if ((prod - cons &lt; XNF_RX_MIN) &amp;&amp; (ifp-&gt;if_flags &amp; IFF_RUNNING))</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :                 resched = 1;</span>
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 :         if (prod - rxr-&gt;rxr_prod_event &lt; prod - oprod)</span>
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :                 xen_intr_signal(sc-&gt;sc_xih);</span>
+<span class="lineNum">     882 </span>            : 
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :         return (resched);</span>
+<span class="lineNum">     884 </span>            : }
+<a name="885"><span class="lineNum">     885 </span>            : </a>
+<span class="lineNum">     886 </span>            : int
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 : xnf_rx_ring_create(struct xnf_softc *sc)</span>
+<span class="lineNum">     888 </span>            : {
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :         int i, flags, rsegs;</span>
+<span class="lineNum">     890 </span>            : 
+<span class="lineNum">     891 </span>            :         /* Allocate a page of memory for the ring */
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :         if (bus_dmamem_alloc(sc-&gt;sc_dmat, PAGE_SIZE, PAGE_SIZE, 0,</span>
+<span class="lineNum">     893 </span>            :             &amp;sc-&gt;sc_rx_seg, 1, &amp;rsegs, BUS_DMA_ZERO | BUS_DMA_NOWAIT)) {
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to allocate memory for the rx ring\n&quot;,</span>
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">     897 </span>            :         }
+<span class="lineNum">     898 </span>            :         /* Map in the allocated memory into the ring structure */
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 :         if (bus_dmamem_map(sc-&gt;sc_dmat, &amp;sc-&gt;sc_rx_seg, 1, PAGE_SIZE,</span>
+<span class="lineNum">     900 </span>            :             (caddr_t *)(&amp;sc-&gt;sc_rx_ring), BUS_DMA_NOWAIT)) {
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to map memory for the rx ring\n&quot;,</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :                 goto errout;</span>
+<span class="lineNum">     904 </span>            :         }
+<span class="lineNum">     905 </span>            :         /* Create a map to load the ring memory into */
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :         if (bus_dmamap_create(sc-&gt;sc_dmat, PAGE_SIZE, 1, PAGE_SIZE, 0,</span>
+<span class="lineNum">     907 </span>            :             BUS_DMA_NOWAIT, &amp;sc-&gt;sc_rx_rmap)) {
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to create a memory map for the rx ring\n&quot;,</span>
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :                 goto errout;</span>
+<span class="lineNum">     911 </span>            :         }
+<span class="lineNum">     912 </span>            :         /* Load the ring into the ring map to extract the PA */
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :         flags = (sc-&gt;sc_domid &lt;&lt; 16) | BUS_DMA_NOWAIT;</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :         if (bus_dmamap_load(sc-&gt;sc_dmat, sc-&gt;sc_rx_rmap, sc-&gt;sc_rx_ring,</span>
+<span class="lineNum">     915 </span>            :             PAGE_SIZE, NULL, flags)) {
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to load the rx ring map\n&quot;,</span>
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :                 goto errout;</span>
+<span class="lineNum">     919 </span>            :         }
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :         sc-&gt;sc_rx_ref = sc-&gt;sc_rx_rmap-&gt;dm_segs[0].ds_addr;</span>
+<span class="lineNum">     921 </span>            : 
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :         sc-&gt;sc_rx_ring-&gt;rxr_prod_event = sc-&gt;sc_rx_ring-&gt;rxr_cons_event = 1;</span>
+<span class="lineNum">     923 </span>            : 
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; XNF_RX_DESC; i++) {</span>
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :                 if (bus_dmamap_create(sc-&gt;sc_dmat, XNF_MCLEN, 1, XNF_MCLEN,</span>
+<span class="lineNum">     926 </span>            :                     PAGE_SIZE, BUS_DMA_NOWAIT, &amp;sc-&gt;sc_rx_dmap[i])) {
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: failed to create a memory map for the&quot;</span>
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :                             &quot; rx slot %d\n&quot;, sc-&gt;sc_dev.dv_xname, i);</span>
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :                         goto errout;</span>
+<span class="lineNum">     930 </span>            :                 }
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rx_ring-&gt;rxr_desc[i].rxd_req.rxq_id = i;</span>
+<span class="lineNum">     932 </span>            :         }
+<span class="lineNum">     933 </span>            : 
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     935 </span>            : 
+<span class="lineNum">     936 </span>            :  errout:
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :         xnf_rx_ring_destroy(sc);</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :         return (-1);</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 : }</span>
+<a name="940"><span class="lineNum">     940 </span>            : </a>
+<span class="lineNum">     941 </span>            : void
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 : xnf_rx_ring_drain(struct xnf_softc *sc)</span>
+<span class="lineNum">     943 </span>            : {
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         struct xnf_rx_ring *rxr = sc-&gt;sc_rx_ring;</span>
+<span class="lineNum">     945 </span>            : 
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_rx_cons != rxr-&gt;rxr_cons)</span>
+<span class="lineNum">     947 </span><span class="lineNoCov">          0 :                 xnf_rxeof(sc);</span>
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 : }</span>
+<a name="949"><span class="lineNum">     949 </span>            : </a>
+<span class="lineNum">     950 </span>            : void
+<span class="lineNum">     951 </span><span class="lineNoCov">          0 : xnf_rx_ring_destroy(struct xnf_softc *sc)</span>
+<span class="lineNum">     952 </span>            : {
+<span class="lineNum">     953 </span>            :         int i;
+<span class="lineNum">     954 </span>            : 
+<span class="lineNum">     955 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; XNF_RX_DESC; i++) {</span>
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_rx_buf[i] == NULL)</span>
+<span class="lineNum">     957 </span>            :                         continue;
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_rx_dmap[i], 0, 0,</span>
+<span class="lineNum">     959 </span>            :                     BUS_DMASYNC_POSTREAD);
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :                 bus_dmamap_unload(sc-&gt;sc_dmat, sc-&gt;sc_rx_dmap[i]);</span>
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :                 m_freem(sc-&gt;sc_rx_buf[i]);</span>
+<span class="lineNum">     962 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rx_buf[i] = NULL;</span>
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     964 </span>            : 
+<span class="lineNum">     965 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; XNF_RX_DESC; i++) {</span>
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_rx_dmap[i] == NULL)</span>
+<span class="lineNum">     967 </span>            :                         continue;
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;sc_dmat, sc-&gt;sc_rx_dmap[i]);</span>
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_rx_dmap[i] = NULL;</span>
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     971 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_rx_rmap) {</span>
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_rx_rmap, 0, 0,</span>
+<span class="lineNum">     973 </span>            :                     BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">     974 </span><span class="lineNoCov">          0 :                 bus_dmamap_unload(sc-&gt;sc_dmat, sc-&gt;sc_rx_rmap);</span>
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;sc_dmat, sc-&gt;sc_rx_rmap);</span>
+<span class="lineNum">     976 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     977 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_rx_ring) {</span>
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 :                 bus_dmamem_unmap(sc-&gt;sc_dmat, (caddr_t)sc-&gt;sc_rx_ring,</span>
+<span class="lineNum">     979 </span>            :                     PAGE_SIZE);
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 :                 bus_dmamem_free(sc-&gt;sc_dmat, &amp;sc-&gt;sc_rx_seg, 1);</span>
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     982 </span><span class="lineNoCov">          0 :         sc-&gt;sc_rx_ring = NULL;</span>
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 :         sc-&gt;sc_rx_rmap = NULL;</span>
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 :         sc-&gt;sc_rx_cons = 0;</span>
+<span class="lineNum">     985 </span><span class="lineNoCov">          0 : }</span>
+<a name="986"><span class="lineNum">     986 </span>            : </a>
+<span class="lineNum">     987 </span>            : int
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 : xnf_tx_ring_create(struct xnf_softc *sc)</span>
+<span class="lineNum">     989 </span>            : {
+<span class="lineNum">     990 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     991 </span><span class="lineNoCov">          0 :         int i, flags, nsegs, rsegs;</span>
+<span class="lineNum">     992 </span>            :         bus_size_t segsz;
+<span class="lineNum">     993 </span>            : 
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_frags = sc-&gt;sc_caps &amp; XNF_CAP_SG ? XNF_TX_FRAG : 1;</span>
+<span class="lineNum">     995 </span>            : 
+<span class="lineNum">     996 </span>            :         /* Allocate a page of memory for the ring */
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :         if (bus_dmamem_alloc(sc-&gt;sc_dmat, PAGE_SIZE, PAGE_SIZE, 0,</span>
+<span class="lineNum">     998 </span>            :             &amp;sc-&gt;sc_tx_seg, 1, &amp;rsegs, BUS_DMA_ZERO | BUS_DMA_NOWAIT)) {
+<span class="lineNum">     999 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to allocate memory for the tx ring\n&quot;,</span>
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :                 return (-1);</span>
+<span class="lineNum">    1002 </span>            :         }
+<span class="lineNum">    1003 </span>            :         /* Map in the allocated memory into the ring structure */
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :         if (bus_dmamem_map(sc-&gt;sc_dmat, &amp;sc-&gt;sc_tx_seg, 1, PAGE_SIZE,</span>
+<span class="lineNum">    1005 </span>            :             (caddr_t *)&amp;sc-&gt;sc_tx_ring, BUS_DMA_NOWAIT)) {
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to map memory for the tx ring\n&quot;,</span>
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :                 goto errout;</span>
+<span class="lineNum">    1009 </span>            :         }
+<span class="lineNum">    1010 </span>            :         /* Create a map to load the ring memory into */
+<span class="lineNum">    1011 </span><span class="lineNoCov">          0 :         if (bus_dmamap_create(sc-&gt;sc_dmat, PAGE_SIZE, 1, PAGE_SIZE, 0,</span>
+<span class="lineNum">    1012 </span>            :             BUS_DMA_NOWAIT, &amp;sc-&gt;sc_tx_rmap)) {
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to create a memory map for the tx ring\n&quot;,</span>
+<span class="lineNum">    1014 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :                 goto errout;</span>
+<span class="lineNum">    1016 </span>            :         }
+<span class="lineNum">    1017 </span>            :         /* Load the ring into the ring map to extract the PA */
+<span class="lineNum">    1018 </span><span class="lineNoCov">          0 :         flags = (sc-&gt;sc_domid &lt;&lt; 16) | BUS_DMA_NOWAIT;</span>
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :         if (bus_dmamap_load(sc-&gt;sc_dmat, sc-&gt;sc_tx_rmap, sc-&gt;sc_tx_ring,</span>
+<span class="lineNum">    1020 </span>            :             PAGE_SIZE, NULL, flags)) {
+<span class="lineNum">    1021 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: failed to load the tx ring map\n&quot;,</span>
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :                     sc-&gt;sc_dev.dv_xname);</span>
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 :                 goto errout;</span>
+<span class="lineNum">    1024 </span>            :         }
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_ref = sc-&gt;sc_tx_rmap-&gt;dm_segs[0].ds_addr;</span>
+<span class="lineNum">    1026 </span>            : 
+<span class="lineNum">    1027 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_ring-&gt;txr_prod_event = sc-&gt;sc_tx_ring-&gt;txr_cons_event = 1;</span>
+<span class="lineNum">    1028 </span>            : 
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_caps &amp; XNF_CAP_SG) {</span>
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :                 nsegs = roundup(ifp-&gt;if_hardmtu, XNF_MCLEN) / XNF_MCLEN + 1;</span>
+<span class="lineNum">    1031 </span><span class="lineNoCov">          0 :                 segsz = nsegs * XNF_MCLEN;</span>
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1033 </span>            :                 nsegs = 1;
+<span class="lineNum">    1034 </span>            :                 segsz = XNF_MCLEN;
+<span class="lineNum">    1035 </span>            :         }
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; XNF_TX_DESC; i++) {</span>
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :                 if (bus_dmamap_create(sc-&gt;sc_dmat, segsz, nsegs, XNF_MCLEN,</span>
+<span class="lineNum">    1038 </span>            :                     PAGE_SIZE, BUS_DMA_NOWAIT, &amp;sc-&gt;sc_tx_buf[i].txb_dmap)) {
+<span class="lineNum">    1039 </span><span class="lineNoCov">          0 :                         printf(&quot;%s: failed to create a memory map for the&quot;</span>
+<span class="lineNum">    1040 </span><span class="lineNoCov">          0 :                             &quot; tx slot %d\n&quot;, sc-&gt;sc_dev.dv_xname, i);</span>
+<span class="lineNum">    1041 </span><span class="lineNoCov">          0 :                         goto errout;</span>
+<span class="lineNum">    1042 </span>            :                 }
+<span class="lineNum">    1043 </span>            :         }
+<span class="lineNum">    1044 </span>            : 
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_avail = XNF_TX_DESC;</span>
+<span class="lineNum">    1046 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_next = 0;</span>
+<span class="lineNum">    1047 </span>            : 
+<span class="lineNum">    1048 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1049 </span>            : 
+<span class="lineNum">    1050 </span>            :  errout:
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :         xnf_tx_ring_destroy(sc);</span>
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :         return (-1);</span>
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 : }</span>
+<a name="1054"><span class="lineNum">    1054 </span>            : </a>
+<span class="lineNum">    1055 </span>            : void
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 : xnf_tx_ring_drain(struct xnf_softc *sc)</span>
+<span class="lineNum">    1057 </span>            : {
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :         struct xnf_tx_ring *txr = sc-&gt;sc_tx_ring;</span>
+<span class="lineNum">    1059 </span>            : 
+<span class="lineNum">    1060 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tx_cons != txr-&gt;txr_cons)</span>
+<span class="lineNum">    1061 </span><span class="lineNoCov">          0 :                 xnf_txeof(sc);</span>
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 : }</span>
+<a name="1063"><span class="lineNum">    1063 </span>            : </a>
+<span class="lineNum">    1064 </span>            : void
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 : xnf_tx_ring_destroy(struct xnf_softc *sc)</span>
+<span class="lineNum">    1066 </span>            : {
+<span class="lineNum">    1067 </span>            :         int i;
+<span class="lineNum">    1068 </span>            : 
+<span class="lineNum">    1069 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; XNF_TX_DESC; i++) {</span>
+<span class="lineNum">    1070 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_tx_buf[i].txb_dmap == NULL)</span>
+<span class="lineNum">    1071 </span>            :                         continue;
+<span class="lineNum">    1072 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_tx_buf[i].txb_dmap, 0, 0,</span>
+<span class="lineNum">    1073 </span>            :                     BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :                 bus_dmamap_unload(sc-&gt;sc_dmat, sc-&gt;sc_tx_buf[i].txb_dmap);</span>
+<span class="lineNum">    1075 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;sc_dmat, sc-&gt;sc_tx_buf[i].txb_dmap);</span>
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_tx_buf[i].txb_dmap = NULL;</span>
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_tx_buf[i].txb_mbuf == NULL)</span>
+<span class="lineNum">    1078 </span>            :                         continue;
+<span class="lineNum">    1079 </span><span class="lineNoCov">          0 :                 m_free(sc-&gt;sc_tx_buf[i].txb_mbuf);</span>
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_tx_buf[i].txb_mbuf = NULL;</span>
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_tx_buf[i].txb_ndesc = 0;</span>
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1083 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tx_rmap) {</span>
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_dmat, sc-&gt;sc_tx_rmap, 0, 0,</span>
+<span class="lineNum">    1085 </span>            :                     BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 :                 bus_dmamap_unload(sc-&gt;sc_dmat, sc-&gt;sc_tx_rmap);</span>
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(sc-&gt;sc_dmat, sc-&gt;sc_tx_rmap);</span>
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1089 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tx_ring) {</span>
+<span class="lineNum">    1090 </span><span class="lineNoCov">          0 :                 bus_dmamem_unmap(sc-&gt;sc_dmat, (caddr_t)sc-&gt;sc_tx_ring,</span>
+<span class="lineNum">    1091 </span>            :                     PAGE_SIZE);
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :                 bus_dmamem_free(sc-&gt;sc_dmat, &amp;sc-&gt;sc_tx_seg, 1);</span>
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_ring = NULL;</span>
+<span class="lineNum">    1095 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_rmap = NULL;</span>
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_avail = XNF_TX_DESC;</span>
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 :         sc-&gt;sc_tx_next = 0;</span>
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 : }</span>
+<a name="1099"><span class="lineNum">    1099 </span>            : </a>
+<span class="lineNum">    1100 </span>            : int
+<span class="lineNum">    1101 </span><span class="lineNoCov">          0 : xnf_capabilities(struct xnf_softc *sc)</span>
+<span class="lineNum">    1102 </span>            : {
+<span class="lineNum">    1103 </span><span class="lineNoCov">          0 :         unsigned long long res;</span>
+<span class="lineNum">    1104 </span>            :         const char *prop;
+<span class="lineNum">    1105 </span>            :         int error;
+<span class="lineNum">    1106 </span>            : 
+<span class="lineNum">    1107 </span>            :         /* Query scatter-gather capability */
+<span class="lineNum">    1108 </span>            :         prop = &quot;feature-sg&quot;;
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 :         if ((error = xs_getnum(sc-&gt;sc_parent, sc-&gt;sc_backend, prop, &amp;res)) != 0</span>
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :             &amp;&amp; error != ENOENT)</span>
+<span class="lineNum">    1111 </span>            :                 goto errout;
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 :         if (error == 0 &amp;&amp; res == 1)</span>
+<span class="lineNum">    1113 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_caps |= XNF_CAP_SG;</span>
+<span class="lineNum">    1114 </span>            : 
+<span class="lineNum">    1115 </span>            : #if 0
+<span class="lineNum">    1116 </span>            :         /* Query IPv4 checksum offloading capability, enabled by default */
+<span class="lineNum">    1117 </span>            :         sc-&gt;sc_caps |= XNF_CAP_CSUM4;
+<span class="lineNum">    1118 </span>            :         prop = &quot;feature-no-csum-offload&quot;;
+<span class="lineNum">    1119 </span>            :         if ((error = xs_getnum(sc-&gt;sc_parent, sc-&gt;sc_backend, prop, &amp;res)) != 0
+<span class="lineNum">    1120 </span>            :             &amp;&amp; error != ENOENT)
+<span class="lineNum">    1121 </span>            :                 goto errout;
+<span class="lineNum">    1122 </span>            :         if (error == 0 &amp;&amp; res == 1)
+<span class="lineNum">    1123 </span>            :                 sc-&gt;sc_caps &amp;= ~XNF_CAP_CSUM4;
+<span class="lineNum">    1124 </span>            : 
+<span class="lineNum">    1125 </span>            :         /* Query IPv6 checksum offloading capability */
+<span class="lineNum">    1126 </span>            :         prop = &quot;feature-ipv6-csum-offload&quot;;
+<span class="lineNum">    1127 </span>            :         if ((error = xs_getnum(sc-&gt;sc_parent, sc-&gt;sc_backend, prop, &amp;res)) != 0
+<span class="lineNum">    1128 </span>            :             &amp;&amp; error != ENOENT)
+<span class="lineNum">    1129 </span>            :                 goto errout;
+<span class="lineNum">    1130 </span>            :         if (error == 0 &amp;&amp; res == 1)
+<span class="lineNum">    1131 </span>            :                 sc-&gt;sc_caps |= XNF_CAP_CSUM6;
+<span class="lineNum">    1132 </span>            : #endif
+<span class="lineNum">    1133 </span>            : 
+<span class="lineNum">    1134 </span>            :         /* Query multicast traffic contol capability */
+<span class="lineNum">    1135 </span>            :         prop = &quot;feature-multicast-control&quot;;
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         if ((error = xs_getnum(sc-&gt;sc_parent, sc-&gt;sc_backend, prop, &amp;res)) != 0</span>
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :             &amp;&amp; error != ENOENT)</span>
+<span class="lineNum">    1138 </span>            :                 goto errout;
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :         if (error == 0 &amp;&amp; res == 1)</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_caps |= XNF_CAP_MCAST;</span>
+<span class="lineNum">    1141 </span>            : 
+<span class="lineNum">    1142 </span>            :         /* Query split Rx/Tx event channel capability */
+<span class="lineNum">    1143 </span>            :         prop = &quot;feature-split-event-channels&quot;;
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 :         if ((error = xs_getnum(sc-&gt;sc_parent, sc-&gt;sc_backend, prop, &amp;res)) != 0</span>
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :             &amp;&amp; error != ENOENT)</span>
+<span class="lineNum">    1146 </span>            :                 goto errout;
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 :         if (error == 0 &amp;&amp; res == 1)</span>
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_caps |= XNF_CAP_SPLIT;</span>
+<span class="lineNum">    1149 </span>            : 
+<span class="lineNum">    1150 </span>            :         /* Query multiqueue capability */
+<span class="lineNum">    1151 </span>            :         prop = &quot;multi-queue-max-queues&quot;;
+<span class="lineNum">    1152 </span><span class="lineNoCov">          0 :         if ((error = xs_getnum(sc-&gt;sc_parent, sc-&gt;sc_backend, prop, &amp;res)) != 0</span>
+<span class="lineNum">    1153 </span><span class="lineNoCov">          0 :             &amp;&amp; error != ENOENT)</span>
+<span class="lineNum">    1154 </span>            :                 goto errout;
+<span class="lineNum">    1155 </span><span class="lineNoCov">          0 :         if (error == 0)</span>
+<span class="lineNum">    1156 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_caps |= XNF_CAP_MULTIQ;</span>
+<span class="lineNum">    1157 </span>            : 
+<span class="lineNum">    1158 </span>            :         DPRINTF(&quot;%s: capabilities %b\n&quot;, sc-&gt;sc_dev.dv_xname, sc-&gt;sc_caps,
+<span class="lineNum">    1159 </span>            :             &quot;\20\006MULTIQ\005SPLIT\004MCAST\003CSUM6\002CSUM4\001SG&quot;);
+<span class="lineNum">    1160 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1161 </span>            : 
+<span class="lineNum">    1162 </span>            :  errout:
+<span class="lineNum">    1163 </span><span class="lineNoCov">          0 :         printf(&quot;%s: failed to read \&quot;%s\&quot; property\n&quot;, sc-&gt;sc_dev.dv_xname,</span>
+<span class="lineNum">    1164 </span>            :             prop);
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 :         return (-1);</span>
+<span class="lineNum">    1166 </span><span class="lineNoCov">          0 : }</span>
+<a name="1167"><span class="lineNum">    1167 </span>            : </a>
+<span class="lineNum">    1168 </span>            : int
+<span class="lineNum">    1169 </span><span class="lineNoCov">          0 : xnf_init_backend(struct xnf_softc *sc)</span>
+<span class="lineNum">    1170 </span>            : {
+<span class="lineNum">    1171 </span>            :         const char *prop;
+<span class="lineNum">    1172 </span>            : 
+<span class="lineNum">    1173 </span>            :         /* Plumb the Rx ring */
+<span class="lineNum">    1174 </span>            :         prop = &quot;rx-ring-ref&quot;;
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :         if (xs_setnum(sc-&gt;sc_parent, sc-&gt;sc_node, prop, sc-&gt;sc_rx_ref))</span>
+<span class="lineNum">    1176 </span>            :                 goto errout;
+<span class="lineNum">    1177 </span>            :         /* Enable &quot;copy&quot; mode */
+<span class="lineNum">    1178 </span>            :         prop = &quot;request-rx-copy&quot;;
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 :         if (xs_setnum(sc-&gt;sc_parent, sc-&gt;sc_node, prop, 1))</span>
+<span class="lineNum">    1180 </span>            :                 goto errout;
+<span class="lineNum">    1181 </span>            :         /* Enable notify mode */
+<span class="lineNum">    1182 </span>            :         prop = &quot;feature-rx-notify&quot;;
+<span class="lineNum">    1183 </span><span class="lineNoCov">          0 :         if (xs_setnum(sc-&gt;sc_parent, sc-&gt;sc_node, prop, 1))</span>
+<span class="lineNum">    1184 </span>            :                 goto errout;
+<span class="lineNum">    1185 </span>            : 
+<span class="lineNum">    1186 </span>            :         /* Plumb the Tx ring */
+<span class="lineNum">    1187 </span>            :         prop = &quot;tx-ring-ref&quot;;
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :         if (xs_setnum(sc-&gt;sc_parent, sc-&gt;sc_node, prop, sc-&gt;sc_tx_ref))</span>
+<span class="lineNum">    1189 </span>            :                 goto errout;
+<span class="lineNum">    1190 </span>            :         /* Enable scatter-gather mode */
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_tx_frags &gt; 1) {</span>
+<span class="lineNum">    1192 </span>            :                 prop = &quot;feature-sg&quot;;
+<span class="lineNum">    1193 </span><span class="lineNoCov">          0 :                 if (xs_setnum(sc-&gt;sc_parent, sc-&gt;sc_node, prop, 1))</span>
+<span class="lineNum">    1194 </span>            :                         goto errout;
+<span class="lineNum">    1195 </span>            :         }
+<span class="lineNum">    1196 </span>            : 
+<span class="lineNum">    1197 </span>            :         /* Disable IPv4 checksum offloading */
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 :         if (!(sc-&gt;sc_caps &amp; XNF_CAP_CSUM4)) {</span>
+<span class="lineNum">    1199 </span>            :                 prop = &quot;feature-no-csum-offload&quot;;
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 :                 if (xs_setnum(sc-&gt;sc_parent, sc-&gt;sc_node, prop, 1))</span>
+<span class="lineNum">    1201 </span>            :                         goto errout;
+<span class="lineNum">    1202 </span>            :         }
+<span class="lineNum">    1203 </span>            : 
+<span class="lineNum">    1204 </span>            :         /* Enable IPv6 checksum offloading */
+<span class="lineNum">    1205 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_caps &amp; XNF_CAP_CSUM6) {</span>
+<span class="lineNum">    1206 </span>            :                 prop = &quot;feature-ipv6-csum-offload&quot;;
+<span class="lineNum">    1207 </span><span class="lineNoCov">          0 :                 if (xs_setnum(sc-&gt;sc_parent, sc-&gt;sc_node, prop, 1))</span>
+<span class="lineNum">    1208 </span>            :                         goto errout;
+<span class="lineNum">    1209 </span>            :         }
+<span class="lineNum">    1210 </span>            : 
+<span class="lineNum">    1211 </span>            :         /* Plumb the event channel port */
+<span class="lineNum">    1212 </span>            :         prop = &quot;event-channel&quot;;
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :         if (xs_setnum(sc-&gt;sc_parent, sc-&gt;sc_node, prop, sc-&gt;sc_xih))</span>
+<span class="lineNum">    1214 </span>            :                 goto errout;
+<span class="lineNum">    1215 </span>            : 
+<span class="lineNum">    1216 </span>            :         /* Connect the device */
+<span class="lineNum">    1217 </span>            :         prop = &quot;state&quot;;
+<span class="lineNum">    1218 </span><span class="lineNoCov">          0 :         if (xs_setprop(sc-&gt;sc_parent, sc-&gt;sc_node, prop, XEN_STATE_CONNECTED,</span>
+<span class="lineNum">    1219 </span><span class="lineNoCov">          0 :             strlen(XEN_STATE_CONNECTED)))</span>
+<span class="lineNum">    1220 </span>            :                 goto errout;
+<span class="lineNum">    1221 </span>            : 
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1223 </span>            : 
+<span class="lineNum">    1224 </span>            :  errout:
+<span class="lineNum">    1225 </span><span class="lineNoCov">          0 :         printf(&quot;%s: failed to set \&quot;%s\&quot; property\n&quot;, sc-&gt;sc_dev.dv_xname, prop);</span>
+<span class="lineNum">    1226 </span><span class="lineNoCov">          0 :         return (-1);</span>
+<span class="lineNum">    1227 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

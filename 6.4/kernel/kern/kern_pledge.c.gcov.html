@@ -1,0 +1,1646 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - kern/kern_pledge.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">kern</a> - kern_pledge.c<span style="font-size: 80%;"> (source / <a href="kern_pledge.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">625</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">21</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: kern_pledge.c,v 1.243 2018/09/13 07:49:33 mestre Exp $        */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2015 Nicholas Marriott &lt;nicm@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  * Copyright (c) 2015 Theo de Raadt &lt;deraadt@openbsd.org&gt;
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       8 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       9 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      12 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      13 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      14 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      15 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      16 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      17 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      18 </span>            :  */
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      21 </span>            : 
+<span class="lineNum">      22 </span>            : #include &lt;sys/mount.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/proc.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/fcntl.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/file.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/filedesc.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/namei.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/socketvar.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/vnode.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/mman.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;sys/sysctl.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;sys/syslog.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;sys/ktrace.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;sys/acct.h&gt;
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;sys/termios.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;sys/tty.h&gt;
+<span class="lineNum">      41 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      42 </span>            : #include &lt;sys/disklabel.h&gt;
+<span class="lineNum">      43 </span>            : #include &lt;sys/dkio.h&gt;
+<span class="lineNum">      44 </span>            : #include &lt;sys/mtio.h&gt;
+<span class="lineNum">      45 </span>            : #include &lt;sys/audioio.h&gt;
+<span class="lineNum">      46 </span>            : #include &lt;net/bpf.h&gt;
+<span class="lineNum">      47 </span>            : #include &lt;net/route.h&gt;
+<span class="lineNum">      48 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      49 </span>            : #include &lt;net/if_var.h&gt;
+<span class="lineNum">      50 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      51 </span>            : #include &lt;netinet6/in6_var.h&gt;
+<span class="lineNum">      52 </span>            : #include &lt;netinet6/nd6.h&gt;
+<span class="lineNum">      53 </span>            : #include &lt;netinet/tcp.h&gt;
+<span class="lineNum">      54 </span>            : #include &lt;net/pfvar.h&gt;
+<span class="lineNum">      55 </span>            : 
+<span class="lineNum">      56 </span>            : #include &lt;sys/conf.h&gt;
+<span class="lineNum">      57 </span>            : #include &lt;sys/specdev.h&gt;
+<span class="lineNum">      58 </span>            : #include &lt;sys/signal.h&gt;
+<span class="lineNum">      59 </span>            : #include &lt;sys/signalvar.h&gt;
+<span class="lineNum">      60 </span>            : #include &lt;sys/syscall.h&gt;
+<span class="lineNum">      61 </span>            : #include &lt;sys/syscallargs.h&gt;
+<span class="lineNum">      62 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      63 </span>            : 
+<span class="lineNum">      64 </span>            : #include &lt;dev/biovar.h&gt;
+<span class="lineNum">      65 </span>            : 
+<span class="lineNum">      66 </span>            : #define PLEDGENAMES
+<span class="lineNum">      67 </span>            : #include &lt;sys/pledge.h&gt;
+<span class="lineNum">      68 </span>            : 
+<span class="lineNum">      69 </span>            : #include &quot;audio.h&quot;
+<span class="lineNum">      70 </span>            : #include &quot;bpfilter.h&quot;
+<span class="lineNum">      71 </span>            : #include &quot;pf.h&quot;
+<span class="lineNum">      72 </span>            : #include &quot;pty.h&quot;
+<span class="lineNum">      73 </span>            : 
+<span class="lineNum">      74 </span>            : #if defined(__amd64__) || defined(__i386__)
+<span class="lineNum">      75 </span>            : #include &quot;vmm.h&quot;
+<span class="lineNum">      76 </span>            : #if NVMM &gt; 0
+<span class="lineNum">      77 </span>            : #include &lt;machine/conf.h&gt;
+<span class="lineNum">      78 </span>            : #endif
+<span class="lineNum">      79 </span>            : #endif
+<span class="lineNum">      80 </span>            : 
+<span class="lineNum">      81 </span>            : #if defined(__amd64__) || defined(__arm64__) || \
+<span class="lineNum">      82 </span>            :     defined(__i386__) || defined(__loongson__) || \
+<span class="lineNum">      83 </span>            :     defined(__macppc__) || defined(__sparc64__)
+<span class="lineNum">      84 </span>            : #include &quot;drm.h&quot;
+<span class="lineNum">      85 </span>            : #endif
+<span class="lineNum">      86 </span>            : 
+<span class="lineNum">      87 </span>            : uint64_t pledgereq_flags(const char *req);
+<span class="lineNum">      88 </span>            : int      parsepledges(struct proc *p, const char *kname,
+<span class="lineNum">      89 </span>            :             const char *promises, u_int64_t *fp);
+<span class="lineNum">      90 </span>            : int      canonpath(const char *input, char *buf, size_t bufsize);
+<span class="lineNum">      91 </span>            : void     unveil_destroy(struct process *ps);
+<span class="lineNum">      92 </span>            : 
+<span class="lineNum">      93 </span>            : /* #define DEBUG_PLEDGE */
+<span class="lineNum">      94 </span>            : #ifdef DEBUG_PLEDGE
+<span class="lineNum">      95 </span>            : int debug_pledge = 1;
+<span class="lineNum">      96 </span>            : #define DPRINTF(x...)    do { if (debug_pledge) printf(x); } while (0)
+<span class="lineNum">      97 </span>            : #define DNPRINTF(n,x...) do { if (debug_pledge &gt;= (n)) printf(x); } while (0)
+<span class="lineNum">      98 </span>            : #else
+<span class="lineNum">      99 </span>            : #define DPRINTF(x...)
+<span class="lineNum">     100 </span>            : #define DNPRINTF(n,x...)
+<span class="lineNum">     101 </span>            : #endif
+<span class="lineNum">     102 </span>            : 
+<span class="lineNum">     103 </span>            : /*
+<span class="lineNum">     104 </span>            :  * Ordered in blocks starting with least risky and most required.
+<span class="lineNum">     105 </span>            :  */
+<span class="lineNum">     106 </span>            : const uint64_t pledge_syscalls[SYS_MAXSYSCALL] = {
+<span class="lineNum">     107 </span>            :         /*
+<span class="lineNum">     108 </span>            :          * Minimum required
+<span class="lineNum">     109 </span>            :          */
+<span class="lineNum">     110 </span>            :         [SYS_exit] = PLEDGE_ALWAYS,
+<span class="lineNum">     111 </span>            :         [SYS_kbind] = PLEDGE_ALWAYS,
+<span class="lineNum">     112 </span>            :         [SYS___get_tcb] = PLEDGE_ALWAYS,
+<span class="lineNum">     113 </span>            :         [SYS___set_tcb] = PLEDGE_ALWAYS,
+<span class="lineNum">     114 </span>            :         [SYS_pledge] = PLEDGE_ALWAYS,
+<span class="lineNum">     115 </span>            :         [SYS_sendsyslog] = PLEDGE_ALWAYS,       /* stack protector reporting */
+<span class="lineNum">     116 </span>            :         [SYS_thrkill] = PLEDGE_ALWAYS,          /* raise, abort, stack pro */
+<span class="lineNum">     117 </span>            :         [SYS_utrace] = PLEDGE_ALWAYS,           /* ltrace(1) from ld.so */
+<span class="lineNum">     118 </span>            : 
+<span class="lineNum">     119 </span>            :         /* &quot;getting&quot; information about self is considered safe */
+<span class="lineNum">     120 </span>            :         [SYS_getuid] = PLEDGE_STDIO,
+<span class="lineNum">     121 </span>            :         [SYS_geteuid] = PLEDGE_STDIO,
+<span class="lineNum">     122 </span>            :         [SYS_getresuid] = PLEDGE_STDIO,
+<span class="lineNum">     123 </span>            :         [SYS_getgid] = PLEDGE_STDIO,
+<span class="lineNum">     124 </span>            :         [SYS_getegid] = PLEDGE_STDIO,
+<span class="lineNum">     125 </span>            :         [SYS_getresgid] = PLEDGE_STDIO,
+<span class="lineNum">     126 </span>            :         [SYS_getgroups] = PLEDGE_STDIO,
+<span class="lineNum">     127 </span>            :         [SYS_getlogin_r] = PLEDGE_STDIO,
+<span class="lineNum">     128 </span>            :         [SYS_getpgrp] = PLEDGE_STDIO,
+<span class="lineNum">     129 </span>            :         [SYS_getpgid] = PLEDGE_STDIO,
+<span class="lineNum">     130 </span>            :         [SYS_getppid] = PLEDGE_STDIO,
+<span class="lineNum">     131 </span>            :         [SYS_getsid] = PLEDGE_STDIO,
+<span class="lineNum">     132 </span>            :         [SYS_getthrid] = PLEDGE_STDIO,
+<span class="lineNum">     133 </span>            :         [SYS_getrlimit] = PLEDGE_STDIO,
+<span class="lineNum">     134 </span>            :         [SYS_getrtable] = PLEDGE_STDIO,
+<span class="lineNum">     135 </span>            :         [SYS_gettimeofday] = PLEDGE_STDIO,
+<span class="lineNum">     136 </span>            :         [SYS_getdtablecount] = PLEDGE_STDIO,
+<span class="lineNum">     137 </span>            :         [SYS_getrusage] = PLEDGE_STDIO,
+<span class="lineNum">     138 </span>            :         [SYS_issetugid] = PLEDGE_STDIO,
+<span class="lineNum">     139 </span>            :         [SYS_clock_getres] = PLEDGE_STDIO,
+<span class="lineNum">     140 </span>            :         [SYS_clock_gettime] = PLEDGE_STDIO,
+<span class="lineNum">     141 </span>            :         [SYS_getpid] = PLEDGE_STDIO,
+<span class="lineNum">     142 </span>            : 
+<span class="lineNum">     143 </span>            :         /*
+<span class="lineNum">     144 </span>            :          * Almost exclusively read-only, Very narrow subset.
+<span class="lineNum">     145 </span>            :          * Use of &quot;route&quot;, &quot;inet&quot;, &quot;dns&quot;, &quot;ps&quot;, or &quot;vminfo&quot;
+<span class="lineNum">     146 </span>            :          * expands access.
+<span class="lineNum">     147 </span>            :          */
+<span class="lineNum">     148 </span>            :         [SYS_sysctl] = PLEDGE_STDIO,
+<span class="lineNum">     149 </span>            : 
+<span class="lineNum">     150 </span>            :         /* Support for malloc(3) family of operations */
+<span class="lineNum">     151 </span>            :         [SYS_getentropy] = PLEDGE_STDIO,
+<span class="lineNum">     152 </span>            :         [SYS_madvise] = PLEDGE_STDIO,
+<span class="lineNum">     153 </span>            :         [SYS_minherit] = PLEDGE_STDIO,
+<span class="lineNum">     154 </span>            :         [SYS_mmap] = PLEDGE_STDIO,
+<span class="lineNum">     155 </span>            :         [SYS_mprotect] = PLEDGE_STDIO,
+<span class="lineNum">     156 </span>            :         [SYS_mquery] = PLEDGE_STDIO,
+<span class="lineNum">     157 </span>            :         [SYS_munmap] = PLEDGE_STDIO,
+<span class="lineNum">     158 </span>            :         [SYS_msync] = PLEDGE_STDIO,
+<span class="lineNum">     159 </span>            :         [SYS_break] = PLEDGE_STDIO,
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span>            :         [SYS_umask] = PLEDGE_STDIO,
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span>            :         /* read/write operations */
+<span class="lineNum">     164 </span>            :         [SYS_read] = PLEDGE_STDIO,
+<span class="lineNum">     165 </span>            :         [SYS_readv] = PLEDGE_STDIO,
+<span class="lineNum">     166 </span>            :         [SYS_pread] = PLEDGE_STDIO,
+<span class="lineNum">     167 </span>            :         [SYS_preadv] = PLEDGE_STDIO,
+<span class="lineNum">     168 </span>            :         [SYS_write] = PLEDGE_STDIO,
+<span class="lineNum">     169 </span>            :         [SYS_writev] = PLEDGE_STDIO,
+<span class="lineNum">     170 </span>            :         [SYS_pwrite] = PLEDGE_STDIO,
+<span class="lineNum">     171 </span>            :         [SYS_pwritev] = PLEDGE_STDIO,
+<span class="lineNum">     172 </span>            :         [SYS_recvmsg] = PLEDGE_STDIO,
+<span class="lineNum">     173 </span>            :         [SYS_recvfrom] = PLEDGE_STDIO | PLEDGE_YPACTIVE,
+<span class="lineNum">     174 </span>            :         [SYS_ftruncate] = PLEDGE_STDIO,
+<span class="lineNum">     175 </span>            :         [SYS_lseek] = PLEDGE_STDIO,
+<span class="lineNum">     176 </span>            :         [SYS_fpathconf] = PLEDGE_STDIO,
+<span class="lineNum">     177 </span>            : 
+<span class="lineNum">     178 </span>            :         /*
+<span class="lineNum">     179 </span>            :          * Address selection required a network pledge (&quot;inet&quot;,
+<span class="lineNum">     180 </span>            :          * &quot;unix&quot;, &quot;dns&quot;.
+<span class="lineNum">     181 </span>            :          */
+<span class="lineNum">     182 </span>            :         [SYS_sendto] = PLEDGE_STDIO | PLEDGE_YPACTIVE,
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span>            :         /*
+<span class="lineNum">     185 </span>            :          * Address specification required a network pledge (&quot;inet&quot;,
+<span class="lineNum">     186 </span>            :          * &quot;unix&quot;, &quot;dns&quot;.  SCM_RIGHTS requires &quot;sendfd&quot; or &quot;recvfd&quot;.
+<span class="lineNum">     187 </span>            :          */
+<span class="lineNum">     188 </span>            :         [SYS_sendmsg] = PLEDGE_STDIO,
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span>            :         /* Common signal operations */
+<span class="lineNum">     191 </span>            :         [SYS_nanosleep] = PLEDGE_STDIO,
+<span class="lineNum">     192 </span>            :         [SYS_sigaltstack] = PLEDGE_STDIO,
+<span class="lineNum">     193 </span>            :         [SYS_sigprocmask] = PLEDGE_STDIO,
+<span class="lineNum">     194 </span>            :         [SYS_sigsuspend] = PLEDGE_STDIO,
+<span class="lineNum">     195 </span>            :         [SYS_sigaction] = PLEDGE_STDIO,
+<span class="lineNum">     196 </span>            :         [SYS_sigreturn] = PLEDGE_STDIO,
+<span class="lineNum">     197 </span>            :         [SYS_sigpending] = PLEDGE_STDIO,
+<span class="lineNum">     198 </span>            :         [SYS_getitimer] = PLEDGE_STDIO,
+<span class="lineNum">     199 </span>            :         [SYS_setitimer] = PLEDGE_STDIO,
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span>            :         /*
+<span class="lineNum">     202 </span>            :          * To support event driven programming.
+<span class="lineNum">     203 </span>            :          */
+<span class="lineNum">     204 </span>            :         [SYS_poll] = PLEDGE_STDIO,
+<span class="lineNum">     205 </span>            :         [SYS_ppoll] = PLEDGE_STDIO,
+<span class="lineNum">     206 </span>            :         [SYS_kevent] = PLEDGE_STDIO,
+<span class="lineNum">     207 </span>            :         [SYS_kqueue] = PLEDGE_STDIO,
+<span class="lineNum">     208 </span>            :         [SYS_select] = PLEDGE_STDIO,
+<span class="lineNum">     209 </span>            :         [SYS_pselect] = PLEDGE_STDIO,
+<span class="lineNum">     210 </span>            : 
+<span class="lineNum">     211 </span>            :         [SYS_fstat] = PLEDGE_STDIO,
+<span class="lineNum">     212 </span>            :         [SYS_fsync] = PLEDGE_STDIO,
+<span class="lineNum">     213 </span>            : 
+<span class="lineNum">     214 </span>            :         [SYS_setsockopt] = PLEDGE_STDIO,        /* narrow whitelist */
+<span class="lineNum">     215 </span>            :         [SYS_getsockopt] = PLEDGE_STDIO,        /* narrow whitelist */
+<span class="lineNum">     216 </span>            : 
+<span class="lineNum">     217 </span>            :         /* F_SETOWN requires PLEDGE_PROC */
+<span class="lineNum">     218 </span>            :         [SYS_fcntl] = PLEDGE_STDIO,
+<span class="lineNum">     219 </span>            : 
+<span class="lineNum">     220 </span>            :         [SYS_close] = PLEDGE_STDIO,
+<span class="lineNum">     221 </span>            :         [SYS_dup] = PLEDGE_STDIO,
+<span class="lineNum">     222 </span>            :         [SYS_dup2] = PLEDGE_STDIO,
+<span class="lineNum">     223 </span>            :         [SYS_dup3] = PLEDGE_STDIO,
+<span class="lineNum">     224 </span>            :         [SYS_closefrom] = PLEDGE_STDIO,
+<span class="lineNum">     225 </span>            :         [SYS_shutdown] = PLEDGE_STDIO,
+<span class="lineNum">     226 </span>            :         [SYS_fchdir] = PLEDGE_STDIO,    /* XXX consider tightening */
+<span class="lineNum">     227 </span>            : 
+<span class="lineNum">     228 </span>            :         [SYS_pipe] = PLEDGE_STDIO,
+<span class="lineNum">     229 </span>            :         [SYS_pipe2] = PLEDGE_STDIO,
+<span class="lineNum">     230 </span>            :         [SYS_socketpair] = PLEDGE_STDIO,
+<span class="lineNum">     231 </span>            : 
+<span class="lineNum">     232 </span>            :         [SYS_wait4] = PLEDGE_STDIO,
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span>            :         /*
+<span class="lineNum">     235 </span>            :          * Can kill self with &quot;stdio&quot;.  Killing another pid
+<span class="lineNum">     236 </span>            :          * requires &quot;proc&quot;
+<span class="lineNum">     237 </span>            :          */
+<span class="lineNum">     238 </span>            :         [SYS_kill] = PLEDGE_STDIO,
+<span class="lineNum">     239 </span>            : 
+<span class="lineNum">     240 </span>            :         /*
+<span class="lineNum">     241 </span>            :          * FIONREAD/FIONBIO for &quot;stdio&quot;
+<span class="lineNum">     242 </span>            :          * Other ioctl are selectively allowed based upon other pledges.
+<span class="lineNum">     243 </span>            :          */
+<span class="lineNum">     244 </span>            :         [SYS_ioctl] = PLEDGE_STDIO,
+<span class="lineNum">     245 </span>            : 
+<span class="lineNum">     246 </span>            :         /*
+<span class="lineNum">     247 </span>            :          * Path access/creation calls encounter many extensive
+<span class="lineNum">     248 </span>            :          * checks done during pledge_namei()
+<span class="lineNum">     249 </span>            :          */
+<span class="lineNum">     250 </span>            :         [SYS_open] = PLEDGE_STDIO,
+<span class="lineNum">     251 </span>            :         [SYS_stat] = PLEDGE_STDIO,
+<span class="lineNum">     252 </span>            :         [SYS_access] = PLEDGE_STDIO,
+<span class="lineNum">     253 </span>            :         [SYS_readlink] = PLEDGE_STDIO,
+<span class="lineNum">     254 </span>            : 
+<span class="lineNum">     255 </span>            :         [SYS_adjtime] = PLEDGE_STDIO,   /* setting requires &quot;settime&quot; */
+<span class="lineNum">     256 </span>            :         [SYS_adjfreq] = PLEDGE_SETTIME,
+<span class="lineNum">     257 </span>            :         [SYS_settimeofday] = PLEDGE_SETTIME,
+<span class="lineNum">     258 </span>            : 
+<span class="lineNum">     259 </span>            :         /*
+<span class="lineNum">     260 </span>            :          * Needed by threaded programs
+<span class="lineNum">     261 </span>            :          * XXX should we have a new &quot;threads&quot;?
+<span class="lineNum">     262 </span>            :          */
+<span class="lineNum">     263 </span>            :         [SYS___tfork] = PLEDGE_STDIO,
+<span class="lineNum">     264 </span>            :         [SYS_sched_yield] = PLEDGE_STDIO,
+<span class="lineNum">     265 </span>            :         [SYS_futex] = PLEDGE_STDIO,
+<span class="lineNum">     266 </span>            :         [SYS___thrsleep] = PLEDGE_STDIO,
+<span class="lineNum">     267 </span>            :         [SYS___thrwakeup] = PLEDGE_STDIO,
+<span class="lineNum">     268 </span>            :         [SYS___threxit] = PLEDGE_STDIO,
+<span class="lineNum">     269 </span>            :         [SYS___thrsigdivert] = PLEDGE_STDIO,
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span>            :         [SYS_fork] = PLEDGE_PROC,
+<span class="lineNum">     272 </span>            :         [SYS_vfork] = PLEDGE_PROC,
+<span class="lineNum">     273 </span>            :         [SYS_setpgid] = PLEDGE_PROC,
+<span class="lineNum">     274 </span>            :         [SYS_setsid] = PLEDGE_PROC,
+<span class="lineNum">     275 </span>            : 
+<span class="lineNum">     276 </span>            :         [SYS_setrlimit] = PLEDGE_PROC | PLEDGE_ID,
+<span class="lineNum">     277 </span>            :         [SYS_getpriority] = PLEDGE_PROC | PLEDGE_ID,
+<span class="lineNum">     278 </span>            : 
+<span class="lineNum">     279 </span>            :         [SYS_setpriority] = PLEDGE_PROC | PLEDGE_ID,
+<span class="lineNum">     280 </span>            : 
+<span class="lineNum">     281 </span>            :         [SYS_setuid] = PLEDGE_ID,
+<span class="lineNum">     282 </span>            :         [SYS_seteuid] = PLEDGE_ID,
+<span class="lineNum">     283 </span>            :         [SYS_setreuid] = PLEDGE_ID,
+<span class="lineNum">     284 </span>            :         [SYS_setresuid] = PLEDGE_ID,
+<span class="lineNum">     285 </span>            :         [SYS_setgid] = PLEDGE_ID,
+<span class="lineNum">     286 </span>            :         [SYS_setegid] = PLEDGE_ID,
+<span class="lineNum">     287 </span>            :         [SYS_setregid] = PLEDGE_ID,
+<span class="lineNum">     288 </span>            :         [SYS_setresgid] = PLEDGE_ID,
+<span class="lineNum">     289 </span>            :         [SYS_setgroups] = PLEDGE_ID,
+<span class="lineNum">     290 </span>            :         [SYS_setlogin] = PLEDGE_ID,
+<span class="lineNum">     291 </span>            : 
+<span class="lineNum">     292 </span>            :         [SYS_unveil] = PLEDGE_UNVEIL,
+<span class="lineNum">     293 </span>            : 
+<span class="lineNum">     294 </span>            :         [SYS_execve] = PLEDGE_EXEC,
+<span class="lineNum">     295 </span>            : 
+<span class="lineNum">     296 </span>            :         [SYS_chdir] = PLEDGE_RPATH,
+<span class="lineNum">     297 </span>            :         [SYS_openat] = PLEDGE_RPATH | PLEDGE_WPATH,
+<span class="lineNum">     298 </span>            :         [SYS_fstatat] = PLEDGE_RPATH | PLEDGE_WPATH,
+<span class="lineNum">     299 </span>            :         [SYS_faccessat] = PLEDGE_RPATH | PLEDGE_WPATH,
+<span class="lineNum">     300 </span>            :         [SYS_readlinkat] = PLEDGE_RPATH | PLEDGE_WPATH,
+<span class="lineNum">     301 </span>            :         [SYS_lstat] = PLEDGE_RPATH | PLEDGE_WPATH | PLEDGE_TMPPATH,
+<span class="lineNum">     302 </span>            :         [SYS_truncate] = PLEDGE_WPATH,
+<span class="lineNum">     303 </span>            :         [SYS_rename] = PLEDGE_RPATH | PLEDGE_CPATH,
+<span class="lineNum">     304 </span>            :         [SYS_rmdir] = PLEDGE_CPATH,
+<span class="lineNum">     305 </span>            :         [SYS_renameat] = PLEDGE_CPATH,
+<span class="lineNum">     306 </span>            :         [SYS_link] = PLEDGE_CPATH,
+<span class="lineNum">     307 </span>            :         [SYS_linkat] = PLEDGE_CPATH,
+<span class="lineNum">     308 </span>            :         [SYS_symlink] = PLEDGE_CPATH,
+<span class="lineNum">     309 </span>            :         [SYS_symlinkat] = PLEDGE_CPATH,
+<span class="lineNum">     310 </span>            :         [SYS_unlink] = PLEDGE_CPATH | PLEDGE_TMPPATH,
+<span class="lineNum">     311 </span>            :         [SYS_unlinkat] = PLEDGE_CPATH,
+<span class="lineNum">     312 </span>            :         [SYS_mkdir] = PLEDGE_CPATH,
+<span class="lineNum">     313 </span>            :         [SYS_mkdirat] = PLEDGE_CPATH,
+<span class="lineNum">     314 </span>            : 
+<span class="lineNum">     315 </span>            :         [SYS_mkfifo] = PLEDGE_DPATH,
+<span class="lineNum">     316 </span>            :         [SYS_mknod] = PLEDGE_DPATH,
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span>            :         [SYS_revoke] = PLEDGE_TTY,      /* also requires PLEDGE_RPATH */
+<span class="lineNum">     319 </span>            : 
+<span class="lineNum">     320 </span>            :         /*
+<span class="lineNum">     321 </span>            :          * Classify as RPATH|WPATH, because of path information leakage.
+<span class="lineNum">     322 </span>            :          * WPATH due to unknown use of mk*temp(3) on non-/tmp paths..
+<span class="lineNum">     323 </span>            :          */
+<span class="lineNum">     324 </span>            :         [SYS___getcwd] = PLEDGE_RPATH | PLEDGE_WPATH,
+<span class="lineNum">     325 </span>            : 
+<span class="lineNum">     326 </span>            :         /* Classify as RPATH, because these leak path information */
+<span class="lineNum">     327 </span>            :         [SYS_getdents] = PLEDGE_RPATH,
+<span class="lineNum">     328 </span>            :         [SYS_getfsstat] = PLEDGE_RPATH,
+<span class="lineNum">     329 </span>            :         [SYS_statfs] = PLEDGE_RPATH,
+<span class="lineNum">     330 </span>            :         [SYS_fstatfs] = PLEDGE_RPATH,
+<span class="lineNum">     331 </span>            :         [SYS_pathconf] = PLEDGE_RPATH,
+<span class="lineNum">     332 </span>            : 
+<span class="lineNum">     333 </span>            :         [SYS_utimes] = PLEDGE_FATTR,
+<span class="lineNum">     334 </span>            :         [SYS_futimes] = PLEDGE_FATTR,
+<span class="lineNum">     335 </span>            :         [SYS_utimensat] = PLEDGE_FATTR,
+<span class="lineNum">     336 </span>            :         [SYS_futimens] = PLEDGE_FATTR,
+<span class="lineNum">     337 </span>            :         [SYS_chmod] = PLEDGE_FATTR,
+<span class="lineNum">     338 </span>            :         [SYS_fchmod] = PLEDGE_FATTR,
+<span class="lineNum">     339 </span>            :         [SYS_fchmodat] = PLEDGE_FATTR,
+<span class="lineNum">     340 </span>            :         [SYS_chflags] = PLEDGE_FATTR,
+<span class="lineNum">     341 </span>            :         [SYS_chflagsat] = PLEDGE_FATTR,
+<span class="lineNum">     342 </span>            :         [SYS_fchflags] = PLEDGE_FATTR,
+<span class="lineNum">     343 </span>            : 
+<span class="lineNum">     344 </span>            :         [SYS_chown] = PLEDGE_CHOWN,
+<span class="lineNum">     345 </span>            :         [SYS_fchownat] = PLEDGE_CHOWN,
+<span class="lineNum">     346 </span>            :         [SYS_lchown] = PLEDGE_CHOWN,
+<span class="lineNum">     347 </span>            :         [SYS_fchown] = PLEDGE_CHOWN,
+<span class="lineNum">     348 </span>            : 
+<span class="lineNum">     349 </span>            :         [SYS_socket] = PLEDGE_INET | PLEDGE_UNIX | PLEDGE_DNS | PLEDGE_YPACTIVE,
+<span class="lineNum">     350 </span>            :         [SYS_connect] = PLEDGE_INET | PLEDGE_UNIX | PLEDGE_DNS | PLEDGE_YPACTIVE,
+<span class="lineNum">     351 </span>            :         [SYS_bind] = PLEDGE_INET | PLEDGE_UNIX | PLEDGE_DNS | PLEDGE_YPACTIVE,
+<span class="lineNum">     352 </span>            :         [SYS_getsockname] = PLEDGE_INET | PLEDGE_UNIX | PLEDGE_DNS | PLEDGE_YPACTIVE,
+<span class="lineNum">     353 </span>            : 
+<span class="lineNum">     354 </span>            :         [SYS_listen] = PLEDGE_INET | PLEDGE_UNIX,
+<span class="lineNum">     355 </span>            :         [SYS_accept4] = PLEDGE_INET | PLEDGE_UNIX,
+<span class="lineNum">     356 </span>            :         [SYS_accept] = PLEDGE_INET | PLEDGE_UNIX,
+<span class="lineNum">     357 </span>            :         [SYS_getpeername] = PLEDGE_INET | PLEDGE_UNIX,
+<span class="lineNum">     358 </span>            : 
+<span class="lineNum">     359 </span>            :         [SYS_flock] = PLEDGE_FLOCK | PLEDGE_YPACTIVE,
+<span class="lineNum">     360 </span>            : 
+<span class="lineNum">     361 </span>            :         [SYS_swapctl] = PLEDGE_VMINFO,  /* XXX should limit to &quot;get&quot; operations */
+<span class="lineNum">     362 </span>            : };
+<span class="lineNum">     363 </span>            : 
+<span class="lineNum">     364 </span>            : static const struct {
+<span class="lineNum">     365 </span>            :         char *name;
+<span class="lineNum">     366 </span>            :         uint64_t flags;
+<span class="lineNum">     367 </span>            : } pledgereq[] = {
+<span class="lineNum">     368 </span>            :         { &quot;audio&quot;,            PLEDGE_AUDIO },
+<span class="lineNum">     369 </span>            :         { &quot;bpf&quot;,              PLEDGE_BPF },
+<span class="lineNum">     370 </span>            :         { &quot;chown&quot;,            PLEDGE_CHOWN | PLEDGE_CHOWNUID },
+<span class="lineNum">     371 </span>            :         { &quot;cpath&quot;,            PLEDGE_CPATH },
+<span class="lineNum">     372 </span>            :         { &quot;disklabel&quot;,                PLEDGE_DISKLABEL },
+<span class="lineNum">     373 </span>            :         { &quot;dns&quot;,              PLEDGE_DNS },
+<span class="lineNum">     374 </span>            :         { &quot;dpath&quot;,            PLEDGE_DPATH },
+<span class="lineNum">     375 </span>            :         { &quot;drm&quot;,              PLEDGE_DRM },
+<span class="lineNum">     376 </span>            :         { &quot;error&quot;,            PLEDGE_ERROR },
+<span class="lineNum">     377 </span>            :         { &quot;exec&quot;,             PLEDGE_EXEC },
+<span class="lineNum">     378 </span>            :         { &quot;fattr&quot;,            PLEDGE_FATTR | PLEDGE_CHOWN },
+<span class="lineNum">     379 </span>            :         { &quot;flock&quot;,            PLEDGE_FLOCK },
+<span class="lineNum">     380 </span>            :         { &quot;getpw&quot;,            PLEDGE_GETPW },
+<span class="lineNum">     381 </span>            :         { &quot;id&quot;,                       PLEDGE_ID },
+<span class="lineNum">     382 </span>            :         { &quot;inet&quot;,             PLEDGE_INET },
+<span class="lineNum">     383 </span>            :         { &quot;mcast&quot;,            PLEDGE_MCAST },
+<span class="lineNum">     384 </span>            :         { &quot;pf&quot;,                       PLEDGE_PF },
+<span class="lineNum">     385 </span>            :         { &quot;proc&quot;,             PLEDGE_PROC },
+<span class="lineNum">     386 </span>            :         { &quot;prot_exec&quot;,                PLEDGE_PROTEXEC },
+<span class="lineNum">     387 </span>            :         { &quot;ps&quot;,                       PLEDGE_PS },
+<span class="lineNum">     388 </span>            :         { &quot;recvfd&quot;,           PLEDGE_RECVFD },
+<span class="lineNum">     389 </span>            :         { &quot;route&quot;,            PLEDGE_ROUTE },
+<span class="lineNum">     390 </span>            :         { &quot;rpath&quot;,            PLEDGE_RPATH },
+<span class="lineNum">     391 </span>            :         { &quot;sendfd&quot;,           PLEDGE_SENDFD },
+<span class="lineNum">     392 </span>            :         { &quot;settime&quot;,          PLEDGE_SETTIME },
+<span class="lineNum">     393 </span>            :         { &quot;stdio&quot;,            PLEDGE_STDIO },
+<span class="lineNum">     394 </span>            :         { &quot;tape&quot;,             PLEDGE_TAPE },
+<span class="lineNum">     395 </span>            :         { &quot;tmppath&quot;,          PLEDGE_TMPPATH },
+<span class="lineNum">     396 </span>            :         { &quot;tty&quot;,              PLEDGE_TTY },
+<span class="lineNum">     397 </span>            :         { &quot;unix&quot;,             PLEDGE_UNIX },
+<span class="lineNum">     398 </span>            :         { &quot;unveil&quot;,           PLEDGE_UNVEIL },
+<span class="lineNum">     399 </span>            :         { &quot;vminfo&quot;,           PLEDGE_VMINFO },
+<span class="lineNum">     400 </span>            :         { &quot;vmm&quot;,              PLEDGE_VMM },
+<span class="lineNum">     401 </span>            :         { &quot;wpath&quot;,            PLEDGE_WPATH },
+<span class="lineNum">     402 </span>            :         { &quot;wroute&quot;,           PLEDGE_WROUTE },
+<span class="lineNum">     403 </span>            : };
+<a name="404"><span class="lineNum">     404 </span>            : </a>
+<span class="lineNum">     405 </span>            : int
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 : parsepledges(struct proc *p, const char *kname, const char *promises, u_int64_t *fp)</span>
+<span class="lineNum">     407 </span>            : {
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :         size_t rbuflen;</span>
+<span class="lineNum">     409 </span>            :         char *rbuf, *rp, *pn;
+<span class="lineNum">     410 </span>            :         u_int64_t flags = 0, f;
+<span class="lineNum">     411 </span>            :         int error;
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         rbuf = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         error = copyinstr(promises, rbuf, MAXPATHLEN,</span>
+<span class="lineNum">     415 </span>            :             &amp;rbuflen);
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 free(rbuf, M_TEMP, MAXPATHLEN);</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">     419 </span>            :         }
+<span class="lineNum">     420 </span>            : #ifdef KTRACE
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         if (KTRPOINT(p, KTR_STRUCT))</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :                 ktrstruct(p, kname, rbuf, rbuflen-1);</span>
+<span class="lineNum">     423 </span>            : #endif
+<span class="lineNum">     424 </span>            : 
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         for (rp = rbuf; rp &amp;&amp; *rp; rp = pn) {</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :                 pn = strchr(rp, ' ');   /* find terminator */</span>
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :                 if (pn) {</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                         while (*pn == ' ')</span>
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :                                 *pn++ = '\0';</span>
+<span class="lineNum">     430 </span>            :                 }
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :                 if ((f = pledgereq_flags(rp)) == 0) {</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                         free(rbuf, M_TEMP, MAXPATHLEN);</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :                         return (EINVAL);</span>
+<span class="lineNum">     434 </span>            :                 }
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :                 flags |= f;</span>
+<span class="lineNum">     436 </span>            :         }
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         free(rbuf, M_TEMP, MAXPATHLEN);</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :         *fp = flags;</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 : }</span>
+<a name="441"><span class="lineNum">     441 </span>            : </a>
+<span class="lineNum">     442 </span>            : int
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 : sys_pledge(struct proc *p, void *v, register_t *retval)</span>
+<span class="lineNum">     444 </span>            : {
+<span class="lineNum">     445 </span>            :         struct sys_pledge_args /* {
+<span class="lineNum">     446 </span>            :                 syscallarg(const char *)promises;
+<span class="lineNum">     447 </span>            :                 syscallarg(const char *)execpromises;
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :         } */    *uap = v;</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 :         struct process *pr = p-&gt;p_p;</span>
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :         uint64_t promises, execpromises;</span>
+<span class="lineNum">     451 </span>            :         int error;
+<span class="lineNum">     452 </span>            : 
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :         if (SCARG(uap, promises)) {</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :                 error = parsepledges(p, &quot;pledgereq&quot;,</span>
+<span class="lineNum">     455 </span>            :                     SCARG(uap, promises), &amp;promises);
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :                 if (error)</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     458 </span>            : 
+<span class="lineNum">     459 </span>            :                 /* In &quot;error&quot; mode, ignore promise increase requests,
+<span class="lineNum">     460 </span>            :                  * but accept promise decrease requests */
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                 if (ISSET(pr-&gt;ps_flags, PS_PLEDGE) &amp;&amp;</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                     (pr-&gt;ps_pledge &amp; PLEDGE_ERROR))</span>
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                         promises &amp;= (pr-&gt;ps_pledge &amp; PLEDGE_USERSET);</span>
+<span class="lineNum">     464 </span>            : 
+<span class="lineNum">     465 </span>            :                 /* Only permit reductions */
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                 if (ISSET(pr-&gt;ps_flags, PS_PLEDGE) &amp;&amp;</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :                     (((promises | pr-&gt;ps_pledge) != pr-&gt;ps_pledge)))</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :                         return (EPERM);</span>
+<span class="lineNum">     469 </span>            :         }
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :         if (SCARG(uap, execpromises)) {</span>
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                 error = parsepledges(p, &quot;pledgeexecreq&quot;,</span>
+<span class="lineNum">     472 </span>            :                     SCARG(uap, execpromises), &amp;execpromises);
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :                 if (error)</span>
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     475 </span>            : 
+<span class="lineNum">     476 </span>            :                 /* Only permit reductions */
+<span class="lineNum">     477 </span><span class="lineNoCov">          0 :                 if (ISSET(pr-&gt;ps_flags, PS_EXECPLEDGE) &amp;&amp;</span>
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :                     (((execpromises | pr-&gt;ps_execpledge) != pr-&gt;ps_execpledge)))</span>
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :                         return (EPERM);</span>
+<span class="lineNum">     480 </span>            :         }
+<span class="lineNum">     481 </span>            : 
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :         if (SCARG(uap, promises)) {</span>
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :                 pr-&gt;ps_pledge = promises;</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :                 pr-&gt;ps_flags |= PS_PLEDGE;</span>
+<span class="lineNum">     485 </span>            :                 /*
+<span class="lineNum">     486 </span>            :                  * Kill off unveil and drop unveil vnode refs if we no
+<span class="lineNum">     487 </span>            :                  * longer are holding any path-accessing pledge
+<span class="lineNum">     488 </span>            :                  */
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                 if ((pr-&gt;ps_pledge &amp; (PLEDGE_RPATH | PLEDGE_WPATH |</span>
+<span class="lineNum">     490 </span>            :                     PLEDGE_CPATH | PLEDGE_DPATH | PLEDGE_TMPPATH | PLEDGE_EXEC |
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :                     PLEDGE_UNIX | PLEDGE_UNVEIL)) == 0)</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :                         unveil_destroy(pr);</span>
+<span class="lineNum">     493 </span>            :         }
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :         if (SCARG(uap, execpromises)) {</span>
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :                 pr-&gt;ps_execpledge = execpromises;</span>
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                 pr-&gt;ps_flags |= PS_EXECPLEDGE;</span>
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 : }</span>
+<a name="500"><span class="lineNum">     500 </span>            : </a>
+<span class="lineNum">     501 </span>            : int
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 : pledge_syscall(struct proc *p, int code, uint64_t *tval)</span>
+<span class="lineNum">     503 </span>            : {
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :         p-&gt;p_pledge_syscall = code;</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         *tval = 0;</span>
+<span class="lineNum">     506 </span>            : 
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :         if (code &lt; 0 || code &gt; SYS_MAXSYSCALL - 1)</span>
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :                 return (EINVAL);</span>
+<span class="lineNum">     509 </span>            : 
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :         if (pledge_syscalls[code] == PLEDGE_ALWAYS)</span>
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     512 </span>            : 
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :         if (p-&gt;p_p-&gt;ps_pledge &amp; pledge_syscalls[code])</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     515 </span>            : 
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :         *tval = pledge_syscalls[code];</span>
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :         return (EPERM);</span>
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 : }</span>
+<a name="519"><span class="lineNum">     519 </span>            : </a>
+<span class="lineNum">     520 </span>            : int
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 : pledge_fail(struct proc *p, int error, uint64_t code)</span>
+<span class="lineNum">     522 </span>            : {
+<span class="lineNum">     523 </span>            :         char *codes = &quot;&quot;;
+<span class="lineNum">     524 </span>            :         int i;
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :         struct sigaction sa;</span>
+<span class="lineNum">     526 </span>            : 
+<span class="lineNum">     527 </span>            :         /* Print first matching pledge */
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :         for (i = 0; code &amp;&amp; pledgenames[i].bits != 0; i++)</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                 if (pledgenames[i].bits &amp; code) {</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :                         codes = pledgenames[i].name;</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     532 </span>            :                 }
+<span class="lineNum">     533 </span>            : #ifdef KTRACE
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :         if (KTRPOINT(p, KTR_PLEDGE))</span>
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                 ktrpledge(p, error, code, p-&gt;p_pledge_syscall);</span>
+<span class="lineNum">     536 </span>            : #endif
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :         if (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_ERROR)</span>
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :                 return (ENOSYS);</span>
+<span class="lineNum">     539 </span>            : 
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :         KERNEL_LOCK();</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :         log(LOG_ERR, &quot;%s[%d]: pledge \&quot;%s\&quot;, syscall %d\n&quot;,</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :             p-&gt;p_p-&gt;ps_comm, p-&gt;p_p-&gt;ps_pid, codes, p-&gt;p_pledge_syscall);</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :         p-&gt;p_p-&gt;ps_acflag |= APLEDGE;</span>
+<span class="lineNum">     544 </span>            : 
+<span class="lineNum">     545 </span>            :         /* Send uncatchable SIGABRT for coredump */
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :         memset(&amp;sa, 0, sizeof sa);</span>
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 :         sa.sa_handler = SIG_DFL;</span>
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         setsigvec(p, SIGABRT, &amp;sa);</span>
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :         atomic_clearbits_int(&amp;p-&gt;p_sigmask, sigmask(SIGABRT));</span>
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :         psignal(p, SIGABRT);</span>
+<span class="lineNum">     551 </span>            : 
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :         p-&gt;p_p-&gt;ps_pledge = 0;            /* Disable all PLEDGE_ flags */</span>
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 :         KERNEL_UNLOCK();</span>
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     556 </span>            : 
+<span class="lineNum">     557 </span>            : /*
+<span class="lineNum">     558 </span>            :  * Need to make it more obvious that one cannot get through here
+<span class="lineNum">     559 </span>            :  * without the right flags set
+<a name="560"><span class="lineNum">     560 </span>            :  */</a>
+<span class="lineNum">     561 </span>            : int
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 : pledge_namei(struct proc *p, struct nameidata *ni, char *origpath)</span>
+<span class="lineNum">     563 </span>            : {
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :         char path[PATH_MAX];</span>
+<span class="lineNum">     565 </span>            :         int error;
+<span class="lineNum">     566 </span>            : 
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0 ||</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :             (p-&gt;p_p-&gt;ps_flags &amp; PS_COREDUMP))</span>
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     570 </span>            : 
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_pledge == 0)</span>
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :                 panic(&quot;pledge_namei: ni_pledge&quot;);</span>
+<span class="lineNum">     573 </span>            : 
+<span class="lineNum">     574 </span>            :         /*
+<span class="lineNum">     575 </span>            :          * We set the BYPASSUNVEIL flag to skip unveil checks
+<span class="lineNum">     576 </span>            :          * as necessary
+<span class="lineNum">     577 </span>            :          */
+<span class="lineNum">     578 </span>            : 
+<span class="lineNum">     579 </span>            :         /* Doing a permitted execve() */
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         if ((ni-&gt;ni_pledge &amp; PLEDGE_EXEC) &amp;&amp;</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :             (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_EXEC))</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     583 </span>            : 
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :         error = canonpath(origpath, path, sizeof(path));</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">     587 </span>            : 
+<span class="lineNum">     588 </span>            :         /* Detect what looks like a mkstemp(3) family operation */
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_TMPPATH) &amp;&amp;</span>
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :             (p-&gt;p_pledge_syscall == SYS_open) &amp;&amp;</span>
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :             (ni-&gt;ni_pledge &amp; PLEDGE_CPATH) &amp;&amp;</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :             strncmp(path, &quot;/tmp/&quot;, sizeof(&quot;/tmp/&quot;) - 1) == 0) {</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     595 </span>            :         }
+<span class="lineNum">     596 </span>            : 
+<span class="lineNum">     597 </span>            :         /* Allow unlinking of a mkstemp(3) file...
+<span class="lineNum">     598 </span>            :          * Good opportunity for strict checks here.
+<span class="lineNum">     599 </span>            :          */
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_TMPPATH) &amp;&amp;</span>
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :             (p-&gt;p_pledge_syscall == SYS_unlink) &amp;&amp;</span>
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :             strncmp(path, &quot;/tmp/&quot;, sizeof(&quot;/tmp/&quot;) - 1) == 0) {</span>
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     605 </span>            :         }
+<span class="lineNum">     606 </span>            : 
+<span class="lineNum">     607 </span>            :         /* Whitelisted paths */
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :         switch (p-&gt;p_pledge_syscall) {</span>
+<span class="lineNum">     609 </span>            :         case SYS_access:
+<span class="lineNum">     610 </span>            :                 /* tzset() needs this. */
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :                 if (ni-&gt;ni_pledge == PLEDGE_RPATH &amp;&amp;</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                     strcmp(path, &quot;/etc/localtime&quot;) == 0) {</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     615 </span>            :                 }
+<span class="lineNum">     616 </span>            : 
+<span class="lineNum">     617 </span>            :                 /* when avoiding YP mode, getpw* functions touch this */
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                 if (ni-&gt;ni_pledge == PLEDGE_RPATH &amp;&amp;</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :                     strcmp(path, &quot;/var/run/ypbind.lock&quot;) == 0) {</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :                         if (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_GETPW) {</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :                                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">     623 </span>            :                         } else
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :                                 return (pledge_fail(p, error, PLEDGE_GETPW));</span>
+<span class="lineNum">     625 </span>            :                 }
+<span class="lineNum">     626 </span>            :                 break;
+<span class="lineNum">     627 </span>            :         case SYS_open:
+<span class="lineNum">     628 </span>            :                 /* daemon(3) or other such functions */
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                 if ((ni-&gt;ni_pledge &amp; ~(PLEDGE_RPATH | PLEDGE_WPATH)) == 0 &amp;&amp;</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :                     strcmp(path, &quot;/dev/null&quot;) == 0) {</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     633 </span>            :                 }
+<span class="lineNum">     634 </span>            : 
+<span class="lineNum">     635 </span>            :                 /* readpassphrase(3), getpass(3) */
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :                 if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_TTY) &amp;&amp;</span>
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :                     (ni-&gt;ni_pledge &amp; ~(PLEDGE_RPATH | PLEDGE_WPATH)) == 0 &amp;&amp;</span>
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :                     strcmp(path, &quot;/dev/tty&quot;) == 0) {</span>
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     641 </span>            :                 }
+<span class="lineNum">     642 </span>            : 
+<span class="lineNum">     643 </span>            :                 /* getpw* and friends need a few files */
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :                 if ((ni-&gt;ni_pledge == PLEDGE_RPATH) &amp;&amp;</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :                     (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_GETPW)) {</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :                         if (strcmp(path, &quot;/etc/spwd.db&quot;) == 0)</span>
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :                                 return (EPERM); /* don't call pledge_fail */</span>
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :                         if (strcmp(path, &quot;/etc/pwd.db&quot;) == 0) {</span>
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :                                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">     651 </span>            :                         }
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :                         if (strcmp(path, &quot;/etc/group&quot;) == 0) {</span>
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :                                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">     655 </span>            :                         }
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :                         if (strcmp(path, &quot;/etc/netid&quot;) == 0) {</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">     659 </span>            :                         }
+<span class="lineNum">     660 </span>            :                 }
+<span class="lineNum">     661 </span>            : 
+<span class="lineNum">     662 </span>            :                 /* DNS needs /etc/{resolv.conf,hosts,services}. */
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                 if ((ni-&gt;ni_pledge == PLEDGE_RPATH) &amp;&amp;</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                     (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_DNS)) {</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :                         if (strcmp(path, &quot;/etc/resolv.conf&quot;) == 0) {</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :                                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">     668 </span>            :                         }
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :                         if (strcmp(path, &quot;/etc/hosts&quot;) == 0) {</span>
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :                                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">     672 </span>            :                         }
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :                         if (strcmp(path, &quot;/etc/services&quot;) == 0) {</span>
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :                                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">     676 </span>            :                         }
+<span class="lineNum">     677 </span>            :                 }
+<span class="lineNum">     678 </span>            : 
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :                 if ((ni-&gt;ni_pledge == PLEDGE_RPATH) &amp;&amp;</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :                     (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_GETPW)) {</span>
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :                         if (strcmp(path, &quot;/var/run/ypbind.lock&quot;) == 0) {</span>
+<span class="lineNum">     682 </span>            :                                 /*
+<span class="lineNum">     683 </span>            :                                  * XXX
+<span class="lineNum">     684 </span>            :                                  * The current hack for YP support in &quot;getpw&quot;
+<span class="lineNum">     685 </span>            :                                  * is to enable some &quot;inet&quot; features until
+<span class="lineNum">     686 </span>            :                                  * next pledge call.  This is not considered
+<span class="lineNum">     687 </span>            :                                  * worse than pre-pledge, but is a work in
+<span class="lineNum">     688 </span>            :                                  * progress, needing a clever design.
+<span class="lineNum">     689 </span>            :                                  */
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :                                 p-&gt;p_p-&gt;ps_pledge |= PLEDGE_YPACTIVE;</span>
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :                                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">     693 </span>            :                         }
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :                         if (strncmp(path, &quot;/var/yp/binding/&quot;,</span>
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :                             sizeof(&quot;/var/yp/binding/&quot;) - 1) == 0) {</span>
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :                                 ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">     698 </span>            :                         }
+<span class="lineNum">     699 </span>            :                 }
+<span class="lineNum">     700 </span>            : 
+<span class="lineNum">     701 </span>            :                 /* tzset() needs these. */
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :                 if ((ni-&gt;ni_pledge == PLEDGE_RPATH) &amp;&amp;</span>
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :                     strncmp(path, &quot;/usr/share/zoneinfo/&quot;,</span>
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :                     sizeof(&quot;/usr/share/zoneinfo/&quot;) - 1) == 0)  {</span>
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     707 </span>            :                 }
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :                 if ((ni-&gt;ni_pledge == PLEDGE_RPATH) &amp;&amp;</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :                     strcmp(path, &quot;/etc/localtime&quot;) == 0) {</span>
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     712 </span>            :                 }
+<span class="lineNum">     713 </span>            : 
+<span class="lineNum">     714 </span>            :                 break;
+<span class="lineNum">     715 </span>            :         case SYS_readlink:
+<span class="lineNum">     716 </span>            :                 /* Allow /etc/malloc.conf for malloc(3). */
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :                 if ((ni-&gt;ni_pledge == PLEDGE_RPATH) &amp;&amp;</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :                     strcmp(path, &quot;/etc/malloc.conf&quot;) == 0) {</span>
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     721 </span>            :                 }
+<span class="lineNum">     722 </span>            :                 break;
+<span class="lineNum">     723 </span>            :         case SYS_stat:
+<span class="lineNum">     724 </span>            :                 /* DNS needs /etc/resolv.conf. */
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :                 if ((ni-&gt;ni_pledge == PLEDGE_RPATH) &amp;&amp;</span>
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 :                     (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_DNS) &amp;&amp;</span>
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :                     strcmp(path, &quot;/etc/resolv.conf&quot;) == 0) {</span>
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :                         ni-&gt;ni_cnd.cn_flags |= BYPASSUNVEIL;</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     730 </span>            :                 }
+<span class="lineNum">     731 </span>            :                 break;
+<span class="lineNum">     732 </span>            :         }
+<span class="lineNum">     733 </span>            : 
+<span class="lineNum">     734 </span>            :         /*
+<span class="lineNum">     735 </span>            :          * Ensure each flag of ni_pledge has counterpart allowing it in
+<span class="lineNum">     736 </span>            :          * ps_pledge.
+<span class="lineNum">     737 </span>            :          */
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :         if (ni-&gt;ni_pledge &amp; ~p-&gt;p_p-&gt;ps_pledge)</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :                 return (pledge_fail(p, EPERM, (ni-&gt;ni_pledge &amp; ~p-&gt;p_p-&gt;ps_pledge)));</span>
+<span class="lineNum">     740 </span>            : 
+<span class="lineNum">     741 </span>            :         /* continue, and check unveil if present */
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     744 </span>            : 
+<span class="lineNum">     745 </span>            : /*
+<span class="lineNum">     746 </span>            :  * Only allow reception of safe file descriptors.
+<a name="747"><span class="lineNum">     747 </span>            :  */</a>
+<span class="lineNum">     748 </span>            : int
+<span class="lineNum">     749 </span><span class="lineNoCov">          0 : pledge_recvfd(struct proc *p, struct file *fp)</span>
+<span class="lineNum">     750 </span>            : {
+<span class="lineNum">     751 </span>            :         struct vnode *vp;
+<span class="lineNum">     752 </span>            : 
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_RECVFD) == 0)</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EPERM, PLEDGE_RECVFD);</span>
+<span class="lineNum">     757 </span>            : 
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :         switch (fp-&gt;f_type) {</span>
+<span class="lineNum">     759 </span>            :         case DTYPE_SOCKET:
+<span class="lineNum">     760 </span>            :         case DTYPE_PIPE:
+<span class="lineNum">     761 </span>            :         case DTYPE_DMABUF:
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     763 </span>            :         case DTYPE_VNODE:
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :                 vp = fp-&gt;f_data;</span>
+<span class="lineNum">     765 </span>            : 
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :                 if (vp-&gt;v_type != VDIR)</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     768 </span>            :         }
+<span class="lineNum">     769 </span><span class="lineNoCov">          0 :         return pledge_fail(p, EINVAL, PLEDGE_RECVFD);</span>
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     771 </span>            : 
+<span class="lineNum">     772 </span>            : /*
+<span class="lineNum">     773 </span>            :  * Only allow sending of safe file descriptors.
+<a name="774"><span class="lineNum">     774 </span>            :  */</a>
+<span class="lineNum">     775 </span>            : int
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 : pledge_sendfd(struct proc *p, struct file *fp)</span>
+<span class="lineNum">     777 </span>            : {
+<span class="lineNum">     778 </span>            :         struct vnode *vp;
+<span class="lineNum">     779 </span>            : 
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_SENDFD) == 0)</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EPERM, PLEDGE_SENDFD);</span>
+<span class="lineNum">     784 </span>            : 
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         switch (fp-&gt;f_type) {</span>
+<span class="lineNum">     786 </span>            :         case DTYPE_SOCKET:
+<span class="lineNum">     787 </span>            :         case DTYPE_PIPE:
+<span class="lineNum">     788 </span>            :         case DTYPE_DMABUF:
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     790 </span>            :         case DTYPE_VNODE:
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :                 vp = fp-&gt;f_data;</span>
+<span class="lineNum">     792 </span>            : 
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :                 if (vp-&gt;v_type != VDIR)</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     795 </span>            :                 break;
+<span class="lineNum">     796 </span>            :         }
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :         return pledge_fail(p, EINVAL, PLEDGE_SENDFD);</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 : }</span>
+<a name="799"><span class="lineNum">     799 </span>            : </a>
+<span class="lineNum">     800 </span>            : int
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 : pledge_sysctl(struct proc *p, int miblen, int *mib, void *new)</span>
+<span class="lineNum">     802 </span>            : {
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :         char    buf[80];</span>
+<span class="lineNum">     804 </span>            :         int     i;
+<span class="lineNum">     805 </span>            : 
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     808 </span>            : 
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 :         if (new)</span>
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EFAULT, 0);</span>
+<span class="lineNum">     811 </span>            : 
+<span class="lineNum">     812 </span>            :         /* routing table observation */
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_ROUTE)) {</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :                 if ((miblen == 6 || miblen == 7) &amp;&amp;</span>
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_NET &amp;&amp; mib[1] == PF_ROUTE &amp;&amp;</span>
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 :                     mib[2] == 0 &amp;&amp;</span>
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 :                     mib[4] == NET_RT_DUMP)</span>
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     819 </span>            : 
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :                 if (miblen == 6 &amp;&amp;</span>
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_NET &amp;&amp; mib[1] == PF_ROUTE &amp;&amp;</span>
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :                     mib[2] == 0 &amp;&amp;</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :                     (mib[3] == 0 || mib[3] == AF_INET6 || mib[3] == AF_INET) &amp;&amp;</span>
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :                     mib[4] == NET_RT_TABLE)</span>
+<span class="lineNum">     825 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     826 </span>            : 
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :                 if (miblen == 7 &amp;&amp;              /* exposes MACs */</span>
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_NET &amp;&amp; mib[1] == PF_ROUTE &amp;&amp;</span>
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :                     mib[2] == 0 &amp;&amp;</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :                     (mib[3] == 0 || mib[3] == AF_INET6 || mib[3] == AF_INET) &amp;&amp;</span>
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :                     mib[4] == NET_RT_FLAGS &amp;&amp; mib[5] == RTF_LLINFO)</span>
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     833 </span>            :         }
+<span class="lineNum">     834 </span>            : 
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_WROUTE)) {</span>
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :                 if (miblen == 4 &amp;&amp;</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_NET &amp;&amp; mib[1] == PF_INET6 &amp;&amp;</span>
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :                     mib[2] == IPPROTO_IPV6 &amp;&amp; mib[3] == IPV6CTL_SOIIKEY)</span>
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     840 </span>            :         }
+<span class="lineNum">     841 </span>            : 
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :         if (p-&gt;p_p-&gt;ps_pledge &amp; (PLEDGE_PS | PLEDGE_VMINFO)) {</span>
+<span class="lineNum">     843 </span><span class="lineNoCov">          0 :                 if (miblen == 2 &amp;&amp;              /* kern.fscale */</span>
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_FSCALE)</span>
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :                 if (miblen == 2 &amp;&amp;              /* kern.boottime */</span>
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_BOOTTIME)</span>
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :                 if (miblen == 2 &amp;&amp;              /* kern.consdev */</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_CONSDEV)</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :                 if (miblen == 2 &amp;&amp;                      /* kern.cptime */</span>
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_CPTIME)</span>
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :                 if (miblen == 3 &amp;&amp;                      /* kern.cptime2 */</span>
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_CPTIME2)</span>
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     858 </span>            :         }
+<span class="lineNum">     859 </span>            : 
+<span class="lineNum">     860 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_PS)) {</span>
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :                 if (miblen == 4 &amp;&amp;              /* kern.procargs.* */</span>
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_PROC_ARGS &amp;&amp;</span>
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :                     (mib[3] == KERN_PROC_ARGV || mib[3] == KERN_PROC_ENV))</span>
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :                 if (miblen == 6 &amp;&amp;              /* kern.proc.* */</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_PROC)</span>
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 :                 if (miblen == 3 &amp;&amp;              /* kern.proc_cwd.* */</span>
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_PROC_CWD)</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :                 if (miblen == 2 &amp;&amp;              /* hw.physmem */</span>
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_HW &amp;&amp; mib[1] == HW_PHYSMEM64)</span>
+<span class="lineNum">     873 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :                 if (miblen == 2 &amp;&amp;              /* kern.ccpu */</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_CCPU)</span>
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :                 if (miblen == 2 &amp;&amp;              /* vm.maxslp */</span>
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_VM &amp;&amp; mib[1] == VM_MAXSLP)</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     880 </span>            :         }
+<span class="lineNum">     881 </span>            : 
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_VMINFO)) {</span>
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :                 if (miblen == 2 &amp;&amp;              /* vm.uvmexp */</span>
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_VM &amp;&amp; mib[1] == VM_UVMEXP)</span>
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :                 if (miblen == 3 &amp;&amp;              /* vfs.generic.bcachestat */</span>
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_VFS &amp;&amp; mib[1] == VFS_GENERIC &amp;&amp;</span>
+<span class="lineNum">     888 </span><span class="lineNoCov">          0 :                     mib[2] == VFS_BCACHESTAT)</span>
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     890 </span>            :         }
+<span class="lineNum">     891 </span>            : 
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; (PLEDGE_ROUTE | PLEDGE_INET | PLEDGE_DNS))) {</span>
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 :                 if (miblen == 6 &amp;&amp;              /* getifaddrs() */</span>
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_NET &amp;&amp; mib[1] == PF_ROUTE &amp;&amp;</span>
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :                     mib[2] == 0 &amp;&amp;</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :                     (mib[3] == 0 || mib[3] == AF_INET6 || mib[3] == AF_INET) &amp;&amp;</span>
+<span class="lineNum">     897 </span><span class="lineNoCov">          0 :                     mib[4] == NET_RT_IFLIST)</span>
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     899 </span>            :         }
+<span class="lineNum">     900 </span>            : 
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_DISKLABEL)) {</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :                 if (miblen == 2 &amp;&amp;              /* kern.rawpartition */</span>
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp;</span>
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :                     mib[1] == KERN_RAWPARTITION)</span>
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :                 if (miblen == 2 &amp;&amp;              /* kern.maxpartitions */</span>
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_KERN &amp;&amp;</span>
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :                     mib[1] == KERN_MAXPARTITIONS)</span>
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     910 </span>            : #ifdef CPU_CHR2BLK
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :                 if (miblen == 3 &amp;&amp;              /* machdep.chr2blk */</span>
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :                     mib[0] == CTL_MACHDEP &amp;&amp;</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :                     mib[1] == CPU_CHR2BLK)</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">     915 </span>            : #endif /* CPU_CHR2BLK */
+<span class="lineNum">     916 </span>            :         }
+<span class="lineNum">     917 </span>            : 
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :         if (miblen &gt;= 3 &amp;&amp;                   /* ntpd(8) to read sensors */</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :             mib[0] == CTL_HW &amp;&amp; mib[1] == HW_SENSORS)</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     921 </span>            : 
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* getdomainname() */</span>
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_DOMAINNAME)</span>
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* gethostname() */</span>
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_HOSTNAME)</span>
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :         if (miblen == 6 &amp;&amp;              /* if_nameindex() */</span>
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :             mib[0] == CTL_NET &amp;&amp; mib[1] == PF_ROUTE &amp;&amp;</span>
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :             mib[2] == 0 &amp;&amp; mib[3] == 0 &amp;&amp; mib[4] == NET_RT_IFNAMES)</span>
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* uname() */</span>
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_OSTYPE)</span>
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* uname() */</span>
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_OSRELEASE)</span>
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     938 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* uname() */</span>
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_OSVERSION)</span>
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* uname() */</span>
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_VERSION)</span>
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* kern.clockrate */</span>
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_CLOCKRATE)</span>
+<span class="lineNum">     946 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     947 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* kern.argmax */</span>
+<span class="lineNum">     948 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_ARGMAX)</span>
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     950 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* kern.ngroups */</span>
+<span class="lineNum">     951 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_NGROUPS)</span>
+<span class="lineNum">     952 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* kern.sysvshm */</span>
+<span class="lineNum">     954 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_SYSVSHM)</span>
+<span class="lineNum">     955 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* kern.posix1version */</span>
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :             mib[0] == CTL_KERN &amp;&amp; mib[1] == KERN_POSIX1)</span>
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* uname() */</span>
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :             mib[0] == CTL_HW &amp;&amp; mib[1] == HW_MACHINE)</span>
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     962 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* getpagesize() */</span>
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :             mib[0] == CTL_HW &amp;&amp; mib[1] == HW_PAGESIZE)</span>
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     965 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* setproctitle() */</span>
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :             mib[0] == CTL_VM &amp;&amp; mib[1] == VM_PSSTRINGS)</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* hw.ncpu / hw.ncpuonline */</span>
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :             mib[0] == CTL_HW &amp;&amp; (mib[1] == HW_NCPU || mib[1] == HW_NCPUONLINE))</span>
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     971 </span><span class="lineNoCov">          0 :         if (miblen == 2 &amp;&amp;              /* vm.loadavg / getloadavg(3) */</span>
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :             mib[0] == CTL_VM &amp;&amp; mib[1] == VM_LOADAVG)</span>
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     974 </span>            : #ifdef CPU_SSE
+<span class="lineNum">     975 </span>            :         if (miblen == 2 &amp;&amp;              /* i386 libm tests for SSE */
+<span class="lineNum">     976 </span>            :             mib[0] == CTL_MACHDEP &amp;&amp; mib[1] == CPU_SSE)
+<span class="lineNum">     977 </span>            :                 return (0);
+<span class="lineNum">     978 </span>            : #endif /* CPU_SSE */
+<span class="lineNum">     979 </span>            : 
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 :         snprintf(buf, sizeof(buf), &quot;%s(%d): pledge sysctl %d:&quot;,</span>
+<span class="lineNum">     981 </span><span class="lineNoCov">          0 :             p-&gt;p_p-&gt;ps_comm, p-&gt;p_p-&gt;ps_pid, miblen);</span>
+<span class="lineNum">     982 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; miblen; i++) {</span>
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 :                 char *p = buf + strlen(buf);</span>
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 :                 snprintf(p, sizeof(buf) - (p - buf), &quot; %d&quot;, mib[i]);</span>
+<span class="lineNum">     985 </span>            :         }
+<span class="lineNum">     986 </span><span class="lineNoCov">          0 :         log(LOG_ERR, &quot;%s\n&quot;, buf);</span>
+<span class="lineNum">     987 </span>            : 
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :         return pledge_fail(p, EINVAL, 0);</span>
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 : }</span>
+<a name="990"><span class="lineNum">     990 </span>            : </a>
+<span class="lineNum">     991 </span>            : int
+<span class="lineNum">     992 </span><span class="lineNoCov">          0 : pledge_chown(struct proc *p, uid_t uid, gid_t gid)</span>
+<span class="lineNum">     993 </span>            : {
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     996 </span>            : 
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :         if (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_CHOWNUID)</span>
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     999 </span>            : 
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :         if (uid != -1 &amp;&amp; uid != p-&gt;p_ucred-&gt;cr_uid)</span>
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :                 return (EPERM);</span>
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 :         if (gid != -1 &amp;&amp; !groupmember(gid, p-&gt;p_ucred))</span>
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :                 return (EPERM);</span>
+<span class="lineNum">    1004 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1005 </span><span class="lineNoCov">          0 : }</span>
+<a name="1006"><span class="lineNum">    1006 </span>            : </a>
+<span class="lineNum">    1007 </span>            : int
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 : pledge_adjtime(struct proc *p, const void *v)</span>
+<span class="lineNum">    1009 </span>            : {
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :         const struct timeval *delta = v;</span>
+<span class="lineNum">    1011 </span>            : 
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1014 </span>            : 
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_SETTIME))</span>
+<span class="lineNum">    1016 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :         if (delta)</span>
+<span class="lineNum">    1018 </span><span class="lineNoCov">          0 :                 return (EPERM);</span>
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1020 </span><span class="lineNoCov">          0 : }</span>
+<a name="1021"><span class="lineNum">    1021 </span>            : </a>
+<span class="lineNum">    1022 </span>            : int
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 : pledge_sendit(struct proc *p, const void *to)</span>
+<span class="lineNum">    1024 </span>            : {
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1027 </span>            : 
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; (PLEDGE_INET | PLEDGE_UNIX | PLEDGE_DNS | PLEDGE_YPACTIVE)))</span>
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :                 return (0);             /* may use address */</span>
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :         if (to == NULL)</span>
+<span class="lineNum">    1031 </span><span class="lineNoCov">          0 :                 return (0);             /* behaves just like write */</span>
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :         return pledge_fail(p, EPERM, PLEDGE_INET);</span>
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 : }</span>
+<a name="1034"><span class="lineNum">    1034 </span>            : </a>
+<span class="lineNum">    1035 </span>            : int
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 : pledge_ioctl(struct proc *p, long com, struct file *fp)</span>
+<span class="lineNum">    1037 </span>            : {
+<span class="lineNum">    1038 </span>            :         struct vnode *vp = NULL;
+<span class="lineNum">    1039 </span>            :         int error = EPERM;
+<span class="lineNum">    1040 </span>            : 
+<span class="lineNum">    1041 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">    1042 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1043 </span>            : 
+<span class="lineNum">    1044 </span>            :         /*
+<span class="lineNum">    1045 </span>            :          * The ioctl's which are always allowed.
+<span class="lineNum">    1046 </span>            :          */
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :         switch (com) {</span>
+<span class="lineNum">    1048 </span>            :         case FIONREAD:
+<span class="lineNum">    1049 </span>            :         case FIONBIO:
+<span class="lineNum">    1050 </span>            :         case FIOCLEX:
+<span class="lineNum">    1051 </span>            :         case FIONCLEX:
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1053 </span>            :         }
+<span class="lineNum">    1054 </span>            : 
+<span class="lineNum">    1055 </span>            :         /* fp != NULL was already checked */
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :         if (fp-&gt;f_type == DTYPE_VNODE) {</span>
+<span class="lineNum">    1057 </span><span class="lineNoCov">          0 :                 vp = fp-&gt;f_data;</span>
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :                 if (vp-&gt;v_type == VBAD)</span>
+<span class="lineNum">    1059 </span><span class="lineNoCov">          0 :                         return (ENOTTY);</span>
+<span class="lineNum">    1060 </span>            :         }
+<span class="lineNum">    1061 </span>            : 
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_INET)) {</span>
+<span class="lineNum">    1063 </span><span class="lineNoCov">          0 :                 switch (com) {</span>
+<span class="lineNum">    1064 </span>            :                 case SIOCATMARK:
+<span class="lineNum">    1065 </span>            :                 case SIOCGIFGROUP:
+<span class="lineNum">    1066 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_SOCKET)</span>
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1068 </span>            :                         break;
+<span class="lineNum">    1069 </span>            :                 }
+<span class="lineNum">    1070 </span>            :         }
+<span class="lineNum">    1071 </span>            : 
+<span class="lineNum">    1072 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">    1073 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_BPF)) {</span>
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :                 switch (com) {</span>
+<span class="lineNum">    1075 </span>            :                 case BIOCGSTATS:        /* bpf: tcpdump privsep on ^C */
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_VNODE &amp;&amp;</span>
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :                             fp-&gt;f_ops-&gt;fo_ioctl == vn_ioctl &amp;&amp;</span>
+<span class="lineNum">    1078 </span><span class="lineNoCov">          0 :                             vp-&gt;v_type == VCHR &amp;&amp;</span>
+<span class="lineNum">    1079 </span><span class="lineNoCov">          0 :                             cdevsw[major(vp-&gt;v_rdev)].d_open == bpfopen)</span>
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1081 </span>            :                         break;
+<span class="lineNum">    1082 </span>            :                 }
+<span class="lineNum">    1083 </span>            :         }
+<span class="lineNum">    1084 </span>            : #endif /* NBPFILTER &gt; 0 */
+<span class="lineNum">    1085 </span>            : 
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_TAPE)) {</span>
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :                 switch (com) {</span>
+<span class="lineNum">    1088 </span>            :                 case MTIOCGET:
+<span class="lineNum">    1089 </span>            :                 case MTIOCTOP:
+<span class="lineNum">    1090 </span>            :                         /* for pax(1) and such, checking tapes... */
+<span class="lineNum">    1091 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_VNODE &amp;&amp;</span>
+<span class="lineNum">    1092 </span><span class="lineNoCov">          0 :                             vp-&gt;v_type == VCHR) {</span>
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :                                 if (vp-&gt;v_flag &amp; VISTTY)</span>
+<span class="lineNum">    1094 </span><span class="lineNoCov">          0 :                                         return (ENOTTY);</span>
+<span class="lineNum">    1095 </span>            :                                 else
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 :                                         return (0);</span>
+<span class="lineNum">    1097 </span>            :                         }
+<span class="lineNum">    1098 </span>            :                         break;
+<span class="lineNum">    1099 </span>            :                 }
+<span class="lineNum">    1100 </span>            :         }
+<span class="lineNum">    1101 </span>            : 
+<span class="lineNum">    1102 </span>            : #if NDRM &gt; 0
+<span class="lineNum">    1103 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_DRM)) {</span>
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 :                 if ((fp-&gt;f_type == DTYPE_VNODE) &amp;&amp;</span>
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :                     (vp-&gt;v_type == VCHR) &amp;&amp;</span>
+<span class="lineNum">    1106 </span><span class="lineNoCov">          0 :                     (cdevsw[major(vp-&gt;v_rdev)].d_open == drmopen)) {</span>
+<span class="lineNum">    1107 </span><span class="lineNoCov">          0 :                         error = pledge_ioctl_drm(p, com, vp-&gt;v_rdev);</span>
+<span class="lineNum">    1108 </span><span class="lineNoCov">          0 :                         if (error == 0)</span>
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 :                                 return 0;</span>
+<span class="lineNum">    1110 </span>            :                 }
+<span class="lineNum">    1111 </span>            :         }
+<span class="lineNum">    1112 </span>            : #endif /* NDRM &gt; 0 */
+<span class="lineNum">    1113 </span>            : 
+<span class="lineNum">    1114 </span>            : #if NAUDIO &gt; 0
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_AUDIO)) {</span>
+<span class="lineNum">    1116 </span><span class="lineNoCov">          0 :                 switch (com) {</span>
+<span class="lineNum">    1117 </span>            :                 case AUDIO_GETPOS:
+<span class="lineNum">    1118 </span>            :                 case AUDIO_GETPAR:
+<span class="lineNum">    1119 </span>            :                 case AUDIO_SETPAR:
+<span class="lineNum">    1120 </span>            :                 case AUDIO_START:
+<span class="lineNum">    1121 </span>            :                 case AUDIO_STOP:
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_VNODE &amp;&amp;</span>
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 :                             vp-&gt;v_type == VCHR &amp;&amp;</span>
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :                             cdevsw[major(vp-&gt;v_rdev)].d_open == audioopen)</span>
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1126 </span>            :                 }
+<span class="lineNum">    1127 </span>            :         }
+<span class="lineNum">    1128 </span>            : #endif /* NAUDIO &gt; 0 */
+<span class="lineNum">    1129 </span>            : 
+<span class="lineNum">    1130 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_DISKLABEL)) {</span>
+<span class="lineNum">    1131 </span><span class="lineNoCov">          0 :                 switch (com) {</span>
+<span class="lineNum">    1132 </span>            :                 case DIOCGDINFO:
+<span class="lineNum">    1133 </span>            :                 case DIOCGPDINFO:
+<span class="lineNum">    1134 </span>            :                 case DIOCRLDINFO:
+<span class="lineNum">    1135 </span>            :                 case DIOCWDINFO:
+<span class="lineNum">    1136 </span>            :                 case BIOCDISK:
+<span class="lineNum">    1137 </span>            :                 case BIOCINQ:
+<span class="lineNum">    1138 </span>            :                 case BIOCINSTALLBOOT:
+<span class="lineNum">    1139 </span>            :                 case BIOCVOL:
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_VNODE &amp;&amp;</span>
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :                             ((vp-&gt;v_type == VCHR &amp;&amp;</span>
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :                             cdevsw[major(vp-&gt;v_rdev)].d_type == D_DISK) ||</span>
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 :                             (vp-&gt;v_type == VBLK &amp;&amp;</span>
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 :                             bdevsw[major(vp-&gt;v_rdev)].d_type == D_DISK)))</span>
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1146 </span>            :                         break;
+<span class="lineNum">    1147 </span>            :                 case DIOCMAP:
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_VNODE &amp;&amp;</span>
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 :                             vp-&gt;v_type == VCHR &amp;&amp;</span>
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :                             cdevsw[major(vp-&gt;v_rdev)].d_ioctl == diskmapioctl)</span>
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1152 </span>            :                         break;
+<span class="lineNum">    1153 </span>            :                 }
+<span class="lineNum">    1154 </span>            :         }
+<span class="lineNum">    1155 </span>            : 
+<span class="lineNum">    1156 </span>            : #if NPF &gt; 0
+<span class="lineNum">    1157 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_PF)) {</span>
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 :                 switch (com) {</span>
+<span class="lineNum">    1159 </span>            :                 case DIOCADDRULE:
+<span class="lineNum">    1160 </span>            :                 case DIOCGETSTATUS:
+<span class="lineNum">    1161 </span>            :                 case DIOCNATLOOK:
+<span class="lineNum">    1162 </span>            :                 case DIOCRADDTABLES:
+<span class="lineNum">    1163 </span>            :                 case DIOCRCLRADDRS:
+<span class="lineNum">    1164 </span>            :                 case DIOCRCLRTABLES:
+<span class="lineNum">    1165 </span>            :                 case DIOCRCLRTSTATS:
+<span class="lineNum">    1166 </span>            :                 case DIOCRGETTSTATS:
+<span class="lineNum">    1167 </span>            :                 case DIOCRSETADDRS:
+<span class="lineNum">    1168 </span>            :                 case DIOCXBEGIN:
+<span class="lineNum">    1169 </span>            :                 case DIOCXCOMMIT:
+<span class="lineNum">    1170 </span>            :                 case DIOCKILLSRCNODES:
+<span class="lineNum">    1171 </span><span class="lineNoCov">          0 :                         if ((fp-&gt;f_type == DTYPE_VNODE) &amp;&amp;</span>
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :                             (vp-&gt;v_type == VCHR) &amp;&amp;</span>
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 :                             (cdevsw[major(vp-&gt;v_rdev)].d_open == pfopen))</span>
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1175 </span>            :                         break;
+<span class="lineNum">    1176 </span>            :                 }
+<span class="lineNum">    1177 </span>            :         }
+<span class="lineNum">    1178 </span>            : #endif
+<span class="lineNum">    1179 </span>            : 
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_TTY)) {</span>
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 :                 switch (com) {</span>
+<span class="lineNum">    1182 </span>            : #if NPTY &gt; 0
+<span class="lineNum">    1183 </span>            :                 case PTMGET:
+<span class="lineNum">    1184 </span><span class="lineNoCov">          0 :                         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_RPATH) == 0)</span>
+<span class="lineNum">    1185 </span>            :                                 break;
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :                         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_WPATH) == 0)</span>
+<span class="lineNum">    1187 </span>            :                                 break;
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type != DTYPE_VNODE || vp-&gt;v_type != VCHR)</span>
+<span class="lineNum">    1189 </span>            :                                 break;
+<span class="lineNum">    1190 </span><span class="lineNoCov">          0 :                         if (cdevsw[major(vp-&gt;v_rdev)].d_open != ptmopen)</span>
+<span class="lineNum">    1191 </span>            :                                 break;
+<span class="lineNum">    1192 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">    1193 </span>            :                 case TIOCUCNTL:         /* vmd */
+<span class="lineNum">    1194 </span><span class="lineNoCov">          0 :                         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_RPATH) == 0)</span>
+<span class="lineNum">    1195 </span>            :                                 break;
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :                         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_WPATH) == 0)</span>
+<span class="lineNum">    1197 </span>            :                                 break;
+<span class="lineNum">    1198 </span><span class="lineNoCov">          0 :                         if (cdevsw[major(vp-&gt;v_rdev)].d_open != ptcopen)</span>
+<span class="lineNum">    1199 </span>            :                                 break;
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">    1201 </span>            : #endif /* NPTY &gt; 0 */
+<span class="lineNum">    1202 </span>            :                 case TIOCSPGRP:
+<span class="lineNum">    1203 </span><span class="lineNoCov">          0 :                         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_PROC) == 0)</span>
+<span class="lineNum">    1204 </span>            :                                 break;
+<span class="lineNum">    1205 </span>            :                         /* FALLTHROUGH */
+<span class="lineNum">    1206 </span>            :                 case TIOCFLUSH:         /* getty, telnet */
+<span class="lineNum">    1207 </span>            :                 case TIOCSTART:         /* emacs, etc */
+<span class="lineNum">    1208 </span>            :                 case TIOCGPGRP:
+<span class="lineNum">    1209 </span>            :                 case TIOCGETA:
+<span class="lineNum">    1210 </span>            :                 case TIOCGWINSZ:        /* ENOTTY return for non-tty */
+<span class="lineNum">    1211 </span>            :                 case TIOCSTAT:          /* csh */
+<span class="lineNum">    1212 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_VNODE &amp;&amp; (vp-&gt;v_flag &amp; VISTTY))</span>
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1214 </span><span class="lineNoCov">          0 :                         return (ENOTTY);</span>
+<span class="lineNum">    1215 </span>            :                 case TIOCSWINSZ:
+<span class="lineNum">    1216 </span>            :                 case TIOCEXT:           /* mail, libedit .. */
+<span class="lineNum">    1217 </span>            :                 case TIOCCBRK:          /* cu */
+<span class="lineNum">    1218 </span>            :                 case TIOCSBRK:          /* cu */
+<span class="lineNum">    1219 </span>            :                 case TIOCCDTR:          /* cu */
+<span class="lineNum">    1220 </span>            :                 case TIOCSDTR:          /* cu */
+<span class="lineNum">    1221 </span>            :                 case TIOCEXCL:          /* cu */
+<span class="lineNum">    1222 </span>            :                 case TIOCSETA:          /* cu, ... */
+<span class="lineNum">    1223 </span>            :                 case TIOCSETAW:         /* cu, ... */
+<span class="lineNum">    1224 </span>            :                 case TIOCSETAF:         /* tcsetattr TCSAFLUSH, script */
+<span class="lineNum">    1225 </span>            :                 case TIOCSCTTY:         /* forkpty(3), login_tty(3), ... */
+<span class="lineNum">    1226 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_VNODE &amp;&amp; (vp-&gt;v_flag &amp; VISTTY))</span>
+<span class="lineNum">    1227 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1228 </span>            :                         break;
+<span class="lineNum">    1229 </span>            :                 }
+<span class="lineNum">    1230 </span>            :         }
+<span class="lineNum">    1231 </span>            : 
+<span class="lineNum">    1232 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_ROUTE)) {</span>
+<span class="lineNum">    1233 </span><span class="lineNoCov">          0 :                 switch (com) {</span>
+<span class="lineNum">    1234 </span>            :                 case SIOCGIFADDR:
+<span class="lineNum">    1235 </span>            :                 case SIOCGIFAFLAG_IN6:
+<span class="lineNum">    1236 </span>            :                 case SIOCGIFALIFETIME_IN6:
+<span class="lineNum">    1237 </span>            :                 case SIOCGIFDESCR:
+<span class="lineNum">    1238 </span>            :                 case SIOCGIFFLAGS:
+<span class="lineNum">    1239 </span>            :                 case SIOCGIFMETRIC:
+<span class="lineNum">    1240 </span>            :                 case SIOCGIFGMEMB:
+<span class="lineNum">    1241 </span>            :                 case SIOCGIFRDOMAIN:
+<span class="lineNum">    1242 </span>            :                 case SIOCGIFDSTADDR_IN6:
+<span class="lineNum">    1243 </span>            :                 case SIOCGIFNETMASK_IN6:
+<span class="lineNum">    1244 </span>            :                 case SIOCGIFXFLAGS:
+<span class="lineNum">    1245 </span>            :                 case SIOCGNBRINFO_IN6:
+<span class="lineNum">    1246 </span>            :                 case SIOCGIFINFO_IN6:
+<span class="lineNum">    1247 </span>            :                 case SIOCGIFMEDIA:
+<span class="lineNum">    1248 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_SOCKET)</span>
+<span class="lineNum">    1249 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1250 </span>            :                         break;
+<span class="lineNum">    1251 </span>            :                 }
+<span class="lineNum">    1252 </span>            :         }
+<span class="lineNum">    1253 </span>            : 
+<span class="lineNum">    1254 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_WROUTE)) {</span>
+<span class="lineNum">    1255 </span><span class="lineNoCov">          0 :                 switch (com) {</span>
+<span class="lineNum">    1256 </span>            :                 case SIOCAIFADDR_IN6:
+<span class="lineNum">    1257 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_SOCKET)</span>
+<span class="lineNum">    1258 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1259 </span>            :                         break;
+<span class="lineNum">    1260 </span>            :                 case SIOCSIFMTU:
+<span class="lineNum">    1261 </span><span class="lineNoCov">          0 :                         if (fp-&gt;f_type == DTYPE_SOCKET)</span>
+<span class="lineNum">    1262 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1263 </span>            :                         break;
+<span class="lineNum">    1264 </span>            :                 }
+<span class="lineNum">    1265 </span>            :         }
+<span class="lineNum">    1266 </span>            : 
+<span class="lineNum">    1267 </span>            : #if NVMM &gt; 0
+<span class="lineNum">    1268 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_VMM)) {</span>
+<span class="lineNum">    1269 </span><span class="lineNoCov">          0 :                 if ((fp-&gt;f_type == DTYPE_VNODE) &amp;&amp;</span>
+<span class="lineNum">    1270 </span><span class="lineNoCov">          0 :                     (vp-&gt;v_type == VCHR) &amp;&amp;</span>
+<span class="lineNum">    1271 </span><span class="lineNoCov">          0 :                     (cdevsw[major(vp-&gt;v_rdev)].d_open == vmmopen)) {</span>
+<span class="lineNum">    1272 </span><span class="lineNoCov">          0 :                         error = pledge_ioctl_vmm(p, com);</span>
+<span class="lineNum">    1273 </span><span class="lineNoCov">          0 :                         if (error == 0)</span>
+<span class="lineNum">    1274 </span><span class="lineNoCov">          0 :                                 return 0;</span>
+<span class="lineNum">    1275 </span>            :                 }
+<span class="lineNum">    1276 </span>            :         }
+<span class="lineNum">    1277 </span>            : #endif
+<span class="lineNum">    1278 </span>            : 
+<span class="lineNum">    1279 </span><span class="lineNoCov">          0 :         return pledge_fail(p, error, PLEDGE_TTY);</span>
+<span class="lineNum">    1280 </span><span class="lineNoCov">          0 : }</span>
+<a name="1281"><span class="lineNum">    1281 </span>            : </a>
+<span class="lineNum">    1282 </span>            : int
+<span class="lineNum">    1283 </span><span class="lineNoCov">          0 : pledge_sockopt(struct proc *p, int set, int level, int optname)</span>
+<span class="lineNum">    1284 </span>            : {
+<span class="lineNum">    1285 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">    1286 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1287 </span>            : 
+<span class="lineNum">    1288 </span>            :         /* Always allow these, which are too common to reject */
+<span class="lineNum">    1289 </span><span class="lineNoCov">          0 :         switch (level) {</span>
+<span class="lineNum">    1290 </span>            :         case SOL_SOCKET:
+<span class="lineNum">    1291 </span><span class="lineNoCov">          0 :                 switch (optname) {</span>
+<span class="lineNum">    1292 </span>            :                 case SO_RCVBUF:
+<span class="lineNum">    1293 </span>            :                 case SO_ERROR:
+<span class="lineNum">    1294 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">    1295 </span>            :                 }
+<span class="lineNum">    1296 </span>            :                 break;
+<span class="lineNum">    1297 </span>            :         }
+<span class="lineNum">    1298 </span>            : 
+<span class="lineNum">    1299 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; (PLEDGE_INET|PLEDGE_UNIX|PLEDGE_DNS|PLEDGE_YPACTIVE)) == 0)</span>
+<span class="lineNum">    1300 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EPERM, PLEDGE_INET);</span>
+<span class="lineNum">    1301 </span>            :         /* In use by some service libraries */
+<span class="lineNum">    1302 </span><span class="lineNoCov">          0 :         switch (level) {</span>
+<span class="lineNum">    1303 </span>            :         case SOL_SOCKET:
+<span class="lineNum">    1304 </span><span class="lineNoCov">          0 :                 switch (optname) {</span>
+<span class="lineNum">    1305 </span>            :                 case SO_TIMESTAMP:
+<span class="lineNum">    1306 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">    1307 </span>            :                 }
+<span class="lineNum">    1308 </span>            :                 break;
+<span class="lineNum">    1309 </span>            :         }
+<span class="lineNum">    1310 </span>            : 
+<span class="lineNum">    1311 </span>            :         /* DNS resolver may do these requests */
+<span class="lineNum">    1312 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_DNS)) {</span>
+<span class="lineNum">    1313 </span><span class="lineNoCov">          0 :                 switch (level) {</span>
+<span class="lineNum">    1314 </span>            :                 case IPPROTO_IPV6:
+<span class="lineNum">    1315 </span><span class="lineNoCov">          0 :                         switch (optname) {</span>
+<span class="lineNum">    1316 </span>            :                         case IPV6_RECVPKTINFO:
+<span class="lineNum">    1317 </span>            :                         case IPV6_USE_MIN_MTU:
+<span class="lineNum">    1318 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1319 </span>            :                         }
+<span class="lineNum">    1320 </span>            :                 }
+<span class="lineNum">    1321 </span>            :         }
+<span class="lineNum">    1322 </span>            : 
+<span class="lineNum">    1323 </span>            :         /* YP may do these requests */
+<span class="lineNum">    1324 </span><span class="lineNoCov">          0 :         if (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_YPACTIVE) {</span>
+<span class="lineNum">    1325 </span><span class="lineNoCov">          0 :                 switch (level) {</span>
+<span class="lineNum">    1326 </span>            :                 case IPPROTO_IP:
+<span class="lineNum">    1327 </span><span class="lineNoCov">          0 :                         switch (optname) {</span>
+<span class="lineNum">    1328 </span>            :                         case IP_PORTRANGE:
+<span class="lineNum">    1329 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1330 </span>            :                         }
+<span class="lineNum">    1331 </span>            :                         break;
+<span class="lineNum">    1332 </span>            : 
+<span class="lineNum">    1333 </span>            :                 case IPPROTO_IPV6:
+<span class="lineNum">    1334 </span><span class="lineNoCov">          0 :                         switch (optname) {</span>
+<span class="lineNum">    1335 </span>            :                         case IPV6_PORTRANGE:
+<span class="lineNum">    1336 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1337 </span>            :                         }
+<span class="lineNum">    1338 </span>            :                         break;
+<span class="lineNum">    1339 </span>            :                 }
+<span class="lineNum">    1340 </span>            :         }
+<span class="lineNum">    1341 </span>            : 
+<span class="lineNum">    1342 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; (PLEDGE_INET|PLEDGE_UNIX)) == 0)</span>
+<span class="lineNum">    1343 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EPERM, PLEDGE_INET);</span>
+<span class="lineNum">    1344 </span><span class="lineNoCov">          0 :         switch (level) {</span>
+<span class="lineNum">    1345 </span>            :         case SOL_SOCKET:
+<span class="lineNum">    1346 </span><span class="lineNoCov">          0 :                 switch (optname) {</span>
+<span class="lineNum">    1347 </span>            :                 case SO_RTABLE:
+<span class="lineNum">    1348 </span><span class="lineNoCov">          0 :                         return pledge_fail(p, EINVAL, PLEDGE_INET);</span>
+<span class="lineNum">    1349 </span>            :                 }
+<span class="lineNum">    1350 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1351 </span>            :         }
+<span class="lineNum">    1352 </span>            : 
+<span class="lineNum">    1353 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_INET) == 0)</span>
+<span class="lineNum">    1354 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EPERM, PLEDGE_INET);</span>
+<span class="lineNum">    1355 </span><span class="lineNoCov">          0 :         switch (level) {</span>
+<span class="lineNum">    1356 </span>            :         case IPPROTO_TCP:
+<span class="lineNum">    1357 </span><span class="lineNoCov">          0 :                 switch (optname) {</span>
+<span class="lineNum">    1358 </span>            :                 case TCP_NODELAY:
+<span class="lineNum">    1359 </span>            :                 case TCP_MD5SIG:
+<span class="lineNum">    1360 </span>            :                 case TCP_SACK_ENABLE:
+<span class="lineNum">    1361 </span>            :                 case TCP_MAXSEG:
+<span class="lineNum">    1362 </span>            :                 case TCP_NOPUSH:
+<span class="lineNum">    1363 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">    1364 </span>            :                 }
+<span class="lineNum">    1365 </span>            :                 break;
+<span class="lineNum">    1366 </span>            :         case IPPROTO_IP:
+<span class="lineNum">    1367 </span><span class="lineNoCov">          0 :                 switch (optname) {</span>
+<span class="lineNum">    1368 </span>            :                 case IP_OPTIONS:
+<span class="lineNum">    1369 </span><span class="lineNoCov">          0 :                         if (!set)</span>
+<span class="lineNum">    1370 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1371 </span>            :                         break;
+<span class="lineNum">    1372 </span>            :                 case IP_TOS:
+<span class="lineNum">    1373 </span>            :                 case IP_TTL:
+<span class="lineNum">    1374 </span>            :                 case IP_MINTTL:
+<span class="lineNum">    1375 </span>            :                 case IP_IPDEFTTL:
+<span class="lineNum">    1376 </span>            :                 case IP_PORTRANGE:
+<span class="lineNum">    1377 </span>            :                 case IP_RECVDSTADDR:
+<span class="lineNum">    1378 </span>            :                 case IP_RECVDSTPORT:
+<span class="lineNum">    1379 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">    1380 </span>            :                 case IP_MULTICAST_IF:
+<span class="lineNum">    1381 </span>            :                 case IP_MULTICAST_TTL:
+<span class="lineNum">    1382 </span>            :                 case IP_MULTICAST_LOOP:
+<span class="lineNum">    1383 </span>            :                 case IP_ADD_MEMBERSHIP:
+<span class="lineNum">    1384 </span>            :                 case IP_DROP_MEMBERSHIP:
+<span class="lineNum">    1385 </span><span class="lineNoCov">          0 :                         if (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_MCAST)</span>
+<span class="lineNum">    1386 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1387 </span>            :                         break;
+<span class="lineNum">    1388 </span>            :                 }
+<span class="lineNum">    1389 </span>            :                 break;
+<span class="lineNum">    1390 </span>            :         case IPPROTO_ICMP:
+<span class="lineNum">    1391 </span>            :                 break;
+<span class="lineNum">    1392 </span>            :         case IPPROTO_IPV6:
+<span class="lineNum">    1393 </span><span class="lineNoCov">          0 :                 switch (optname) {</span>
+<span class="lineNum">    1394 </span>            :                 case IPV6_TCLASS:
+<span class="lineNum">    1395 </span>            :                 case IPV6_UNICAST_HOPS:
+<span class="lineNum">    1396 </span>            :                 case IPV6_MINHOPCOUNT:
+<span class="lineNum">    1397 </span>            :                 case IPV6_RECVHOPLIMIT:
+<span class="lineNum">    1398 </span>            :                 case IPV6_PORTRANGE:
+<span class="lineNum">    1399 </span>            :                 case IPV6_RECVPKTINFO:
+<span class="lineNum">    1400 </span>            :                 case IPV6_RECVDSTPORT:
+<span class="lineNum">    1401 </span>            :                 case IPV6_V6ONLY:
+<span class="lineNum">    1402 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">    1403 </span>            :                 case IPV6_MULTICAST_IF:
+<span class="lineNum">    1404 </span>            :                 case IPV6_MULTICAST_HOPS:
+<span class="lineNum">    1405 </span>            :                 case IPV6_MULTICAST_LOOP:
+<span class="lineNum">    1406 </span>            :                 case IPV6_JOIN_GROUP:
+<span class="lineNum">    1407 </span>            :                 case IPV6_LEAVE_GROUP:
+<span class="lineNum">    1408 </span><span class="lineNoCov">          0 :                         if (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_MCAST)</span>
+<span class="lineNum">    1409 </span><span class="lineNoCov">          0 :                                 return (0);</span>
+<span class="lineNum">    1410 </span>            :                         break;
+<span class="lineNum">    1411 </span>            :                 }
+<span class="lineNum">    1412 </span>            :                 break;
+<span class="lineNum">    1413 </span>            :         case IPPROTO_ICMPV6:
+<span class="lineNum">    1414 </span>            :                 break;
+<span class="lineNum">    1415 </span>            :         }
+<span class="lineNum">    1416 </span><span class="lineNoCov">          0 :         return pledge_fail(p, EPERM, PLEDGE_INET);</span>
+<span class="lineNum">    1417 </span><span class="lineNoCov">          0 : }</span>
+<a name="1418"><span class="lineNum">    1418 </span>            : </a>
+<span class="lineNum">    1419 </span>            : int
+<span class="lineNum">    1420 </span><span class="lineNoCov">          0 : pledge_socket(struct proc *p, int domain, unsigned int state)</span>
+<span class="lineNum">    1421 </span>            : {
+<span class="lineNum">    1422 </span><span class="lineNoCov">          0 :         if (! ISSET(p-&gt;p_p-&gt;ps_flags, PS_PLEDGE))</span>
+<span class="lineNum">    1423 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">    1424 </span>            : 
+<span class="lineNum">    1425 </span><span class="lineNoCov">          0 :         if (ISSET(state, SS_DNS)) {</span>
+<span class="lineNum">    1426 </span><span class="lineNoCov">          0 :                 if (ISSET(p-&gt;p_p-&gt;ps_pledge, PLEDGE_DNS))</span>
+<span class="lineNum">    1427 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">    1428 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EPERM, PLEDGE_DNS);</span>
+<span class="lineNum">    1429 </span>            :         }
+<span class="lineNum">    1430 </span>            : 
+<span class="lineNum">    1431 </span><span class="lineNoCov">          0 :         switch (domain) {</span>
+<span class="lineNum">    1432 </span>            :         case -1:                /* accept on any domain */
+<span class="lineNum">    1433 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1434 </span>            :         case AF_INET:
+<span class="lineNum">    1435 </span>            :         case AF_INET6:
+<span class="lineNum">    1436 </span><span class="lineNoCov">          0 :                 if (ISSET(p-&gt;p_p-&gt;ps_pledge, PLEDGE_INET) ||</span>
+<span class="lineNum">    1437 </span><span class="lineNoCov">          0 :                     ISSET(p-&gt;p_p-&gt;ps_pledge, PLEDGE_YPACTIVE))</span>
+<span class="lineNum">    1438 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">    1439 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EPERM, PLEDGE_INET);</span>
+<span class="lineNum">    1440 </span>            : 
+<span class="lineNum">    1441 </span>            :         case AF_UNIX:
+<span class="lineNum">    1442 </span><span class="lineNoCov">          0 :                 if (ISSET(p-&gt;p_p-&gt;ps_pledge, PLEDGE_UNIX))</span>
+<span class="lineNum">    1443 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">    1444 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EPERM, PLEDGE_UNIX);</span>
+<span class="lineNum">    1445 </span>            :         }
+<span class="lineNum">    1446 </span>            : 
+<span class="lineNum">    1447 </span><span class="lineNoCov">          0 :         return pledge_fail(p, EINVAL, PLEDGE_INET);</span>
+<span class="lineNum">    1448 </span><span class="lineNoCov">          0 : }</span>
+<a name="1449"><span class="lineNum">    1449 </span>            : </a>
+<span class="lineNum">    1450 </span>            : int
+<span class="lineNum">    1451 </span><span class="lineNoCov">          0 : pledge_flock(struct proc *p)</span>
+<span class="lineNum">    1452 </span>            : {
+<span class="lineNum">    1453 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">    1454 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1455 </span>            : 
+<span class="lineNum">    1456 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_FLOCK))</span>
+<span class="lineNum">    1457 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1458 </span><span class="lineNoCov">          0 :         return (pledge_fail(p, EPERM, PLEDGE_FLOCK));</span>
+<span class="lineNum">    1459 </span><span class="lineNoCov">          0 : }</span>
+<a name="1460"><span class="lineNum">    1460 </span>            : </a>
+<span class="lineNum">    1461 </span>            : int
+<span class="lineNum">    1462 </span><span class="lineNoCov">          0 : pledge_swapctl(struct proc *p)</span>
+<span class="lineNum">    1463 </span>            : {
+<span class="lineNum">    1464 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">    1465 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1466 </span><span class="lineNoCov">          0 :         return (EPERM);</span>
+<span class="lineNum">    1467 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1468 </span>            : 
+<a name="1469"><span class="lineNum">    1469 </span>            : /* bsearch over pledgereq. return flags value if found, 0 else */</a>
+<span class="lineNum">    1470 </span>            : uint64_t
+<span class="lineNum">    1471 </span><span class="lineNoCov">          0 : pledgereq_flags(const char *req_name)</span>
+<span class="lineNum">    1472 </span>            : {
+<span class="lineNum">    1473 </span>            :         int base = 0, cmp, i, lim;
+<span class="lineNum">    1474 </span>            : 
+<span class="lineNum">    1475 </span><span class="lineNoCov">          0 :         for (lim = nitems(pledgereq); lim != 0; lim &gt;&gt;= 1) {</span>
+<span class="lineNum">    1476 </span><span class="lineNoCov">          0 :                 i = base + (lim &gt;&gt; 1);</span>
+<span class="lineNum">    1477 </span><span class="lineNoCov">          0 :                 cmp = strcmp(req_name, pledgereq[i].name);</span>
+<span class="lineNum">    1478 </span><span class="lineNoCov">          0 :                 if (cmp == 0)</span>
+<span class="lineNum">    1479 </span><span class="lineNoCov">          0 :                         return (pledgereq[i].flags);</span>
+<span class="lineNum">    1480 </span><span class="lineNoCov">          0 :                 if (cmp &gt; 0) { /* not found before, move right */</span>
+<span class="lineNum">    1481 </span><span class="lineNoCov">          0 :                         base = i + 1;</span>
+<span class="lineNum">    1482 </span><span class="lineNoCov">          0 :                         lim--;</span>
+<span class="lineNum">    1483 </span><span class="lineNoCov">          0 :                 } /* else move left */</span>
+<span class="lineNum">    1484 </span>            :         }
+<span class="lineNum">    1485 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1486 </span><span class="lineNoCov">          0 : }</span>
+<a name="1487"><span class="lineNum">    1487 </span>            : </a>
+<span class="lineNum">    1488 </span>            : int
+<span class="lineNum">    1489 </span><span class="lineNoCov">          0 : pledge_fcntl(struct proc *p, int cmd)</span>
+<span class="lineNum">    1490 </span>            : {
+<span class="lineNum">    1491 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">    1492 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">    1493 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_PROC) == 0 &amp;&amp; cmd == F_SETOWN)</span>
+<span class="lineNum">    1494 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EPERM, PLEDGE_PROC);</span>
+<span class="lineNum">    1495 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1496 </span><span class="lineNoCov">          0 : }</span>
+<a name="1497"><span class="lineNum">    1497 </span>            : </a>
+<span class="lineNum">    1498 </span>            : int
+<span class="lineNum">    1499 </span><span class="lineNoCov">          0 : pledge_kill(struct proc *p, pid_t pid)</span>
+<span class="lineNum">    1500 </span>            : {
+<span class="lineNum">    1501 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">    1502 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">    1503 </span><span class="lineNoCov">          0 :         if (p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_PROC)</span>
+<span class="lineNum">    1504 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">    1505 </span><span class="lineNoCov">          0 :         if (pid == 0 || pid == p-&gt;p_p-&gt;ps_pid)</span>
+<span class="lineNum">    1506 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">    1507 </span><span class="lineNoCov">          0 :         return pledge_fail(p, EPERM, PLEDGE_PROC);</span>
+<span class="lineNum">    1508 </span><span class="lineNoCov">          0 : }</span>
+<a name="1509"><span class="lineNum">    1509 </span>            : </a>
+<span class="lineNum">    1510 </span>            : int
+<span class="lineNum">    1511 </span><span class="lineNoCov">          0 : pledge_protexec(struct proc *p, int prot)</span>
+<span class="lineNum">    1512 </span>            : {
+<span class="lineNum">    1513 </span><span class="lineNoCov">          0 :         if ((p-&gt;p_p-&gt;ps_flags &amp; PS_PLEDGE) == 0)</span>
+<span class="lineNum">    1514 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">    1515 </span>            :         /* Before kbind(2) call, ld.so and crt may create EXEC mappings */
+<span class="lineNum">    1516 </span><span class="lineNoCov">          0 :         if (p-&gt;p_p-&gt;ps_kbind_addr == 0 &amp;&amp; p-&gt;p_p-&gt;ps_kbind_cookie == 0)</span>
+<span class="lineNum">    1517 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">    1518 </span><span class="lineNoCov">          0 :         if (!(p-&gt;p_p-&gt;ps_pledge &amp; PLEDGE_PROTEXEC) &amp;&amp; (prot &amp; PROT_EXEC))</span>
+<span class="lineNum">    1519 </span><span class="lineNoCov">          0 :                 return pledge_fail(p, EPERM, PLEDGE_PROTEXEC);</span>
+<span class="lineNum">    1520 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1521 </span><span class="lineNoCov">          0 : }</span>
+<a name="1522"><span class="lineNum">    1522 </span>            : </a>
+<span class="lineNum">    1523 </span>            : int
+<span class="lineNum">    1524 </span><span class="lineNoCov">          0 : canonpath(const char *input, char *buf, size_t bufsize)</span>
+<span class="lineNum">    1525 </span>            : {
+<span class="lineNum">    1526 </span>            :         const char *p;
+<span class="lineNum">    1527 </span>            :         char *q;
+<span class="lineNum">    1528 </span>            : 
+<span class="lineNum">    1529 </span>            :         /* can't canon relative paths, don't bother */
+<span class="lineNum">    1530 </span><span class="lineNoCov">          0 :         if (input[0] != '/') {</span>
+<span class="lineNum">    1531 </span><span class="lineNoCov">          0 :                 if (strlcpy(buf, input, bufsize) &gt;= bufsize)</span>
+<span class="lineNum">    1532 </span><span class="lineNoCov">          0 :                         return ENAMETOOLONG;</span>
+<span class="lineNum">    1533 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">    1534 </span>            :         }
+<span class="lineNum">    1535 </span>            : 
+<span class="lineNum">    1536 </span>            :         p = input;
+<span class="lineNum">    1537 </span>            :         q = buf;
+<span class="lineNum">    1538 </span><span class="lineNoCov">          0 :         while (*p &amp;&amp; (q - buf &lt; bufsize)) {</span>
+<span class="lineNum">    1539 </span><span class="lineNoCov">          0 :                 if (p[0] == '/' &amp;&amp; (p[1] == '/' || p[1] == '\0')) {</span>
+<span class="lineNum">    1540 </span>            :                         p += 1;
+<span class="lineNum">    1541 </span>            : 
+<span class="lineNum">    1542 </span><span class="lineNoCov">          0 :                 } else if (p[0] == '/' &amp;&amp; p[1] == '.' &amp;&amp;</span>
+<span class="lineNum">    1543 </span><span class="lineNoCov">          0 :                     (p[2] == '/' || p[2] == '\0')) {</span>
+<span class="lineNum">    1544 </span>            :                         p += 2;
+<span class="lineNum">    1545 </span>            : 
+<span class="lineNum">    1546 </span><span class="lineNoCov">          0 :                 } else if (p[0] == '/' &amp;&amp; p[1] == '.' &amp;&amp; p[2] == '.' &amp;&amp;</span>
+<span class="lineNum">    1547 </span><span class="lineNoCov">          0 :                     (p[3] == '/' || p[3] == '\0')) {</span>
+<span class="lineNum">    1548 </span>            :                         p += 3;
+<span class="lineNum">    1549 </span><span class="lineNoCov">          0 :                         if (q != buf)   /* &quot;/../&quot; at start of buf */</span>
+<span class="lineNum">    1550 </span><span class="lineNoCov">          0 :                                 while (*--q != '/')</span>
+<span class="lineNum">    1551 </span><span class="lineNoCov">          0 :                                         continue;</span>
+<span class="lineNum">    1552 </span>            : 
+<span class="lineNum">    1553 </span>            :                 } else {
+<span class="lineNum">    1554 </span><span class="lineNoCov">          0 :                         *q++ = *p++;</span>
+<span class="lineNum">    1555 </span>            :                 }
+<span class="lineNum">    1556 </span>            :         }
+<span class="lineNum">    1557 </span><span class="lineNoCov">          0 :         if ((*p == '\0') &amp;&amp; (q - buf &lt; bufsize)) {</span>
+<span class="lineNum">    1558 </span><span class="lineNoCov">          0 :                 *q = 0;</span>
+<span class="lineNum">    1559 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">    1560 </span>            :         } else
+<span class="lineNum">    1561 </span><span class="lineNoCov">          0 :                 return ENAMETOOLONG;</span>
+<span class="lineNum">    1562 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

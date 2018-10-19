@@ -1,0 +1,1242 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - net/if_tun.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">net</a> - if_tun.c<span style="font-size: 80%;"> (source / <a href="if_tun.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">514</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">38</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: if_tun.c,v 1.181 2018/02/24 07:20:04 dlg Exp $        */</a>
+<span class="lineNum">       2 </span>            : /*      $NetBSD: if_tun.c,v 1.24 1996/05/07 02:40:48 thorpej Exp $      */
+<span class="lineNum">       3 </span>            : 
+<span class="lineNum">       4 </span>            : /*
+<span class="lineNum">       5 </span>            :  * Copyright (c) 1988, Julian Onions &lt;Julian.Onions@nexor.co.uk&gt;
+<span class="lineNum">       6 </span>            :  * Nottingham University 1987.
+<span class="lineNum">       7 </span>            :  * All rights reserved.
+<span class="lineNum">       8 </span>            :  *
+<span class="lineNum">       9 </span>            :  * Redistribution and use in source and binary forms, with or without
+<span class="lineNum">      10 </span>            :  * modification, are permitted provided that the following conditions
+<span class="lineNum">      11 </span>            :  * are met:
+<span class="lineNum">      12 </span>            :  * 1. Redistributions of source code must retain the above copyright
+<span class="lineNum">      13 </span>            :  *    notice, this list of conditions and the following disclaimer.
+<span class="lineNum">      14 </span>            :  * 2. Redistributions in binary form must reproduce the above copyright
+<span class="lineNum">      15 </span>            :  *    notice, this list of conditions and the following disclaimer in the
+<span class="lineNum">      16 </span>            :  *    documentation and/or other materials provided with the distribution.
+<span class="lineNum">      17 </span>            :  *
+<span class="lineNum">      18 </span>            :  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+<span class="lineNum">      19 </span>            :  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+<span class="lineNum">      20 </span>            :  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+<span class="lineNum">      21 </span>            :  * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+<span class="lineNum">      22 </span>            :  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+<span class="lineNum">      23 </span>            :  * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+<span class="lineNum">      24 </span>            :  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+<span class="lineNum">      25 </span>            :  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+<span class="lineNum">      26 </span>            :  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+<span class="lineNum">      27 </span>            :  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+<span class="lineNum">      28 </span>            :  */
+<span class="lineNum">      29 </span>            : 
+<span class="lineNum">      30 </span>            : /*
+<span class="lineNum">      31 </span>            :  * This driver takes packets off the IP i/f and hands them up to a
+<span class="lineNum">      32 </span>            :  * user process to have its wicked way with. This driver has its
+<span class="lineNum">      33 </span>            :  * roots in a similar driver written by Phil Cockcroft (formerly) at
+<span class="lineNum">      34 </span>            :  * UCL. This driver is based much more on read/write/select mode of
+<span class="lineNum">      35 </span>            :  * operation though.
+<span class="lineNum">      36 </span>            :  */
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span>            : /* #define      TUN_DEBUG       9 */
+<span class="lineNum">      39 </span>            : 
+<span class="lineNum">      40 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      41 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      42 </span>            : #include &lt;sys/proc.h&gt;
+<span class="lineNum">      43 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      44 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      45 </span>            : #include &lt;sys/protosw.h&gt;
+<span class="lineNum">      46 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      47 </span>            : #include &lt;sys/ioctl.h&gt;
+<span class="lineNum">      48 </span>            : #include &lt;sys/errno.h&gt;
+<span class="lineNum">      49 </span>            : #include &lt;sys/syslog.h&gt;
+<span class="lineNum">      50 </span>            : #include &lt;sys/selinfo.h&gt;
+<span class="lineNum">      51 </span>            : #include &lt;sys/fcntl.h&gt;
+<span class="lineNum">      52 </span>            : #include &lt;sys/time.h&gt;
+<span class="lineNum">      53 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      54 </span>            : #include &lt;sys/vnode.h&gt;
+<span class="lineNum">      55 </span>            : #include &lt;sys/signalvar.h&gt;
+<span class="lineNum">      56 </span>            : #include &lt;sys/poll.h&gt;
+<span class="lineNum">      57 </span>            : #include &lt;sys/conf.h&gt;
+<span class="lineNum">      58 </span>            : 
+<span class="lineNum">      59 </span>            : 
+<span class="lineNum">      60 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      61 </span>            : #include &lt;net/if_types.h&gt;
+<span class="lineNum">      62 </span>            : #include &lt;net/netisr.h&gt;
+<span class="lineNum">      63 </span>            : #include &lt;net/rtable.h&gt;
+<span class="lineNum">      64 </span>            : 
+<span class="lineNum">      65 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      66 </span>            : #include &lt;netinet/if_ether.h&gt;
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span>            : #ifdef PIPEX
+<span class="lineNum">      69 </span>            : #include &lt;net/pipex.h&gt;
+<span class="lineNum">      70 </span>            : #endif
+<span class="lineNum">      71 </span>            : 
+<span class="lineNum">      72 </span>            : #include &quot;bpfilter.h&quot;
+<span class="lineNum">      73 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">      74 </span>            : #include &lt;net/bpf.h&gt;
+<span class="lineNum">      75 </span>            : #endif
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            : #include &lt;net/if_tun.h&gt;
+<span class="lineNum">      78 </span>            : 
+<span class="lineNum">      79 </span>            : struct tun_softc {
+<span class="lineNum">      80 </span>            :         struct arpcom   arpcom;         /* ethernet common data */
+<span class="lineNum">      81 </span>            :         struct selinfo  tun_rsel;       /* read select */
+<span class="lineNum">      82 </span>            :         struct selinfo  tun_wsel;       /* write select (not used) */
+<span class="lineNum">      83 </span>            :         LIST_ENTRY(tun_softc) entry;    /* all tunnel interfaces */
+<span class="lineNum">      84 </span>            :         int             tun_unit;
+<span class="lineNum">      85 </span>            :         uid_t           tun_siguid;     /* uid for process that set tun_pgid */
+<span class="lineNum">      86 </span>            :         uid_t           tun_sigeuid;    /* euid for process that set tun_pgid */
+<span class="lineNum">      87 </span>            :         pid_t           tun_pgid;       /* the process group - if any */
+<span class="lineNum">      88 </span>            :         u_short         tun_flags;      /* misc flags */
+<span class="lineNum">      89 </span>            : #define tun_if  arpcom.ac_if
+<span class="lineNum">      90 </span>            : #ifdef PIPEX
+<span class="lineNum">      91 </span>            :         struct pipex_iface_context pipex_iface; /* pipex context */
+<span class="lineNum">      92 </span>            : #endif
+<span class="lineNum">      93 </span>            : };
+<span class="lineNum">      94 </span>            : 
+<span class="lineNum">      95 </span>            : #ifdef  TUN_DEBUG
+<span class="lineNum">      96 </span>            : int     tundebug = TUN_DEBUG;
+<span class="lineNum">      97 </span>            : #define TUNDEBUG(a)     (tundebug? printf a : 0)
+<span class="lineNum">      98 </span>            : #else
+<span class="lineNum">      99 </span>            : #define TUNDEBUG(a)     /* (tundebug? printf a : 0) */
+<span class="lineNum">     100 </span>            : #endif
+<span class="lineNum">     101 </span>            : 
+<span class="lineNum">     102 </span>            : /* Only these IFF flags are changeable by TUNSIFINFO */
+<span class="lineNum">     103 </span>            : #define TUN_IFF_FLAGS (IFF_UP|IFF_POINTOPOINT|IFF_MULTICAST|IFF_BROADCAST)
+<span class="lineNum">     104 </span>            : 
+<span class="lineNum">     105 </span>            : void    tunattach(int);
+<span class="lineNum">     106 </span>            : 
+<span class="lineNum">     107 </span>            : /* cdev functions */
+<span class="lineNum">     108 </span>            : int     tunopen(dev_t, int, int, struct proc *);
+<span class="lineNum">     109 </span>            : int     tunclose(dev_t, int, int, struct proc *);
+<span class="lineNum">     110 </span>            : int     tunioctl(dev_t, u_long, caddr_t, int, struct proc *);
+<span class="lineNum">     111 </span>            : int     tunread(dev_t, struct uio *, int);
+<span class="lineNum">     112 </span>            : int     tunwrite(dev_t, struct uio *, int);
+<span class="lineNum">     113 </span>            : int     tunpoll(dev_t, int, struct proc *);
+<span class="lineNum">     114 </span>            : int     tunkqfilter(dev_t, struct knote *);
+<span class="lineNum">     115 </span>            : 
+<span class="lineNum">     116 </span>            : int     tapopen(dev_t, int, int, struct proc *);
+<span class="lineNum">     117 </span>            : int     tapclose(dev_t, int, int, struct proc *);
+<span class="lineNum">     118 </span>            : int     tapioctl(dev_t, u_long, caddr_t, int, struct proc *);
+<span class="lineNum">     119 </span>            : int     tapread(dev_t, struct uio *, int);
+<span class="lineNum">     120 </span>            : int     tapwrite(dev_t, struct uio *, int);
+<span class="lineNum">     121 </span>            : int     tappoll(dev_t, int, struct proc *);
+<span class="lineNum">     122 </span>            : int     tapkqfilter(dev_t, struct knote *);
+<span class="lineNum">     123 </span>            : 
+<span class="lineNum">     124 </span>            : int     tun_dev_open(struct tun_softc *, int, int, struct proc *);
+<span class="lineNum">     125 </span>            : int     tun_dev_close(struct tun_softc *, int, int, struct proc *);
+<span class="lineNum">     126 </span>            : int     tun_dev_ioctl(struct tun_softc *, u_long, caddr_t, int, struct proc *);
+<span class="lineNum">     127 </span>            : int     tun_dev_read(struct tun_softc *, struct uio *, int);
+<span class="lineNum">     128 </span>            : int     tun_dev_write(struct tun_softc *, struct uio *, int);
+<span class="lineNum">     129 </span>            : int     tun_dev_poll(struct tun_softc *, int, struct proc *);
+<span class="lineNum">     130 </span>            : int     tun_dev_kqfilter(struct tun_softc *, struct knote *);
+<span class="lineNum">     131 </span>            : 
+<span class="lineNum">     132 </span>            : 
+<span class="lineNum">     133 </span>            : int     tun_ioctl(struct ifnet *, u_long, caddr_t);
+<span class="lineNum">     134 </span>            : int     tun_output(struct ifnet *, struct mbuf *, struct sockaddr *,
+<span class="lineNum">     135 </span>            :             struct rtentry *);
+<span class="lineNum">     136 </span>            : int     tun_clone_create(struct if_clone *, int);
+<span class="lineNum">     137 </span>            : int     tap_clone_create(struct if_clone *, int);
+<span class="lineNum">     138 </span>            : int     tun_create(struct if_clone *, int, int);
+<span class="lineNum">     139 </span>            : int     tun_clone_destroy(struct ifnet *);
+<span class="lineNum">     140 </span>            : static inline struct    tun_softc *tun_lookup(int);
+<span class="lineNum">     141 </span>            : static inline struct    tun_softc *tap_lookup(int);
+<span class="lineNum">     142 </span>            : void    tun_wakeup(struct tun_softc *);
+<span class="lineNum">     143 </span>            : int     tun_init(struct tun_softc *);
+<span class="lineNum">     144 </span>            : void    tun_start(struct ifnet *);
+<span class="lineNum">     145 </span>            : int     filt_tunread(struct knote *, long);
+<span class="lineNum">     146 </span>            : int     filt_tunwrite(struct knote *, long);
+<span class="lineNum">     147 </span>            : void    filt_tunrdetach(struct knote *);
+<span class="lineNum">     148 </span>            : void    filt_tunwdetach(struct knote *);
+<span class="lineNum">     149 </span>            : void    tun_link_state(struct tun_softc *);
+<span class="lineNum">     150 </span>            : 
+<span class="lineNum">     151 </span>            : struct filterops tunread_filtops =
+<span class="lineNum">     152 </span>            :         { 1, NULL, filt_tunrdetach, filt_tunread};
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span>            : struct filterops tunwrite_filtops =
+<span class="lineNum">     155 </span>            :         { 1, NULL, filt_tunwdetach, filt_tunwrite};
+<span class="lineNum">     156 </span>            : 
+<span class="lineNum">     157 </span>            : LIST_HEAD(, tun_softc) tun_softc_list;
+<span class="lineNum">     158 </span>            : LIST_HEAD(, tun_softc) tap_softc_list;
+<span class="lineNum">     159 </span>            : 
+<span class="lineNum">     160 </span>            : struct if_clone tun_cloner =
+<span class="lineNum">     161 </span>            :     IF_CLONE_INITIALIZER(&quot;tun&quot;, tun_clone_create, tun_clone_destroy);
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span>            : struct if_clone tap_cloner =
+<span class="lineNum">     164 </span>            :     IF_CLONE_INITIALIZER(&quot;tap&quot;, tap_clone_create, tun_clone_destroy);
+<a name="165"><span class="lineNum">     165 </span>            : </a>
+<span class="lineNum">     166 </span>            : void
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 : tunattach(int n)</span>
+<span class="lineNum">     168 </span>            : {
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :         LIST_INIT(&amp;tun_softc_list);</span>
+<span class="lineNum">     170 </span><span class="lineNoCov">          0 :         LIST_INIT(&amp;tap_softc_list);</span>
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         if_clone_attach(&amp;tun_cloner);</span>
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :         if_clone_attach(&amp;tap_cloner);</span>
+<span class="lineNum">     173 </span>            : #ifdef PIPEX
+<span class="lineNum">     174 </span><span class="lineNoCov">          0 :         pipex_init();</span>
+<span class="lineNum">     175 </span>            : #endif
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 : }</span>
+<a name="177"><span class="lineNum">     177 </span>            : </a>
+<span class="lineNum">     178 </span>            : int
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 : tun_clone_create(struct if_clone *ifc, int unit)</span>
+<span class="lineNum">     180 </span>            : {
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :         return (tun_create(ifc, unit, 0));</span>
+<span class="lineNum">     182 </span>            : }
+<a name="183"><span class="lineNum">     183 </span>            : </a>
+<span class="lineNum">     184 </span>            : int
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 : tap_clone_create(struct if_clone *ifc, int unit)</span>
+<span class="lineNum">     186 </span>            : {
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         return (tun_create(ifc, unit, TUN_LAYER2));</span>
+<span class="lineNum">     188 </span>            : }
+<a name="189"><span class="lineNum">     189 </span>            : </a>
+<span class="lineNum">     190 </span>            : int
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 : tun_create(struct if_clone *ifc, int unit, int flags)</span>
+<span class="lineNum">     192 </span>            : {
+<span class="lineNum">     193 </span>            :         struct tun_softc        *tp;
+<span class="lineNum">     194 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">     195 </span>            : 
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         tp = malloc(sizeof(*tp), M_DEVBUF, M_WAITOK|M_ZERO);</span>
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         tp-&gt;tun_unit = unit;</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         tp-&gt;tun_flags = TUN_INITED|TUN_STAYUP;</span>
+<span class="lineNum">     199 </span>            : 
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :         ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :         snprintf(ifp-&gt;if_xname, sizeof(ifp-&gt;if_xname), &quot;%s%d&quot;, ifc-&gt;ifc_name,</span>
+<span class="lineNum">     202 </span>            :             unit);
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :         ifp-&gt;if_softc = tp;</span>
+<span class="lineNum">     204 </span>            : 
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ioctl = tun_ioctl;</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :         ifp-&gt;if_output = tun_output;</span>
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 :         ifp-&gt;if_start = tun_start;</span>
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         ifp-&gt;if_hardmtu = TUNMRU;</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         ifp-&gt;if_link_state = LINK_STATE_DOWN;</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :         IFQ_SET_MAXLEN(&amp;ifp-&gt;if_snd, IFQ_MAXLEN);</span>
+<span class="lineNum">     211 </span>            : 
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :         if ((flags &amp; TUN_LAYER2) == 0) {</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_flags &amp;= ~TUN_LAYER2;</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_mtu = ETHERMTU;</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_flags = (IFF_POINTOPOINT|IFF_MULTICAST);</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_type = IFT_TUNNEL;</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_hdrlen = sizeof(u_int32_t);</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_rtrequest = p2p_rtrequest;</span>
+<span class="lineNum">     219 </span>            : 
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :                 if_attach(ifp);</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                 if_alloc_sadl(ifp);</span>
+<span class="lineNum">     222 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :                 bpfattach(&amp;ifp-&gt;if_bpf, ifp, DLT_LOOP, sizeof(u_int32_t));</span>
+<span class="lineNum">     224 </span>            : #endif
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                 LIST_INSERT_HEAD(&amp;tun_softc_list, tp, entry);</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_flags |= TUN_LAYER2;</span>
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                 ether_fakeaddr(ifp);</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_flags =</span>
+<span class="lineNum">     230 </span>            :                     (IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST);
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_capabilities = IFCAP_VLAN_MTU;</span>
+<span class="lineNum">     232 </span>            : 
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :                 if_attach(ifp);</span>
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :                 ether_ifattach(ifp);</span>
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :                 LIST_INSERT_HEAD(&amp;tap_softc_list, tp, entry);</span>
+<span class="lineNum">     237 </span>            :         }
+<span class="lineNum">     238 </span>            : 
+<span class="lineNum">     239 </span>            : #ifdef PIPEX
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :         if ((tp-&gt;tun_flags &amp; TUN_LAYER2) == 0)</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                 pipex_iface_init(&amp;tp-&gt;pipex_iface, ifp);</span>
+<span class="lineNum">     242 </span>            : #endif
+<span class="lineNum">     243 </span>            : 
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     245 </span>            : }
+<a name="246"><span class="lineNum">     246 </span>            : </a>
+<span class="lineNum">     247 </span>            : int
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 : tun_clone_destroy(struct ifnet *ifp)</span>
+<span class="lineNum">     249 </span>            : {
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         struct tun_softc        *tp = ifp-&gt;if_softc;</span>
+<span class="lineNum">     251 </span>            :         int                      s;
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span>            : #ifdef PIPEX
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         if ((tp-&gt;tun_flags &amp; TUN_LAYER2) == 0)</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :                 pipex_iface_fini(&amp;tp-&gt;pipex_iface);</span>
+<span class="lineNum">     256 </span>            : #endif
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         tun_wakeup(tp);</span>
+<span class="lineNum">     258 </span>            : 
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :         s = splhigh();</span>
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         klist_invalidate(&amp;tp-&gt;tun_rsel.si_note);</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         klist_invalidate(&amp;tp-&gt;tun_wsel.si_note);</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">     263 </span>            : 
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         LIST_REMOVE(tp, entry);</span>
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         if (tp-&gt;tun_flags &amp; TUN_LAYER2)</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :                 ether_ifdetach(ifp);</span>
+<span class="lineNum">     268 </span>            : 
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         if_detach(ifp);</span>
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         free(tp, M_DEVBUF, sizeof *tp);</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     273 </span>            : }
+<a name="274"><span class="lineNum">     274 </span>            : </a>
+<span class="lineNum">     275 </span>            : static inline struct tun_softc *
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 : tun_lookup(int unit)</span>
+<span class="lineNum">     277 </span>            : {
+<span class="lineNum">     278 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         LIST_FOREACH(tp, &amp;tun_softc_list, entry)</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                 if (tp-&gt;tun_unit == unit)</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :                         return (tp);</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 : }</span>
+<a name="285"><span class="lineNum">     285 </span>            : </a>
+<span class="lineNum">     286 </span>            : static inline struct tun_softc *
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 : tap_lookup(int unit)</span>
+<span class="lineNum">     288 </span>            : {
+<span class="lineNum">     289 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     290 </span>            : 
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         LIST_FOREACH(tp, &amp;tap_softc_list, entry)</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :                 if (tp-&gt;tun_unit == unit)</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                         return (tp);</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     296 </span>            : 
+<span class="lineNum">     297 </span>            : /*
+<span class="lineNum">     298 </span>            :  * tunnel open - must be superuser &amp; the device must be
+<span class="lineNum">     299 </span>            :  * configured in
+<a name="300"><span class="lineNum">     300 </span>            :  */</a>
+<span class="lineNum">     301 </span>            : int
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 : tunopen(dev_t dev, int flag, int mode, struct proc *p)</span>
+<span class="lineNum">     303 </span>            : {
+<span class="lineNum">     304 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         unsigned int rdomain = rtable_l2(p-&gt;p_p-&gt;ps_rtableid);</span>
+<span class="lineNum">     306 </span>            : 
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :         if ((tp = tun_lookup(minor(dev))) == NULL) {    /* create on demand */</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :                 char    xname[IFNAMSIZ];</span>
+<span class="lineNum">     309 </span>            :                 int     error;
+<span class="lineNum">     310 </span>            : 
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :                 snprintf(xname, sizeof(xname), &quot;%s%d&quot;, &quot;tun&quot;, minor(dev));</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                 NET_LOCK();</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :                 error = if_clone_create(xname, rdomain);</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                 NET_UNLOCK();</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :                 if (error != 0)</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :                 if ((tp = tun_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :                         return (ENXIO);</span>
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_flags &amp;= ~TUN_STAYUP;</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     322 </span>            : 
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :         return (tun_dev_open(tp, flag, mode, p));</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 : }</span>
+<a name="325"><span class="lineNum">     325 </span>            : </a>
+<span class="lineNum">     326 </span>            : int
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 : tapopen(dev_t dev, int flag, int mode, struct proc *p)</span>
+<span class="lineNum">     328 </span>            : {
+<span class="lineNum">     329 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         unsigned int rdomain = rtable_l2(p-&gt;p_p-&gt;ps_rtableid);</span>
+<span class="lineNum">     331 </span>            : 
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :         if ((tp = tap_lookup(minor(dev))) == NULL) {    /* create on demand */</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :                 char    xname[IFNAMSIZ];</span>
+<span class="lineNum">     334 </span>            :                 int     error;
+<span class="lineNum">     335 </span>            : 
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :                 snprintf(xname, sizeof(xname), &quot;%s%d&quot;, &quot;tap&quot;, minor(dev));</span>
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :                 NET_LOCK();</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :                 error = if_clone_create(xname, rdomain);</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :                 NET_UNLOCK();</span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :                 if (error != 0)</span>
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :                         return (error);</span>
+<span class="lineNum">     342 </span>            : 
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :                 if ((tp = tap_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :                         return (ENXIO);</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_flags &amp;= ~TUN_STAYUP;</span>
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     347 </span>            : 
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         return (tun_dev_open(tp, flag, mode, p));</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 : }</span>
+<a name="350"><span class="lineNum">     350 </span>            : </a>
+<span class="lineNum">     351 </span>            : int
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 : tun_dev_open(struct tun_softc *tp, int flag, int mode, struct proc *p)</span>
+<span class="lineNum">     353 </span>            : {
+<span class="lineNum">     354 </span>            :         struct ifnet *ifp;
+<span class="lineNum">     355 </span>            : 
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :         if (tp-&gt;tun_flags &amp; TUN_OPEN)</span>
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :                 return (EBUSY);</span>
+<span class="lineNum">     358 </span>            : 
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :         ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         tp-&gt;tun_flags |= TUN_OPEN;</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         if (flag &amp; FNONBLOCK)</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_flags |= TUN_NBIO;</span>
+<span class="lineNum">     363 </span>            : 
+<span class="lineNum">     364 </span>            :         /* automatically mark the interface running on open */
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags |= IFF_RUNNING;</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         tun_link_state(tp);</span>
+<span class="lineNum">     367 </span>            : 
+<span class="lineNum">     368 </span>            :         TUNDEBUG((&quot;%s: open\n&quot;, ifp-&gt;if_xname));
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     371 </span>            : 
+<span class="lineNum">     372 </span>            : /*
+<span class="lineNum">     373 </span>            :  * tunclose - close the device; if closing the real device, flush pending
+<span class="lineNum">     374 </span>            :  *  output and unless STAYUP bring down and destroy the interface.
+<a name="375"><span class="lineNum">     375 </span>            :  */</a>
+<span class="lineNum">     376 </span>            : int
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 : tunclose(dev_t dev, int flag, int mode, struct proc *p)</span>
+<span class="lineNum">     378 </span>            : {
+<span class="lineNum">     379 </span>            :         struct tun_softc        *tp;
+<span class="lineNum">     380 </span>            : 
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :         if ((tp = tun_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :         return (tun_dev_close(tp, flag, mode, p));</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 : }</span>
+<a name="385"><span class="lineNum">     385 </span>            : </a>
+<span class="lineNum">     386 </span>            : int
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 : tapclose(dev_t dev, int flag, int mode, struct proc *p)</span>
+<span class="lineNum">     388 </span>            : {
+<span class="lineNum">     389 </span>            :         struct tun_softc        *tp;
+<span class="lineNum">     390 </span>            : 
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :         if ((tp = tap_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         return (tun_dev_close(tp, flag, mode, p));</span>
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 : }</span>
+<a name="395"><span class="lineNum">     395 </span>            : </a>
+<span class="lineNum">     396 </span>            : int
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 : tun_dev_close(struct tun_softc *tp, int flag, int mode, struct proc *p)</span>
+<span class="lineNum">     398 </span>            : {
+<span class="lineNum">     399 </span>            :         int                      error = 0;
+<span class="lineNum">     400 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">     401 </span>            : 
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :         ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :         tp-&gt;tun_flags &amp;= ~(TUN_OPEN|TUN_NBIO|TUN_ASYNC);</span>
+<span class="lineNum">     404 </span>            : 
+<span class="lineNum">     405 </span>            :         /*
+<span class="lineNum">     406 </span>            :          * junk all pending output
+<span class="lineNum">     407 </span>            :          */
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags &amp;= ~IFF_RUNNING;</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :         tun_link_state(tp);</span>
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         IFQ_PURGE(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">     411 </span>            : 
+<span class="lineNum">     412 </span>            :         TUNDEBUG((&quot;%s: closed\n&quot;, ifp-&gt;if_xname));
+<span class="lineNum">     413 </span>            : 
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         if (!(tp-&gt;tun_flags &amp; TUN_STAYUP)) {</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :                 NET_LOCK();</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :                 error = if_clone_destroy(ifp-&gt;if_xname);</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                 NET_UNLOCK();</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_pgid = 0;</span>
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :                 selwakeup(&amp;tp-&gt;tun_rsel);</span>
+<span class="lineNum">     421 </span>            :         }
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     424 </span>            : }
+<a name="425"><span class="lineNum">     425 </span>            : </a>
+<span class="lineNum">     426 </span>            : int
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 : tun_init(struct tun_softc *tp)</span>
+<span class="lineNum">     428 </span>            : {
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :         struct ifnet    *ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">     430 </span>            :         struct ifaddr   *ifa;
+<span class="lineNum">     431 </span>            : 
+<span class="lineNum">     432 </span>            :         TUNDEBUG((&quot;%s: tun_init\n&quot;, ifp-&gt;if_xname));
+<span class="lineNum">     433 </span>            : 
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags |= IFF_UP | IFF_RUNNING;</span>
+<span class="lineNum">     435 </span>            : 
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :         tp-&gt;tun_flags &amp;= ~(TUN_IASET|TUN_DSTADDR|TUN_BRDADDR);</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :         TAILQ_FOREACH(ifa, &amp;ifp-&gt;if_addrlist, ifa_list) {</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                 if (ifa-&gt;ifa_addr-&gt;sa_family == AF_INET) {</span>
+<span class="lineNum">     439 </span>            :                         struct sockaddr_in *sin;
+<span class="lineNum">     440 </span>            : 
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                         sin = satosin(ifa-&gt;ifa_addr);</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :                         if (sin &amp;&amp; sin-&gt;sin_addr.s_addr)</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :                                 tp-&gt;tun_flags |= TUN_IASET;</span>
+<span class="lineNum">     444 </span>            : 
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_POINTOPOINT) {</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                                 sin = satosin(ifa-&gt;ifa_dstaddr);</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                                 if (sin &amp;&amp; sin-&gt;sin_addr.s_addr)</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                                         tp-&gt;tun_flags |= TUN_DSTADDR;</span>
+<span class="lineNum">     449 </span>            :                         } else
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                                 tp-&gt;tun_flags &amp;= ~TUN_DSTADDR;</span>
+<span class="lineNum">     451 </span>            : 
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_BROADCAST) {</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                                 sin = satosin(ifa-&gt;ifa_broadaddr);</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :                                 if (sin &amp;&amp; sin-&gt;sin_addr.s_addr)</span>
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :                                         tp-&gt;tun_flags |= TUN_BRDADDR;</span>
+<span class="lineNum">     456 </span>            :                         } else
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                                 tp-&gt;tun_flags &amp;= ~TUN_BRDADDR;</span>
+<span class="lineNum">     458 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     459 </span>            : #ifdef INET6
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :                 if (ifa-&gt;ifa_addr-&gt;sa_family == AF_INET6) {</span>
+<span class="lineNum">     461 </span>            :                         struct sockaddr_in6 *sin6;
+<span class="lineNum">     462 </span>            : 
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :                         sin6 = satosin6(ifa-&gt;ifa_addr);</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :                         if (!IN6_IS_ADDR_UNSPECIFIED(&amp;sin6-&gt;sin6_addr))</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                                 tp-&gt;tun_flags |= TUN_IASET;</span>
+<span class="lineNum">     466 </span>            : 
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_POINTOPOINT) {</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :                                 sin6 = satosin6(ifa-&gt;ifa_dstaddr);</span>
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :                                 if (sin6 &amp;&amp;</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :                                     !IN6_IS_ADDR_UNSPECIFIED(&amp;sin6-&gt;sin6_addr))</span>
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                                         tp-&gt;tun_flags |= TUN_DSTADDR;</span>
+<span class="lineNum">     472 </span>            :                         } else
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :                                 tp-&gt;tun_flags &amp;= ~TUN_DSTADDR;</span>
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     475 </span>            : #endif /* INET6 */
+<span class="lineNum">     476 </span>            :         }
+<span class="lineNum">     477 </span>            : 
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     479 </span>            : }
+<span class="lineNum">     480 </span>            : 
+<span class="lineNum">     481 </span>            : /*
+<span class="lineNum">     482 </span>            :  * Process an ioctl request.
+<a name="483"><span class="lineNum">     483 </span>            :  */</a>
+<span class="lineNum">     484 </span>            : int
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 : tun_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)</span>
+<span class="lineNum">     486 </span>            : {
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :         struct tun_softc        *tp = (struct tun_softc *)(ifp-&gt;if_softc);</span>
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :         struct ifreq            *ifr = (struct ifreq *)data;</span>
+<span class="lineNum">     489 </span>            :         int                      error = 0;
+<span class="lineNum">     490 </span>            : 
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     492 </span>            :         case SIOCSIFADDR:
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :                 tun_init(tp);</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     495 </span>            :         case SIOCSIFDSTADDR:
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                 tun_init(tp);</span>
+<span class="lineNum">     497 </span>            :                 TUNDEBUG((&quot;%s: destination address set\n&quot;, ifp-&gt;if_xname));
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     499 </span>            :         case SIOCSIFMTU:
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :                 if (ifr-&gt;ifr_mtu &lt; ETHERMIN || ifr-&gt;ifr_mtu &gt; TUNMRU)</span>
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :                         error = EINVAL;</span>
+<span class="lineNum">     502 </span>            :                 else
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_mtu = ifr-&gt;ifr_mtu;</span>
+<span class="lineNum">     504 </span>            :                 break;
+<span class="lineNum">     505 </span>            :         case SIOCADDMULTI:
+<span class="lineNum">     506 </span>            :         case SIOCDELMULTI:
+<span class="lineNum">     507 </span>            :                 break;
+<span class="lineNum">     508 </span>            :         case SIOCSIFFLAGS:
+<span class="lineNum">     509 </span>            :                 break;
+<span class="lineNum">     510 </span>            :         default:
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :                 if (tp-&gt;tun_flags &amp; TUN_LAYER2)</span>
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :                         error = ether_ioctl(ifp, &amp;tp-&gt;arpcom, cmd, data);</span>
+<span class="lineNum">     513 </span>            :                 else
+<span class="lineNum">     514 </span>            :                         error = ENOTTY;
+<span class="lineNum">     515 </span>            :         }
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     518 </span>            : }
+<span class="lineNum">     519 </span>            : 
+<span class="lineNum">     520 </span>            : /*
+<span class="lineNum">     521 </span>            :  * tun_output - queue packets from higher level ready to put out.
+<a name="522"><span class="lineNum">     522 </span>            :  */</a>
+<span class="lineNum">     523 </span>            : int
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 : tun_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,</span>
+<span class="lineNum">     525 </span>            :     struct rtentry *rt)
+<span class="lineNum">     526 </span>            : {
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :         struct tun_softc        *tp = ifp-&gt;if_softc;</span>
+<span class="lineNum">     528 </span>            :         int                      error;
+<span class="lineNum">     529 </span>            :         u_int32_t               *af;
+<span class="lineNum">     530 </span>            : 
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :         if ((ifp-&gt;if_flags &amp; (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING)) {</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :                 m_freem(m0);</span>
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :                 return (EHOSTDOWN);</span>
+<span class="lineNum">     534 </span>            :         }
+<span class="lineNum">     535 </span>            : 
+<span class="lineNum">     536 </span>            :         TUNDEBUG((&quot;%s: tun_output\n&quot;, ifp-&gt;if_xname));
+<span class="lineNum">     537 </span>            : 
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :         if ((tp-&gt;tun_flags &amp; TUN_READY) != TUN_READY) {</span>
+<span class="lineNum">     539 </span>            :                 TUNDEBUG((&quot;%s: not ready %#x\n&quot;, ifp-&gt;if_xname,
+<span class="lineNum">     540 </span>            :                      tp-&gt;tun_flags));
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :                 m_freem(m0);</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :                 return (EHOSTDOWN);</span>
+<span class="lineNum">     543 </span>            :         }
+<span class="lineNum">     544 </span>            : 
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         if (tp-&gt;tun_flags &amp; TUN_LAYER2)</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :                 return (ether_output(ifp, m0, dst, rt));</span>
+<span class="lineNum">     547 </span>            : 
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         M_PREPEND(m0, sizeof(*af), M_DONTWAIT);</span>
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :         if (m0 == NULL)</span>
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :         af = mtod(m0, u_int32_t *);</span>
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :         *af = htonl(dst-&gt;sa_family);</span>
+<span class="lineNum">     553 </span>            : 
+<span class="lineNum">     554 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_bpf)</span>
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :                 bpf_mtap(ifp-&gt;if_bpf, m0, BPF_DIRECTION_OUT);</span>
+<span class="lineNum">     557 </span>            : #endif
+<span class="lineNum">     558 </span>            : #ifdef PIPEX
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :         if (pipex_enable &amp;&amp; (m0 = pipex_output(m0, dst-&gt;sa_family,</span>
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :             sizeof(u_int32_t), &amp;tp-&gt;pipex_iface)) == NULL) {</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     562 </span>            :         }
+<span class="lineNum">     563 </span>            : #endif
+<span class="lineNum">     564 </span>            : 
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :         error = if_enqueue(ifp, m0);</span>
+<span class="lineNum">     566 </span>            : 
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_collisions++;</span>
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">     570 </span>            :         }
+<span class="lineNum">     571 </span>            : 
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :         tun_wakeup(tp);</span>
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 : }</span>
+<a name="575"><span class="lineNum">     575 </span>            : </a>
+<span class="lineNum">     576 </span>            : void
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 : tun_wakeup(struct tun_softc *tp)</span>
+<span class="lineNum">     578 </span>            : {
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :         if (tp-&gt;tun_flags &amp; TUN_RWAIT) {</span>
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_flags &amp;= ~TUN_RWAIT;</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :                 wakeup((caddr_t)tp);</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :         if (tp-&gt;tun_flags &amp; TUN_ASYNC &amp;&amp; tp-&gt;tun_pgid)</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                 csignal(tp-&gt;tun_pgid, SIGIO,</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :                     tp-&gt;tun_siguid, tp-&gt;tun_sigeuid);</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :         selwakeup(&amp;tp-&gt;tun_rsel);</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     588 </span>            : 
+<span class="lineNum">     589 </span>            : /*
+<span class="lineNum">     590 </span>            :  * the cdevsw interface is now pretty minimal.
+<a name="591"><span class="lineNum">     591 </span>            :  */</a>
+<span class="lineNum">     592 </span>            : int
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 : tunioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)</span>
+<span class="lineNum">     594 </span>            : {
+<span class="lineNum">     595 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     596 </span>            : 
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :         if ((tp = tun_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :         return (tun_dev_ioctl(tp, cmd, data, flag, p));</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 : }</span>
+<a name="601"><span class="lineNum">     601 </span>            : </a>
+<span class="lineNum">     602 </span>            : int
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 : tapioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)</span>
+<span class="lineNum">     604 </span>            : {
+<span class="lineNum">     605 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     606 </span>            : 
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :         if ((tp = tap_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         return (tun_dev_ioctl(tp, cmd, data, flag, p));</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 : }</span>
+<a name="611"><span class="lineNum">     611 </span>            : </a>
+<span class="lineNum">     612 </span>            : int
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 : tun_dev_ioctl(struct tun_softc *tp, u_long cmd, caddr_t data, int flag,</span>
+<span class="lineNum">     614 </span>            :     struct proc *p)
+<span class="lineNum">     615 </span>            : {
+<span class="lineNum">     616 </span>            :         struct tuninfo          *tunp;
+<span class="lineNum">     617 </span>            : 
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     619 </span>            :         case TUNSIFINFO:
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :                 tunp = (struct tuninfo *)data;</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :                 if (tunp-&gt;mtu &lt; ETHERMIN || tunp-&gt;mtu &gt; TUNMRU)</span>
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :                         return (EINVAL);</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_if.if_mtu = tunp-&gt;mtu;</span>
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_if.if_type = tunp-&gt;type;</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_if.if_flags =</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                     (tunp-&gt;flags &amp; TUN_IFF_FLAGS) |</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :                     (tp-&gt;tun_if.if_flags &amp; ~TUN_IFF_FLAGS);</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_if.if_baudrate = tunp-&gt;baudrate;</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     630 </span>            :         case TUNGIFINFO:
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                 tunp = (struct tuninfo *)data;</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :                 tunp-&gt;mtu = tp-&gt;tun_if.if_mtu;</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :                 tunp-&gt;type = tp-&gt;tun_if.if_type;</span>
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 :                 tunp-&gt;flags = tp-&gt;tun_if.if_flags;</span>
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :                 tunp-&gt;baudrate = tp-&gt;tun_if.if_baudrate;</span>
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     637 </span>            : #ifdef TUN_DEBUG
+<span class="lineNum">     638 </span>            :         case TUNSDEBUG:
+<span class="lineNum">     639 </span>            :                 tundebug = *(int *)data;
+<span class="lineNum">     640 </span>            :                 break;
+<span class="lineNum">     641 </span>            :         case TUNGDEBUG:
+<span class="lineNum">     642 </span>            :                 *(int *)data = tundebug;
+<span class="lineNum">     643 </span>            :                 break;
+<span class="lineNum">     644 </span>            : #endif
+<span class="lineNum">     645 </span>            :         case TUNSIFMODE:
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :                 switch (*(int *)data &amp; (IFF_POINTOPOINT|IFF_BROADCAST)) {</span>
+<span class="lineNum">     647 </span>            :                 case IFF_POINTOPOINT:
+<span class="lineNum">     648 </span>            :                 case IFF_BROADCAST:
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :                         tp-&gt;tun_if.if_flags &amp;= ~TUN_IFF_FLAGS;</span>
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :                         tp-&gt;tun_if.if_flags |= *(int *)data &amp; TUN_IFF_FLAGS;</span>
+<span class="lineNum">     651 </span>            :                         break;
+<span class="lineNum">     652 </span>            :                 default:
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :                         return (EINVAL);</span>
+<span class="lineNum">     654 </span>            :                 }
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     656 </span>            : 
+<span class="lineNum">     657 </span>            :         case FIONBIO:
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                 if (*(int *)data)</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                         tp-&gt;tun_flags |= TUN_NBIO;</span>
+<span class="lineNum">     660 </span>            :                 else
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                         tp-&gt;tun_flags &amp;= ~TUN_NBIO;</span>
+<span class="lineNum">     662 </span>            :                 break;
+<span class="lineNum">     663 </span>            :         case FIOASYNC:
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                 if (*(int *)data)</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :                         tp-&gt;tun_flags |= TUN_ASYNC;</span>
+<span class="lineNum">     666 </span>            :                 else
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                         tp-&gt;tun_flags &amp;= ~TUN_ASYNC;</span>
+<span class="lineNum">     668 </span>            :                 break;
+<span class="lineNum">     669 </span>            :         case FIONREAD:
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :                 *(int *)data = ifq_empty(&amp;tp-&gt;tun_if.if_snd) ?</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                     0 : tp-&gt;tun_if.if_mtu;</span>
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     673 </span>            :         case TIOCSPGRP:
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_pgid = *(int *)data;</span>
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_siguid = p-&gt;p_ucred-&gt;cr_ruid;</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :                 tp-&gt;tun_sigeuid = p-&gt;p_ucred-&gt;cr_uid;</span>
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     678 </span>            :         case TIOCGPGRP:
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :                 *(int *)data = tp-&gt;tun_pgid;</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     681 </span>            :         case SIOCGIFADDR:
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :                 if (!(tp-&gt;tun_flags &amp; TUN_LAYER2))</span>
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :                         return (EINVAL);</span>
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :                 bcopy(tp-&gt;arpcom.ac_enaddr, data,</span>
+<span class="lineNum">     685 </span>            :                     sizeof(tp-&gt;arpcom.ac_enaddr));
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     687 </span>            : 
+<span class="lineNum">     688 </span>            :         case SIOCSIFADDR:
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :                 if (!(tp-&gt;tun_flags &amp; TUN_LAYER2))</span>
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :                         return (EINVAL);</span>
+<span class="lineNum">     691 </span><span class="lineNoCov">          0 :                 bcopy(data, tp-&gt;arpcom.ac_enaddr,</span>
+<span class="lineNum">     692 </span>            :                     sizeof(tp-&gt;arpcom.ac_enaddr));
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     694 </span>            :         default:
+<span class="lineNum">     695 </span>            : #ifdef PIPEX
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :                 if (!(tp-&gt;tun_flags &amp; TUN_LAYER2)) {</span>
+<span class="lineNum">     697 </span>            :                         int ret;
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :                         ret = pipex_ioctl(&amp;tp-&gt;pipex_iface, cmd, data);</span>
+<span class="lineNum">     699 </span>            :                         return (ret);
+<span class="lineNum">     700 </span>            :                 }
+<span class="lineNum">     701 </span>            : #endif
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :                 return (ENOTTY);</span>
+<span class="lineNum">     703 </span>            :         }
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     706 </span>            : 
+<span class="lineNum">     707 </span>            : /*
+<span class="lineNum">     708 </span>            :  * The cdevsw read interface - reads a packet at a time, or at
+<span class="lineNum">     709 </span>            :  * least as much of a packet as can be read.
+<a name="710"><span class="lineNum">     710 </span>            :  */</a>
+<span class="lineNum">     711 </span>            : int
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 : tunread(dev_t dev, struct uio *uio, int ioflag)</span>
+<span class="lineNum">     713 </span>            : {
+<span class="lineNum">     714 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     715 </span>            : 
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :         if ((tp = tun_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :         return (tun_dev_read(tp, uio, ioflag));</span>
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 : }</span>
+<a name="720"><span class="lineNum">     720 </span>            : </a>
+<span class="lineNum">     721 </span>            : int
+<span class="lineNum">     722 </span><span class="lineNoCov">          0 : tapread(dev_t dev, struct uio *uio, int ioflag)</span>
+<span class="lineNum">     723 </span>            : {
+<span class="lineNum">     724 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     725 </span>            : 
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 :         if ((tp = tap_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :         return (tun_dev_read(tp, uio, ioflag));</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 : }</span>
+<a name="730"><span class="lineNum">     730 </span>            : </a>
+<span class="lineNum">     731 </span>            : int
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 : tun_dev_read(struct tun_softc *tp, struct uio *uio, int ioflag)</span>
+<span class="lineNum">     733 </span>            : {
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :         struct ifnet            *ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">     735 </span>            :         struct mbuf             *m, *m0;
+<span class="lineNum">     736 </span>            :         unsigned int             ifidx;
+<span class="lineNum">     737 </span>            :         int                      error = 0;
+<span class="lineNum">     738 </span>            :         size_t                   len;
+<span class="lineNum">     739 </span>            : 
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :         if ((tp-&gt;tun_flags &amp; TUN_READY) != TUN_READY)</span>
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 :                 return (EHOSTDOWN);</span>
+<span class="lineNum">     742 </span>            : 
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :         ifidx = ifp-&gt;if_index;</span>
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :         tp-&gt;tun_flags &amp;= ~TUN_RWAIT;</span>
+<span class="lineNum">     745 </span>            : 
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     747 </span>            :                 struct ifnet *ifp1;
+<span class="lineNum">     748 </span>            :                 int destroyed;
+<span class="lineNum">     749 </span>            : 
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :                 while ((tp-&gt;tun_flags &amp; TUN_READY) != TUN_READY) {</span>
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :                         if ((error = tsleep((caddr_t)tp,</span>
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :                             (PZERO + 1)|PCATCH, &quot;tunread&quot;, 0)) != 0)</span>
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :                                 return (error);</span>
+<span class="lineNum">     754 </span>            :                         /* Make sure the interface still exists. */
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :                         ifp1 = if_get(ifidx);</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :                         destroyed = (ifp1 == NULL);</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :                         if_put(ifp1);</span>
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :                         if (destroyed)</span>
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :                                 return (ENXIO);</span>
+<span class="lineNum">     760 </span>            :                 }
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :                 IFQ_DEQUEUE(&amp;ifp-&gt;if_snd, m0);</span>
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :                 if (m0 == NULL) {</span>
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :                         if (tp-&gt;tun_flags &amp; TUN_NBIO &amp;&amp; ioflag &amp; IO_NDELAY)</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :                                 return (EWOULDBLOCK);</span>
+<span class="lineNum">     765 </span><span class="lineNoCov">          0 :                         tp-&gt;tun_flags |= TUN_RWAIT;</span>
+<span class="lineNum">     766 </span><span class="lineNoCov">          0 :                         if ((error = tsleep((caddr_t)tp,</span>
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :                             (PZERO + 1)|PCATCH, &quot;tunread&quot;, 0)) != 0)</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :                                 return (error);</span>
+<span class="lineNum">     769 </span>            :                         /* Make sure the interface still exists. */
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :                         ifp1 = if_get(ifidx);</span>
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 :                         destroyed = (ifp1 == NULL);</span>
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :                         if_put(ifp1);</span>
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 :                         if (destroyed)</span>
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :                                 return (ENXIO);</span>
+<span class="lineNum">     775 </span>            :                 }
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :         } while (m0 == NULL);</span>
+<span class="lineNum">     777 </span>            : 
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :         if (tp-&gt;tun_flags &amp; TUN_LAYER2) {</span>
+<span class="lineNum">     779 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_bpf)</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :                         bpf_mtap(ifp-&gt;if_bpf, m0, BPF_DIRECTION_OUT);</span>
+<span class="lineNum">     782 </span>            : #endif
+<span class="lineNum">     783 </span>            :         }
+<span class="lineNum">     784 </span>            : 
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         while (m0 != NULL &amp;&amp; uio-&gt;uio_resid &gt; 0 &amp;&amp; error == 0) {</span>
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :                 len = ulmin(uio-&gt;uio_resid, m0-&gt;m_len);</span>
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :                 if (len != 0)</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :                         error = uiomove(mtod(m0, caddr_t), len, uio);</span>
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 :                 m = m_free(m0);</span>
+<span class="lineNum">     790 </span>            :                 m0 = m;
+<span class="lineNum">     791 </span>            :         }
+<span class="lineNum">     792 </span>            : 
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :         if (m0 != NULL) {</span>
+<span class="lineNum">     794 </span>            :                 TUNDEBUG((&quot;Dropping mbuf\n&quot;));
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :                 m_freem(m0);</span>
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :         if (error)</span>
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_oerrors++;</span>
+<span class="lineNum">     799 </span>            : 
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     801 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     802 </span>            : 
+<span class="lineNum">     803 </span>            : /*
+<span class="lineNum">     804 </span>            :  * the cdevsw write interface - an atomic write is a packet - or else!
+<a name="805"><span class="lineNum">     805 </span>            :  */</a>
+<span class="lineNum">     806 </span>            : int
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 : tunwrite(dev_t dev, struct uio *uio, int ioflag)</span>
+<span class="lineNum">     808 </span>            : {
+<span class="lineNum">     809 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     810 </span>            : 
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :         if ((tp = tun_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :         return (tun_dev_write(tp, uio, ioflag));</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 : }</span>
+<a name="815"><span class="lineNum">     815 </span>            : </a>
+<span class="lineNum">     816 </span>            : int
+<span class="lineNum">     817 </span><span class="lineNoCov">          0 : tapwrite(dev_t dev, struct uio *uio, int ioflag)</span>
+<span class="lineNum">     818 </span>            : {
+<span class="lineNum">     819 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     820 </span>            : 
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :         if ((tp = tap_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :         return (tun_dev_write(tp, uio, ioflag));</span>
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 : }</span>
+<a name="825"><span class="lineNum">     825 </span>            : </a>
+<span class="lineNum">     826 </span>            : int
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 : tun_dev_write(struct tun_softc *tp, struct uio *uio, int ioflag)</span>
+<span class="lineNum">     828 </span>            : {
+<span class="lineNum">     829 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">     830 </span>            :         u_int32_t               *th;
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :         struct mbuf             *top, **mp, *m;</span>
+<span class="lineNum">     832 </span>            :         int                     error = 0, tlen;
+<span class="lineNum">     833 </span>            :         size_t                  mlen;
+<span class="lineNum">     834 </span>            : 
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">     836 </span>            :         TUNDEBUG((&quot;%s: tunwrite\n&quot;, ifp-&gt;if_xname));
+<span class="lineNum">     837 </span>            : 
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :         if (uio-&gt;uio_resid == 0 || uio-&gt;uio_resid &gt; ifp-&gt;if_mtu +</span>
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :             (tp-&gt;tun_flags &amp; TUN_LAYER2 ? ETHER_HDR_LEN : sizeof(*th))) {</span>
+<span class="lineNum">     840 </span>            :                 TUNDEBUG((&quot;%s: len=%d!\n&quot;, ifp-&gt;if_xname, uio-&gt;uio_resid));
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :                 return (EMSGSIZE);</span>
+<span class="lineNum">     842 </span>            :         }
+<span class="lineNum">     843 </span><span class="lineNoCov">          0 :         tlen = uio-&gt;uio_resid;</span>
+<span class="lineNum">     844 </span>            : 
+<span class="lineNum">     845 </span>            :         /* get a header mbuf */
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :         MGETHDR(m, M_DONTWAIT, MT_DATA);</span>
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :         if (m == NULL)</span>
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">     849 </span>            :         mlen = MHLEN;
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :         if (uio-&gt;uio_resid &gt;= MINCLSIZE) {</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                 MCLGET(m, M_DONTWAIT);</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :                 if (!(m-&gt;m_flags &amp; M_EXT)) {</span>
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :                         m_free(m);</span>
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :                         return (ENOBUFS);</span>
+<span class="lineNum">     855 </span>            :                 }
+<span class="lineNum">     856 </span>            :                 mlen = MCLBYTES;
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     858 </span>            : 
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :         top = NULL;</span>
+<span class="lineNum">     860 </span>            :         mp = &amp;top;
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :         if (tp-&gt;tun_flags &amp; TUN_LAYER2) {</span>
+<span class="lineNum">     862 </span>            :                 /*
+<span class="lineNum">     863 </span>            :                  * Pad so that IP header is correctly aligned
+<span class="lineNum">     864 </span>            :                  * this is necessary for all strict aligned architectures.
+<span class="lineNum">     865 </span>            :                  */
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :                 mlen -= ETHER_ALIGN;</span>
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :                 m-&gt;m_data += ETHER_ALIGN;</span>
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :         while (error == 0 &amp;&amp; uio-&gt;uio_resid &gt; 0) {</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :                 m-&gt;m_len = ulmin(mlen, uio-&gt;uio_resid);</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :                 error = uiomove(mtod (m, caddr_t), m-&gt;m_len, uio);</span>
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :                 *mp = m;</span>
+<span class="lineNum">     873 </span><span class="lineNoCov">          0 :                 mp = &amp;m-&gt;m_next;</span>
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :                 if (error == 0 &amp;&amp; uio-&gt;uio_resid &gt; 0) {</span>
+<span class="lineNum">     875 </span><span class="lineNoCov">          0 :                         MGET(m, M_DONTWAIT, MT_DATA);</span>
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :                         if (m == NULL) {</span>
+<span class="lineNum">     877 </span>            :                                 error = ENOBUFS;
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     879 </span>            :                         }
+<span class="lineNum">     880 </span>            :                         mlen = MLEN;
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :                         if (uio-&gt;uio_resid &gt;= MINCLSIZE) {</span>
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :                                 MCLGET(m, M_DONTWAIT);</span>
+<span class="lineNum">     883 </span><span class="lineNoCov">          0 :                                 if (!(m-&gt;m_flags &amp; M_EXT)) {</span>
+<span class="lineNum">     884 </span>            :                                         error = ENOBUFS;
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :                                         m_free(m);</span>
+<span class="lineNum">     886 </span><span class="lineNoCov">          0 :                                         break;</span>
+<span class="lineNum">     887 </span>            :                                 }
+<span class="lineNum">     888 </span>            :                                 mlen = MCLBYTES;
+<span class="lineNum">     889 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     890 </span>            :                 }
+<span class="lineNum">     891 </span>            :         }
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :         if (error) {</span>
+<span class="lineNum">     893 </span><span class="lineNoCov">          0 :                 m_freem(top);</span>
+<span class="lineNum">     894 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_ierrors++;</span>
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">     896 </span>            :         }
+<span class="lineNum">     897 </span>            : 
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :         top-&gt;m_pkthdr.len = tlen;</span>
+<span class="lineNum">     899 </span>            : 
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :         if (tp-&gt;tun_flags &amp; TUN_LAYER2) {</span>
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :                 struct mbuf_list ml = MBUF_LIST_INITIALIZER();</span>
+<span class="lineNum">     902 </span>            : 
+<span class="lineNum">     903 </span><span class="lineNoCov">          0 :                 ml_enqueue(&amp;ml, top);</span>
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :                 if_input(ifp, &amp;ml);</span>
+<span class="lineNum">     905 </span>            :                 return (0);
+<span class="lineNum">     906 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     907 </span>            : 
+<span class="lineNum">     908 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">     909 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_bpf) {</span>
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :                 bpf_mtap(ifp-&gt;if_bpf, top, BPF_DIRECTION_IN);</span>
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     912 </span>            : #endif
+<span class="lineNum">     913 </span>            : 
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :         th = mtod(top, u_int32_t *);</span>
+<span class="lineNum">     915 </span>            :         /* strip the tunnel header */
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :         top-&gt;m_data += sizeof(*th);</span>
+<span class="lineNum">     917 </span><span class="lineNoCov">          0 :         top-&gt;m_len  -= sizeof(*th);</span>
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :         top-&gt;m_pkthdr.len -= sizeof(*th);</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :         top-&gt;m_pkthdr.ph_rtableid = ifp-&gt;if_rdomain;</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :         top-&gt;m_pkthdr.ph_ifidx = ifp-&gt;if_index;</span>
+<span class="lineNum">     921 </span>            : 
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ipackets++;</span>
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ibytes += top-&gt;m_pkthdr.len;</span>
+<span class="lineNum">     924 </span>            : 
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :         NET_LOCK();</span>
+<span class="lineNum">     926 </span>            : 
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :         switch (ntohl(*th)) {</span>
+<span class="lineNum">     928 </span>            :         case AF_INET:
+<span class="lineNum">     929 </span><span class="lineNoCov">          0 :                 ipv4_input(ifp, top);</span>
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     931 </span>            : #ifdef INET6
+<span class="lineNum">     932 </span>            :         case AF_INET6:
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :                 ipv6_input(ifp, top);</span>
+<span class="lineNum">     934 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     935 </span>            : #endif
+<span class="lineNum">     936 </span>            :         default:
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :                 m_freem(top);</span>
+<span class="lineNum">     938 </span>            :                 error = EAFNOSUPPORT;
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     940 </span>            :         }
+<span class="lineNum">     941 </span>            : 
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :         NET_UNLOCK();</span>
+<span class="lineNum">     943 </span>            : 
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     946 </span>            : 
+<span class="lineNum">     947 </span>            : /*
+<span class="lineNum">     948 </span>            :  * tunpoll - the poll interface, this is only useful on reads
+<span class="lineNum">     949 </span>            :  * really. The write detect always returns true, write never blocks
+<span class="lineNum">     950 </span>            :  * anyway, it either accepts the packet or drops it.
+<a name="951"><span class="lineNum">     951 </span>            :  */</a>
+<span class="lineNum">     952 </span>            : int
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 : tunpoll(dev_t dev, int events, struct proc *p)</span>
+<span class="lineNum">     954 </span>            : {
+<span class="lineNum">     955 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     956 </span>            : 
+<span class="lineNum">     957 </span><span class="lineNoCov">          0 :         if ((tp = tun_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     958 </span><span class="lineNoCov">          0 :                 return (POLLERR);</span>
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :         return (tun_dev_poll(tp, events, p));</span>
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 : }</span>
+<a name="961"><span class="lineNum">     961 </span>            : </a>
+<span class="lineNum">     962 </span>            : int
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 : tappoll(dev_t dev, int events, struct proc *p)</span>
+<span class="lineNum">     964 </span>            : {
+<span class="lineNum">     965 </span>            :         struct tun_softc *tp;
+<span class="lineNum">     966 </span>            : 
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :         if ((tp = tap_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :                 return (POLLERR);</span>
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :         return (tun_dev_poll(tp, events, p));</span>
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 : }</span>
+<a name="971"><span class="lineNum">     971 </span>            : </a>
+<span class="lineNum">     972 </span>            : int
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 : tun_dev_poll(struct tun_softc *tp, int events, struct proc *p)</span>
+<span class="lineNum">     974 </span>            : {
+<span class="lineNum">     975 </span>            :         int                      revents;
+<span class="lineNum">     976 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">     977 </span>            :         unsigned int             len;
+<span class="lineNum">     978 </span>            : 
+<span class="lineNum">     979 </span><span class="lineNoCov">          0 :         ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">     980 </span>            :         revents = 0;
+<span class="lineNum">     981 </span>            :         TUNDEBUG((&quot;%s: tunpoll\n&quot;, ifp-&gt;if_xname));
+<span class="lineNum">     982 </span>            : 
+<span class="lineNum">     983 </span><span class="lineNoCov">          0 :         if (events &amp; (POLLIN | POLLRDNORM)) {</span>
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 :                 len = IFQ_LEN(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">     985 </span><span class="lineNoCov">          0 :                 if (len &gt; 0) {</span>
+<span class="lineNum">     986 </span>            :                         TUNDEBUG((&quot;%s: tunselect q=%d\n&quot;, ifp-&gt;if_xname, len));
+<span class="lineNum">     987 </span>            :                         revents |= events &amp; (POLLIN | POLLRDNORM);
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     989 </span>            :                         TUNDEBUG((&quot;%s: tunpoll waiting\n&quot;, ifp-&gt;if_xname));
+<span class="lineNum">     990 </span><span class="lineNoCov">          0 :                         selrecord(p, &amp;tp-&gt;tun_rsel);</span>
+<span class="lineNum">     991 </span>            :                 }
+<span class="lineNum">     992 </span>            :         }
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :         if (events &amp; (POLLOUT | POLLWRNORM))</span>
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :                 revents |= events &amp; (POLLOUT | POLLWRNORM);</span>
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :         return (revents);</span>
+<span class="lineNum">     996 </span>            : }
+<span class="lineNum">     997 </span>            : 
+<span class="lineNum">     998 </span>            : /*
+<span class="lineNum">     999 </span>            :  * kqueue(2) support.
+<span class="lineNum">    1000 </span>            :  *
+<span class="lineNum">    1001 </span>            :  * The tun driver uses an array of tun_softc's based on the minor number
+<span class="lineNum">    1002 </span>            :  * of the device.  kn-&gt;kn_hook gets set to the specific tun_softc.
+<span class="lineNum">    1003 </span>            :  *
+<span class="lineNum">    1004 </span>            :  * filt_tunread() sets kn-&gt;kn_data to the iface qsize
+<span class="lineNum">    1005 </span>            :  * filt_tunwrite() sets kn-&gt;kn_data to the MTU size
+<a name="1006"><span class="lineNum">    1006 </span>            :  */</a>
+<span class="lineNum">    1007 </span>            : int
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 : tunkqfilter(dev_t dev, struct knote *kn)</span>
+<span class="lineNum">    1009 </span>            : {
+<span class="lineNum">    1010 </span>            :         struct tun_softc *tp;
+<span class="lineNum">    1011 </span>            : 
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :         if ((tp = tun_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">    1014 </span><span class="lineNoCov">          0 :         return (tun_dev_kqfilter(tp, kn));</span>
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 : }</span>
+<a name="1016"><span class="lineNum">    1016 </span>            : </a>
+<span class="lineNum">    1017 </span>            : int
+<span class="lineNum">    1018 </span><span class="lineNoCov">          0 : tapkqfilter(dev_t dev, struct knote *kn)</span>
+<span class="lineNum">    1019 </span>            : {
+<span class="lineNum">    1020 </span>            :         struct tun_softc *tp;
+<span class="lineNum">    1021 </span>            : 
+<span class="lineNum">    1022 </span><span class="lineNoCov">          0 :         if ((tp = tap_lookup(minor(dev))) == NULL)</span>
+<span class="lineNum">    1023 </span><span class="lineNoCov">          0 :                 return (ENXIO);</span>
+<span class="lineNum">    1024 </span><span class="lineNoCov">          0 :         return (tun_dev_kqfilter(tp, kn));</span>
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 : }</span>
+<a name="1026"><span class="lineNum">    1026 </span>            : </a>
+<span class="lineNum">    1027 </span>            : int
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 : tun_dev_kqfilter(struct tun_softc *tp, struct knote *kn)</span>
+<span class="lineNum">    1029 </span>            : {
+<span class="lineNum">    1030 </span>            :         int                      s;
+<span class="lineNum">    1031 </span>            :         struct klist            *klist;
+<span class="lineNum">    1032 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">    1033 </span>            : 
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :         ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">    1035 </span>            :         TUNDEBUG((&quot;%s: tunkqfilter\n&quot;, ifp-&gt;if_xname));
+<span class="lineNum">    1036 </span>            : 
+<span class="lineNum">    1037 </span><span class="lineNoCov">          0 :         switch (kn-&gt;kn_filter) {</span>
+<span class="lineNum">    1038 </span>            :                 case EVFILT_READ:
+<span class="lineNum">    1039 </span><span class="lineNoCov">          0 :                         klist = &amp;tp-&gt;tun_rsel.si_note;</span>
+<span class="lineNum">    1040 </span><span class="lineNoCov">          0 :                         kn-&gt;kn_fop = &amp;tunread_filtops;</span>
+<span class="lineNum">    1041 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1042 </span>            :                 case EVFILT_WRITE:
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :                         klist = &amp;tp-&gt;tun_wsel.si_note;</span>
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 :                         kn-&gt;kn_fop = &amp;tunwrite_filtops;</span>
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1046 </span>            :                 default:
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :                         return (EINVAL);</span>
+<span class="lineNum">    1048 </span>            :         }
+<span class="lineNum">    1049 </span>            : 
+<span class="lineNum">    1050 </span><span class="lineNoCov">          0 :         kn-&gt;kn_hook = (caddr_t)tp;</span>
+<span class="lineNum">    1051 </span>            : 
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :         s = splhigh();</span>
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 :         SLIST_INSERT_HEAD(klist, kn, kn_selnext);</span>
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1055 </span>            : 
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1057 </span><span class="lineNoCov">          0 : }</span>
+<a name="1058"><span class="lineNum">    1058 </span>            : </a>
+<span class="lineNum">    1059 </span>            : void
+<span class="lineNum">    1060 </span><span class="lineNoCov">          0 : filt_tunrdetach(struct knote *kn)</span>
+<span class="lineNum">    1061 </span>            : {
+<span class="lineNum">    1062 </span>            :         int                      s;
+<span class="lineNum">    1063 </span>            :         struct tun_softc        *tp;
+<span class="lineNum">    1064 </span>            : 
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 :         tp = (struct tun_softc *)kn-&gt;kn_hook;</span>
+<span class="lineNum">    1066 </span><span class="lineNoCov">          0 :         s = splhigh();</span>
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :         if (!(kn-&gt;kn_status &amp; KN_DETACHED))</span>
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 :                 SLIST_REMOVE(&amp;tp-&gt;tun_rsel.si_note, kn, knote, kn_selnext);</span>
+<span class="lineNum">    1069 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1070 </span><span class="lineNoCov">          0 : }</span>
+<a name="1071"><span class="lineNum">    1071 </span>            : </a>
+<span class="lineNum">    1072 </span>            : int
+<span class="lineNum">    1073 </span><span class="lineNoCov">          0 : filt_tunread(struct knote *kn, long hint)</span>
+<span class="lineNum">    1074 </span>            : {
+<span class="lineNum">    1075 </span>            :         struct tun_softc        *tp;
+<span class="lineNum">    1076 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">    1077 </span>            :         unsigned int             len;
+<span class="lineNum">    1078 </span>            : 
+<span class="lineNum">    1079 </span><span class="lineNoCov">          0 :         if (kn-&gt;kn_status &amp; KN_DETACHED) {</span>
+<span class="lineNum">    1080 </span><span class="lineNoCov">          0 :                 kn-&gt;kn_data = 0;</span>
+<span class="lineNum">    1081 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1082 </span>            :         }
+<span class="lineNum">    1083 </span>            : 
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 :         tp = (struct tun_softc *)kn-&gt;kn_hook;</span>
+<span class="lineNum">    1085 </span><span class="lineNoCov">          0 :         ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">    1086 </span>            : 
+<span class="lineNum">    1087 </span><span class="lineNoCov">          0 :         len = IFQ_LEN(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1088 </span><span class="lineNoCov">          0 :         if (len &gt; 0) {</span>
+<span class="lineNum">    1089 </span><span class="lineNoCov">          0 :                 kn-&gt;kn_data = len;</span>
+<span class="lineNum">    1090 </span>            : 
+<span class="lineNum">    1091 </span>            :                 TUNDEBUG((&quot;%s: tunkqread q=%d\n&quot;, ifp-&gt;if_xname,
+<span class="lineNum">    1092 </span>            :                     IFQ_LEN(&amp;ifp-&gt;if_snd)));
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1094 </span>            :         }
+<span class="lineNum">    1095 </span>            :         TUNDEBUG((&quot;%s: tunkqread waiting\n&quot;, ifp-&gt;if_xname));
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1097 </span><span class="lineNoCov">          0 : }</span>
+<a name="1098"><span class="lineNum">    1098 </span>            : </a>
+<span class="lineNum">    1099 </span>            : void
+<span class="lineNum">    1100 </span><span class="lineNoCov">          0 : filt_tunwdetach(struct knote *kn)</span>
+<span class="lineNum">    1101 </span>            : {
+<span class="lineNum">    1102 </span>            :         int                      s;
+<span class="lineNum">    1103 </span>            :         struct tun_softc        *tp;
+<span class="lineNum">    1104 </span>            : 
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :         tp = (struct tun_softc *)kn-&gt;kn_hook;</span>
+<span class="lineNum">    1106 </span><span class="lineNoCov">          0 :         s = splhigh();</span>
+<span class="lineNum">    1107 </span><span class="lineNoCov">          0 :         if (!(kn-&gt;kn_status &amp; KN_DETACHED))</span>
+<span class="lineNum">    1108 </span><span class="lineNoCov">          0 :                 SLIST_REMOVE(&amp;tp-&gt;tun_wsel.si_note, kn, knote, kn_selnext);</span>
+<span class="lineNum">    1109 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 : }</span>
+<a name="1111"><span class="lineNum">    1111 </span>            : </a>
+<span class="lineNum">    1112 </span>            : int
+<span class="lineNum">    1113 </span><span class="lineNoCov">          0 : filt_tunwrite(struct knote *kn, long hint)</span>
+<span class="lineNum">    1114 </span>            : {
+<span class="lineNum">    1115 </span>            :         struct tun_softc        *tp;
+<span class="lineNum">    1116 </span>            :         struct ifnet            *ifp;
+<span class="lineNum">    1117 </span>            : 
+<span class="lineNum">    1118 </span><span class="lineNoCov">          0 :         if (kn-&gt;kn_status &amp; KN_DETACHED) {</span>
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :                 kn-&gt;kn_data = 0;</span>
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1121 </span>            :         }
+<span class="lineNum">    1122 </span>            : 
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 :         tp = (struct tun_softc *)kn-&gt;kn_hook;</span>
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :         ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">    1125 </span>            : 
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 :         kn-&gt;kn_data = ifp-&gt;if_mtu;</span>
+<span class="lineNum">    1127 </span>            : 
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">    1129 </span><span class="lineNoCov">          0 : }</span>
+<a name="1130"><span class="lineNum">    1130 </span>            : </a>
+<span class="lineNum">    1131 </span>            : void
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 : tun_start(struct ifnet *ifp)</span>
+<span class="lineNum">    1133 </span>            : {
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :         struct tun_softc        *tp = ifp-&gt;if_softc;</span>
+<span class="lineNum">    1135 </span>            : 
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         splassert(IPL_NET);</span>
+<span class="lineNum">    1137 </span>            : 
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :         if (IFQ_LEN(&amp;ifp-&gt;if_snd))</span>
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :                 tun_wakeup(tp);</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 : }</span>
+<a name="1141"><span class="lineNum">    1141 </span>            : </a>
+<span class="lineNum">    1142 </span>            : void
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 : tun_link_state(struct tun_softc *tp)</span>
+<span class="lineNum">    1144 </span>            : {
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :         struct ifnet *ifp = &amp;tp-&gt;tun_if;</span>
+<span class="lineNum">    1146 </span>            :         int link_state = LINK_STATE_DOWN;
+<span class="lineNum">    1147 </span>            : 
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :         if (tp-&gt;tun_flags &amp; TUN_OPEN) {</span>
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 :                 if (tp-&gt;tun_flags &amp; TUN_LAYER2)</span>
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :                         link_state = LINK_STATE_FULL_DUPLEX;</span>
+<span class="lineNum">    1151 </span>            :                 else
+<span class="lineNum">    1152 </span>            :                         link_state = LINK_STATE_UP;
+<span class="lineNum">    1153 </span>            :         }
+<span class="lineNum">    1154 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_link_state != link_state) {</span>
+<span class="lineNum">    1155 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_link_state = link_state;</span>
+<span class="lineNum">    1156 </span><span class="lineNoCov">          0 :                 if_link_state_change(ifp);</span>
+<span class="lineNum">    1157 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

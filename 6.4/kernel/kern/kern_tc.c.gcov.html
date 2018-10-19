@@ -1,0 +1,728 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - kern/kern_tc.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">kern</a> - kern_tc.c<span style="font-size: 80%;"> (source / <a href="kern_tc.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">232</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">24</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: kern_tc.c,v 1.33 2018/05/28 18:05:42 guenther Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2000 Poul-Henning Kamp &lt;phk@FreeBSD.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /*
+<span class="lineNum">      20 </span>            :  * If we meet some day, and you think this stuff is worth it, you
+<span class="lineNum">      21 </span>            :  * can buy me a beer in return. Poul-Henning Kamp
+<span class="lineNum">      22 </span>            :  */
+<span class="lineNum">      23 </span>            : 
+<span class="lineNum">      24 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/sysctl.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;sys/syslog.h&gt;
+<span class="lineNum">      29 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/timetc.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;dev/rndvar.h&gt;
+<span class="lineNum">      33 </span>            : 
+<span class="lineNum">      34 </span>            : /*
+<span class="lineNum">      35 </span>            :  * A large step happens on boot.  This constant detects such steps.
+<span class="lineNum">      36 </span>            :  * It is relatively small so that ntp_update_second gets called enough
+<span class="lineNum">      37 </span>            :  * in the typical 'missed a couple of seconds' case, but doesn't loop
+<span class="lineNum">      38 </span>            :  * forever when the time step is large.
+<span class="lineNum">      39 </span>            :  */
+<span class="lineNum">      40 </span>            : #define LARGE_STEP      200
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : u_int dummy_get_timecount(struct timecounter *);
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : void ntp_update_second(int64_t *);
+<span class="lineNum">      45 </span>            : int sysctl_tc_hardware(void *, size_t *, void *, size_t);
+<span class="lineNum">      46 </span>            : int sysctl_tc_choice(void *, size_t *, void *, size_t);
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : /*
+<span class="lineNum">      49 </span>            :  * Implement a dummy timecounter which we can use until we get a real one
+<span class="lineNum">      50 </span>            :  * in the air.  This allows the console and other early stuff to use
+<span class="lineNum">      51 </span>            :  * time services.
+<span class="lineNum">      52 </span>            :  */
+<a name="53"><span class="lineNum">      53 </span>            : </a>
+<span class="lineNum">      54 </span>            : u_int
+<span class="lineNum">      55 </span><span class="lineNoCov">          0 : dummy_get_timecount(struct timecounter *tc)</span>
+<span class="lineNum">      56 </span>            : {
+<span class="lineNum">      57 </span>            :         static u_int now;
+<span class="lineNum">      58 </span>            : 
+<span class="lineNum">      59 </span><span class="lineNoCov">          0 :         return (++now);</span>
+<span class="lineNum">      60 </span>            : }
+<span class="lineNum">      61 </span>            : 
+<span class="lineNum">      62 </span>            : static struct timecounter dummy_timecounter = {
+<span class="lineNum">      63 </span>            :         dummy_get_timecount, 0, ~0u, 1000000, &quot;dummy&quot;, -1000000
+<span class="lineNum">      64 </span>            : };
+<span class="lineNum">      65 </span>            : 
+<span class="lineNum">      66 </span>            : struct timehands {
+<span class="lineNum">      67 </span>            :         /* These fields must be initialized by the driver. */
+<span class="lineNum">      68 </span>            :         struct timecounter      *th_counter;
+<span class="lineNum">      69 </span>            :         int64_t                 th_adjustment;
+<span class="lineNum">      70 </span>            :         u_int64_t               th_scale;
+<span class="lineNum">      71 </span>            :         u_int                   th_offset_count;
+<span class="lineNum">      72 </span>            :         struct bintime          th_offset;
+<span class="lineNum">      73 </span>            :         struct timeval          th_microtime;
+<span class="lineNum">      74 </span>            :         struct timespec         th_nanotime;
+<span class="lineNum">      75 </span>            :         /* Fields not to be copied in tc_windup start with th_generation. */
+<span class="lineNum">      76 </span>            :         volatile u_int          th_generation;
+<span class="lineNum">      77 </span>            :         struct timehands        *th_next;
+<span class="lineNum">      78 </span>            : };
+<span class="lineNum">      79 </span>            : 
+<span class="lineNum">      80 </span>            : static struct timehands th0;
+<span class="lineNum">      81 </span>            : static struct timehands th9 = { NULL, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0, &amp;th0};
+<span class="lineNum">      82 </span>            : static struct timehands th8 = { NULL, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0, &amp;th9};
+<span class="lineNum">      83 </span>            : static struct timehands th7 = { NULL, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0, &amp;th8};
+<span class="lineNum">      84 </span>            : static struct timehands th6 = { NULL, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0, &amp;th7};
+<span class="lineNum">      85 </span>            : static struct timehands th5 = { NULL, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0, &amp;th6};
+<span class="lineNum">      86 </span>            : static struct timehands th4 = { NULL, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0, &amp;th5};
+<span class="lineNum">      87 </span>            : static struct timehands th3 = { NULL, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0, &amp;th4};
+<span class="lineNum">      88 </span>            : static struct timehands th2 = { NULL, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0, &amp;th3};
+<span class="lineNum">      89 </span>            : static struct timehands th1 = { NULL, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0, &amp;th2};
+<span class="lineNum">      90 </span>            : static struct timehands th0 = {
+<span class="lineNum">      91 </span>            :         &amp;dummy_timecounter,
+<span class="lineNum">      92 </span>            :         0,
+<span class="lineNum">      93 </span>            :         (uint64_t)-1 / 1000000,
+<span class="lineNum">      94 </span>            :         0,
+<span class="lineNum">      95 </span>            :         {1, 0},
+<span class="lineNum">      96 </span>            :         {0, 0},
+<span class="lineNum">      97 </span>            :         {0, 0},
+<span class="lineNum">      98 </span>            :         1,
+<span class="lineNum">      99 </span>            :         &amp;th1
+<span class="lineNum">     100 </span>            : };
+<span class="lineNum">     101 </span>            : 
+<span class="lineNum">     102 </span>            : static struct timehands *volatile timehands = &amp;th0;
+<span class="lineNum">     103 </span>            : struct timecounter *timecounter = &amp;dummy_timecounter;
+<span class="lineNum">     104 </span>            : static struct timecounter *timecounters = &amp;dummy_timecounter;
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span>            : volatile time_t time_second = 1;
+<span class="lineNum">     107 </span>            : volatile time_t time_uptime = 0;
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span>            : struct bintime naptime;
+<span class="lineNum">     110 </span>            : static struct bintime boottimebin;
+<span class="lineNum">     111 </span>            : static int timestepwarnings;
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span>            : void tc_windup(void);
+<span class="lineNum">     114 </span>            : 
+<span class="lineNum">     115 </span>            : /*
+<span class="lineNum">     116 </span>            :  * Return the difference between the timehands' counter value now and what
+<span class="lineNum">     117 </span>            :  * was when we copied it to the timehands' offset_count.
+<a name="118"><span class="lineNum">     118 </span>            :  */</a>
+<span class="lineNum">     119 </span>            : static __inline u_int
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 : tc_delta(struct timehands *th)</span>
+<span class="lineNum">     121 </span>            : {
+<span class="lineNum">     122 </span>            :         struct timecounter *tc;
+<span class="lineNum">     123 </span>            : 
+<span class="lineNum">     124 </span><span class="lineNoCov">          0 :         tc = th-&gt;th_counter;</span>
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         return ((tc-&gt;tc_get_timecount(tc) - th-&gt;th_offset_count) &amp;</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :             tc-&gt;tc_counter_mask);</span>
+<span class="lineNum">     127 </span>            : }
+<span class="lineNum">     128 </span>            : 
+<span class="lineNum">     129 </span>            : /*
+<span class="lineNum">     130 </span>            :  * Functions for reading the time.  We have to loop until we are sure that
+<span class="lineNum">     131 </span>            :  * the timehands that we operated on was not updated under our feet.  See
+<span class="lineNum">     132 </span>            :  * the comment in &lt;sys/time.h&gt; for a description of these 12 functions.
+<span class="lineNum">     133 </span>            :  */
+<a name="134"><span class="lineNum">     134 </span>            : </a>
+<span class="lineNum">     135 </span>            : void
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 : binuptime(struct bintime *bt)</span>
+<span class="lineNum">     137 </span>            : {
+<span class="lineNum">     138 </span>            :         struct timehands *th;
+<span class="lineNum">     139 </span>            :         u_int gen;
+<span class="lineNum">     140 </span>            : 
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                 th = timehands;</span>
+<span class="lineNum">     143 </span><span class="lineNoCov">          0 :                 gen = th-&gt;th_generation;</span>
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :                 *bt = th-&gt;th_offset;</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :                 bintime_addx(bt, th-&gt;th_scale * tc_delta(th));</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         } while (gen == 0 || gen != th-&gt;th_generation);</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 : }</span>
+<a name="148"><span class="lineNum">     148 </span>            : </a>
+<span class="lineNum">     149 </span>            : void
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 : nanouptime(struct timespec *tsp)</span>
+<span class="lineNum">     151 </span>            : {
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         struct bintime bt;</span>
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span><span class="lineNoCov">          0 :         binuptime(&amp;bt);</span>
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         bintime2timespec(&amp;bt, tsp);</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 : }</span>
+<a name="157"><span class="lineNum">     157 </span>            : </a>
+<span class="lineNum">     158 </span>            : void
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 : microuptime(struct timeval *tvp)</span>
+<span class="lineNum">     160 </span>            : {
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         struct bintime bt;</span>
+<span class="lineNum">     162 </span>            : 
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :         binuptime(&amp;bt);</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :         bintime2timeval(&amp;bt, tvp);</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 : }</span>
+<a name="166"><span class="lineNum">     166 </span>            : </a>
+<span class="lineNum">     167 </span>            : void
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 : bintime(struct bintime *bt)</span>
+<span class="lineNum">     169 </span>            : {
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :         binuptime(bt);</span>
+<span class="lineNum">     172 </span><span class="lineNoCov">          0 :         bintime_add(bt, &amp;boottimebin);</span>
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 : }</span>
+<a name="174"><span class="lineNum">     174 </span>            : </a>
+<span class="lineNum">     175 </span>            : void
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 : nanotime(struct timespec *tsp)</span>
+<span class="lineNum">     177 </span>            : {
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :         struct bintime bt;</span>
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :         bintime(&amp;bt);</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :         bintime2timespec(&amp;bt, tsp);</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 : }</span>
+<a name="183"><span class="lineNum">     183 </span>            : </a>
+<span class="lineNum">     184 </span>            : void
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 : microtime(struct timeval *tvp)</span>
+<span class="lineNum">     186 </span>            : {
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :         struct bintime bt;</span>
+<span class="lineNum">     188 </span>            : 
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :         bintime(&amp;bt);</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         bintime2timeval(&amp;bt, tvp);</span>
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 : }</span>
+<a name="192"><span class="lineNum">     192 </span>            : </a>
+<span class="lineNum">     193 </span>            : void
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 : getnanouptime(struct timespec *tsp)</span>
+<span class="lineNum">     195 </span>            : {
+<span class="lineNum">     196 </span>            :         struct timehands *th;
+<span class="lineNum">     197 </span>            :         u_int gen;
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                 th = timehands;</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                 gen = th-&gt;th_generation;</span>
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :                 bintime2timespec(&amp;th-&gt;th_offset, tsp);</span>
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :         } while (gen == 0 || gen != th-&gt;th_generation);</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 : }</span>
+<a name="205"><span class="lineNum">     205 </span>            : </a>
+<span class="lineNum">     206 </span>            : void
+<span class="lineNum">     207 </span><span class="lineNoCov">          0 : getmicrouptime(struct timeval *tvp)</span>
+<span class="lineNum">     208 </span>            : {
+<span class="lineNum">     209 </span>            :         struct timehands *th;
+<span class="lineNum">     210 </span>            :         u_int gen;
+<span class="lineNum">     211 </span>            : 
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :                 th = timehands;</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                 gen = th-&gt;th_generation;</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :                 bintime2timeval(&amp;th-&gt;th_offset, tvp);</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :         } while (gen == 0 || gen != th-&gt;th_generation);</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 : }</span>
+<a name="218"><span class="lineNum">     218 </span>            : </a>
+<span class="lineNum">     219 </span>            : void
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 : getnanotime(struct timespec *tsp)</span>
+<span class="lineNum">     221 </span>            : {
+<span class="lineNum">     222 </span>            :         struct timehands *th;
+<span class="lineNum">     223 </span>            :         u_int gen;
+<span class="lineNum">     224 </span>            : 
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                 th = timehands;</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                 gen = th-&gt;th_generation;</span>
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                 *tsp = th-&gt;th_nanotime;</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         } while (gen == 0 || gen != th-&gt;th_generation);</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 : }</span>
+<a name="231"><span class="lineNum">     231 </span>            : </a>
+<span class="lineNum">     232 </span>            : void
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 : getmicrotime(struct timeval *tvp)</span>
+<span class="lineNum">     234 </span>            : {
+<span class="lineNum">     235 </span>            :         struct timehands *th;
+<span class="lineNum">     236 </span>            :         u_int gen;
+<span class="lineNum">     237 </span>            : 
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :                 th = timehands;</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :                 gen = th-&gt;th_generation;</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :                 *tvp = th-&gt;th_microtime;</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         } while (gen == 0 || gen != th-&gt;th_generation);</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     244 </span>            : 
+<span class="lineNum">     245 </span>            : /*
+<span class="lineNum">     246 </span>            :  * Initialize a new timecounter and possibly use it.
+<a name="247"><span class="lineNum">     247 </span>            :  */</a>
+<span class="lineNum">     248 </span>            : void
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 : tc_init(struct timecounter *tc)</span>
+<span class="lineNum">     250 </span>            : {
+<span class="lineNum">     251 </span>            :         u_int u;
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         u = tc-&gt;tc_frequency / tc-&gt;tc_counter_mask;</span>
+<span class="lineNum">     254 </span>            :         /* XXX: We need some margin here, 10% is a guess */
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         u *= 11;</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         u /= 10;</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :         if (tc-&gt;tc_quality &gt;= 0) {</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :                 if (u &gt; hz) {</span>
+<span class="lineNum">     259 </span><span class="lineNoCov">          0 :                         tc-&gt;tc_quality = -2000;</span>
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :                         printf(&quot;Timecounter \&quot;%s\&quot; frequency %lu Hz&quot;,</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :                             tc-&gt;tc_name, (unsigned long)tc-&gt;tc_frequency);</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :                         printf(&quot; -- Insufficient hz, needs at least %u\n&quot;, u);</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     264 </span>            :         }
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         tc-&gt;tc_next = timecounters;</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         timecounters = tc;</span>
+<span class="lineNum">     268 </span>            :         /*
+<span class="lineNum">     269 </span>            :          * Never automatically use a timecounter with negative quality.
+<span class="lineNum">     270 </span>            :          * Even though we run on the dummy counter, switching here may be
+<span class="lineNum">     271 </span>            :          * worse since this timecounter may not be monotonic.
+<span class="lineNum">     272 </span>            :          */
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :         if (tc-&gt;tc_quality &lt; 0)</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         if (tc-&gt;tc_quality &lt; timecounter-&gt;tc_quality)</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         if (tc-&gt;tc_quality == timecounter-&gt;tc_quality &amp;&amp;</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :             tc-&gt;tc_frequency &lt; timecounter-&gt;tc_frequency)</span>
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         (void)tc-&gt;tc_get_timecount(tc);</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         enqueue_randomness(tc-&gt;tc_get_timecount(tc));</span>
+<span class="lineNum">     282 </span>            : 
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :         timecounter = tc;</span>
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     285 </span>            : 
+<a name="286"><span class="lineNum">     286 </span>            : /* Report the frequency of the current timecounter. */</a>
+<span class="lineNum">     287 </span>            : u_int64_t
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 : tc_getfrequency(void)</span>
+<span class="lineNum">     289 </span>            : {
+<span class="lineNum">     290 </span>            : 
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         return (timehands-&gt;th_counter-&gt;tc_frequency);</span>
+<span class="lineNum">     292 </span>            : }
+<span class="lineNum">     293 </span>            : 
+<span class="lineNum">     294 </span>            : /*
+<span class="lineNum">     295 </span>            :  * Step our concept of UTC, aka the realtime clock.
+<span class="lineNum">     296 </span>            :  * This is done by modifying our estimate of when we booted.
+<span class="lineNum">     297 </span>            :  * XXX: not locked.
+<a name="298"><span class="lineNum">     298 </span>            :  */</a>
+<span class="lineNum">     299 </span>            : void
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 : tc_setrealtimeclock(const struct timespec *ts)</span>
+<span class="lineNum">     301 </span>            : {
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :         struct timespec ts2;</span>
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :         struct bintime bt, bt2;</span>
+<span class="lineNum">     304 </span>            : 
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         binuptime(&amp;bt2);</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :         timespec2bintime(ts, &amp;bt);</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :         bintime_sub(&amp;bt, &amp;bt2);</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         bintime_add(&amp;bt2, &amp;boottimebin);</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         boottimebin = bt;</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         bintime2timespec(&amp;bt, &amp;boottime);</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :         enqueue_randomness(ts-&gt;tv_sec);</span>
+<span class="lineNum">     312 </span>            : 
+<span class="lineNum">     313 </span>            :         /* XXX fiddle all the little crinkly bits around the fiords... */
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :         tc_windup();</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :         if (timestepwarnings) {</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                 bintime2timespec(&amp;bt2, &amp;ts2);</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :                 log(LOG_INFO, &quot;Time stepped from %lld.%09ld to %lld.%09ld\n&quot;,</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :                     (long long)ts2.tv_sec, ts2.tv_nsec,</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :                     (long long)ts-&gt;tv_sec, ts-&gt;tv_nsec);</span>
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     321 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     322 </span>            : 
+<span class="lineNum">     323 </span>            : /*
+<span class="lineNum">     324 </span>            :  * Step the monotonic and realtime clocks, triggering any timeouts that
+<span class="lineNum">     325 </span>            :  * should have occurred across the interval.
+<span class="lineNum">     326 </span>            :  * XXX: not locked.
+<a name="327"><span class="lineNum">     327 </span>            :  */</a>
+<span class="lineNum">     328 </span>            : void
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 : tc_setclock(const struct timespec *ts)</span>
+<span class="lineNum">     330 </span>            : {
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :         struct bintime bt, bt2;</span>
+<span class="lineNum">     332 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">     333 </span>            :         long long adj_ticks;
+<span class="lineNum">     334 </span>            : #endif
+<span class="lineNum">     335 </span>            : 
+<span class="lineNum">     336 </span>            :         /*
+<span class="lineNum">     337 </span>            :          * When we're called for the first time, during boot when
+<span class="lineNum">     338 </span>            :          * the root partition is mounted, boottime is still zero:
+<span class="lineNum">     339 </span>            :          * we just need to set it.
+<span class="lineNum">     340 </span>            :          */
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         if (boottimebin.sec == 0) {</span>
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :                 tc_setrealtimeclock(ts);</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     344 </span>            :         }
+<span class="lineNum">     345 </span>            : 
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         enqueue_randomness(ts-&gt;tv_sec);</span>
+<span class="lineNum">     347 </span>            : 
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         timespec2bintime(ts, &amp;bt);</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :         bintime_sub(&amp;bt, &amp;boottimebin);</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         bt2 = timehands-&gt;th_offset;</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         timehands-&gt;th_offset = bt;</span>
+<span class="lineNum">     352 </span>            : 
+<span class="lineNum">     353 </span>            :         /* XXX fiddle all the little crinkly bits around the fiords... */
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         tc_windup();</span>
+<span class="lineNum">     355 </span>            : 
+<span class="lineNum">     356 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">     357 </span>            :         /* convert the bintime to ticks */
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :         bintime_sub(&amp;bt, &amp;bt2);</span>
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :         bintime_add(&amp;naptime, &amp;bt);</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :         adj_ticks = (uint64_t)hz * bt.sec +</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :             (((uint64_t)1000000 * (uint32_t)(bt.frac &gt;&gt; 32)) &gt;&gt; 32) / tick;</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :         if (adj_ticks &gt; 0) {</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :                 if (adj_ticks &gt; INT_MAX)</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :                         adj_ticks = INT_MAX;</span>
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :                 timeout_adjust_ticks(adj_ticks);</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     367 </span>            : #endif
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     369 </span>            : 
+<span class="lineNum">     370 </span>            : /*
+<span class="lineNum">     371 </span>            :  * Initialize the next struct timehands in the ring and make
+<span class="lineNum">     372 </span>            :  * it the active timehands.  Along the way we might switch to a different
+<span class="lineNum">     373 </span>            :  * timecounter and/or do seconds processing in NTP.  Slightly magic.
+<a name="374"><span class="lineNum">     374 </span>            :  */</a>
+<span class="lineNum">     375 </span>            : void
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 : tc_windup(void)</span>
+<span class="lineNum">     377 </span>            : {
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :         struct bintime bt;</span>
+<span class="lineNum">     379 </span>            :         struct timehands *th, *tho;
+<span class="lineNum">     380 </span>            :         u_int64_t scale;
+<span class="lineNum">     381 </span>            :         u_int delta, ncount, ogen;
+<span class="lineNum">     382 </span>            :         int i;
+<span class="lineNum">     383 </span>            : 
+<span class="lineNum">     384 </span>            :         /*
+<span class="lineNum">     385 </span>            :          * Make the next timehands a copy of the current one, but do not
+<span class="lineNum">     386 </span>            :          * overwrite the generation or next pointer.  While we update
+<span class="lineNum">     387 </span>            :          * the contents, the generation must be zero.
+<span class="lineNum">     388 </span>            :          */
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         tho = timehands;</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :         th = tho-&gt;th_next;</span>
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :         ogen = th-&gt;th_generation;</span>
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         th-&gt;th_generation = 0;</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         memcpy(th, tho, offsetof(struct timehands, th_generation));</span>
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span>            :         /*
+<span class="lineNum">     396 </span>            :          * Capture a timecounter delta on the current timecounter and if
+<span class="lineNum">     397 </span>            :          * changing timecounters, a counter value from the new timecounter.
+<span class="lineNum">     398 </span>            :          * Update the offset fields accordingly.
+<span class="lineNum">     399 </span>            :          */
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :         delta = tc_delta(th);</span>
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :         if (th-&gt;th_counter != timecounter)</span>
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                 ncount = timecounter-&gt;tc_get_timecount(timecounter);</span>
+<span class="lineNum">     403 </span>            :         else
+<span class="lineNum">     404 </span>            :                 ncount = 0;
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         th-&gt;th_offset_count += delta;</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :         th-&gt;th_offset_count &amp;= th-&gt;th_counter-&gt;tc_counter_mask;</span>
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         bintime_addx(&amp;th-&gt;th_offset, th-&gt;th_scale * delta);</span>
+<span class="lineNum">     408 </span>            : 
+<span class="lineNum">     409 </span>            : #ifdef notyet
+<span class="lineNum">     410 </span>            :         /*
+<span class="lineNum">     411 </span>            :          * Hardware latching timecounters may not generate interrupts on
+<span class="lineNum">     412 </span>            :          * PPS events, so instead we poll them.  There is a finite risk that
+<span class="lineNum">     413 </span>            :          * the hardware might capture a count which is later than the one we
+<span class="lineNum">     414 </span>            :          * got above, and therefore possibly in the next NTP second which might
+<span class="lineNum">     415 </span>            :          * have a different rate than the current NTP second.  It doesn't
+<span class="lineNum">     416 </span>            :          * matter in practice.
+<span class="lineNum">     417 </span>            :          */
+<span class="lineNum">     418 </span>            :         if (tho-&gt;th_counter-&gt;tc_poll_pps)
+<span class="lineNum">     419 </span>            :                 tho-&gt;th_counter-&gt;tc_poll_pps(tho-&gt;th_counter);
+<span class="lineNum">     420 </span>            : #endif
+<span class="lineNum">     421 </span>            : 
+<span class="lineNum">     422 </span>            :         /*
+<span class="lineNum">     423 </span>            :          * Deal with NTP second processing.  The for loop normally
+<span class="lineNum">     424 </span>            :          * iterates at most once, but in extreme situations it might
+<span class="lineNum">     425 </span>            :          * keep NTP sane if timeouts are not run for several seconds.
+<span class="lineNum">     426 </span>            :          * At boot, the time step can be large when the TOD hardware
+<span class="lineNum">     427 </span>            :          * has been read, so on really large steps, we call
+<span class="lineNum">     428 </span>            :          * ntp_update_second only twice.  We need to call it twice in
+<span class="lineNum">     429 </span>            :          * case we missed a leap second.
+<span class="lineNum">     430 </span>            :          */
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :         bt = th-&gt;th_offset;</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :         bintime_add(&amp;bt, &amp;boottimebin);</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :         i = bt.sec - tho-&gt;th_microtime.tv_sec;</span>
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         if (i &gt; LARGE_STEP)</span>
+<span class="lineNum">     435 </span>            :                 i = 2;
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :         for (; i &gt; 0; i--)</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :                 ntp_update_second(&amp;th-&gt;th_adjustment);</span>
+<span class="lineNum">     438 </span>            : 
+<span class="lineNum">     439 </span>            :         /* Update the UTC timestamps used by the get*() functions. */
+<span class="lineNum">     440 </span>            :         /* XXX shouldn't do this here.  Should force non-`get' versions. */
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :         bintime2timeval(&amp;bt, &amp;th-&gt;th_microtime);</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         bintime2timespec(&amp;bt, &amp;th-&gt;th_nanotime);</span>
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span>            :         /* Now is a good time to change timecounters. */
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :         if (th-&gt;th_counter != timecounter) {</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                 th-&gt;th_counter = timecounter;</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                 th-&gt;th_offset_count = ncount;</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     449 </span>            : 
+<span class="lineNum">     450 </span>            :         /*-
+<span class="lineNum">     451 </span>            :          * Recalculate the scaling factor.  We want the number of 1/2^64
+<span class="lineNum">     452 </span>            :          * fractions of a second per period of the hardware counter, taking
+<span class="lineNum">     453 </span>            :          * into account the th_adjustment factor which the NTP PLL/adjtime(2)
+<span class="lineNum">     454 </span>            :          * processing provides us with.
+<span class="lineNum">     455 </span>            :          *
+<span class="lineNum">     456 </span>            :          * The th_adjustment is nanoseconds per second with 32 bit binary
+<span class="lineNum">     457 </span>            :          * fraction and we want 64 bit binary fraction of second:
+<span class="lineNum">     458 </span>            :          *
+<span class="lineNum">     459 </span>            :          *       x = a * 2^32 / 10^9 = a * 4.294967296
+<span class="lineNum">     460 </span>            :          *
+<span class="lineNum">     461 </span>            :          * The range of th_adjustment is +/- 5000PPM so inside a 64bit int
+<span class="lineNum">     462 </span>            :          * we can only multiply by about 850 without overflowing, but that
+<span class="lineNum">     463 </span>            :          * leaves suitably precise fractions for multiply before divide.
+<span class="lineNum">     464 </span>            :          *
+<span class="lineNum">     465 </span>            :          * Divide before multiply with a fraction of 2199/512 results in a
+<span class="lineNum">     466 </span>            :          * systematic undercompensation of 10PPM of th_adjustment.  On a
+<span class="lineNum">     467 </span>            :          * 5000PPM adjustment this is a 0.05PPM error.  This is acceptable.
+<span class="lineNum">     468 </span>            :          *
+<span class="lineNum">     469 </span>            :          * We happily sacrifice the lowest of the 64 bits of our result
+<span class="lineNum">     470 </span>            :          * to the goddess of code clarity.
+<span class="lineNum">     471 </span>            :          *
+<span class="lineNum">     472 </span>            :          */
+<span class="lineNum">     473 </span>            :         scale = (u_int64_t)1 &lt;&lt; 63;
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :         scale += (th-&gt;th_adjustment / 1024) * 2199;</span>
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :         scale /= th-&gt;th_counter-&gt;tc_frequency;</span>
+<span class="lineNum">     476 </span><span class="lineNoCov">          0 :         th-&gt;th_scale = scale * 2;</span>
+<span class="lineNum">     477 </span>            : 
+<span class="lineNum">     478 </span>            :         /*
+<span class="lineNum">     479 </span>            :          * Now that the struct timehands is again consistent, set the new
+<span class="lineNum">     480 </span>            :          * generation number, making sure to not make it zero.
+<span class="lineNum">     481 </span>            :          */
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :         if (++ogen == 0)</span>
+<span class="lineNum">     483 </span>            :                 ogen = 1;
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :         th-&gt;th_generation = ogen;</span>
+<span class="lineNum">     485 </span>            : 
+<span class="lineNum">     486 </span>            :         /* Go live with the new struct timehands. */
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :         time_second = th-&gt;th_microtime.tv_sec;</span>
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :         time_uptime = th-&gt;th_offset.sec;</span>
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :         timehands = th;</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     491 </span>            : 
+<a name="492"><span class="lineNum">     492 </span>            : /* Report or change the active timecounter hardware. */</a>
+<span class="lineNum">     493 </span>            : int
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 : sysctl_tc_hardware(void *oldp, size_t *oldlenp, void *newp, size_t newlen)</span>
+<span class="lineNum">     495 </span>            : {
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :         char newname[32];</span>
+<span class="lineNum">     497 </span>            :         struct timecounter *newtc, *tc;
+<span class="lineNum">     498 </span>            :         int error;
+<span class="lineNum">     499 </span>            : 
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :         tc = timecounter;</span>
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         strlcpy(newname, tc-&gt;tc_name, sizeof(newname));</span>
+<span class="lineNum">     502 </span>            : 
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :         error = sysctl_string(oldp, oldlenp, newp, newlen, newname, sizeof(newname));</span>
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :         if (error != 0 || strcmp(newname, tc-&gt;tc_name) == 0)</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :                 return (error);</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :         for (newtc = timecounters; newtc != NULL; newtc = newtc-&gt;tc_next) {</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :                 if (strcmp(newname, newtc-&gt;tc_name) != 0)</span>
+<span class="lineNum">     508 </span>            :                         continue;
+<span class="lineNum">     509 </span>            : 
+<span class="lineNum">     510 </span>            :                 /* Warm up new timecounter. */
+<span class="lineNum">     511 </span><span class="lineNoCov">          0 :                 (void)newtc-&gt;tc_get_timecount(newtc);</span>
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :                 (void)newtc-&gt;tc_get_timecount(newtc);</span>
+<span class="lineNum">     513 </span>            : 
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                 timecounter = newtc;</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :                 return (0);</span>
+<span class="lineNum">     516 </span>            :         }
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :         return (EINVAL);</span>
+<span class="lineNum">     518 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     519 </span>            : 
+<a name="520"><span class="lineNum">     520 </span>            : /* Report or change the active timecounter hardware. */</a>
+<span class="lineNum">     521 </span>            : int
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 : sysctl_tc_choice(void *oldp, size_t *oldlenp, void *newp, size_t newlen)</span>
+<span class="lineNum">     523 </span>            : {
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :         char buf[32], *spc, *choices;</span>
+<span class="lineNum">     525 </span>            :         struct timecounter *tc;
+<span class="lineNum">     526 </span>            :         int error, maxlen;
+<span class="lineNum">     527 </span>            : 
+<span class="lineNum">     528 </span>            :         spc = &quot;&quot;;
+<span class="lineNum">     529 </span>            :         maxlen = 0;
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :         for (tc = timecounters; tc != NULL; tc = tc-&gt;tc_next)</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :                 maxlen += sizeof(buf);</span>
+<span class="lineNum">     532 </span><span class="lineNoCov">          0 :         choices = malloc(maxlen, M_TEMP, M_WAITOK);</span>
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :         *choices = '\0';</span>
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :         for (tc = timecounters; tc != NULL; tc = tc-&gt;tc_next) {</span>
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :                 snprintf(buf, sizeof(buf), &quot;%s%s(%d)&quot;,</span>
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :                     spc, tc-&gt;tc_name, tc-&gt;tc_quality);</span>
+<span class="lineNum">     537 </span>            :                 spc = &quot; &quot;;
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :                 strlcat(choices, buf, maxlen);</span>
+<span class="lineNum">     539 </span>            :         }
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :         error = sysctl_rdstring(oldp, oldlenp, newp, choices);</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :         free(choices, M_TEMP, maxlen);</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     544 </span>            : 
+<span class="lineNum">     545 </span>            : /*
+<span class="lineNum">     546 </span>            :  * Timecounters need to be updated every so often to prevent the hardware
+<span class="lineNum">     547 </span>            :  * counter from overflowing.  Updating also recalculates the cached values
+<span class="lineNum">     548 </span>            :  * used by the get*() family of functions, so their precision depends on
+<span class="lineNum">     549 </span>            :  * the update frequency.
+<span class="lineNum">     550 </span>            :  */
+<span class="lineNum">     551 </span>            : static int tc_tick;
+<a name="552"><span class="lineNum">     552 </span>            : </a>
+<span class="lineNum">     553 </span>            : void
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 : tc_ticktock(void)</span>
+<span class="lineNum">     555 </span>            : {
+<span class="lineNum">     556 </span>            :         static int count;
+<span class="lineNum">     557 </span>            : 
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :         if (++count &lt; tc_tick)</span>
+<span class="lineNum">     559 </span>            :                 return;
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :         count = 0;</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :         tc_windup();</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 : }</span>
+<a name="563"><span class="lineNum">     563 </span>            : </a>
+<span class="lineNum">     564 </span>            : void
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 : inittimecounter(void)</span>
+<span class="lineNum">     566 </span>            : {
+<span class="lineNum">     567 </span>            : #ifdef DEBUG
+<span class="lineNum">     568 </span>            :         u_int p;
+<span class="lineNum">     569 </span>            : #endif
+<span class="lineNum">     570 </span>            : 
+<span class="lineNum">     571 </span>            :         /*
+<span class="lineNum">     572 </span>            :          * Set the initial timeout to
+<span class="lineNum">     573 </span>            :          * max(1, &lt;approx. number of hardclock ticks in a millisecond&gt;).
+<span class="lineNum">     574 </span>            :          * People should probably not use the sysctl to set the timeout
+<span class="lineNum">     575 </span>            :          * to smaller than its initial value, since that value is the
+<span class="lineNum">     576 </span>            :          * smallest reasonable one.  If they want better timestamps they
+<span class="lineNum">     577 </span>            :          * should use the non-&quot;get&quot;* functions.
+<span class="lineNum">     578 </span>            :          */
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :         if (hz &gt; 1000)</span>
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :                 tc_tick = (hz + 500) / 1000;</span>
+<span class="lineNum">     581 </span>            :         else
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :                 tc_tick = 1;</span>
+<span class="lineNum">     583 </span>            : #ifdef DEBUG
+<span class="lineNum">     584 </span>            :         p = (tc_tick * 1000000) / hz;
+<span class="lineNum">     585 </span>            :         printf(&quot;Timecounters tick every %d.%03u msec\n&quot;, p / 1000, p % 1000);
+<span class="lineNum">     586 </span>            : #endif
+<span class="lineNum">     587 </span>            : 
+<span class="lineNum">     588 </span>            :         /* warm up new timecounter (again) and get rolling. */
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :         (void)timecounter-&gt;tc_get_timecount(timecounter);</span>
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :         (void)timecounter-&gt;tc_get_timecount(timecounter);</span>
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     592 </span>            : 
+<span class="lineNum">     593 </span>            : /*
+<span class="lineNum">     594 </span>            :  * Return timecounter-related information.
+<a name="595"><span class="lineNum">     595 </span>            :  */</a>
+<span class="lineNum">     596 </span>            : int
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 : sysctl_tc(int *name, u_int namelen, void *oldp, size_t *oldlenp,</span>
+<span class="lineNum">     598 </span>            :     void *newp, size_t newlen)
+<span class="lineNum">     599 </span>            : {
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :         if (namelen != 1)</span>
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :                 return (ENOTDIR);</span>
+<span class="lineNum">     602 </span>            : 
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :         switch (name[0]) {</span>
+<span class="lineNum">     604 </span>            :         case KERN_TIMECOUNTER_TICK:
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :                 return (sysctl_rdint(oldp, oldlenp, newp, tc_tick));</span>
+<span class="lineNum">     606 </span>            :         case KERN_TIMECOUNTER_TIMESTEPWARNINGS:
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :                 return (sysctl_int(oldp, oldlenp, newp, newlen,</span>
+<span class="lineNum">     608 </span>            :                     &amp;timestepwarnings));
+<span class="lineNum">     609 </span>            :         case KERN_TIMECOUNTER_HARDWARE:
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :                 return (sysctl_tc_hardware(oldp, oldlenp, newp, newlen));</span>
+<span class="lineNum">     611 </span>            :         case KERN_TIMECOUNTER_CHOICE:
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                 return (sysctl_tc_choice(oldp, oldlenp, newp, newlen));</span>
+<span class="lineNum">     613 </span>            :         default:
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                 return (EOPNOTSUPP);</span>
+<span class="lineNum">     615 </span>            :         }
+<span class="lineNum">     616 </span>            :         /* NOTREACHED */
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 : }</span>
+<a name="618"><span class="lineNum">     618 </span>            : </a>
+<span class="lineNum">     619 </span>            : void
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 : ntp_update_second(int64_t *adjust)</span>
+<span class="lineNum">     621 </span>            : {
+<span class="lineNum">     622 </span>            :         int64_t adj;
+<span class="lineNum">     623 </span>            : 
+<span class="lineNum">     624 </span>            :         /* Skew time according to any adjtime(2) adjustments. */
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :         if (adjtimedelta &gt; 0)</span>
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                 adj = MIN(5000, adjtimedelta);</span>
+<span class="lineNum">     627 </span>            :         else
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                 adj = MAX(-5000, adjtimedelta);</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :         adjtimedelta -= adj;</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :         *adjust = (adj * 1000) &lt;&lt; 32;</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :         *adjust += timecounter-&gt;tc_freq_adj;</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 : }</span>
+<a name="633"><span class="lineNum">     633 </span>            : </a>
+<span class="lineNum">     634 </span>            : int
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 : tc_adjfreq(int64_t *old, int64_t *new)</span>
+<span class="lineNum">     636 </span>            : {
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 :         if (old != NULL) {</span>
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :                 *old = timecounter-&gt;tc_freq_adj;</span>
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :         if (new != NULL) {</span>
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :                 timecounter-&gt;tc_freq_adj = *new;</span>
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     644 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,956 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - kern/kern_sched.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">kern</a> - kern_sched.c<span style="font-size: 80%;"> (source / <a href="kern_sched.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">355</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">32</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: kern_sched.c,v 1.51 2018/07/12 01:23:38 cheloha Exp $ */</a>
+<span class="lineNum">       2 </span>            : /*
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2007, 2008 Artur Grabowski &lt;art@openbsd.org&gt;
+<span class="lineNum">       4 </span>            :  *
+<span class="lineNum">       5 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       6 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       7 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       8 </span>            :  *
+<span class="lineNum">       9 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      10 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      11 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      12 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      13 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      14 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      15 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      16 </span>            :  */
+<span class="lineNum">      17 </span>            : 
+<span class="lineNum">      18 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : #include &lt;sys/sched.h&gt;
+<span class="lineNum">      21 </span>            : #include &lt;sys/proc.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;sys/kthread.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/resourcevar.h&gt;
+<span class="lineNum">      25 </span>            : #include &lt;sys/signalvar.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;sys/mutex.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;sys/task.h&gt;
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span>            : #include &lt;uvm/uvm_extern.h&gt;
+<span class="lineNum">      30 </span>            : 
+<span class="lineNum">      31 </span>            : void sched_kthreads_create(void *);
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : int sched_proc_to_cpu_cost(struct cpu_info *ci, struct proc *p);
+<span class="lineNum">      34 </span>            : struct proc *sched_steal_proc(struct cpu_info *);
+<span class="lineNum">      35 </span>            : 
+<span class="lineNum">      36 </span>            : /*
+<span class="lineNum">      37 </span>            :  * To help choosing which cpu should run which process we keep track
+<span class="lineNum">      38 </span>            :  * of cpus which are currently idle and which cpus have processes
+<span class="lineNum">      39 </span>            :  * queued.
+<span class="lineNum">      40 </span>            :  */
+<span class="lineNum">      41 </span>            : struct cpuset sched_idle_cpus;
+<span class="lineNum">      42 </span>            : struct cpuset sched_queued_cpus;
+<span class="lineNum">      43 </span>            : struct cpuset sched_all_cpus;
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : /*
+<span class="lineNum">      46 </span>            :  * Some general scheduler counters.
+<span class="lineNum">      47 </span>            :  */
+<span class="lineNum">      48 </span>            : uint64_t sched_nmigrations;     /* Cpu migration counter */
+<span class="lineNum">      49 </span>            : uint64_t sched_nomigrations;    /* Cpu no migration counter */
+<span class="lineNum">      50 </span>            : uint64_t sched_noidle;          /* Times we didn't pick the idle task */
+<span class="lineNum">      51 </span>            : uint64_t sched_stolen;          /* Times we stole proc from other cpus */
+<span class="lineNum">      52 </span>            : uint64_t sched_choose;          /* Times we chose a cpu */
+<span class="lineNum">      53 </span>            : uint64_t sched_wasidle;         /* Times we came out of idle */
+<span class="lineNum">      54 </span>            : 
+<span class="lineNum">      55 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">      56 </span>            : struct taskq *sbartq;
+<span class="lineNum">      57 </span>            : #endif
+<span class="lineNum">      58 </span>            : 
+<span class="lineNum">      59 </span>            : int sched_smt;
+<span class="lineNum">      60 </span>            : 
+<span class="lineNum">      61 </span>            : /*
+<span class="lineNum">      62 </span>            :  * A few notes about cpu_switchto that is implemented in MD code.
+<span class="lineNum">      63 </span>            :  *
+<span class="lineNum">      64 </span>            :  * cpu_switchto takes two arguments, the old proc and the proc
+<span class="lineNum">      65 </span>            :  * it should switch to. The new proc will never be NULL, so we always have
+<span class="lineNum">      66 </span>            :  * a saved state that we need to switch to. The old proc however can
+<span class="lineNum">      67 </span>            :  * be NULL if the process is exiting. NULL for the old proc simply
+<span class="lineNum">      68 </span>            :  * means &quot;don't bother saving old state&quot;.
+<span class="lineNum">      69 </span>            :  *
+<span class="lineNum">      70 </span>            :  * cpu_switchto is supposed to atomically load the new state of the process
+<span class="lineNum">      71 </span>            :  * including the pcb, pmap and setting curproc, the p_cpu pointer in the
+<span class="lineNum">      72 </span>            :  * proc and p_stat to SONPROC. Atomically with respect to interrupts, other
+<span class="lineNum">      73 </span>            :  * cpus in the system must not depend on this state being consistent.
+<span class="lineNum">      74 </span>            :  * Therefore no locking is necessary in cpu_switchto other than blocking
+<span class="lineNum">      75 </span>            :  * interrupts during the context switch.
+<span class="lineNum">      76 </span>            :  */
+<span class="lineNum">      77 </span>            : 
+<span class="lineNum">      78 </span>            : /*
+<span class="lineNum">      79 </span>            :  * sched_init_cpu is called from main() for the boot cpu, then it's the
+<span class="lineNum">      80 </span>            :  * responsibility of the MD code to call it for all other cpus.
+<a name="81"><span class="lineNum">      81 </span>            :  */</a>
+<span class="lineNum">      82 </span>            : void
+<span class="lineNum">      83 </span><span class="lineNoCov">          0 : sched_init_cpu(struct cpu_info *ci)</span>
+<span class="lineNum">      84 </span>            : {
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :         struct schedstate_percpu *spc = &amp;ci-&gt;ci_schedstate;</span>
+<span class="lineNum">      86 </span>            :         int i;
+<span class="lineNum">      87 </span>            : 
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; SCHED_NQS; i++)</span>
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :                 TAILQ_INIT(&amp;spc-&gt;spc_qs[i]);</span>
+<span class="lineNum">      90 </span>            : 
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :         spc-&gt;spc_idleproc = NULL;</span>
+<span class="lineNum">      92 </span>            : 
+<span class="lineNum">      93 </span><span class="lineNoCov">          0 :         kthread_create_deferred(sched_kthreads_create, ci);</span>
+<span class="lineNum">      94 </span>            : 
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         LIST_INIT(&amp;spc-&gt;spc_deadproc);</span>
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span>            :         /*
+<span class="lineNum">      98 </span>            :          * Slight hack here until the cpuset code handles cpu_info
+<span class="lineNum">      99 </span>            :          * structures.
+<span class="lineNum">     100 </span>            :          */
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :         cpuset_init_cpu(ci);</span>
+<span class="lineNum">     102 </span>            : 
+<span class="lineNum">     103 </span>            : #ifdef __HAVE_CPU_TOPOLOGY
+<span class="lineNum">     104 </span><span class="lineNoCov">          0 :         if (!sched_smt &amp;&amp; ci-&gt;ci_smt_id &gt; 0)</span>
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     106 </span>            : #endif
+<span class="lineNum">     107 </span><span class="lineNoCov">          0 :         cpuset_add(&amp;sched_all_cpus, ci);</span>
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 : }</span>
+<a name="109"><span class="lineNum">     109 </span>            : </a>
+<span class="lineNum">     110 </span>            : void
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 : sched_kthreads_create(void *v)</span>
+<span class="lineNum">     112 </span>            : {
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         struct cpu_info *ci = v;</span>
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         struct schedstate_percpu *spc = &amp;ci-&gt;ci_schedstate;</span>
+<span class="lineNum">     115 </span>            :         static int num;
+<span class="lineNum">     116 </span>            : 
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         if (fork1(&amp;proc0, FORK_SHAREVM|FORK_SHAREFILES|FORK_NOZOMBIE|</span>
+<span class="lineNum">     118 </span>            :             FORK_SYSTEM|FORK_SIGHAND|FORK_IDLE, sched_idle, ci, NULL,
+<span class="lineNum">     119 </span><span class="lineNoCov">          0 :             &amp;spc-&gt;spc_idleproc))</span>
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :                 panic(&quot;fork idle&quot;);</span>
+<span class="lineNum">     121 </span>            : 
+<span class="lineNum">     122 </span>            :         /* Name it as specified. */
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :         snprintf(spc-&gt;spc_idleproc-&gt;p_p-&gt;ps_comm,</span>
+<span class="lineNum">     124 </span>            :             sizeof(spc-&gt;spc_idleproc-&gt;p_p-&gt;ps_comm),
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :             &quot;idle%d&quot;, num);</span>
+<span class="lineNum">     126 </span>            : 
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :         num++;</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 : }</span>
+<a name="129"><span class="lineNum">     129 </span>            : </a>
+<span class="lineNum">     130 </span>            : void
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 : sched_idle(void *v)</span>
+<span class="lineNum">     132 </span>            : {
+<span class="lineNum">     133 </span>            :         struct schedstate_percpu *spc;
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :         struct proc *p = curproc;</span>
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :         struct cpu_info *ci = v;</span>
+<span class="lineNum">     136 </span>            :         int s;
+<span class="lineNum">     137 </span>            : 
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :         KERNEL_UNLOCK();</span>
+<span class="lineNum">     139 </span>            : 
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :         spc = &amp;ci-&gt;ci_schedstate;</span>
+<span class="lineNum">     141 </span>            : 
+<span class="lineNum">     142 </span>            :         /*
+<span class="lineNum">     143 </span>            :          * First time we enter here, we're not supposed to idle,
+<span class="lineNum">     144 </span>            :          * just go away for a while.
+<span class="lineNum">     145 </span>            :          */
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :         SCHED_LOCK(s);</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         cpuset_add(&amp;sched_idle_cpus, ci);</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :         p-&gt;p_stat = SSLEEP;</span>
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         p-&gt;p_cpu = ci;</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         atomic_setbits_int(&amp;p-&gt;p_flag, P_CPUPEG);</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         mi_switch();</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         cpuset_del(&amp;sched_idle_cpus, ci);</span>
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         SCHED_UNLOCK(s);</span>
+<span class="lineNum">     154 </span>            : 
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         KASSERT(ci == curcpu());</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         KASSERT(curproc == spc-&gt;spc_idleproc);</span>
+<span class="lineNum">     157 </span>            : 
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :         while (1) {</span>
+<span class="lineNum">     159 </span><span class="lineNoCov">          0 :                 while (!cpu_is_idle(curcpu())) {</span>
+<span class="lineNum">     160 </span>            :                         struct proc *dead;
+<span class="lineNum">     161 </span>            : 
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                         SCHED_LOCK(s);</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                         p-&gt;p_stat = SSLEEP;</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                         mi_switch();</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 :                         SCHED_UNLOCK(s);</span>
+<span class="lineNum">     166 </span>            : 
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :                         while ((dead = LIST_FIRST(&amp;spc-&gt;spc_deadproc))) {</span>
+<span class="lineNum">     168 </span><span class="lineNoCov">          0 :                                 LIST_REMOVE(dead, p_hash);</span>
+<span class="lineNum">     169 </span><span class="lineNoCov">          0 :                                 exit2(dead);</span>
+<span class="lineNum">     170 </span>            :                         }
+<span class="lineNum">     171 </span>            :                 }
+<span class="lineNum">     172 </span>            : 
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :                 splassert(IPL_NONE);</span>
+<span class="lineNum">     174 </span>            : 
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                 cpuset_add(&amp;sched_idle_cpus, ci);</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :                 cpu_idle_enter();</span>
+<span class="lineNum">     177 </span><span class="lineNoCov">          0 :                 while (spc-&gt;spc_whichqs == 0) {</span>
+<span class="lineNum">     178 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                         if (spc-&gt;spc_schedflags &amp; SPCF_SHOULDHALT &amp;&amp;</span>
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :                             (spc-&gt;spc_schedflags &amp; SPCF_HALTED) == 0) {</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                                 cpuset_del(&amp;sched_idle_cpus, ci);</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :                                 SCHED_LOCK(s);</span>
+<span class="lineNum">     183 </span><span class="lineNoCov">          0 :                                 atomic_setbits_int(&amp;spc-&gt;spc_schedflags,</span>
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :                                     spc-&gt;spc_whichqs ? 0 : SPCF_HALTED);</span>
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :                                 SCHED_UNLOCK(s);</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                                 wakeup(spc);</span>
+<span class="lineNum">     187 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     188 </span>            : #endif
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                         cpu_idle_cycle();</span>
+<span class="lineNum">     190 </span>            :                 }
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :                 cpu_idle_leave();</span>
+<span class="lineNum">     192 </span><span class="lineNoCov">          0 :                 cpuset_del(&amp;sched_idle_cpus, ci);</span>
+<span class="lineNum">     193 </span>            :         }
+<span class="lineNum">     194 </span>            : }
+<span class="lineNum">     195 </span>            : 
+<span class="lineNum">     196 </span>            : /*
+<span class="lineNum">     197 </span>            :  * To free our address space we have to jump through a few hoops.
+<span class="lineNum">     198 </span>            :  * The freeing is done by the reaper, but until we have one reaper
+<span class="lineNum">     199 </span>            :  * per cpu, we have no way of putting this proc on the deadproc list
+<span class="lineNum">     200 </span>            :  * and waking up the reaper without risking having our address space and
+<span class="lineNum">     201 </span>            :  * stack torn from under us before we manage to switch to another proc.
+<span class="lineNum">     202 </span>            :  * Therefore we have a per-cpu list of dead processes where we put this
+<span class="lineNum">     203 </span>            :  * proc and have idle clean up that list and move it to the reaper list.
+<span class="lineNum">     204 </span>            :  * All this will be unnecessary once we can bind the reaper this cpu
+<span class="lineNum">     205 </span>            :  * and not risk having it switch to another in case it sleeps.
+<a name="206"><span class="lineNum">     206 </span>            :  */</a>
+<span class="lineNum">     207 </span>            : void
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 : sched_exit(struct proc *p)</span>
+<span class="lineNum">     209 </span>            : {
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :         struct schedstate_percpu *spc = &amp;curcpu()-&gt;ci_schedstate;</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :         struct timespec ts;</span>
+<span class="lineNum">     212 </span>            :         struct proc *idle;
+<span class="lineNum">     213 </span>            :         int s;
+<span class="lineNum">     214 </span>            : 
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         nanouptime(&amp;ts);</span>
+<span class="lineNum">     216 </span><span class="lineNoCov">          0 :         timespecsub(&amp;ts, &amp;spc-&gt;spc_runtime, &amp;ts);</span>
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         timespecadd(&amp;p-&gt;p_rtime, &amp;ts, &amp;p-&gt;p_rtime);</span>
+<span class="lineNum">     218 </span>            : 
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :         LIST_INSERT_HEAD(&amp;spc-&gt;spc_deadproc, p, p_hash);</span>
+<span class="lineNum">     220 </span>            : 
+<span class="lineNum">     221 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">     222 </span>            :         /* This process no longer needs to hold the kernel lock. */
+<span class="lineNum">     223 </span><span class="lineNoCov">          0 :         KERNEL_ASSERT_LOCKED();</span>
+<span class="lineNum">     224 </span><span class="lineNoCov">          0 :         __mp_release_all(&amp;kernel_lock);</span>
+<span class="lineNum">     225 </span>            : #endif
+<span class="lineNum">     226 </span>            : 
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :         SCHED_LOCK(s);</span>
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :         idle = spc-&gt;spc_idleproc;</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :         idle-&gt;p_stat = SRUN;</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         cpu_switchto(NULL, idle);</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :         panic(&quot;cpu_switchto returned&quot;);</span>
+<span class="lineNum">     232 </span>            : }
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span>            : /*
+<span class="lineNum">     235 </span>            :  * Run queue management.
+<a name="236"><span class="lineNum">     236 </span>            :  */</a>
+<span class="lineNum">     237 </span>            : void
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 : sched_init_runqueues(void)</span>
+<span class="lineNum">     239 </span>            : {
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 : }</span>
+<a name="241"><span class="lineNum">     241 </span>            : </a>
+<span class="lineNum">     242 </span>            : void
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 : setrunqueue(struct proc *p)</span>
+<span class="lineNum">     244 </span>            : {
+<span class="lineNum">     245 </span>            :         struct schedstate_percpu *spc;
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         int queue = p-&gt;p_priority &gt;&gt; 2;</span>
+<span class="lineNum">     247 </span>            : 
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :         SCHED_ASSERT_LOCKED();</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :         spc = &amp;p-&gt;p_cpu-&gt;ci_schedstate;</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         spc-&gt;spc_nrun++;</span>
+<span class="lineNum">     251 </span>            : 
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :         TAILQ_INSERT_TAIL(&amp;spc-&gt;spc_qs[queue], p, p_runq);</span>
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :         spc-&gt;spc_whichqs |= (1 &lt;&lt; queue);</span>
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 :         cpuset_add(&amp;sched_queued_cpus, p-&gt;p_cpu);</span>
+<span class="lineNum">     255 </span>            : 
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         if (cpuset_isset(&amp;sched_idle_cpus, p-&gt;p_cpu))</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 :                 cpu_unidle(p-&gt;p_cpu);</span>
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 : }</span>
+<a name="259"><span class="lineNum">     259 </span>            : </a>
+<span class="lineNum">     260 </span>            : void
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 : remrunqueue(struct proc *p)</span>
+<span class="lineNum">     262 </span>            : {
+<span class="lineNum">     263 </span>            :         struct schedstate_percpu *spc;
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         int queue = p-&gt;p_priority &gt;&gt; 2;</span>
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         SCHED_ASSERT_LOCKED();</span>
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         spc = &amp;p-&gt;p_cpu-&gt;ci_schedstate;</span>
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         spc-&gt;spc_nrun--;</span>
+<span class="lineNum">     269 </span>            : 
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :         TAILQ_REMOVE(&amp;spc-&gt;spc_qs[queue], p, p_runq);</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         if (TAILQ_EMPTY(&amp;spc-&gt;spc_qs[queue])) {</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                 spc-&gt;spc_whichqs &amp;= ~(1 &lt;&lt; queue);</span>
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :                 if (spc-&gt;spc_whichqs == 0)</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :                         cpuset_del(&amp;sched_queued_cpus, p-&gt;p_cpu);</span>
+<span class="lineNum">     275 </span>            :         }
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 : }</span>
+<a name="277"><span class="lineNum">     277 </span>            : </a>
+<span class="lineNum">     278 </span>            : struct proc *
+<span class="lineNum">     279 </span><span class="lineNoCov">          0 : sched_chooseproc(void)</span>
+<span class="lineNum">     280 </span>            : {
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :         struct schedstate_percpu *spc = &amp;curcpu()-&gt;ci_schedstate;</span>
+<span class="lineNum">     282 </span>            :         struct proc *p;
+<span class="lineNum">     283 </span>            :         int queue;
+<span class="lineNum">     284 </span>            : 
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :         SCHED_ASSERT_LOCKED();</span>
+<span class="lineNum">     286 </span>            : 
+<span class="lineNum">     287 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :         if (spc-&gt;spc_schedflags &amp; SPCF_SHOULDHALT) {</span>
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :                 if (spc-&gt;spc_whichqs) {</span>
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :                         for (queue = 0; queue &lt; SCHED_NQS; queue++) {</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :                                 while ((p = TAILQ_FIRST(&amp;spc-&gt;spc_qs[queue]))) {</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :                                         remrunqueue(p);</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :                                         p-&gt;p_cpu = sched_choosecpu(p);</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :                                         setrunqueue(p);</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :                                         if (p-&gt;p_cpu == curcpu()) {</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :                                                 KASSERT(p-&gt;p_flag &amp; P_CPUPEG);</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                                                 goto again;</span>
+<span class="lineNum">     298 </span>            :                                         }
+<span class="lineNum">     299 </span>            :                                 }
+<span class="lineNum">     300 </span>            :                         }
+<span class="lineNum">     301 </span>            :                 }
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :                 p = spc-&gt;spc_idleproc;</span>
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :                 KASSERT(p);</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :                 KASSERT(p-&gt;p_wchan == NULL);</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :                 p-&gt;p_stat = SRUN;</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :                 return (p);</span>
+<span class="lineNum">     307 </span>            :         }
+<span class="lineNum">     308 </span>            : #endif
+<span class="lineNum">     309 </span>            : 
+<span class="lineNum">     310 </span>            : again:
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :         if (spc-&gt;spc_whichqs) {</span>
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :                 queue = ffs(spc-&gt;spc_whichqs) - 1;</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :                 p = TAILQ_FIRST(&amp;spc-&gt;spc_qs[queue]);</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                 remrunqueue(p);</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :                 sched_noidle++;</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                 KASSERT(p-&gt;p_stat == SRUN);</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :         } else if ((p = sched_steal_proc(curcpu())) == NULL) {</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :                 p = spc-&gt;spc_idleproc;</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :                 if (p == NULL) {</span>
+<span class="lineNum">     320 </span>            :                         int s;
+<span class="lineNum">     321 </span>            :                         /*
+<span class="lineNum">     322 </span>            :                          * We get here if someone decides to switch during
+<span class="lineNum">     323 </span>            :                          * boot before forking kthreads, bleh.
+<span class="lineNum">     324 </span>            :                          * This is kind of like a stupid idle loop.
+<span class="lineNum">     325 </span>            :                          */
+<span class="lineNum">     326 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 :                         __mp_unlock(&amp;sched_lock);</span>
+<span class="lineNum">     328 </span>            : #endif
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                         spl0();</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :                         delay(10);</span>
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :                         SCHED_LOCK(s);</span>
+<span class="lineNum">     332 </span>            :                         goto again;
+<span class="lineNum">     333 </span>            :                 }
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :                 KASSERT(p);</span>
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :                 p-&gt;p_stat = SRUN;</span>
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         } </span>
+<span class="lineNum">     337 </span>            : 
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         KASSERT(p-&gt;p_wchan == NULL);</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :         return (p);     </span>
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 : }</span>
+<a name="341"><span class="lineNum">     341 </span>            : </a>
+<span class="lineNum">     342 </span>            : struct cpu_info *
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 : sched_choosecpu_fork(struct proc *parent, int flags)</span>
+<span class="lineNum">     344 </span>            : {
+<span class="lineNum">     345 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">     346 </span>            :         struct cpu_info *choice = NULL;
+<span class="lineNum">     347 </span>            :         fixpt_t load, best_load = ~0;
+<span class="lineNum">     348 </span>            :         int run, best_run = INT_MAX;
+<span class="lineNum">     349 </span>            :         struct cpu_info *ci;
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         struct cpuset set;</span>
+<span class="lineNum">     351 </span>            : 
+<span class="lineNum">     352 </span>            : #if 0
+<span class="lineNum">     353 </span>            :         /*
+<span class="lineNum">     354 </span>            :          * XXX
+<span class="lineNum">     355 </span>            :          * Don't do this until we have a painless way to move the cpu in exec.
+<span class="lineNum">     356 </span>            :          * Preferably when nuking the old pmap and getting a new one on a
+<span class="lineNum">     357 </span>            :          * new cpu.
+<span class="lineNum">     358 </span>            :          */
+<span class="lineNum">     359 </span>            :         /*
+<span class="lineNum">     360 </span>            :          * PPWAIT forks are simple. We know that the parent will not
+<span class="lineNum">     361 </span>            :          * run until we exec and choose another cpu, so we just steal its
+<span class="lineNum">     362 </span>            :          * cpu.
+<span class="lineNum">     363 </span>            :          */
+<span class="lineNum">     364 </span>            :         if (flags &amp; FORK_PPWAIT)
+<span class="lineNum">     365 </span>            :                 return (parent-&gt;p_cpu);
+<span class="lineNum">     366 </span>            : #endif
+<span class="lineNum">     367 </span>            : 
+<span class="lineNum">     368 </span>            :         /*
+<span class="lineNum">     369 </span>            :          * Look at all cpus that are currently idle and have nothing queued.
+<span class="lineNum">     370 </span>            :          * If there are none, pick the one with least queued procs first,
+<span class="lineNum">     371 </span>            :          * then the one with lowest load average.
+<span class="lineNum">     372 </span>            :          */
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :         cpuset_complement(&amp;set, &amp;sched_queued_cpus, &amp;sched_idle_cpus);</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :         cpuset_intersection(&amp;set, &amp;set, &amp;sched_all_cpus);</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :         if (cpuset_first(&amp;set) == NULL)</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :                 cpuset_copy(&amp;set, &amp;sched_all_cpus);</span>
+<span class="lineNum">     377 </span>            : 
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :         while ((ci = cpuset_first(&amp;set)) != NULL) {</span>
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :                 cpuset_del(&amp;set, ci);</span>
+<span class="lineNum">     380 </span>            : 
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                 load = ci-&gt;ci_schedstate.spc_ldavg;</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                 run = ci-&gt;ci_schedstate.spc_nrun;</span>
+<span class="lineNum">     383 </span>            : 
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :                 if (choice == NULL || run &lt; best_run ||</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                     (run == best_run &amp;&amp;load &lt; best_load)) {</span>
+<span class="lineNum">     386 </span>            :                         choice = ci;
+<span class="lineNum">     387 </span>            :                         best_load = load;
+<span class="lineNum">     388 </span>            :                         best_run = run;
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     390 </span>            :         }
+<span class="lineNum">     391 </span>            : 
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         return (choice);</span>
+<span class="lineNum">     393 </span>            : #else
+<span class="lineNum">     394 </span>            :         return (curcpu());
+<span class="lineNum">     395 </span>            : #endif
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 : }</span>
+<a name="397"><span class="lineNum">     397 </span>            : </a>
+<span class="lineNum">     398 </span>            : struct cpu_info *
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 : sched_choosecpu(struct proc *p)</span>
+<span class="lineNum">     400 </span>            : {
+<span class="lineNum">     401 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">     402 </span>            :         struct cpu_info *choice = NULL;
+<span class="lineNum">     403 </span>            :         int last_cost = INT_MAX;
+<span class="lineNum">     404 </span>            :         struct cpu_info *ci;
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         struct cpuset set;</span>
+<span class="lineNum">     406 </span>            : 
+<span class="lineNum">     407 </span>            :         /*
+<span class="lineNum">     408 </span>            :          * If pegged to a cpu, don't allow it to move.
+<span class="lineNum">     409 </span>            :          */
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :         if (p-&gt;p_flag &amp; P_CPUPEG)</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                 return (p-&gt;p_cpu);</span>
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :         sched_choose++;</span>
+<span class="lineNum">     414 </span>            : 
+<span class="lineNum">     415 </span>            :         /*
+<span class="lineNum">     416 </span>            :          * Look at all cpus that are currently idle and have nothing queued.
+<span class="lineNum">     417 </span>            :          * If there are none, pick the cheapest of those.
+<span class="lineNum">     418 </span>            :          * (idle + queued could mean that the cpu is handling an interrupt
+<span class="lineNum">     419 </span>            :          * at this moment and haven't had time to leave idle yet).
+<span class="lineNum">     420 </span>            :          */
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :         cpuset_complement(&amp;set, &amp;sched_queued_cpus, &amp;sched_idle_cpus);</span>
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :         cpuset_intersection(&amp;set, &amp;set, &amp;sched_all_cpus);</span>
+<span class="lineNum">     423 </span>            : 
+<span class="lineNum">     424 </span>            :         /*
+<span class="lineNum">     425 </span>            :          * First, just check if our current cpu is in that set, if it is,
+<span class="lineNum">     426 </span>            :          * this is simple.
+<span class="lineNum">     427 </span>            :          * Also, our cpu might not be idle, but if it's the current cpu
+<span class="lineNum">     428 </span>            :          * and it has nothing else queued and we're curproc, take it.
+<span class="lineNum">     429 </span>            :          */
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :         if (cpuset_isset(&amp;set, p-&gt;p_cpu) ||</span>
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :             (p-&gt;p_cpu == curcpu() &amp;&amp; p-&gt;p_cpu-&gt;ci_schedstate.spc_nrun == 0 &amp;&amp;</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :             (p-&gt;p_cpu-&gt;ci_schedstate.spc_schedflags &amp; SPCF_SHOULDHALT) == 0 &amp;&amp;</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :             curproc == p)) {</span>
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :                 sched_wasidle++;</span>
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :                 return (p-&gt;p_cpu);</span>
+<span class="lineNum">     436 </span>            :         }
+<span class="lineNum">     437 </span>            : 
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :         if (cpuset_first(&amp;set) == NULL)</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :                 cpuset_copy(&amp;set, &amp;sched_all_cpus);</span>
+<span class="lineNum">     440 </span>            : 
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :         while ((ci = cpuset_first(&amp;set)) != NULL) {</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :                 int cost = sched_proc_to_cpu_cost(ci, p);</span>
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :                 if (choice == NULL || cost &lt; last_cost) {</span>
+<span class="lineNum">     445 </span>            :                         choice = ci;
+<span class="lineNum">     446 </span>            :                         last_cost = cost;
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                 cpuset_del(&amp;set, ci);</span>
+<span class="lineNum">     449 </span>            :         }
+<span class="lineNum">     450 </span>            : 
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :         if (p-&gt;p_cpu != choice)</span>
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                 sched_nmigrations++;</span>
+<span class="lineNum">     453 </span>            :         else
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :                 sched_nomigrations++;</span>
+<span class="lineNum">     455 </span>            : 
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :         return (choice);</span>
+<span class="lineNum">     457 </span>            : #else
+<span class="lineNum">     458 </span>            :         return (curcpu());
+<span class="lineNum">     459 </span>            : #endif
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     461 </span>            : 
+<span class="lineNum">     462 </span>            : /*
+<span class="lineNum">     463 </span>            :  * Attempt to steal a proc from some cpu.
+<a name="464"><span class="lineNum">     464 </span>            :  */</a>
+<span class="lineNum">     465 </span>            : struct proc *
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 : sched_steal_proc(struct cpu_info *self)</span>
+<span class="lineNum">     467 </span>            : {
+<span class="lineNum">     468 </span>            :         struct proc *best = NULL;
+<span class="lineNum">     469 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">     470 </span>            :         struct schedstate_percpu *spc;
+<span class="lineNum">     471 </span>            :         int bestcost = INT_MAX;
+<span class="lineNum">     472 </span>            :         struct cpu_info *ci;
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :         struct cpuset set;</span>
+<span class="lineNum">     474 </span>            : 
+<span class="lineNum">     475 </span><span class="lineNoCov">          0 :         KASSERT((self-&gt;ci_schedstate.spc_schedflags &amp; SPCF_SHOULDHALT) == 0);</span>
+<span class="lineNum">     476 </span>            : 
+<span class="lineNum">     477 </span>            :         /* Don't steal if we don't want to schedule processes in this CPU. */
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         if (!cpuset_isset(&amp;sched_all_cpus, self))</span>
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     480 </span>            : 
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :         cpuset_copy(&amp;set, &amp;sched_queued_cpus);</span>
+<span class="lineNum">     482 </span>            : 
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :         while ((ci = cpuset_first(&amp;set)) != NULL) {</span>
+<span class="lineNum">     484 </span>            :                 struct proc *p;
+<span class="lineNum">     485 </span>            :                 int queue;
+<span class="lineNum">     486 </span>            :                 int cost;
+<span class="lineNum">     487 </span>            : 
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :                 cpuset_del(&amp;set, ci);</span>
+<span class="lineNum">     489 </span>            : 
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :                 spc = &amp;ci-&gt;ci_schedstate;</span>
+<span class="lineNum">     491 </span>            : 
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :                 queue = ffs(spc-&gt;spc_whichqs) - 1;</span>
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :                 TAILQ_FOREACH(p, &amp;spc-&gt;spc_qs[queue], p_runq) {</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                         if (p-&gt;p_flag &amp; P_CPUPEG)</span>
+<span class="lineNum">     495 </span>            :                                 continue;
+<span class="lineNum">     496 </span>            : 
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :                         cost = sched_proc_to_cpu_cost(self, p);</span>
+<span class="lineNum">     498 </span>            : 
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :                         if (best == NULL || cost &lt; bestcost) {</span>
+<span class="lineNum">     500 </span>            :                                 best = p;
+<span class="lineNum">     501 </span>            :                                 bestcost = cost;
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">     503 </span>            :                 }
+<span class="lineNum">     504 </span>            :         }
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         if (best == NULL)</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :                 return (NULL);</span>
+<span class="lineNum">     507 </span>            : 
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :         spc = &amp;best-&gt;p_cpu-&gt;ci_schedstate;</span>
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :         remrunqueue(best);</span>
+<span class="lineNum">     510 </span><span class="lineNoCov">          0 :         best-&gt;p_cpu = self;</span>
+<span class="lineNum">     511 </span>            : 
+<span class="lineNum">     512 </span><span class="lineNoCov">          0 :         sched_stolen++;</span>
+<span class="lineNum">     513 </span>            : #endif
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :         return (best);</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     516 </span>            : 
+<span class="lineNum">     517 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">     518 </span>            : /*
+<span class="lineNum">     519 </span>            :  * Base 2 logarithm of an int. returns 0 for 0 (yeye, I know).
+<a name="520"><span class="lineNum">     520 </span>            :  */</a>
+<span class="lineNum">     521 </span>            : static int
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 : log2(unsigned int i)</span>
+<span class="lineNum">     523 </span>            : {
+<span class="lineNum">     524 </span>            :         int ret = 0;
+<span class="lineNum">     525 </span>            : 
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :         while (i &gt;&gt;= 1)</span>
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :                 ret++;</span>
+<span class="lineNum">     528 </span>            : 
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :         return (ret);</span>
+<span class="lineNum">     530 </span>            : }
+<span class="lineNum">     531 </span>            : 
+<span class="lineNum">     532 </span>            : /*
+<span class="lineNum">     533 </span>            :  * Calculate the cost of moving the proc to this cpu.
+<span class="lineNum">     534 </span>            :  * 
+<span class="lineNum">     535 </span>            :  * What we want is some guesstimate of how much &quot;performance&quot; it will
+<span class="lineNum">     536 </span>            :  * cost us to move the proc here. Not just for caches and TLBs and NUMA
+<span class="lineNum">     537 </span>            :  * memory, but also for the proc itself. A highly loaded cpu might not
+<span class="lineNum">     538 </span>            :  * be the best candidate for this proc since it won't get run.
+<span class="lineNum">     539 </span>            :  *
+<span class="lineNum">     540 </span>            :  * Just total guesstimates for now.
+<span class="lineNum">     541 </span>            :  */
+<span class="lineNum">     542 </span>            : 
+<span class="lineNum">     543 </span>            : int sched_cost_load = 1;
+<span class="lineNum">     544 </span>            : int sched_cost_priority = 1;
+<span class="lineNum">     545 </span>            : int sched_cost_runnable = 3;
+<span class="lineNum">     546 </span>            : int sched_cost_resident = 1;
+<span class="lineNum">     547 </span>            : #endif
+<a name="548"><span class="lineNum">     548 </span>            : </a>
+<span class="lineNum">     549 </span>            : int
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 : sched_proc_to_cpu_cost(struct cpu_info *ci, struct proc *p)</span>
+<span class="lineNum">     551 </span>            : {
+<span class="lineNum">     552 </span>            :         int cost = 0;
+<span class="lineNum">     553 </span>            : #ifdef MULTIPROCESSOR
+<span class="lineNum">     554 </span>            :         struct schedstate_percpu *spc;
+<span class="lineNum">     555 </span>            :         int l2resident = 0;
+<span class="lineNum">     556 </span>            : 
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :         spc = &amp;ci-&gt;ci_schedstate;</span>
+<span class="lineNum">     558 </span>            : 
+<span class="lineNum">     559 </span>            :         /*
+<span class="lineNum">     560 </span>            :          * First, account for the priority of the proc we want to move.
+<span class="lineNum">     561 </span>            :          * More willing to move, the lower the priority of the destination
+<span class="lineNum">     562 </span>            :          * and the higher the priority of the proc.
+<span class="lineNum">     563 </span>            :          */
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :         if (!cpuset_isset(&amp;sched_idle_cpus, ci)) {</span>
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :                 cost += (p-&gt;p_priority - spc-&gt;spc_curpriority) *</span>
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :                     sched_cost_priority;</span>
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :                 cost += sched_cost_runnable;</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :         if (cpuset_isset(&amp;sched_queued_cpus, ci))</span>
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :                 cost += spc-&gt;spc_nrun * sched_cost_runnable;</span>
+<span class="lineNum">     571 </span>            : 
+<span class="lineNum">     572 </span>            :         /*
+<span class="lineNum">     573 </span>            :          * Try to avoid the primary cpu as it handles hardware interrupts.
+<span class="lineNum">     574 </span>            :          *
+<span class="lineNum">     575 </span>            :          * XXX Needs to be revisited when we distribute interrupts
+<span class="lineNum">     576 </span>            :          * over cpus.
+<span class="lineNum">     577 </span>            :          */
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :         if (CPU_IS_PRIMARY(ci))</span>
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :                 cost += sched_cost_runnable;</span>
+<span class="lineNum">     580 </span>            : 
+<span class="lineNum">     581 </span>            :         /*
+<span class="lineNum">     582 </span>            :          * Higher load on the destination means we don't want to go there.
+<span class="lineNum">     583 </span>            :          */
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :         cost += ((sched_cost_load * spc-&gt;spc_ldavg) &gt;&gt; FSHIFT);</span>
+<span class="lineNum">     585 </span>            : 
+<span class="lineNum">     586 </span>            :         /*
+<span class="lineNum">     587 </span>            :          * If the proc is on this cpu already, lower the cost by how much
+<span class="lineNum">     588 </span>            :          * it has been running and an estimate of its footprint.
+<span class="lineNum">     589 </span>            :          */
+<span class="lineNum">     590 </span><span class="lineNoCov">          0 :         if (p-&gt;p_cpu == ci &amp;&amp; p-&gt;p_slptime == 0) {</span>
+<span class="lineNum">     591 </span>            :                 l2resident =
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :                     log2(pmap_resident_count(p-&gt;p_vmspace-&gt;vm_map.pmap));</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :                 cost -= l2resident * sched_cost_resident;</span>
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     595 </span>            : #endif
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :         return (cost);</span>
+<span class="lineNum">     597 </span>            : }
+<span class="lineNum">     598 </span>            : 
+<span class="lineNum">     599 </span>            : /*
+<span class="lineNum">     600 </span>            :  * Peg a proc to a cpu.
+<a name="601"><span class="lineNum">     601 </span>            :  */</a>
+<span class="lineNum">     602 </span>            : void
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 : sched_peg_curproc(struct cpu_info *ci)</span>
+<span class="lineNum">     604 </span>            : {
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :         struct proc *p = curproc;</span>
+<span class="lineNum">     606 </span>            :         int s;
+<span class="lineNum">     607 </span>            : 
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :         SCHED_LOCK(s);</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         p-&gt;p_priority = p-&gt;p_usrpri;</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :         p-&gt;p_stat = SRUN;</span>
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :         p-&gt;p_cpu = ci;</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :         atomic_setbits_int(&amp;p-&gt;p_flag, P_CPUPEG);</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         setrunqueue(p);</span>
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :         p-&gt;p_ru.ru_nvcsw++;</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :         mi_switch();</span>
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :         SCHED_UNLOCK(s);</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     618 </span>            : 
+<span class="lineNum">     619 </span>            : #ifdef MULTIPROCESSOR
+<a name="620"><span class="lineNum">     620 </span>            : </a>
+<span class="lineNum">     621 </span>            : void
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 : sched_start_secondary_cpus(void)</span>
+<span class="lineNum">     623 </span>            : {
+<span class="lineNum">     624 </span>            :         CPU_INFO_ITERATOR cii;
+<span class="lineNum">     625 </span>            :         struct cpu_info *ci;
+<span class="lineNum">     626 </span>            : 
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :         CPU_INFO_FOREACH(cii, ci) {</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                 struct schedstate_percpu *spc = &amp;ci-&gt;ci_schedstate;</span>
+<span class="lineNum">     629 </span>            : 
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :                 if (CPU_IS_PRIMARY(ci))</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :                 atomic_clearbits_int(&amp;spc-&gt;spc_schedflags,</span>
+<span class="lineNum">     633 </span>            :                     SPCF_SHOULDHALT | SPCF_HALTED);
+<span class="lineNum">     634 </span>            : #ifdef __HAVE_CPU_TOPOLOGY
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :                 if (!sched_smt &amp;&amp; ci-&gt;ci_smt_id &gt; 0)</span>
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     637 </span>            : #endif
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :                 cpuset_add(&amp;sched_all_cpus, ci);</span>
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 : }</span>
+<a name="641"><span class="lineNum">     641 </span>            : </a>
+<span class="lineNum">     642 </span>            : void
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 : sched_stop_secondary_cpus(void)</span>
+<span class="lineNum">     644 </span>            : {
+<span class="lineNum">     645 </span>            :         CPU_INFO_ITERATOR cii;
+<span class="lineNum">     646 </span>            :         struct cpu_info *ci;
+<span class="lineNum">     647 </span>            : 
+<span class="lineNum">     648 </span>            :         /*
+<span class="lineNum">     649 </span>            :          * Make sure we stop the secondary CPUs.
+<span class="lineNum">     650 </span>            :          */
+<span class="lineNum">     651 </span><span class="lineNoCov">          0 :         CPU_INFO_FOREACH(cii, ci) {</span>
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :                 struct schedstate_percpu *spc = &amp;ci-&gt;ci_schedstate;</span>
+<span class="lineNum">     653 </span>            : 
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :                 if (CPU_IS_PRIMARY(ci))</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :                 cpuset_del(&amp;sched_all_cpus, ci);</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                 atomic_setbits_int(&amp;spc-&gt;spc_schedflags, SPCF_SHOULDHALT);</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :         CPU_INFO_FOREACH(cii, ci) {</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :                 struct schedstate_percpu *spc = &amp;ci-&gt;ci_schedstate;</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                 struct sleep_state sls;</span>
+<span class="lineNum">     662 </span>            : 
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :                 if (CPU_IS_PRIMARY(ci))</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :                 while ((spc-&gt;spc_schedflags &amp; SPCF_HALTED) == 0) {</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :                         sleep_setup(&amp;sls, spc, PZERO, &quot;schedstate&quot;);</span>
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                         sleep_finish(&amp;sls,</span>
+<span class="lineNum">     668 </span><span class="lineNoCov">          0 :                             (spc-&gt;spc_schedflags &amp; SPCF_HALTED) == 0);</span>
+<span class="lineNum">     669 </span>            :                 }
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     672 </span>            : 
+<span class="lineNum">     673 </span>            : struct sched_barrier_state {
+<span class="lineNum">     674 </span>            :         struct cpu_info *ci;
+<span class="lineNum">     675 </span>            :         struct cond cond;
+<span class="lineNum">     676 </span>            : };
+<a name="677"><span class="lineNum">     677 </span>            : </a>
+<span class="lineNum">     678 </span>            : void
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 : sched_barrier_task(void *arg)</span>
+<span class="lineNum">     680 </span>            : {
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         struct sched_barrier_state *sb = arg;</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :         struct cpu_info *ci = sb-&gt;ci;</span>
+<span class="lineNum">     683 </span>            : 
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :         sched_peg_curproc(ci);</span>
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :         cond_signal(&amp;sb-&gt;cond);</span>
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :         atomic_clearbits_int(&amp;curproc-&gt;p_flag, P_CPUPEG);</span>
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 : }</span>
+<a name="688"><span class="lineNum">     688 </span>            : </a>
+<span class="lineNum">     689 </span>            : void
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 : sched_barrier(struct cpu_info *ci)</span>
+<span class="lineNum">     691 </span>            : {
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :         struct sched_barrier_state sb;</span>
+<span class="lineNum">     693 </span><span class="lineNoCov">          0 :         struct task task;</span>
+<span class="lineNum">     694 </span>            :         CPU_INFO_ITERATOR cii;
+<span class="lineNum">     695 </span>            : 
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :         if (ci == NULL) {</span>
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :                 CPU_INFO_FOREACH(cii, ci) {</span>
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :                         if (CPU_IS_PRIMARY(ci))</span>
+<span class="lineNum">     699 </span>            :                                 break;
+<span class="lineNum">     700 </span>            :                 }
+<span class="lineNum">     701 </span>            :         }
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :         KASSERT(ci != NULL);</span>
+<span class="lineNum">     703 </span>            : 
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :         if (ci == curcpu())</span>
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     706 </span>            : 
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :         sb.ci = ci;</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :         cond_init(&amp;sb.cond);</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :         task_set(&amp;task, sched_barrier_task, &amp;sb);</span>
+<span class="lineNum">     710 </span>            : 
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :         task_add(systqmp, &amp;task);</span>
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :         cond_wait(&amp;sb.cond, &quot;sbar&quot;);</span>
+<span class="lineNum">     713 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     714 </span>            : 
+<span class="lineNum">     715 </span>            : #else
+<span class="lineNum">     716 </span>            : 
+<span class="lineNum">     717 </span>            : void
+<span class="lineNum">     718 </span>            : sched_barrier(struct cpu_info *ci)
+<span class="lineNum">     719 </span>            : {
+<span class="lineNum">     720 </span>            : }
+<span class="lineNum">     721 </span>            : 
+<span class="lineNum">     722 </span>            : #endif
+<span class="lineNum">     723 </span>            : 
+<span class="lineNum">     724 </span>            : /*
+<span class="lineNum">     725 </span>            :  * Functions to manipulate cpu sets.
+<span class="lineNum">     726 </span>            :  */
+<span class="lineNum">     727 </span>            : struct cpu_info *cpuset_infos[MAXCPUS];
+<span class="lineNum">     728 </span>            : static struct cpuset cpuset_all;
+<a name="729"><span class="lineNum">     729 </span>            : </a>
+<span class="lineNum">     730 </span>            : void
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 : cpuset_init_cpu(struct cpu_info *ci)</span>
+<span class="lineNum">     732 </span>            : {
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :         cpuset_add(&amp;cpuset_all, ci);</span>
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :         cpuset_infos[CPU_INFO_UNIT(ci)] = ci;</span>
+<span class="lineNum">     735 </span><span class="lineNoCov">          0 : }</span>
+<a name="736"><span class="lineNum">     736 </span>            : </a>
+<span class="lineNum">     737 </span>            : void
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 : cpuset_clear(struct cpuset *cs)</span>
+<span class="lineNum">     739 </span>            : {
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :         memset(cs, 0, sizeof(*cs));</span>
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 : }</span>
+<a name="742"><span class="lineNum">     742 </span>            : </a>
+<span class="lineNum">     743 </span>            : void
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 : cpuset_add(struct cpuset *cs, struct cpu_info *ci)</span>
+<span class="lineNum">     745 </span>            : {
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :         unsigned int num = CPU_INFO_UNIT(ci);</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :         atomic_setbits_int(&amp;cs-&gt;cs_set[num/32], (1 &lt;&lt; (num % 32)));</span>
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 : }</span>
+<a name="749"><span class="lineNum">     749 </span>            : </a>
+<span class="lineNum">     750 </span>            : void
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 : cpuset_del(struct cpuset *cs, struct cpu_info *ci)</span>
+<span class="lineNum">     752 </span>            : {
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :         unsigned int num = CPU_INFO_UNIT(ci);</span>
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :         atomic_clearbits_int(&amp;cs-&gt;cs_set[num/32], (1 &lt;&lt; (num % 32)));</span>
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 : }</span>
+<a name="756"><span class="lineNum">     756 </span>            : </a>
+<span class="lineNum">     757 </span>            : int
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 : cpuset_isset(struct cpuset *cs, struct cpu_info *ci)</span>
+<span class="lineNum">     759 </span>            : {
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         unsigned int num = CPU_INFO_UNIT(ci);</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :         return (cs-&gt;cs_set[num/32] &amp; (1 &lt;&lt; (num % 32)));</span>
+<span class="lineNum">     762 </span>            : }
+<a name="763"><span class="lineNum">     763 </span>            : </a>
+<span class="lineNum">     764 </span>            : void
+<span class="lineNum">     765 </span><span class="lineNoCov">          0 : cpuset_add_all(struct cpuset *cs)</span>
+<span class="lineNum">     766 </span>            : {
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :         cpuset_copy(cs, &amp;cpuset_all);</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 : }</span>
+<a name="769"><span class="lineNum">     769 </span>            : </a>
+<span class="lineNum">     770 </span>            : void
+<span class="lineNum">     771 </span><span class="lineNoCov">          0 : cpuset_copy(struct cpuset *to, struct cpuset *from)</span>
+<span class="lineNum">     772 </span>            : {
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 :         memcpy(to, from, sizeof(*to));</span>
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 : }</span>
+<a name="775"><span class="lineNum">     775 </span>            : </a>
+<span class="lineNum">     776 </span>            : struct cpu_info *
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 : cpuset_first(struct cpuset *cs)</span>
+<span class="lineNum">     778 </span>            : {
+<span class="lineNum">     779 </span>            :         int i;
+<span class="lineNum">     780 </span>            : 
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; CPUSET_ASIZE(ncpus); i++)</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :                 if (cs-&gt;cs_set[i])</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :                         return (cpuset_infos[i * 32 + ffs(cs-&gt;cs_set[i]) - 1]);</span>
+<span class="lineNum">     784 </span>            : 
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 : }</span>
+<a name="787"><span class="lineNum">     787 </span>            : </a>
+<span class="lineNum">     788 </span>            : void
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 : cpuset_union(struct cpuset *to, struct cpuset *a, struct cpuset *b)</span>
+<span class="lineNum">     790 </span>            : {
+<span class="lineNum">     791 </span>            :         int i;
+<span class="lineNum">     792 </span>            : 
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; CPUSET_ASIZE(ncpus); i++)</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :                 to-&gt;cs_set[i] = a-&gt;cs_set[i] | b-&gt;cs_set[i];</span>
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 : }</span>
+<a name="796"><span class="lineNum">     796 </span>            : </a>
+<span class="lineNum">     797 </span>            : void
+<span class="lineNum">     798 </span><span class="lineNoCov">          0 : cpuset_intersection(struct cpuset *to, struct cpuset *a, struct cpuset *b)</span>
+<span class="lineNum">     799 </span>            : {
+<span class="lineNum">     800 </span>            :         int i;
+<span class="lineNum">     801 </span>            : 
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; CPUSET_ASIZE(ncpus); i++)</span>
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 :                 to-&gt;cs_set[i] = a-&gt;cs_set[i] &amp; b-&gt;cs_set[i];</span>
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 : }</span>
+<a name="805"><span class="lineNum">     805 </span>            : </a>
+<span class="lineNum">     806 </span>            : void
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 : cpuset_complement(struct cpuset *to, struct cpuset *a, struct cpuset *b)</span>
+<span class="lineNum">     808 </span>            : {
+<span class="lineNum">     809 </span>            :         int i;
+<span class="lineNum">     810 </span>            : 
+<span class="lineNum">     811 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; CPUSET_ASIZE(ncpus); i++)</span>
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :                 to-&gt;cs_set[i] = b-&gt;cs_set[i] &amp; ~a-&gt;cs_set[i];</span>
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 : }</span>
+<a name="814"><span class="lineNum">     814 </span>            : </a>
+<span class="lineNum">     815 </span>            : int
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 : cpuset_cardinality(struct cpuset *cs)</span>
+<span class="lineNum">     817 </span>            : {
+<span class="lineNum">     818 </span>            :         int cardinality, i, n;
+<span class="lineNum">     819 </span>            : 
+<span class="lineNum">     820 </span>            :         cardinality = 0;
+<span class="lineNum">     821 </span>            : 
+<span class="lineNum">     822 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; CPUSET_ASIZE(ncpus); i++)</span>
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :                 for (n = cs-&gt;cs_set[i]; n != 0; n &amp;= n - 1)</span>
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :                         cardinality++;</span>
+<span class="lineNum">     825 </span>            : 
+<span class="lineNum">     826 </span><span class="lineNoCov">          0 :         return (cardinality);</span>
+<span class="lineNum">     827 </span>            : }
+<a name="828"><span class="lineNum">     828 </span>            : </a>
+<span class="lineNum">     829 </span>            : int
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 : sysctl_hwncpuonline(void)</span>
+<span class="lineNum">     831 </span>            : {
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :         return cpuset_cardinality(&amp;sched_all_cpus);</span>
+<span class="lineNum">     833 </span>            : }
+<span class="lineNum">     834 </span>            : 
+<span class="lineNum">     835 </span>            : #ifdef __HAVE_CPU_TOPOLOGY
+<span class="lineNum">     836 </span>            : 
+<span class="lineNum">     837 </span>            : #include &lt;sys/sysctl.h&gt;
+<a name="838"><span class="lineNum">     838 </span>            : </a>
+<span class="lineNum">     839 </span>            : int
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 : sysctl_hwsmt(void *oldp, size_t *oldlenp, void *newp, size_t newlen)</span>
+<span class="lineNum">     841 </span>            : {
+<span class="lineNum">     842 </span>            :         CPU_INFO_ITERATOR cii;
+<span class="lineNum">     843 </span>            :         struct cpu_info *ci;
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :         int err, newsmt;</span>
+<span class="lineNum">     845 </span>            : 
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :         newsmt = sched_smt;</span>
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :         err = sysctl_int(oldp, oldlenp, newp, newlen, &amp;newsmt);</span>
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :         if (err)</span>
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :                 return err;</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :         if (newsmt &gt; 1)</span>
+<span class="lineNum">     851 </span><span class="lineNoCov">          0 :                 newsmt = 1;</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :         if (newsmt &lt; 0)</span>
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :                 newsmt = 0;</span>
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 :         if (newsmt == sched_smt)</span>
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     856 </span>            : 
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :         sched_smt = newsmt;</span>
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :         CPU_INFO_FOREACH(cii, ci) {</span>
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :                 if (CPU_IS_PRIMARY(ci))</span>
+<span class="lineNum">     860 </span>            :                         continue;
+<span class="lineNum">     861 </span><span class="lineNoCov">          0 :                 if (ci-&gt;ci_smt_id == 0)</span>
+<span class="lineNum">     862 </span>            :                         continue;
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 :                 if (sched_smt)</span>
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :                         cpuset_add(&amp;sched_all_cpus, ci);</span>
+<span class="lineNum">     865 </span>            :                 else
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :                         cpuset_del(&amp;sched_all_cpus, ci);</span>
+<span class="lineNum">     867 </span>            :         }
+<span class="lineNum">     868 </span>            : 
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     871 </span>            : 
+<span class="lineNum">     872 </span>            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,2009 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/if_tht.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">dev/pci</a> - if_tht.c<span style="font-size: 80%;"> (source / <a href="if_tht.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">654</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">49</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: if_tht.c,v 1.140 2017/01/22 10:17:38 dlg Exp $ */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2007 David Gwynne &lt;dlg@openbsd.org&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /*
+<span class="lineNum">      20 </span>            :  * Driver for the Tehuti TN30xx multi port 10Gb Ethernet chipsets,
+<span class="lineNum">      21 </span>            :  * see http://www.tehutinetworks.net/.
+<span class="lineNum">      22 </span>            :  *
+<span class="lineNum">      23 </span>            :  * This driver was made possible because Tehuti networks provided
+<span class="lineNum">      24 </span>            :  * hardware and documentation. Thanks!
+<span class="lineNum">      25 </span>            :  */
+<span class="lineNum">      26 </span>            : 
+<span class="lineNum">      27 </span>            : #include &quot;bpfilter.h&quot;
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;sys/systm.h&gt;
+<span class="lineNum">      31 </span>            : #include &lt;sys/sockio.h&gt;
+<span class="lineNum">      32 </span>            : #include &lt;sys/mbuf.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;sys/kernel.h&gt;
+<span class="lineNum">      34 </span>            : #include &lt;sys/socket.h&gt;
+<span class="lineNum">      35 </span>            : #include &lt;sys/malloc.h&gt;
+<span class="lineNum">      36 </span>            : #include &lt;sys/device.h&gt;
+<span class="lineNum">      37 </span>            : #include &lt;sys/timeout.h&gt;
+<span class="lineNum">      38 </span>            : #include &lt;sys/queue.h&gt;
+<span class="lineNum">      39 </span>            : #include &lt;sys/rwlock.h&gt;
+<span class="lineNum">      40 </span>            : #include &lt;sys/time.h&gt;
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span>            : #include &lt;machine/bus.h&gt;
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : #include &lt;dev/pci/pcireg.h&gt;
+<span class="lineNum">      45 </span>            : #include &lt;dev/pci/pcivar.h&gt;
+<span class="lineNum">      46 </span>            : #include &lt;dev/pci/pcidevs.h&gt;
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span>            : #include &lt;net/if.h&gt;
+<span class="lineNum">      49 </span>            : #include &lt;net/if_media.h&gt;
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">      52 </span>            : #include &lt;net/bpf.h&gt;
+<span class="lineNum">      53 </span>            : #endif
+<span class="lineNum">      54 </span>            : 
+<span class="lineNum">      55 </span>            : #include &lt;netinet/in.h&gt;
+<span class="lineNum">      56 </span>            : #include &lt;netinet/if_ether.h&gt;
+<span class="lineNum">      57 </span>            : 
+<span class="lineNum">      58 </span>            : #ifdef THT_DEBUG
+<span class="lineNum">      59 </span>            : #define THT_D_FIFO              (1&lt;&lt;0)
+<span class="lineNum">      60 </span>            : #define THT_D_TX                (1&lt;&lt;1)
+<span class="lineNum">      61 </span>            : #define THT_D_RX                (1&lt;&lt;2)
+<span class="lineNum">      62 </span>            : #define THT_D_INTR              (1&lt;&lt;3)
+<span class="lineNum">      63 </span>            : 
+<span class="lineNum">      64 </span>            : int thtdebug = THT_D_TX | THT_D_RX | THT_D_INTR;
+<span class="lineNum">      65 </span>            : 
+<span class="lineNum">      66 </span>            : #define DPRINTF(l, f...)        do { if (thtdebug &amp; (l)) printf(f); } while (0)
+<span class="lineNum">      67 </span>            : #else
+<span class="lineNum">      68 </span>            : #define DPRINTF(l, f...)
+<span class="lineNum">      69 </span>            : #endif
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : /* registers */
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span>            : #define THT_PCI_BAR             0x10
+<span class="lineNum">      74 </span>            : 
+<span class="lineNum">      75 </span>            : #define _Q(_q)                  ((_q) * 4)
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            : /* General Configuration */
+<span class="lineNum">      78 </span>            : #define THT_REG_END_SEL         0x5448 /* PCI Endian Select */
+<span class="lineNum">      79 </span>            : #define THT_REG_CLKPLL          0x5000
+<span class="lineNum">      80 </span>            : #define  THT_REG_CLKPLL_PLLLK           (1&lt;&lt;9) /* PLL is locked */
+<span class="lineNum">      81 </span>            : #define  THT_REG_CLKPLL_RSTEND          (1&lt;&lt;8) /* Reset ended */
+<span class="lineNum">      82 </span>            : #define  THT_REG_CLKPLL_TXF_DIS         (1&lt;&lt;3) /* TX Free disabled */
+<span class="lineNum">      83 </span>            : #define  THT_REG_CLKPLL_VNT_STOP        (1&lt;&lt;2) /* VENETO Stop */
+<span class="lineNum">      84 </span>            : #define  THT_REG_CLKPLL_PLLRST          (1&lt;&lt;1) /* PLL Reset */
+<span class="lineNum">      85 </span>            : #define  THT_REG_CLKPLL_SFTRST          (1&lt;&lt;0) /* Software Reset */
+<span class="lineNum">      86 </span>            : /* Descriptors and FIFO Registers */
+<span class="lineNum">      87 </span>            : #define THT_REG_TXT_CFG0(_q)    (0x4040 + _Q(_q)) /* CFG0 TX Task queues */
+<span class="lineNum">      88 </span>            : #define THT_REG_RXF_CFG0(_q)    (0x4050 + _Q(_q)) /* CFG0 RX Free queues */
+<span class="lineNum">      89 </span>            : #define THT_REG_RXD_CFG0(_q)    (0x4060 + _Q(_q)) /* CFG0 RX DSC queues */
+<span class="lineNum">      90 </span>            : #define THT_REG_TXF_CFG0(_q)    (0x4070 + _Q(_q)) /* CFG0 TX Free queues */
+<span class="lineNum">      91 </span>            : #define THT_REG_TXT_CFG1(_q)    (0x4000 + _Q(_q)) /* CFG1 TX Task queues */
+<span class="lineNum">      92 </span>            : #define THT_REG_RXF_CFG1(_q)    (0x4010 + _Q(_q)) /* CFG1 RX Free queues */
+<span class="lineNum">      93 </span>            : #define THT_REG_RXD_CFG1(_q)    (0x4020 + _Q(_q)) /* CFG1 RX DSC queues */
+<span class="lineNum">      94 </span>            : #define THT_REG_TXF_CFG1(_q)    (0x4030 + _Q(_q)) /* CFG1 TX Free queues */
+<span class="lineNum">      95 </span>            : #define THT_REG_TXT_RPTR(_q)    (0x40c0 + _Q(_q)) /* TX Task read ptr */
+<span class="lineNum">      96 </span>            : #define THT_REG_RXF_RPTR(_q)    (0x40d0 + _Q(_q)) /* RX Free read ptr */
+<span class="lineNum">      97 </span>            : #define THT_REG_RXD_RPTR(_q)    (0x40e0 + _Q(_q)) /* RX DSC read ptr */
+<span class="lineNum">      98 </span>            : #define THT_REG_TXF_RPTR(_q)    (0x40f0 + _Q(_q)) /* TX Free read ptr */
+<span class="lineNum">      99 </span>            : #define THT_REG_TXT_WPTR(_q)    (0x4080 + _Q(_q)) /* TX Task write ptr */
+<span class="lineNum">     100 </span>            : #define THT_REG_RXF_WPTR(_q)    (0x4090 + _Q(_q)) /* RX Free write ptr */
+<span class="lineNum">     101 </span>            : #define THT_REG_RXD_WPTR(_q)    (0x40a0 + _Q(_q)) /* RX DSC write ptr */
+<span class="lineNum">     102 </span>            : #define THT_REG_TXF_WPTR(_q)    (0x40b0 + _Q(_q)) /* TX Free write ptr */
+<span class="lineNum">     103 </span>            : #define THT_REG_HTB_ADDR        0x4100 /* HTB Addressing Mechanism enable */
+<span class="lineNum">     104 </span>            : #define THT_REG_HTB_ADDR_HI     0x4110 /* High HTB Address */
+<span class="lineNum">     105 </span>            : #define THT_REG_HTB_ST_TMR      0x3290 /* HTB Timer */
+<span class="lineNum">     106 </span>            : #define THT_REG_RDINTCM(_q)     (0x5120 + _Q(_q)) /* RX DSC Intr Coalescing */
+<span class="lineNum">     107 </span>            : #define  THT_REG_RDINTCM_PKT_TH(_c)     ((_c)&lt;&lt;20) /* pkt count threshold */
+<span class="lineNum">     108 </span>            : #define  THT_REG_RDINTCM_RXF_TH(_c)     ((_c)&lt;&lt;16) /* rxf intr req thresh */
+<span class="lineNum">     109 </span>            : #define  THT_REG_RDINTCM_COAL_RC        (1&lt;&lt;15) /* coalescing timer recharge */
+<span class="lineNum">     110 </span>            : #define  THT_REG_RDINTCM_COAL(_c)       (_c) /* coalescing timer */
+<span class="lineNum">     111 </span>            : #define THT_REG_TDINTCM(_q)     (0x5130 + _Q(_q)) /* TX DSC Intr Coalescing */
+<span class="lineNum">     112 </span>            : #define  THT_REG_TDINTCM_PKT_TH(_c)     ((_c)&lt;&lt;20) /* pkt count threshold */
+<span class="lineNum">     113 </span>            : #define  THT_REG_TDINTCM_COAL_RC        (1&lt;&lt;15) /* coalescing timer recharge */
+<span class="lineNum">     114 </span>            : #define  THT_REG_TDINTCM_COAL(_c)       (_c) /* coalescing timer */
+<span class="lineNum">     115 </span>            : /* 10G Ethernet MAC */
+<span class="lineNum">     116 </span>            : #define THT_REG_10G_REV         0x6000 /* Revision */
+<span class="lineNum">     117 </span>            : #define THT_REG_10G_SCR         0x6004 /* Scratch */
+<span class="lineNum">     118 </span>            : #define THT_REG_10G_CTL         0x6008 /* Control/Status */
+<span class="lineNum">     119 </span>            : #define  THT_REG_10G_CTL_CMD_FRAME_EN   (1&lt;&lt;13) /* cmd frame enable */
+<span class="lineNum">     120 </span>            : #define  THT_REG_10G_CTL_SW_RESET       (1&lt;&lt;12) /* sw reset */
+<span class="lineNum">     121 </span>            : #define  THT_REG_10G_CTL_STATS_AUTO_CLR (1&lt;&lt;11) /* auto clear statistics */
+<span class="lineNum">     122 </span>            : #define  THT_REG_10G_CTL_LOOPBACK       (1&lt;&lt;10) /* enable loopback */
+<span class="lineNum">     123 </span>            : #define  THT_REG_10G_CTL_TX_ADDR_INS    (1&lt;&lt;9) /* set mac on tx */
+<span class="lineNum">     124 </span>            : #define  THT_REG_10G_CTL_PAUSE_IGNORE   (1&lt;&lt;8) /* ignore pause */
+<span class="lineNum">     125 </span>            : #define  THT_REG_10G_CTL_PAUSE_FWD      (1&lt;&lt;7) /* forward pause */
+<span class="lineNum">     126 </span>            : #define  THT_REG_10G_CTL_CRC_FWD        (1&lt;&lt;6) /* crc forward */
+<span class="lineNum">     127 </span>            : #define  THT_REG_10G_CTL_PAD            (1&lt;&lt;5) /* frame padding */
+<span class="lineNum">     128 </span>            : #define  THT_REG_10G_CTL_PROMISC        (1&lt;&lt;4) /* promiscuous mode */
+<span class="lineNum">     129 </span>            : #define  THT_REG_10G_CTL_WAN_MODE       (1&lt;&lt;3) /* WAN mode */
+<span class="lineNum">     130 </span>            : #define  THT_REG_10G_CTL_RX_EN          (1&lt;&lt;1) /* RX enable */
+<span class="lineNum">     131 </span>            : #define  THT_REG_10G_CTL_TX_EN          (1&lt;&lt;0) /* TX enable */
+<span class="lineNum">     132 </span>            : #define THT_REG_10G_FRM_LEN     0x6014 /* Frame Length */
+<span class="lineNum">     133 </span>            : #define THT_REG_10G_PAUSE       0x6018 /* Pause Quanta */
+<span class="lineNum">     134 </span>            : #define THT_REG_10G_RX_SEC      0x601c /* RX Section */
+<span class="lineNum">     135 </span>            : #define THT_REG_10G_TX_SEC      0x6020 /* TX Section */
+<span class="lineNum">     136 </span>            : #define  THT_REG_10G_SEC_AVAIL(_t)      (_t) /* section available thresh*/
+<span class="lineNum">     137 </span>            : #define  THT_REG_10G_SEC_EMPTY(_t)      ((_t)&lt;&lt;16) /* section empty avail */
+<span class="lineNum">     138 </span>            : #define THT_REG_10G_RFIFO_AEF   0x6024 /* RX FIFO Almost Empty/Full */
+<span class="lineNum">     139 </span>            : #define THT_REG_10G_TFIFO_AEF   0x6028 /* TX FIFO Almost Empty/Full */
+<span class="lineNum">     140 </span>            : #define  THT_REG_10G_FIFO_AE(_t)        (_t) /* almost empty */
+<span class="lineNum">     141 </span>            : #define  THT_REG_10G_FIFO_AF(_t)        ((_t)&lt;&lt;16) /* almost full */
+<span class="lineNum">     142 </span>            : #define THT_REG_10G_SM_STAT     0x6030 /* MDIO Status */
+<span class="lineNum">     143 </span>            : #define THT_REG_10G_SM_CMD      0x6034 /* MDIO Command */
+<span class="lineNum">     144 </span>            : #define THT_REG_10G_SM_DAT      0x6038 /* MDIO Data */
+<span class="lineNum">     145 </span>            : #define THT_REG_10G_SM_ADD      0x603c /* MDIO Address */
+<span class="lineNum">     146 </span>            : #define THT_REG_10G_STAT        0x6040 /* Status */
+<span class="lineNum">     147 </span>            : /* Statistic Counters */
+<span class="lineNum">     148 </span>            : /* XXX todo */
+<span class="lineNum">     149 </span>            : /* Status Registers */
+<span class="lineNum">     150 </span>            : #define THT_REG_MAC_LNK_STAT    0x0200 /* Link Status */
+<span class="lineNum">     151 </span>            : #define  THT_REG_MAC_LNK_STAT_DIS       (1&lt;&lt;4) /* Mac Stats read disable */
+<span class="lineNum">     152 </span>            : #define  THT_REG_MAC_LNK_STAT_LINK      (1&lt;&lt;2) /* Link State */
+<span class="lineNum">     153 </span>            : #define  THT_REG_MAC_LNK_STAT_REM_FAULT (1&lt;&lt;1) /* Remote Fault */
+<span class="lineNum">     154 </span>            : #define  THT_REG_MAC_LNK_STAT_LOC_FAULT (1&lt;&lt;0) /* Local Fault */
+<span class="lineNum">     155 </span>            : /* Interrupt Registers */
+<span class="lineNum">     156 </span>            : #define THT_REG_ISR             0x5100 /* Interrupt Status */
+<span class="lineNum">     157 </span>            : #define THT_REG_ISR_LINKCHG(_p)         (1&lt;&lt;(27+(_p))) /* link changed */
+<span class="lineNum">     158 </span>            : #define THT_REG_ISR_GPIO                (1&lt;&lt;26) /* GPIO */
+<span class="lineNum">     159 </span>            : #define THT_REG_ISR_RFRSH               (1&lt;&lt;25) /* DDR Refresh */
+<span class="lineNum">     160 </span>            : #define THT_REG_ISR_SWI                 (1&lt;&lt;23) /* software interrupt */
+<span class="lineNum">     161 </span>            : #define THT_REG_ISR_RXF(_q)             (1&lt;&lt;(19+(_q))) /* rx free fifo */
+<span class="lineNum">     162 </span>            : #define THT_REG_ISR_TXF(_q)             (1&lt;&lt;(15+(_q))) /* tx free fifo */
+<span class="lineNum">     163 </span>            : #define THT_REG_ISR_RXD(_q)             (1&lt;&lt;(11+(_q))) /* rx desc fifo */
+<span class="lineNum">     164 </span>            : #define THT_REG_ISR_TMR(_t)             (1&lt;&lt;(6+(_t))) /* timer */
+<span class="lineNum">     165 </span>            : #define THT_REG_ISR_VNT                 (1&lt;&lt;5) /* optistrata */
+<span class="lineNum">     166 </span>            : #define THT_REG_ISR_RxFL                (1&lt;&lt;4) /* RX Full */
+<span class="lineNum">     167 </span>            : #define THT_REG_ISR_TR                  (1&lt;&lt;2) /* table read */
+<span class="lineNum">     168 </span>            : #define THT_REG_ISR_PCIE_LNK_INT        (1&lt;&lt;1) /* pcie link fail */
+<span class="lineNum">     169 </span>            : #define THT_REG_ISR_GPLE_CLR            (1&lt;&lt;0) /* pcie timeout */
+<span class="lineNum">     170 </span>            : #define THT_FMT_ISR             &quot;\020&quot; &quot;\035LINKCHG1&quot; &quot;\034LINKCHG0&quot; \
+<span class="lineNum">     171 </span>            :                                     &quot;\033GPIO&quot; &quot;\032RFRSH&quot; &quot;\030SWI&quot; \
+<span class="lineNum">     172 </span>            :                                     &quot;\027RXF3&quot; &quot;\026RXF2&quot; &quot;\025RXF1&quot; \
+<span class="lineNum">     173 </span>            :                                     &quot;\024RXF0&quot; &quot;\023TXF3&quot; &quot;\022TXF2&quot; \
+<span class="lineNum">     174 </span>            :                                     &quot;\021TXF1&quot; &quot;\020TXF0&quot; &quot;\017RXD3&quot; \
+<span class="lineNum">     175 </span>            :                                     &quot;\016RXD2&quot; &quot;\015RXD1&quot; &quot;\014RXD0&quot; \
+<span class="lineNum">     176 </span>            :                                     &quot;\012TMR3&quot; &quot;\011TMR2&quot; &quot;\010TMR1&quot; \
+<span class="lineNum">     177 </span>            :                                     &quot;\007TMR0&quot; &quot;\006VNT&quot; &quot;\005RxFL&quot; \
+<span class="lineNum">     178 </span>            :                                     &quot;\003TR&quot; &quot;\002PCI_LNK_INT&quot; \
+<span class="lineNum">     179 </span>            :                                     &quot;\001GPLE_CLR&quot;
+<span class="lineNum">     180 </span>            : #define THT_REG_ISR_GTI         0x5080 /* GTI Interrupt Status */
+<span class="lineNum">     181 </span>            : #define THT_REG_IMR             0x5110 /* Interrupt Mask */
+<span class="lineNum">     182 </span>            : #define THT_REG_IMR_LINKCHG(_p)         (1&lt;&lt;(27+(_p))) /* link changed */
+<span class="lineNum">     183 </span>            : #define THT_REG_IMR_GPIO                (1&lt;&lt;26) /* GPIO */
+<span class="lineNum">     184 </span>            : #define THT_REG_IMR_RFRSH               (1&lt;&lt;25) /* DDR Refresh */
+<span class="lineNum">     185 </span>            : #define THT_REG_IMR_SWI                 (1&lt;&lt;23) /* software interrupt */
+<span class="lineNum">     186 </span>            : #define THT_REG_IMR_RXF(_q)             (1&lt;&lt;(19+(_q))) /* rx free fifo */
+<span class="lineNum">     187 </span>            : #define THT_REG_IMR_TXF(_q)             (1&lt;&lt;(15+(_q))) /* tx free fifo */
+<span class="lineNum">     188 </span>            : #define THT_REG_IMR_RXD(_q)             (1&lt;&lt;(11+(_q))) /* rx desc fifo */
+<span class="lineNum">     189 </span>            : #define THT_REG_IMR_TMR(_t)             (1&lt;&lt;(6+(_t))) /* timer */
+<span class="lineNum">     190 </span>            : #define THT_REG_IMR_VNT                 (1&lt;&lt;5) /* optistrata */
+<span class="lineNum">     191 </span>            : #define THT_REG_IMR_RxFL                (1&lt;&lt;4) /* RX Full */
+<span class="lineNum">     192 </span>            : #define THT_REG_IMR_TR                  (1&lt;&lt;2) /* table read */
+<span class="lineNum">     193 </span>            : #define THT_REG_IMR_PCIE_LNK_INT        (1&lt;&lt;1) /* pcie link fail */
+<span class="lineNum">     194 </span>            : #define THT_REG_IMR_GPLE_CLR            (1&lt;&lt;0) /* pcie timeout */
+<span class="lineNum">     195 </span>            : #define THT_REG_IMR_GTI         0x5090 /* GTI Interrupt Mask */
+<span class="lineNum">     196 </span>            : #define THT_REG_ISR_MSK         0x5140 /* ISR Masked */
+<span class="lineNum">     197 </span>            : /* Global Counters */
+<span class="lineNum">     198 </span>            : /* XXX todo */
+<span class="lineNum">     199 </span>            : /* DDR2 SDRAM Controller Registers */
+<span class="lineNum">     200 </span>            : /* XXX TBD */
+<span class="lineNum">     201 </span>            : /* EEPROM Registers */
+<span class="lineNum">     202 </span>            : /* XXX todo */
+<span class="lineNum">     203 </span>            : /* Init arbitration and status registers */
+<span class="lineNum">     204 </span>            : #define THT_REG_INIT_SEMAPHORE  0x5170 /* Init Semaphore */
+<span class="lineNum">     205 </span>            : #define THT_REG_INIT_STATUS     0x5180 /* Init Status */
+<span class="lineNum">     206 </span>            : /* PCI Credits Registers */
+<span class="lineNum">     207 </span>            : /* XXX todo */
+<span class="lineNum">     208 </span>            : /* TX Arbitration Registers */
+<span class="lineNum">     209 </span>            : #define THT_REG_TXTSK_PR(_q)    (0x41b0 + _Q(_q)) /* TX Queue Priority */
+<span class="lineNum">     210 </span>            : /* RX Part Registers */
+<span class="lineNum">     211 </span>            : #define THT_REG_RX_FLT          0x1240 /* RX Filter Configuration */
+<span class="lineNum">     212 </span>            : #define  THT_REG_RX_FLT_ATXER           (1&lt;&lt;15) /* accept with xfer err */
+<span class="lineNum">     213 </span>            : #define  THT_REG_RX_FLT_ATRM            (1&lt;&lt;14) /* accept with term err */
+<span class="lineNum">     214 </span>            : #define  THT_REG_RX_FLT_AFTSQ           (1&lt;&lt;13) /* accept with fault seq */
+<span class="lineNum">     215 </span>            : #define  THT_REG_RX_FLT_OSEN            (1&lt;&lt;12) /* enable pkts */
+<span class="lineNum">     216 </span>            : #define  THT_REG_RX_FLT_APHER           (1&lt;&lt;11) /* accept with phy err */
+<span class="lineNum">     217 </span>            : #define  THT_REG_RX_FLT_TXFC            (1&lt;&lt;10) /* TX flow control */
+<span class="lineNum">     218 </span>            : #define  THT_REG_RX_FLT_FDA             (1&lt;&lt;8) /* filter direct address */
+<span class="lineNum">     219 </span>            : #define  THT_REG_RX_FLT_AOF             (1&lt;&lt;7) /* accept overflow frame */
+<span class="lineNum">     220 </span>            : #define  THT_REG_RX_FLT_ACF             (1&lt;&lt;6) /* accept control frame */
+<span class="lineNum">     221 </span>            : #define  THT_REG_RX_FLT_ARUNT           (1&lt;&lt;5) /* accept runt */
+<span class="lineNum">     222 </span>            : #define  THT_REG_RX_FLT_ACRC            (1&lt;&lt;4) /* accept crc error */
+<span class="lineNum">     223 </span>            : #define  THT_REG_RX_FLT_AM              (1&lt;&lt;3) /* accept multicast */
+<span class="lineNum">     224 </span>            : #define  THT_REG_RX_FLT_AB              (1&lt;&lt;2) /* accept broadcast */
+<span class="lineNum">     225 </span>            : #define  THT_REG_RX_FLT_PRM_MASK        0x3 /* promiscuous mode */
+<span class="lineNum">     226 </span>            : #define  THT_REG_RX_FLT_PRM_NORMAL      0x0 /* normal mode */
+<span class="lineNum">     227 </span>            : #define  THT_REG_RX_FLT_PRM_ALL         0x1 /* pass all incoming frames */
+<span class="lineNum">     228 </span>            : #define THT_REG_RX_MAX_FRAME    0x12c0 /* Max Frame Size */
+<span class="lineNum">     229 </span>            : #define THT_REG_RX_UNC_MAC0     0x1250 /* MAC Address low word */
+<span class="lineNum">     230 </span>            : #define THT_REG_RX_UNC_MAC1     0x1260 /* MAC Address mid word */
+<span class="lineNum">     231 </span>            : #define THT_REG_RX_UNC_MAC2     0x1270 /* MAC Address high word */
+<span class="lineNum">     232 </span>            : #define THT_REG_RX_MAC_MCST0(_m) (0x1a80 + (_m)*8)
+<span class="lineNum">     233 </span>            : #define THT_REG_RX_MAC_MCST1(_m) (0x1a84 + (_m)*8)
+<span class="lineNum">     234 </span>            : #define  THT_REG_RX_MAC_MCST_CNT        15
+<span class="lineNum">     235 </span>            : #define THT_REG_RX_MCST_HASH    0x1a00 /* imperfect multicast filter hash */
+<span class="lineNum">     236 </span>            : #define  THT_REG_RX_MCST_HASH_SIZE      (256 / NBBY)
+<span class="lineNum">     237 </span>            : /* OptiStrata Debug Registers */
+<span class="lineNum">     238 </span>            : #define THT_REG_VPC             0x2300 /* Program Counter */
+<span class="lineNum">     239 </span>            : #define THT_REG_VLI             0x2310 /* Last Interrupt */
+<span class="lineNum">     240 </span>            : #define THT_REG_VIC             0x2320 /* Interrupts Count */
+<span class="lineNum">     241 </span>            : #define THT_REG_VTMR            0x2330 /* Timer */
+<span class="lineNum">     242 </span>            : #define THT_REG_VGLB            0x2340 /* Global */
+<span class="lineNum">     243 </span>            : /* SW Reset Registers */
+<span class="lineNum">     244 </span>            : #define THT_REG_RST_PRT         0x7000 /* Reset Port */
+<span class="lineNum">     245 </span>            : #define  THT_REG_RST_PRT_ACTIVE         0x1 /* port reset is active */
+<span class="lineNum">     246 </span>            : #define THT_REG_DIS_PRT         0x7010 /* Disable Port */
+<span class="lineNum">     247 </span>            : #define THT_REG_RST_QU_0        0x7020 /* Reset Queue 0 */
+<span class="lineNum">     248 </span>            : #define THT_REG_RST_QU_1        0x7028 /* Reset Queue 1 */
+<span class="lineNum">     249 </span>            : #define THT_REG_DIS_QU_0        0x7030 /* Disable Queue 0 */
+<span class="lineNum">     250 </span>            : #define THT_REG_DIS_QU_1        0x7038 /* Disable Queue 1 */
+<span class="lineNum">     251 </span>            : 
+<span class="lineNum">     252 </span>            : #define THT_PORT_SIZE           0x8000
+<span class="lineNum">     253 </span>            : #define THT_PORT_REGION(_p)     ((_p) * THT_PORT_SIZE)
+<span class="lineNum">     254 </span>            : #define THT_NQUEUES             4
+<span class="lineNum">     255 </span>            : 
+<span class="lineNum">     256 </span>            : #define THT_FIFO_ALIGN          4096
+<span class="lineNum">     257 </span>            : #define THT_FIFO_SIZE_4k        0x0
+<span class="lineNum">     258 </span>            : #define THT_FIFO_SIZE_8k        0x1
+<span class="lineNum">     259 </span>            : #define THT_FIFO_SIZE_16k       0x2
+<span class="lineNum">     260 </span>            : #define THT_FIFO_SIZE_32k       0x3
+<span class="lineNum">     261 </span>            : #define THT_FIFO_SIZE(_r)       (4096 * (1&lt;&lt;(_r)))
+<span class="lineNum">     262 </span>            : #define THT_FIFO_GAP            8 /* keep 8 bytes between ptrs */
+<span class="lineNum">     263 </span>            : #define THT_FIFO_PTR_MASK       0x00007ff8 /* rptr/wptr mask */
+<span class="lineNum">     264 </span>            : 
+<span class="lineNum">     265 </span>            : #define THT_FIFO_DESC_LEN       208 /* a descriptor cant be bigger than this */
+<span class="lineNum">     266 </span>            : 
+<span class="lineNum">     267 </span>            : #define THT_IMR_DOWN(_p)        (THT_REG_IMR_LINKCHG(_p))
+<span class="lineNum">     268 </span>            : #define THT_IMR_UP(_p)          (THT_REG_IMR_LINKCHG(_p) | \
+<span class="lineNum">     269 </span>            :                                     THT_REG_IMR_RXF(0) | THT_REG_IMR_TXF(0) | \
+<span class="lineNum">     270 </span>            :                                     THT_REG_IMR_RXD(0))
+<span class="lineNum">     271 </span>            : 
+<span class="lineNum">     272 </span>            : /* hardware structures (we're using the 64 bit variants) */
+<span class="lineNum">     273 </span>            : 
+<span class="lineNum">     274 </span>            : /* physical buffer descriptor */
+<span class="lineNum">     275 </span>            : struct tht_pbd {
+<span class="lineNum">     276 </span>            :         u_int32_t               addr_lo;
+<span class="lineNum">     277 </span>            :         u_int32_t               addr_hi;
+<span class="lineNum">     278 </span>            :         u_int32_t               len;
+<span class="lineNum">     279 </span>            : } __packed;
+<span class="lineNum">     280 </span>            : #define THT_PBD_PKTLEN          (64 * 1024)
+<span class="lineNum">     281 </span>            : 
+<span class="lineNum">     282 </span>            : /* rx free fifo */
+<span class="lineNum">     283 </span>            : struct tht_rx_free {
+<span class="lineNum">     284 </span>            :         u_int16_t               bc; /* buffer count (0:4) */
+<span class="lineNum">     285 </span>            :         u_int16_t               type;
+<span class="lineNum">     286 </span>            : 
+<span class="lineNum">     287 </span>            :         u_int64_t               uid;
+<span class="lineNum">     288 </span>            : 
+<span class="lineNum">     289 </span>            :         /* followed by a pdb list */
+<span class="lineNum">     290 </span>            : } __packed;
+<span class="lineNum">     291 </span>            : #define THT_RXF_TYPE            1
+<span class="lineNum">     292 </span>            : #define THT_RXF_1ST_PDB_LEN     128
+<span class="lineNum">     293 </span>            : #define THT_RXF_SGL_LEN         ((THT_FIFO_DESC_LEN - \
+<span class="lineNum">     294 </span>            :                                     sizeof(struct tht_rx_free)) / \
+<span class="lineNum">     295 </span>            :                                     sizeof(struct tht_pbd))
+<span class="lineNum">     296 </span>            : #define THT_RXF_PKT_NUM         128
+<span class="lineNum">     297 </span>            : 
+<span class="lineNum">     298 </span>            : /* rx descriptor */
+<span class="lineNum">     299 </span>            : struct tht_rx_desc {
+<span class="lineNum">     300 </span>            :         u_int32_t               flags;
+<span class="lineNum">     301 </span>            : #define THT_RXD_FLAGS_BC(_f)            ((_f) &amp; 0x1f) /* buffer count */
+<span class="lineNum">     302 </span>            : #define THT_RXD_FLAGS_RXFQ(_f)          (((_f)&gt;&gt;8) &amp; 0x3) /* rxf queue id */
+<span class="lineNum">     303 </span>            : #define THT_RXD_FLAGS_TO                (1&lt;&lt;15)
+<span class="lineNum">     304 </span>            : #define THT_RXD_FLAGS_TYPE(_f)          (((_f)&gt;&gt;16) &amp; 0xf) /* desc type */
+<span class="lineNum">     305 </span>            : #define THT_RXD_FLAGS_OVF               (1&lt;&lt;21) /* overflow error */
+<span class="lineNum">     306 </span>            : #define THT_RXD_FLAGS_RUNT              (1&lt;&lt;22) /* runt error */
+<span class="lineNum">     307 </span>            : #define THT_RXD_FLAGS_CRC               (1&lt;&lt;23) /* crc error */
+<span class="lineNum">     308 </span>            : #define THT_RXD_FLAGS_UDPCS             (1&lt;&lt;24) /* udp checksum error */
+<span class="lineNum">     309 </span>            : #define THT_RXD_FLAGS_TCPCS             (1&lt;&lt;25) /* tcp checksum error */
+<span class="lineNum">     310 </span>            : #define THT_RXD_FLAGS_IPCS              (1&lt;&lt;26) /* ip checksum error */
+<span class="lineNum">     311 </span>            : #define THT_RXD_FLAGS_PKT_ID            0x70000000
+<span class="lineNum">     312 </span>            : #define THT_RXD_FLAGS_PKT_ID_NONIP      0x00000000
+<span class="lineNum">     313 </span>            : #define THT_RXD_FLAGS_PKT_ID_TCP4       0x10000000
+<span class="lineNum">     314 </span>            : #define THT_RXD_FLAGS_PKT_ID_UDP4       0x20000000
+<span class="lineNum">     315 </span>            : #define THT_RXD_FLAGS_PKT_ID_IPV4       0x30000000
+<span class="lineNum">     316 </span>            : #define THT_RXD_FLAGS_PKT_ID_TCP6       0x50000000
+<span class="lineNum">     317 </span>            : #define THT_RXD_FLAGS_PKT_ID_UDP6       0x60000000
+<span class="lineNum">     318 </span>            : #define THT_RXD_FLAGS_PKT_ID_IPV6       0x70000000
+<span class="lineNum">     319 </span>            : #define THT_RXD_FLAGS_VTAG              (1&lt;&lt;31)
+<span class="lineNum">     320 </span>            :         u_int16_t               len;
+<span class="lineNum">     321 </span>            :         u_int16_t               vlan;
+<span class="lineNum">     322 </span>            : #define THT_RXD_VLAN_ID(_v)             ((_v) &amp; 0xfff)
+<span class="lineNum">     323 </span>            : #define THT_RXD_VLAN_CFI                (1&lt;&lt;12)
+<span class="lineNum">     324 </span>            : #define THT_RXD_VLAN_PRI(_v)            ((_v) &amp; 0x7) &gt;&gt; 13)
+<span class="lineNum">     325 </span>            : 
+<span class="lineNum">     326 </span>            :         u_int64_t               uid;
+<span class="lineNum">     327 </span>            : } __packed;
+<span class="lineNum">     328 </span>            : #define THT_RXD_TYPE            2
+<span class="lineNum">     329 </span>            : 
+<span class="lineNum">     330 </span>            : /* rx decriptor type 3: data chain instruction */
+<span class="lineNum">     331 </span>            : struct tht_rx_desc_dc {
+<span class="lineNum">     332 </span>            :         /* preceded by tht_rx_desc */
+<span class="lineNum">     333 </span>            : 
+<span class="lineNum">     334 </span>            :         u_int16_t               cd_offset;
+<span class="lineNum">     335 </span>            :         u_int16_t               flags;
+<span class="lineNum">     336 </span>            : 
+<span class="lineNum">     337 </span>            :         u_int8_t                data[4];
+<span class="lineNum">     338 </span>            : } __packed;
+<span class="lineNum">     339 </span>            : #define THT_RXD_TYPE_DC         3
+<span class="lineNum">     340 </span>            : 
+<span class="lineNum">     341 </span>            : /* rx descriptor type 4: rss (recv side scaling) information */
+<span class="lineNum">     342 </span>            : struct tht_rx_desc_rss {
+<span class="lineNum">     343 </span>            :         /* preceded by tht_rx_desc */
+<span class="lineNum">     344 </span>            : 
+<span class="lineNum">     345 </span>            :         u_int8_t                rss_hft;
+<span class="lineNum">     346 </span>            :         u_int8_t                rss_type;
+<span class="lineNum">     347 </span>            :         u_int8_t                rss_tcpu;
+<span class="lineNum">     348 </span>            :         u_int8_t                reserved;
+<span class="lineNum">     349 </span>            : 
+<span class="lineNum">     350 </span>            :         u_int32_t               rss_hash;
+<span class="lineNum">     351 </span>            : } __packed;
+<span class="lineNum">     352 </span>            : #define THT_RXD_TYPE_RSS        4
+<span class="lineNum">     353 </span>            : 
+<span class="lineNum">     354 </span>            : /* tx task fifo */
+<span class="lineNum">     355 </span>            : struct tht_tx_task {
+<span class="lineNum">     356 </span>            :         u_int32_t               flags;
+<span class="lineNum">     357 </span>            : #define THT_TXT_FLAGS_BC(_f)    (_f) /* buffer count */
+<span class="lineNum">     358 </span>            : #define THT_TXT_FLAGS_UDPCS     (1&lt;&lt;5) /* udp checksum */
+<span class="lineNum">     359 </span>            : #define THT_TXT_FLAGS_TCPCS     (1&lt;&lt;6) /* tcp checksum */
+<span class="lineNum">     360 </span>            : #define THT_TXT_FLAGS_IPCS      (1&lt;&lt;7) /* ip checksum */
+<span class="lineNum">     361 </span>            : #define THT_TXT_FLAGS_VTAG      (1&lt;&lt;8) /* insert vlan tag */
+<span class="lineNum">     362 </span>            : #define THT_TXT_FLAGS_LGSND     (1&lt;&lt;9) /* tcp large send enabled */
+<span class="lineNum">     363 </span>            : #define THT_TXT_FLAGS_FRAG      (1&lt;&lt;10) /* ip fragmentation enabled */
+<span class="lineNum">     364 </span>            : #define THT_TXT_FLAGS_CFI       (1&lt;&lt;12) /* canonical format indicator */
+<span class="lineNum">     365 </span>            : #define THT_TXT_FLAGS_PRIO(_f)  ((_f)&lt;&lt;13) /* vlan priority */
+<span class="lineNum">     366 </span>            : #define THT_TXT_FLAGS_VLAN(_f)  ((_f)&lt;&lt;20) /* vlan id */
+<span class="lineNum">     367 </span>            :         u_int16_t               mss_mtu;
+<span class="lineNum">     368 </span>            :         u_int16_t               len;
+<span class="lineNum">     369 </span>            : 
+<span class="lineNum">     370 </span>            :         u_int64_t               uid;
+<span class="lineNum">     371 </span>            : 
+<span class="lineNum">     372 </span>            :         /* followed by a pbd list */
+<span class="lineNum">     373 </span>            : } __packed;
+<span class="lineNum">     374 </span>            : #define THT_TXT_TYPE            (3&lt;&lt;16)
+<span class="lineNum">     375 </span>            : #define THT_TXT_SGL_LEN         ((THT_FIFO_DESC_LEN - \
+<span class="lineNum">     376 </span>            :                                     sizeof(struct tht_tx_task)) / \
+<span class="lineNum">     377 </span>            :                                     sizeof(struct tht_pbd))
+<span class="lineNum">     378 </span>            : #define THT_TXT_PKT_NUM         128
+<span class="lineNum">     379 </span>            : 
+<span class="lineNum">     380 </span>            : /* tx free fifo */
+<span class="lineNum">     381 </span>            : struct tht_tx_free {
+<span class="lineNum">     382 </span>            :         u_int32_t               status;
+<span class="lineNum">     383 </span>            : 
+<span class="lineNum">     384 </span>            :         u_int64_t               uid;
+<span class="lineNum">     385 </span>            : 
+<span class="lineNum">     386 </span>            :         u_int32_t               pad;
+<span class="lineNum">     387 </span>            : } __packed;
+<span class="lineNum">     388 </span>            : 
+<span class="lineNum">     389 </span>            : /* pci controller autoconf glue */
+<span class="lineNum">     390 </span>            : 
+<span class="lineNum">     391 </span>            : struct thtc_softc {
+<span class="lineNum">     392 </span>            :         struct device           sc_dev;
+<span class="lineNum">     393 </span>            : 
+<span class="lineNum">     394 </span>            :         bus_dma_tag_t           sc_dmat;
+<span class="lineNum">     395 </span>            : 
+<span class="lineNum">     396 </span>            :         bus_space_tag_t         sc_memt;
+<span class="lineNum">     397 </span>            :         bus_space_handle_t      sc_memh;
+<span class="lineNum">     398 </span>            :         bus_size_t              sc_mems;
+<span class="lineNum">     399 </span>            :         void                    *sc_ih;
+<span class="lineNum">     400 </span>            : };
+<span class="lineNum">     401 </span>            : 
+<span class="lineNum">     402 </span>            : int                     thtc_match(struct device *, void *, void *);
+<span class="lineNum">     403 </span>            : void                    thtc_attach(struct device *, struct device *, void *);
+<span class="lineNum">     404 </span>            : int                     thtc_print(void *, const char *);
+<span class="lineNum">     405 </span>            : 
+<span class="lineNum">     406 </span>            : struct cfattach thtc_ca = {
+<span class="lineNum">     407 </span>            :         sizeof(struct thtc_softc), thtc_match, thtc_attach
+<span class="lineNum">     408 </span>            : };
+<span class="lineNum">     409 </span>            : 
+<span class="lineNum">     410 </span>            : struct cfdriver thtc_cd = {
+<span class="lineNum">     411 </span>            :         NULL, &quot;thtc&quot;, DV_DULL
+<span class="lineNum">     412 </span>            : };
+<span class="lineNum">     413 </span>            : 
+<span class="lineNum">     414 </span>            : /* glue between the controller and the port */
+<span class="lineNum">     415 </span>            : 
+<span class="lineNum">     416 </span>            : struct tht_attach_args {
+<span class="lineNum">     417 </span>            :         int                     taa_port;
+<span class="lineNum">     418 </span>            : 
+<span class="lineNum">     419 </span>            :         struct pci_attach_args  *taa_pa;
+<span class="lineNum">     420 </span>            : };
+<span class="lineNum">     421 </span>            : 
+<span class="lineNum">     422 </span>            : /* tht itself */
+<span class="lineNum">     423 </span>            : 
+<span class="lineNum">     424 </span>            : struct tht_dmamem {
+<span class="lineNum">     425 </span>            :         bus_dmamap_t            tdm_map;
+<span class="lineNum">     426 </span>            :         bus_dma_segment_t       tdm_seg;
+<span class="lineNum">     427 </span>            :         size_t                  tdm_size;
+<span class="lineNum">     428 </span>            :         caddr_t                 tdm_kva;
+<span class="lineNum">     429 </span>            : };
+<span class="lineNum">     430 </span>            : #define THT_DMA_MAP(_tdm)       ((_tdm)-&gt;tdm_map)
+<span class="lineNum">     431 </span>            : #define THT_DMA_DVA(_tdm)       ((_tdm)-&gt;tdm_map-&gt;dm_segs[0].ds_addr)
+<span class="lineNum">     432 </span>            : #define THT_DMA_KVA(_tdm)       ((void *)(_tdm)-&gt;tdm_kva)
+<span class="lineNum">     433 </span>            : 
+<span class="lineNum">     434 </span>            : struct tht_fifo_desc {
+<span class="lineNum">     435 </span>            :         bus_size_t              tfd_cfg0;
+<span class="lineNum">     436 </span>            :         bus_size_t              tfd_cfg1;
+<span class="lineNum">     437 </span>            :         bus_size_t              tfd_rptr;
+<span class="lineNum">     438 </span>            :         bus_size_t              tfd_wptr;
+<span class="lineNum">     439 </span>            :         u_int32_t               tfd_size;
+<span class="lineNum">     440 </span>            :         int                     tfd_write;
+<span class="lineNum">     441 </span>            : };
+<span class="lineNum">     442 </span>            : #define THT_FIFO_PRE_SYNC(_d)   ((_d)-&gt;tfd_write ? \
+<span class="lineNum">     443 </span>            :                                     BUS_DMASYNC_PREWRITE : \
+<span class="lineNum">     444 </span>            :                                     BUS_DMASYNC_PREREAD)
+<span class="lineNum">     445 </span>            : #define THT_FIFO_POST_SYNC(_d)  ((_d)-&gt;tfd_write ? \
+<span class="lineNum">     446 </span>            :                                     BUS_DMASYNC_POSTWRITE : \
+<span class="lineNum">     447 </span>            :                                     BUS_DMASYNC_POSTREAD)
+<span class="lineNum">     448 </span>            : 
+<span class="lineNum">     449 </span>            : struct tht_fifo {
+<span class="lineNum">     450 </span>            :         struct tht_fifo_desc    *tf_desc;
+<span class="lineNum">     451 </span>            :         struct tht_dmamem       *tf_mem;
+<span class="lineNum">     452 </span>            :         int                     tf_len;
+<span class="lineNum">     453 </span>            :         int                     tf_rptr;
+<span class="lineNum">     454 </span>            :         int                     tf_wptr;
+<span class="lineNum">     455 </span>            :         int                     tf_ready;
+<span class="lineNum">     456 </span>            : };
+<span class="lineNum">     457 </span>            : 
+<span class="lineNum">     458 </span>            : struct tht_pkt {
+<span class="lineNum">     459 </span>            :         u_int64_t               tp_id;
+<span class="lineNum">     460 </span>            : 
+<span class="lineNum">     461 </span>            :         bus_dmamap_t            tp_dmap;
+<span class="lineNum">     462 </span>            :         struct mbuf             *tp_m;
+<span class="lineNum">     463 </span>            : 
+<span class="lineNum">     464 </span>            :         TAILQ_ENTRY(tht_pkt)    tp_link;
+<span class="lineNum">     465 </span>            : };
+<span class="lineNum">     466 </span>            : 
+<span class="lineNum">     467 </span>            : struct tht_pkt_list {
+<span class="lineNum">     468 </span>            :         struct tht_pkt          *tpl_pkts;
+<span class="lineNum">     469 </span>            :         TAILQ_HEAD(, tht_pkt)   tpl_free;
+<span class="lineNum">     470 </span>            :         TAILQ_HEAD(, tht_pkt)   tpl_used;
+<span class="lineNum">     471 </span>            : };
+<span class="lineNum">     472 </span>            : 
+<span class="lineNum">     473 </span>            : struct tht_softc {
+<span class="lineNum">     474 </span>            :         struct device           sc_dev;
+<span class="lineNum">     475 </span>            :         struct thtc_softc       *sc_thtc;
+<span class="lineNum">     476 </span>            :         int                     sc_port;
+<span class="lineNum">     477 </span>            : 
+<span class="lineNum">     478 </span>            :         bus_space_handle_t      sc_memh;
+<span class="lineNum">     479 </span>            : 
+<span class="lineNum">     480 </span>            :         struct arpcom           sc_ac;
+<span class="lineNum">     481 </span>            :         struct ifmedia          sc_media;
+<span class="lineNum">     482 </span>            :         struct timeval          sc_mediacheck;
+<span class="lineNum">     483 </span>            : 
+<span class="lineNum">     484 </span>            :         u_int16_t               sc_lladdr[3];
+<span class="lineNum">     485 </span>            : 
+<span class="lineNum">     486 </span>            :         struct tht_pkt_list     sc_tx_list;
+<span class="lineNum">     487 </span>            :         struct tht_pkt_list     sc_rx_list;
+<span class="lineNum">     488 </span>            : 
+<span class="lineNum">     489 </span>            :         struct tht_fifo         sc_txt;
+<span class="lineNum">     490 </span>            :         struct tht_fifo         sc_rxf;
+<span class="lineNum">     491 </span>            :         struct tht_fifo         sc_rxd;
+<span class="lineNum">     492 </span>            :         struct tht_fifo         sc_txf;
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span>            :         u_int32_t               sc_imr;
+<span class="lineNum">     495 </span>            : 
+<span class="lineNum">     496 </span>            :         struct rwlock           sc_lock;
+<span class="lineNum">     497 </span>            : };
+<span class="lineNum">     498 </span>            : 
+<span class="lineNum">     499 </span>            : int                     tht_match(struct device *, void *, void *);
+<span class="lineNum">     500 </span>            : void                    tht_attach(struct device *, struct device *, void *);
+<span class="lineNum">     501 </span>            : void                    tht_mountroot(struct device *);
+<span class="lineNum">     502 </span>            : int                     tht_intr(void *);
+<span class="lineNum">     503 </span>            : 
+<span class="lineNum">     504 </span>            : struct cfattach tht_ca = {
+<span class="lineNum">     505 </span>            :         sizeof(struct tht_softc), tht_match, tht_attach
+<span class="lineNum">     506 </span>            : };
+<span class="lineNum">     507 </span>            : 
+<span class="lineNum">     508 </span>            : struct cfdriver tht_cd = {
+<span class="lineNum">     509 </span>            :         NULL, &quot;tht&quot;, DV_IFNET
+<span class="lineNum">     510 </span>            : };
+<span class="lineNum">     511 </span>            : 
+<span class="lineNum">     512 </span>            : /* pkts */
+<span class="lineNum">     513 </span>            : int                     tht_pkt_alloc(struct tht_softc *,
+<span class="lineNum">     514 </span>            :                             struct tht_pkt_list *, int, int);
+<span class="lineNum">     515 </span>            : void                    tht_pkt_free(struct tht_softc *,
+<span class="lineNum">     516 </span>            :                             struct tht_pkt_list *);
+<span class="lineNum">     517 </span>            : void                    tht_pkt_put(struct tht_pkt_list *, struct tht_pkt *);
+<span class="lineNum">     518 </span>            : struct tht_pkt          *tht_pkt_get(struct tht_pkt_list *);
+<span class="lineNum">     519 </span>            : struct tht_pkt          *tht_pkt_used(struct tht_pkt_list *);
+<span class="lineNum">     520 </span>            : 
+<span class="lineNum">     521 </span>            : /* fifos */
+<span class="lineNum">     522 </span>            : 
+<span class="lineNum">     523 </span>            : struct tht_fifo_desc tht_txt_desc = {
+<span class="lineNum">     524 </span>            :         THT_REG_TXT_CFG0(0),
+<span class="lineNum">     525 </span>            :         THT_REG_TXT_CFG1(0),
+<span class="lineNum">     526 </span>            :         THT_REG_TXT_RPTR(0),
+<span class="lineNum">     527 </span>            :         THT_REG_TXT_WPTR(0),
+<span class="lineNum">     528 </span>            :         THT_FIFO_SIZE_16k,
+<span class="lineNum">     529 </span>            :         1
+<span class="lineNum">     530 </span>            : };
+<span class="lineNum">     531 </span>            : 
+<span class="lineNum">     532 </span>            : struct tht_fifo_desc tht_rxf_desc = {
+<span class="lineNum">     533 </span>            :         THT_REG_RXF_CFG0(0),
+<span class="lineNum">     534 </span>            :         THT_REG_RXF_CFG1(0),
+<span class="lineNum">     535 </span>            :         THT_REG_RXF_RPTR(0),
+<span class="lineNum">     536 </span>            :         THT_REG_RXF_WPTR(0),
+<span class="lineNum">     537 </span>            :         THT_FIFO_SIZE_16k,
+<span class="lineNum">     538 </span>            :         1
+<span class="lineNum">     539 </span>            : };
+<span class="lineNum">     540 </span>            : 
+<span class="lineNum">     541 </span>            : struct tht_fifo_desc tht_rxd_desc = {
+<span class="lineNum">     542 </span>            :         THT_REG_RXD_CFG0(0),
+<span class="lineNum">     543 </span>            :         THT_REG_RXD_CFG1(0),
+<span class="lineNum">     544 </span>            :         THT_REG_RXD_RPTR(0),
+<span class="lineNum">     545 </span>            :         THT_REG_RXD_WPTR(0),
+<span class="lineNum">     546 </span>            :         THT_FIFO_SIZE_16k,
+<span class="lineNum">     547 </span>            :         0
+<span class="lineNum">     548 </span>            : };
+<span class="lineNum">     549 </span>            : 
+<span class="lineNum">     550 </span>            : struct tht_fifo_desc tht_txf_desc = {
+<span class="lineNum">     551 </span>            :         THT_REG_TXF_CFG0(0),
+<span class="lineNum">     552 </span>            :         THT_REG_TXF_CFG1(0),
+<span class="lineNum">     553 </span>            :         THT_REG_TXF_RPTR(0),
+<span class="lineNum">     554 </span>            :         THT_REG_TXF_WPTR(0),
+<span class="lineNum">     555 </span>            :         THT_FIFO_SIZE_4k,
+<span class="lineNum">     556 </span>            :         0
+<span class="lineNum">     557 </span>            : };
+<span class="lineNum">     558 </span>            : 
+<span class="lineNum">     559 </span>            : int                     tht_fifo_alloc(struct tht_softc *, struct tht_fifo *,
+<span class="lineNum">     560 </span>            :                             struct tht_fifo_desc *);
+<span class="lineNum">     561 </span>            : void                    tht_fifo_free(struct tht_softc *, struct tht_fifo *);
+<span class="lineNum">     562 </span>            : 
+<span class="lineNum">     563 </span>            : size_t                  tht_fifo_readable(struct tht_softc *,
+<span class="lineNum">     564 </span>            :                             struct tht_fifo *);
+<span class="lineNum">     565 </span>            : size_t                  tht_fifo_writable(struct tht_softc *,
+<span class="lineNum">     566 </span>            :                             struct tht_fifo *);
+<span class="lineNum">     567 </span>            : void                    tht_fifo_pre(struct tht_softc *,
+<span class="lineNum">     568 </span>            :                             struct tht_fifo *);
+<span class="lineNum">     569 </span>            : void                    tht_fifo_read(struct tht_softc *, struct tht_fifo *,
+<span class="lineNum">     570 </span>            :                             void *, size_t);
+<span class="lineNum">     571 </span>            : void                    tht_fifo_write(struct tht_softc *, struct tht_fifo *,
+<span class="lineNum">     572 </span>            :                             void *, size_t);
+<span class="lineNum">     573 </span>            : void                    tht_fifo_write_dmap(struct tht_softc *,
+<span class="lineNum">     574 </span>            :                             struct tht_fifo *, bus_dmamap_t);
+<span class="lineNum">     575 </span>            : void                    tht_fifo_write_pad(struct tht_softc *,
+<span class="lineNum">     576 </span>            :                             struct tht_fifo *, int);
+<span class="lineNum">     577 </span>            : void                    tht_fifo_post(struct tht_softc *,
+<span class="lineNum">     578 </span>            :                             struct tht_fifo *);
+<span class="lineNum">     579 </span>            : 
+<span class="lineNum">     580 </span>            : /* port operations */
+<span class="lineNum">     581 </span>            : void                    tht_lladdr_read(struct tht_softc *);
+<span class="lineNum">     582 </span>            : void                    tht_lladdr_write(struct tht_softc *);
+<span class="lineNum">     583 </span>            : int                     tht_sw_reset(struct tht_softc *);
+<span class="lineNum">     584 </span>            : int                     tht_fw_load(struct tht_softc *);
+<span class="lineNum">     585 </span>            : void                    tht_fw_tick(void *arg);
+<span class="lineNum">     586 </span>            : void                    tht_link_state(struct tht_softc *);
+<span class="lineNum">     587 </span>            : 
+<span class="lineNum">     588 </span>            : /* interface operations */
+<span class="lineNum">     589 </span>            : int                     tht_ioctl(struct ifnet *, u_long, caddr_t);
+<span class="lineNum">     590 </span>            : void                    tht_watchdog(struct ifnet *);
+<span class="lineNum">     591 </span>            : void                    tht_start(struct ifnet *);
+<span class="lineNum">     592 </span>            : int                     tht_load_pkt(struct tht_softc *, struct tht_pkt *,
+<span class="lineNum">     593 </span>            :                             struct mbuf *);
+<span class="lineNum">     594 </span>            : void                    tht_txf(struct tht_softc *sc);
+<span class="lineNum">     595 </span>            : 
+<span class="lineNum">     596 </span>            : void                    tht_rxf_fill(struct tht_softc *, int);
+<span class="lineNum">     597 </span>            : void                    tht_rxf_drain(struct tht_softc *);
+<span class="lineNum">     598 </span>            : void                    tht_rxd(struct tht_softc *);
+<span class="lineNum">     599 </span>            : 
+<span class="lineNum">     600 </span>            : void                    tht_up(struct tht_softc *);
+<span class="lineNum">     601 </span>            : void                    tht_iff(struct tht_softc *);
+<span class="lineNum">     602 </span>            : void                    tht_down(struct tht_softc *);
+<span class="lineNum">     603 </span>            : 
+<span class="lineNum">     604 </span>            : /* ifmedia operations */
+<span class="lineNum">     605 </span>            : int                     tht_media_change(struct ifnet *);
+<span class="lineNum">     606 </span>            : void                    tht_media_status(struct ifnet *, struct ifmediareq *);
+<span class="lineNum">     607 </span>            : 
+<span class="lineNum">     608 </span>            : /* wrapper around dma memory */
+<span class="lineNum">     609 </span>            : struct tht_dmamem       *tht_dmamem_alloc(struct tht_softc *, bus_size_t,
+<span class="lineNum">     610 </span>            :                             bus_size_t);
+<span class="lineNum">     611 </span>            : void                    tht_dmamem_free(struct tht_softc *,
+<span class="lineNum">     612 </span>            :                             struct tht_dmamem *);
+<span class="lineNum">     613 </span>            : 
+<span class="lineNum">     614 </span>            : /* bus space operations */
+<span class="lineNum">     615 </span>            : u_int32_t               tht_read(struct tht_softc *, bus_size_t);
+<span class="lineNum">     616 </span>            : void                    tht_write(struct tht_softc *, bus_size_t, u_int32_t);
+<span class="lineNum">     617 </span>            : void                    tht_write_region(struct tht_softc *, bus_size_t,
+<span class="lineNum">     618 </span>            :                             void *, size_t);
+<span class="lineNum">     619 </span>            : int                     tht_wait_eq(struct tht_softc *, bus_size_t, u_int32_t,
+<span class="lineNum">     620 </span>            :                             u_int32_t, int);
+<span class="lineNum">     621 </span>            : int                     tht_wait_ne(struct tht_softc *, bus_size_t, u_int32_t,
+<span class="lineNum">     622 </span>            :                             u_int32_t, int);
+<span class="lineNum">     623 </span>            : 
+<span class="lineNum">     624 </span>            : #define tht_set(_s, _r, _b)             tht_write((_s), (_r), \
+<span class="lineNum">     625 </span>            :                                             tht_read((_s), (_r)) | (_b))
+<span class="lineNum">     626 </span>            : #define tht_clr(_s, _r, _b)             tht_write((_s), (_r), \
+<span class="lineNum">     627 </span>            :                                             tht_read((_s), (_r)) &amp; ~(_b))
+<span class="lineNum">     628 </span>            : #define tht_wait_set(_s, _r, _b, _t)    tht_wait_eq((_s), (_r), \
+<span class="lineNum">     629 </span>            :                                             (_b), (_b), (_t))
+<span class="lineNum">     630 </span>            : 
+<span class="lineNum">     631 </span>            : 
+<span class="lineNum">     632 </span>            : /* misc */
+<span class="lineNum">     633 </span>            : #define DEVNAME(_sc)    ((_sc)-&gt;sc_dev.dv_xname)
+<span class="lineNum">     634 </span>            : #define LWORDS(_b)      (((_b) + 7) &gt;&gt; 3)
+<span class="lineNum">     635 </span>            : 
+<span class="lineNum">     636 </span>            : 
+<span class="lineNum">     637 </span>            : struct thtc_device {
+<span class="lineNum">     638 </span>            :         pci_vendor_id_t         td_vendor;
+<span class="lineNum">     639 </span>            :         pci_vendor_id_t         td_product;
+<span class="lineNum">     640 </span>            :         u_int                   td_nports;
+<span class="lineNum">     641 </span>            : };
+<span class="lineNum">     642 </span>            : 
+<span class="lineNum">     643 </span>            : const struct thtc_device *thtc_lookup(struct pci_attach_args *);
+<span class="lineNum">     644 </span>            : 
+<span class="lineNum">     645 </span>            : static const struct thtc_device thtc_devices[] = {
+<span class="lineNum">     646 </span>            :         { PCI_VENDOR_TEHUTI,    PCI_PRODUCT_TEHUTI_TN3009, 1 },
+<span class="lineNum">     647 </span>            :         { PCI_VENDOR_TEHUTI,    PCI_PRODUCT_TEHUTI_TN3010, 1 },
+<span class="lineNum">     648 </span>            :         { PCI_VENDOR_TEHUTI,    PCI_PRODUCT_TEHUTI_TN3014, 2 }
+<span class="lineNum">     649 </span>            : };
+<a name="650"><span class="lineNum">     650 </span>            : </a>
+<span class="lineNum">     651 </span>            : const struct thtc_device *
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 : thtc_lookup(struct pci_attach_args *pa)</span>
+<span class="lineNum">     653 </span>            : {
+<span class="lineNum">     654 </span>            :         int                             i;
+<span class="lineNum">     655 </span>            :         const struct thtc_device        *td;
+<span class="lineNum">     656 </span>            : 
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; nitems(thtc_devices); i++) {</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                 td = &amp;thtc_devices[i];</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                 if (td-&gt;td_vendor == PCI_VENDOR(pa-&gt;pa_id) &amp;&amp;</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :                     td-&gt;td_product == PCI_PRODUCT(pa-&gt;pa_id))</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                         return (td);</span>
+<span class="lineNum">     662 </span>            :         }
+<span class="lineNum">     663 </span>            : 
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 : }</span>
+<a name="666"><span class="lineNum">     666 </span>            : </a>
+<span class="lineNum">     667 </span>            : int
+<span class="lineNum">     668 </span><span class="lineNoCov">          0 : thtc_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     669 </span>            : {
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :         struct pci_attach_args          *pa = aux;</span>
+<span class="lineNum">     671 </span>            : 
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :         if (thtc_lookup(pa) != NULL)</span>
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">     674 </span>            : 
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 : }</span>
+<a name="677"><span class="lineNum">     677 </span>            : </a>
+<span class="lineNum">     678 </span>            : void
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 : thtc_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     680 </span>            : {
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         struct thtc_softc               *sc = (struct thtc_softc *)self;</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 :         struct pci_attach_args          *pa = aux;</span>
+<span class="lineNum">     683 </span>            :         pcireg_t                        memtype;
+<span class="lineNum">     684 </span>            :         const struct thtc_device        *td;
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :         struct tht_attach_args          taa;</span>
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :         pci_intr_handle_t               ih;</span>
+<span class="lineNum">     687 </span>            :         int                             i;
+<span class="lineNum">     688 </span>            : 
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :         bzero(&amp;taa, sizeof(taa));</span>
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :         td = thtc_lookup(pa);</span>
+<span class="lineNum">     691 </span>            : 
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :         sc-&gt;sc_dmat = pa-&gt;pa_dmat;</span>
+<span class="lineNum">     693 </span>            : 
+<span class="lineNum">     694 </span><span class="lineNoCov">          0 :         memtype = pci_mapreg_type(pa-&gt;pa_pc, pa-&gt;pa_tag, THT_PCI_BAR);</span>
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :         if (pci_mapreg_map(pa, THT_PCI_BAR, memtype, 0, &amp;sc-&gt;sc_memt,</span>
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :             &amp;sc-&gt;sc_memh, NULL, &amp;sc-&gt;sc_mems, 0) != 0) {</span>
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :                 printf(&quot;: unable to map host registers\n&quot;);</span>
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     699 </span>            :         }
+<span class="lineNum">     700 </span>            : 
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :         if (pci_intr_map(pa, &amp;ih) != 0) {</span>
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :                 printf(&quot;: unable to map interrupt\n&quot;);</span>
+<span class="lineNum">     703 </span>            :                 goto unmap;
+<span class="lineNum">     704 </span>            :         }
+<span class="lineNum">     705 </span>            : 
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :         sc-&gt;sc_ih = pci_intr_establish(pa-&gt;pa_pc, ih,</span>
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :             IPL_NET, tht_intr, sc, DEVNAME(sc));</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :         if (sc-&gt;sc_ih == NULL) {</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :                 printf(&quot;: unable to establish interrupt\n&quot;);</span>
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     711 </span>            :         }
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :         printf(&quot;: %s\n&quot;, pci_intr_string(pa-&gt;pa_pc, ih));</span>
+<span class="lineNum">     713 </span>            : 
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 :         taa.taa_pa = pa;</span>
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; td-&gt;td_nports; i++) {</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :                 taa.taa_port = i;</span>
+<span class="lineNum">     717 </span>            : 
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :                 config_found(self, &amp;taa, thtc_print);</span>
+<span class="lineNum">     719 </span>            :         }
+<span class="lineNum">     720 </span>            : 
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     722 </span>            : 
+<span class="lineNum">     723 </span>            : unmap:
+<span class="lineNum">     724 </span><span class="lineNoCov">          0 :         bus_space_unmap(sc-&gt;sc_memt, sc-&gt;sc_memh, sc-&gt;sc_mems);</span>
+<span class="lineNum">     725 </span><span class="lineNoCov">          0 :         sc-&gt;sc_mems = 0;</span>
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 : }</span>
+<a name="727"><span class="lineNum">     727 </span>            : </a>
+<span class="lineNum">     728 </span>            : int
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 : thtc_print(void *aux, const char *pnp)</span>
+<span class="lineNum">     730 </span>            : {
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :         struct tht_attach_args          *taa = aux;</span>
+<span class="lineNum">     732 </span>            : 
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :         if (pnp != NULL)</span>
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :                 printf(&quot;\&quot;%s\&quot; at %s&quot;, tht_cd.cd_name, pnp);</span>
+<span class="lineNum">     735 </span>            : 
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :         printf(&quot; port %d&quot;, taa-&gt;taa_port);</span>
+<span class="lineNum">     737 </span>            : 
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :         return (UNCONF);</span>
+<span class="lineNum">     739 </span>            : }
+<a name="740"><span class="lineNum">     740 </span>            : </a>
+<span class="lineNum">     741 </span>            : int
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 : tht_match(struct device *parent, void *match, void *aux)</span>
+<span class="lineNum">     743 </span>            : {
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">     745 </span>            : }
+<a name="746"><span class="lineNum">     746 </span>            : </a>
+<span class="lineNum">     747 </span>            : void
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 : tht_attach(struct device *parent, struct device *self, void *aux)</span>
+<span class="lineNum">     749 </span>            : {
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :         struct thtc_softc               *csc = (struct thtc_softc *)parent;</span>
+<span class="lineNum">     751 </span><span class="lineNoCov">          0 :         struct tht_softc                *sc = (struct tht_softc *)self;</span>
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :         struct tht_attach_args          *taa = aux;</span>
+<span class="lineNum">     753 </span>            :         struct ifnet                    *ifp;
+<span class="lineNum">     754 </span>            : 
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :         sc-&gt;sc_thtc = csc;</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         sc-&gt;sc_port = taa-&gt;taa_port;</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :         sc-&gt;sc_imr = THT_IMR_DOWN(sc-&gt;sc_port);</span>
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :         rw_init(&amp;sc-&gt;sc_lock, &quot;thtioc&quot;);</span>
+<span class="lineNum">     759 </span>            : 
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         if (bus_space_subregion(csc-&gt;sc_memt, csc-&gt;sc_memh,</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :             THT_PORT_REGION(sc-&gt;sc_port), THT_PORT_SIZE,</span>
+<span class="lineNum">     762 </span><span class="lineNoCov">          0 :             &amp;sc-&gt;sc_memh) != 0) {</span>
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :                 printf(&quot;: unable to map port registers\n&quot;);</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     765 </span>            :         }
+<span class="lineNum">     766 </span>            : 
+<span class="lineNum">     767 </span><span class="lineNoCov">          0 :         if (tht_sw_reset(sc) != 0) {</span>
+<span class="lineNum">     768 </span><span class="lineNoCov">          0 :                 printf(&quot;: unable to reset port\n&quot;);</span>
+<span class="lineNum">     769 </span>            :                 /* bus_space(9) says we dont have to free subregions */
+<span class="lineNum">     770 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     771 </span>            :         }
+<span class="lineNum">     772 </span>            : 
+<span class="lineNum">     773 </span><span class="lineNoCov">          0 :         tht_lladdr_read(sc);</span>
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :         bcopy(sc-&gt;sc_lladdr, sc-&gt;sc_ac.ac_enaddr, ETHER_ADDR_LEN);</span>
+<span class="lineNum">     775 </span>            : 
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :         ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :         ifp-&gt;if_softc = sc;</span>
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;</span>
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :         ifp-&gt;if_capabilities = IFCAP_VLAN_MTU;</span>
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :         ifp-&gt;if_ioctl = tht_ioctl;</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :         ifp-&gt;if_start = tht_start;</span>
+<span class="lineNum">     782 </span><span class="lineNoCov">          0 :         ifp-&gt;if_watchdog = tht_watchdog;</span>
+<span class="lineNum">     783 </span><span class="lineNoCov">          0 :         ifp-&gt;if_hardmtu = MCLBYTES - ETHER_HDR_LEN - ETHER_CRC_LEN; /* XXX */</span>
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :         strlcpy(ifp-&gt;if_xname, DEVNAME(sc), IFNAMSIZ);</span>
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         IFQ_SET_MAXLEN(&amp;ifp-&gt;if_snd, 400);</span>
+<span class="lineNum">     786 </span>            : 
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :         ifmedia_init(&amp;sc-&gt;sc_media, 0, tht_media_change, tht_media_status);</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :         ifmedia_add(&amp;sc-&gt;sc_media, IFM_ETHER|IFM_AUTO, 0, NULL);</span>
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 :         ifmedia_set(&amp;sc-&gt;sc_media, IFM_ETHER|IFM_AUTO);</span>
+<span class="lineNum">     790 </span>            : 
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :         if_attach(ifp);</span>
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :         ether_ifattach(ifp);</span>
+<span class="lineNum">     793 </span>            : 
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :         printf(&quot;: address %s\n&quot;, ether_sprintf(sc-&gt;sc_ac.ac_enaddr));</span>
+<span class="lineNum">     795 </span>            : 
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 :         config_mountroot(self, tht_mountroot);</span>
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 : }</span>
+<a name="798"><span class="lineNum">     798 </span>            : </a>
+<span class="lineNum">     799 </span>            : void
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 : tht_mountroot(struct device *self)</span>
+<span class="lineNum">     801 </span>            : {
+<span class="lineNum">     802 </span><span class="lineNoCov">          0 :         struct tht_softc                *sc = (struct tht_softc *)self;</span>
+<span class="lineNum">     803 </span>            : 
+<span class="lineNum">     804 </span><span class="lineNoCov">          0 :         if (tht_fifo_alloc(sc, &amp;sc-&gt;sc_txt, &amp;tht_txt_desc) != 0)</span>
+<span class="lineNum">     805 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     806 </span>            : 
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :         if (tht_fw_load(sc) != 0)</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                 printf(&quot;%s: firmware load failed\n&quot;, DEVNAME(sc));</span>
+<span class="lineNum">     809 </span>            : 
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :         tht_sw_reset(sc);</span>
+<span class="lineNum">     811 </span>            : 
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :         tht_fifo_free(sc, &amp;sc-&gt;sc_txt);</span>
+<span class="lineNum">     813 </span>            : 
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :         tht_link_state(sc);</span>
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_IMR, sc-&gt;sc_imr);</span>
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 : }</span>
+<a name="817"><span class="lineNum">     817 </span>            : </a>
+<span class="lineNum">     818 </span>            : int
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 : tht_intr(void *arg)</span>
+<span class="lineNum">     820 </span>            : {
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :         struct thtc_softc               *thtc = arg;</span>
+<span class="lineNum">     822 </span>            :         struct tht_softc                *sc = arg;
+<span class="lineNum">     823 </span>            :         struct device                   *d;
+<span class="lineNum">     824 </span>            :         struct ifnet                    *ifp;
+<span class="lineNum">     825 </span>            :         u_int32_t                       isr;
+<span class="lineNum">     826 </span>            :         int                             rv = 0;
+<span class="lineNum">     827 </span>            : 
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :         for (d = TAILQ_NEXT(&amp;thtc-&gt;sc_dev, dv_list); d != NULL;</span>
+<span class="lineNum">     829 </span><span class="lineNoCov">          0 :             d = TAILQ_NEXT(d, dv_list)) {</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :                 sc = (struct tht_softc *)d;</span>
+<span class="lineNum">     831 </span>            : 
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :                 isr = tht_read(sc, THT_REG_ISR);</span>
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 :                 if (isr == 0x0) {</span>
+<span class="lineNum">     834 </span><span class="lineNoCov">          0 :                         tht_write(sc, THT_REG_IMR, sc-&gt;sc_imr);</span>
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     836 </span>            :                 }
+<span class="lineNum">     837 </span>            :                 rv = 1;
+<span class="lineNum">     838 </span>            : 
+<span class="lineNum">     839 </span>            :                 DPRINTF(THT_D_INTR, &quot;%s: isr: 0x%b\n&quot;, DEVNAME(sc), isr, THT_FMT_ISR);
+<span class="lineNum">     840 </span>            : 
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :                 if (ISSET(isr, THT_REG_ISR_LINKCHG(0) | THT_REG_ISR_LINKCHG(1)))</span>
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :                         tht_link_state(sc);</span>
+<span class="lineNum">     843 </span>            : 
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :                 ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_flags &amp; IFF_RUNNING) {</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :                         if (ISSET(isr, THT_REG_ISR_RXD(0)))</span>
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :                                 tht_rxd(sc);</span>
+<span class="lineNum">     848 </span>            : 
+<span class="lineNum">     849 </span><span class="lineNoCov">          0 :                         if (ISSET(isr, THT_REG_ISR_RXF(0)))</span>
+<span class="lineNum">     850 </span><span class="lineNoCov">          0 :                                 tht_rxf_fill(sc, 0);</span>
+<span class="lineNum">     851 </span>            : 
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :                         if (ISSET(isr, THT_REG_ISR_TXF(0)))</span>
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :                                 tht_txf(sc);</span>
+<span class="lineNum">     854 </span>            : 
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :                         tht_start(ifp);</span>
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_IMR, sc-&gt;sc_imr);</span>
+<span class="lineNum">     858 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     859 </span><span class="lineNoCov">          0 :         return (rv);</span>
+<span class="lineNum">     860 </span>            : }
+<a name="861"><span class="lineNum">     861 </span>            : </a>
+<span class="lineNum">     862 </span>            : int
+<span class="lineNum">     863 </span><span class="lineNoCov">          0 : tht_ioctl(struct ifnet *ifp, u_long cmd, caddr_t addr)</span>
+<span class="lineNum">     864 </span>            : {
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :         struct tht_softc                *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :         struct ifreq                    *ifr = (struct ifreq *)addr;</span>
+<span class="lineNum">     867 </span>            :         int                             s, error = 0;
+<span class="lineNum">     868 </span>            : 
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :         rw_enter_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         s = splnet();</span>
+<span class="lineNum">     871 </span>            : 
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :         switch (cmd) {</span>
+<span class="lineNum">     873 </span>            :         case SIOCSIFADDR:
+<span class="lineNum">     874 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_flags |= IFF_UP;</span>
+<span class="lineNum">     875 </span>            :                 /* FALLTHROUGH */
+<span class="lineNum">     876 </span>            : 
+<span class="lineNum">     877 </span>            :         case SIOCSIFFLAGS:
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_flags &amp; IFF_UP) {</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">     880 </span><span class="lineNoCov">          0 :                                 error = ENETRESET;</span>
+<span class="lineNum">     881 </span>            :                         else
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :                                 tht_up(sc);</span>
+<span class="lineNum">     883 </span>            :                 } else {
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :                         if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 :                                 tht_down(sc);</span>
+<span class="lineNum">     886 </span>            :                 }
+<span class="lineNum">     887 </span>            :                 break;
+<span class="lineNum">     888 </span>            : 
+<span class="lineNum">     889 </span>            :         case SIOCGIFMEDIA:
+<span class="lineNum">     890 </span>            :         case SIOCSIFMEDIA:
+<span class="lineNum">     891 </span><span class="lineNoCov">          0 :                 error = ifmedia_ioctl(ifp, ifr, &amp;sc-&gt;sc_media, cmd);</span>
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     893 </span>            : 
+<span class="lineNum">     894 </span>            :         default:
+<span class="lineNum">     895 </span><span class="lineNoCov">          0 :                 error =  ether_ioctl(ifp, &amp;sc-&gt;sc_ac, cmd, addr);</span>
+<span class="lineNum">     896 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     897 </span>            : 
+<span class="lineNum">     898 </span><span class="lineNoCov">          0 :         if (error == ENETRESET) {</span>
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_flags &amp; IFF_RUNNING)</span>
+<span class="lineNum">     900 </span><span class="lineNoCov">          0 :                         tht_iff(sc);</span>
+<span class="lineNum">     901 </span>            :                 error = 0;
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     903 </span>            : 
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :         splx(s);</span>
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :         rw_exit_write(&amp;sc-&gt;sc_lock);</span>
+<span class="lineNum">     906 </span>            : 
+<span class="lineNum">     907 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">     908 </span>            : }
+<a name="909"><span class="lineNum">     909 </span>            : </a>
+<span class="lineNum">     910 </span>            : void
+<span class="lineNum">     911 </span><span class="lineNoCov">          0 : tht_up(struct tht_softc *sc)</span>
+<span class="lineNum">     912 </span>            : {
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :         struct ifnet                    *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     914 </span>            : 
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :         if (ISSET(ifp-&gt;if_flags, IFF_RUNNING)) {</span>
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     917 </span>            :         }
+<span class="lineNum">     918 </span>            : 
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :         if (tht_pkt_alloc(sc, &amp;sc-&gt;sc_tx_list, THT_TXT_PKT_NUM,</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :             THT_TXT_SGL_LEN) != 0)</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :         if (tht_pkt_alloc(sc, &amp;sc-&gt;sc_rx_list, THT_RXF_PKT_NUM,</span>
+<span class="lineNum">     923 </span><span class="lineNoCov">          0 :             THT_RXF_SGL_LEN) != 0)</span>
+<span class="lineNum">     924 </span>            :                 goto free_tx_list;
+<span class="lineNum">     925 </span>            : 
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :         if (tht_fifo_alloc(sc, &amp;sc-&gt;sc_txt, &amp;tht_txt_desc) != 0)</span>
+<span class="lineNum">     927 </span>            :                 goto free_rx_list;
+<span class="lineNum">     928 </span><span class="lineNoCov">          0 :         if (tht_fifo_alloc(sc, &amp;sc-&gt;sc_rxf, &amp;tht_rxf_desc) != 0)</span>
+<span class="lineNum">     929 </span>            :                 goto free_txt;
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :         if (tht_fifo_alloc(sc, &amp;sc-&gt;sc_rxd, &amp;tht_rxd_desc) != 0)</span>
+<span class="lineNum">     931 </span>            :                 goto free_rxf;
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :         if (tht_fifo_alloc(sc, &amp;sc-&gt;sc_txf, &amp;tht_txf_desc) != 0)</span>
+<span class="lineNum">     933 </span>            :                 goto free_rxd;
+<span class="lineNum">     934 </span>            : 
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_10G_FRM_LEN, MCLBYTES - ETHER_ALIGN);</span>
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_10G_PAUSE, 0x96);</span>
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_10G_RX_SEC, THT_REG_10G_SEC_AVAIL(0x10) |</span>
+<span class="lineNum">     938 </span>            :             THT_REG_10G_SEC_EMPTY(0x80));
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_10G_TX_SEC, THT_REG_10G_SEC_AVAIL(0x10) |</span>
+<span class="lineNum">     940 </span>            :             THT_REG_10G_SEC_EMPTY(0xe0));
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_10G_RFIFO_AEF, THT_REG_10G_FIFO_AE(0x0) |</span>
+<span class="lineNum">     942 </span>            :             THT_REG_10G_FIFO_AF(0x0));
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_10G_TFIFO_AEF, THT_REG_10G_FIFO_AE(0x0) |</span>
+<span class="lineNum">     944 </span>            :             THT_REG_10G_FIFO_AF(0x0));
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_10G_CTL, THT_REG_10G_CTL_TX_EN |</span>
+<span class="lineNum">     946 </span>            :             THT_REG_10G_CTL_RX_EN | THT_REG_10G_CTL_PAD |
+<span class="lineNum">     947 </span>            :             THT_REG_10G_CTL_PROMISC);
+<span class="lineNum">     948 </span>            : 
+<span class="lineNum">     949 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_VGLB, 0);</span>
+<span class="lineNum">     950 </span>            : 
+<span class="lineNum">     951 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_RX_MAX_FRAME, MCLBYTES - ETHER_ALIGN);</span>
+<span class="lineNum">     952 </span>            : 
+<span class="lineNum">     953 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_RDINTCM(0), THT_REG_RDINTCM_PKT_TH(12) |</span>
+<span class="lineNum">     954 </span>            :             THT_REG_RDINTCM_RXF_TH(4) | THT_REG_RDINTCM_COAL_RC |
+<span class="lineNum">     955 </span>            :             THT_REG_RDINTCM_COAL(0x20));
+<span class="lineNum">     956 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_TDINTCM(0), THT_REG_TDINTCM_PKT_TH(12) |</span>
+<span class="lineNum">     957 </span>            :             THT_REG_TDINTCM_COAL_RC | THT_REG_TDINTCM_COAL(0x20));
+<span class="lineNum">     958 </span>            : 
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :         bcopy(sc-&gt;sc_ac.ac_enaddr, sc-&gt;sc_lladdr, ETHER_ADDR_LEN);</span>
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :         tht_lladdr_write(sc);</span>
+<span class="lineNum">     961 </span>            : 
+<span class="lineNum">     962 </span>            :         /* populate rxf fifo */
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         tht_rxf_fill(sc, 1);</span>
+<span class="lineNum">     964 </span>            : 
+<span class="lineNum">     965 </span>            :         /* program promiscuous mode and multicast filters */
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :         tht_iff(sc);</span>
+<span class="lineNum">     967 </span>            : 
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags |= IFF_RUNNING;</span>
+<span class="lineNum">     969 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">     970 </span>            :         
+<span class="lineNum">     971 </span>            :         /* enable interrupts */
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :         sc-&gt;sc_imr = THT_IMR_UP(sc-&gt;sc_port);</span>
+<span class="lineNum">     973 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_IMR, sc-&gt;sc_imr);</span>
+<span class="lineNum">     974 </span>            : 
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     976 </span>            : 
+<span class="lineNum">     977 </span>            : free_rxd:
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 :         tht_fifo_free(sc, &amp;sc-&gt;sc_rxd);</span>
+<span class="lineNum">     979 </span>            : free_rxf:
+<span class="lineNum">     980 </span><span class="lineNoCov">          0 :         tht_fifo_free(sc, &amp;sc-&gt;sc_rxf);</span>
+<span class="lineNum">     981 </span>            : free_txt:
+<span class="lineNum">     982 </span><span class="lineNoCov">          0 :         tht_fifo_free(sc, &amp;sc-&gt;sc_txt);</span>
+<span class="lineNum">     983 </span>            : 
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 :         tht_sw_reset(sc);</span>
+<span class="lineNum">     985 </span>            : 
+<span class="lineNum">     986 </span>            : free_rx_list:
+<span class="lineNum">     987 </span><span class="lineNoCov">          0 :         tht_pkt_free(sc, &amp;sc-&gt;sc_rx_list);</span>
+<span class="lineNum">     988 </span>            : free_tx_list:
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 :         tht_pkt_free(sc, &amp;sc-&gt;sc_tx_list);</span>
+<span class="lineNum">     990 </span><span class="lineNoCov">          0 : }</span>
+<a name="991"><span class="lineNum">     991 </span>            : </a>
+<span class="lineNum">     992 </span>            : void
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 : tht_iff(struct tht_softc *sc)</span>
+<span class="lineNum">     994 </span>            : {
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :         struct ifnet                    *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">     996 </span>            :         struct ether_multi              *enm;
+<span class="lineNum">     997 </span>            :         struct ether_multistep          step;
+<span class="lineNum">     998 </span>            :         u_int32_t                       rxf;
+<span class="lineNum">     999 </span><span class="lineNoCov">          0 :         u_int8_t                        imf[THT_REG_RX_MCST_HASH_SIZE];</span>
+<span class="lineNum">    1000 </span>            :         u_int8_t                        hash;
+<span class="lineNum">    1001 </span>            :         int                             i;
+<span class="lineNum">    1002 </span>            : 
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags &amp;= ~IFF_ALLMULTI;</span>
+<span class="lineNum">    1004 </span>            : 
+<span class="lineNum">    1005 </span>            :         rxf = THT_REG_RX_FLT_OSEN | THT_REG_RX_FLT_AM | THT_REG_RX_FLT_AB;
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; THT_REG_RX_MAC_MCST_CNT; i++) {</span>
+<span class="lineNum">    1007 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_RX_MAC_MCST0(i), 0);</span>
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_RX_MAC_MCST1(i), 0);</span>
+<span class="lineNum">    1009 </span>            :         }
+<span class="lineNum">    1010 </span><span class="lineNoCov">          0 :         memset(imf, 0x00, sizeof(imf));</span>
+<span class="lineNum">    1011 </span>            : 
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_flags &amp; IFF_PROMISC) {</span>
+<span class="lineNum">    1013 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_flags |= IFF_ALLMULTI;</span>
+<span class="lineNum">    1014 </span>            :                 rxf |= THT_REG_RX_FLT_PRM_ALL;
+<span class="lineNum">    1015 </span><span class="lineNoCov">          0 :         } else if (sc-&gt;sc_ac.ac_multirangecnt &gt; 0) {</span>
+<span class="lineNum">    1016 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_flags |= IFF_ALLMULTI;</span>
+<span class="lineNum">    1017 </span><span class="lineNoCov">          0 :                 memset(imf, 0xff, sizeof(imf));</span>
+<span class="lineNum">    1018 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">    1019 </span><span class="lineNoCov">          0 :                 ETHER_FIRST_MULTI(step, &amp;sc-&gt;sc_ac, enm);</span>
+<span class="lineNum">    1020 </span>            : 
+<span class="lineNum">    1021 </span>            : #if 0
+<span class="lineNum">    1022 </span>            :                 /* fill the perfect multicast filters */
+<span class="lineNum">    1023 </span>            :                 for (i = 0; i &lt; THT_REG_RX_MAC_MCST_CNT; i++) {
+<span class="lineNum">    1024 </span>            :                         if (enm == NULL)
+<span class="lineNum">    1025 </span>            :                                 break;
+<span class="lineNum">    1026 </span>            : 
+<span class="lineNum">    1027 </span>            :                         tht_write(sc, THT_REG_RX_MAC_MCST0(i),
+<span class="lineNum">    1028 </span>            :                             (enm-&gt;enm_addrlo[0] &lt;&lt; 0) |
+<span class="lineNum">    1029 </span>            :                             (enm-&gt;enm_addrlo[1] &lt;&lt; 8) |
+<span class="lineNum">    1030 </span>            :                             (enm-&gt;enm_addrlo[2] &lt;&lt; 16) |
+<span class="lineNum">    1031 </span>            :                             (enm-&gt;enm_addrlo[3] &lt;&lt; 24));
+<span class="lineNum">    1032 </span>            :                         tht_write(sc, THT_REG_RX_MAC_MCST1(i),
+<span class="lineNum">    1033 </span>            :                             (enm-&gt;enm_addrlo[4] &lt;&lt; 0) |
+<span class="lineNum">    1034 </span>            :                             (enm-&gt;enm_addrlo[5] &lt;&lt; 8));
+<span class="lineNum">    1035 </span>            : 
+<span class="lineNum">    1036 </span>            :                         ETHER_NEXT_MULTI(step, enm);
+<span class="lineNum">    1037 </span>            :                 }
+<span class="lineNum">    1038 </span>            : #endif
+<span class="lineNum">    1039 </span>            : 
+<span class="lineNum">    1040 </span>            :                 /* fill the imperfect multicast filter with whats left */
+<span class="lineNum">    1041 </span><span class="lineNoCov">          0 :                 while (enm != NULL) {</span>
+<span class="lineNum">    1042 </span>            :                         hash = 0x00;
+<span class="lineNum">    1043 </span><span class="lineNoCov">          0 :                         for (i = 0; i &lt; ETHER_ADDR_LEN; i++)</span>
+<span class="lineNum">    1044 </span><span class="lineNoCov">          0 :                                 hash ^= enm-&gt;enm_addrlo[i];</span>
+<span class="lineNum">    1045 </span><span class="lineNoCov">          0 :                         setbit(imf, hash);</span>
+<span class="lineNum">    1046 </span>            : 
+<span class="lineNum">    1047 </span><span class="lineNoCov">          0 :                         ETHER_NEXT_MULTI(step, enm);</span>
+<span class="lineNum">    1048 </span>            :                 }
+<span class="lineNum">    1049 </span>            :         }
+<span class="lineNum">    1050 </span>            : 
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :         tht_write_region(sc, THT_REG_RX_MCST_HASH, imf, sizeof(imf));</span>
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_RX_FLT, rxf);</span>
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 : }</span>
+<a name="1054"><span class="lineNum">    1054 </span>            : </a>
+<span class="lineNum">    1055 </span>            : void
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 : tht_down(struct tht_softc *sc)</span>
+<span class="lineNum">    1057 </span>            : {
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :         struct ifnet                    *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">    1059 </span>            : 
+<span class="lineNum">    1060 </span><span class="lineNoCov">          0 :         if (!ISSET(ifp-&gt;if_flags, IFF_RUNNING)) {</span>
+<span class="lineNum">    1061 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1062 </span>            :         }
+<span class="lineNum">    1063 </span>            : 
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :         ifp-&gt;if_flags &amp;= ~(IFF_RUNNING | IFF_ALLMULTI);</span>
+<span class="lineNum">    1065 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1066 </span>            : 
+<span class="lineNum">    1067 </span><span class="lineNoCov">          0 :         while (tht_fifo_writable(sc, &amp;sc-&gt;sc_txt) &lt; sc-&gt;sc_txt.tf_len &amp;&amp;</span>
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 :             tht_fifo_readable(sc, &amp;sc-&gt;sc_txf) &gt; 0)</span>
+<span class="lineNum">    1069 </span><span class="lineNoCov">          0 :                 tsleep(sc, 0, &quot;thtdown&quot;, hz);</span>
+<span class="lineNum">    1070 </span>            : 
+<span class="lineNum">    1071 </span><span class="lineNoCov">          0 :         sc-&gt;sc_imr = THT_IMR_DOWN(sc-&gt;sc_port);</span>
+<span class="lineNum">    1072 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_IMR, sc-&gt;sc_imr);</span>
+<span class="lineNum">    1073 </span>            : 
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :         tht_sw_reset(sc);</span>
+<span class="lineNum">    1075 </span>            : 
+<span class="lineNum">    1076 </span><span class="lineNoCov">          0 :         tht_fifo_free(sc, &amp;sc-&gt;sc_txf);</span>
+<span class="lineNum">    1077 </span><span class="lineNoCov">          0 :         tht_fifo_free(sc, &amp;sc-&gt;sc_rxd);</span>
+<span class="lineNum">    1078 </span><span class="lineNoCov">          0 :         tht_fifo_free(sc, &amp;sc-&gt;sc_rxf);</span>
+<span class="lineNum">    1079 </span><span class="lineNoCov">          0 :         tht_fifo_free(sc, &amp;sc-&gt;sc_txt);</span>
+<span class="lineNum">    1080 </span>            : 
+<span class="lineNum">    1081 </span>            :         /* free mbufs that were on the rxf fifo */
+<span class="lineNum">    1082 </span><span class="lineNoCov">          0 :         tht_rxf_drain(sc);</span>
+<span class="lineNum">    1083 </span>            : 
+<span class="lineNum">    1084 </span><span class="lineNoCov">          0 :         tht_pkt_free(sc, &amp;sc-&gt;sc_rx_list);</span>
+<span class="lineNum">    1085 </span><span class="lineNoCov">          0 :         tht_pkt_free(sc, &amp;sc-&gt;sc_tx_list);</span>
+<span class="lineNum">    1086 </span><span class="lineNoCov">          0 : }</span>
+<a name="1087"><span class="lineNum">    1087 </span>            : </a>
+<span class="lineNum">    1088 </span>            : void
+<span class="lineNum">    1089 </span><span class="lineNoCov">          0 : tht_start(struct ifnet *ifp)</span>
+<span class="lineNum">    1090 </span>            : {
+<span class="lineNum">    1091 </span><span class="lineNoCov">          0 :         struct tht_softc                *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">    1092 </span>            :         struct tht_pkt                  *pkt;
+<span class="lineNum">    1093 </span><span class="lineNoCov">          0 :         struct tht_tx_task              txt;</span>
+<span class="lineNum">    1094 </span>            :         u_int32_t                       flags;
+<span class="lineNum">    1095 </span>            :         struct mbuf                     *m;
+<span class="lineNum">    1096 </span>            :         int                             bc;
+<span class="lineNum">    1097 </span>            : 
+<span class="lineNum">    1098 </span><span class="lineNoCov">          0 :         if (!(ifp-&gt;if_flags &amp; IFF_RUNNING))</span>
+<span class="lineNum">    1099 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1100 </span><span class="lineNoCov">          0 :         if (ifq_is_oactive(&amp;ifp-&gt;if_snd))</span>
+<span class="lineNum">    1101 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1102 </span><span class="lineNoCov">          0 :         if (IFQ_IS_EMPTY(&amp;ifp-&gt;if_snd))</span>
+<span class="lineNum">    1103 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1104 </span>            : 
+<span class="lineNum">    1105 </span><span class="lineNoCov">          0 :         if (tht_fifo_writable(sc, &amp;sc-&gt;sc_txt) &lt;= THT_FIFO_DESC_LEN)</span>
+<span class="lineNum">    1106 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1107 </span>            : 
+<span class="lineNum">    1108 </span><span class="lineNoCov">          0 :         bzero(&amp;txt, sizeof(txt));</span>
+<span class="lineNum">    1109 </span>            : 
+<span class="lineNum">    1110 </span><span class="lineNoCov">          0 :         tht_fifo_pre(sc, &amp;sc-&gt;sc_txt);</span>
+<span class="lineNum">    1111 </span>            : 
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">    1113 </span><span class="lineNoCov">          0 :                 m = ifq_deq_begin(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :                 if (m == NULL)</span>
+<span class="lineNum">    1115 </span>            :                         break;
+<span class="lineNum">    1116 </span>            : 
+<span class="lineNum">    1117 </span><span class="lineNoCov">          0 :                 pkt = tht_pkt_get(&amp;sc-&gt;sc_tx_list);</span>
+<span class="lineNum">    1118 </span><span class="lineNoCov">          0 :                 if (pkt == NULL) {</span>
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :                         ifq_deq_rollback(&amp;ifp-&gt;if_snd, m);</span>
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 :                         ifq_set_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1121 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1122 </span>            :                 }
+<span class="lineNum">    1123 </span>            : 
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :                 ifq_deq_commit(&amp;ifp-&gt;if_snd, m);</span>
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :                 if (tht_load_pkt(sc, pkt, m) != 0) {</span>
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 :                         m_freem(m);</span>
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :                         tht_pkt_put(&amp;sc-&gt;sc_tx_list, pkt);</span>
+<span class="lineNum">    1128 </span><span class="lineNoCov">          0 :                         ifp-&gt;if_oerrors++;</span>
+<span class="lineNum">    1129 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1130 </span>            :                 }
+<span class="lineNum">    1131 </span>            :                 /* thou shalt not use m after this point, only pkt-&gt;tp_m */
+<span class="lineNum">    1132 </span>            : 
+<span class="lineNum">    1133 </span>            : #if NBPFILTER &gt; 0
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :                 if (ifp-&gt;if_bpf)</span>
+<span class="lineNum">    1135 </span><span class="lineNoCov">          0 :                         bpf_mtap(ifp-&gt;if_bpf, pkt-&gt;tp_m, BPF_DIRECTION_OUT);</span>
+<span class="lineNum">    1136 </span>            : #endif
+<span class="lineNum">    1137 </span>            : 
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :                 bc = sizeof(txt) +</span>
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :                     sizeof(struct tht_pbd) * pkt-&gt;tp_dmap-&gt;dm_nsegs;</span>
+<span class="lineNum">    1140 </span>            : 
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :                 flags = THT_TXT_TYPE | LWORDS(bc);</span>
+<span class="lineNum">    1142 </span><span class="lineNoCov">          0 :                 txt.flags = htole32(flags);</span>
+<span class="lineNum">    1143 </span><span class="lineNoCov">          0 :                 txt.len = htole16(pkt-&gt;tp_m-&gt;m_pkthdr.len);</span>
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 :                 txt.uid = pkt-&gt;tp_id;</span>
+<span class="lineNum">    1145 </span>            : 
+<span class="lineNum">    1146 </span>            :                 DPRINTF(THT_D_TX, &quot;%s: txt uid 0x%llx flags 0x%08x len %d\n&quot;,
+<span class="lineNum">    1147 </span>            :                     DEVNAME(sc), pkt-&gt;tp_id, flags, pkt-&gt;tp_m-&gt;m_pkthdr.len);
+<span class="lineNum">    1148 </span>            : 
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 :                 tht_fifo_write(sc, &amp;sc-&gt;sc_txt, &amp;txt, sizeof(txt));</span>
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :                 tht_fifo_write_dmap(sc, &amp;sc-&gt;sc_txt, pkt-&gt;tp_dmap);</span>
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 :                 tht_fifo_write_pad(sc, &amp;sc-&gt;sc_txt, bc);</span>
+<span class="lineNum">    1152 </span>            : 
+<span class="lineNum">    1153 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(sc-&gt;sc_thtc-&gt;sc_dmat, pkt-&gt;tp_dmap, 0,</span>
+<span class="lineNum">    1154 </span>            :                     pkt-&gt;tp_dmap-&gt;dm_mapsize, BUS_DMASYNC_PREWRITE);
+<span class="lineNum">    1155 </span>            : 
+<span class="lineNum">    1156 </span><span class="lineNoCov">          0 :         } while (sc-&gt;sc_txt.tf_ready &gt; THT_FIFO_DESC_LEN);</span>
+<span class="lineNum">    1157 </span>            : 
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 :         tht_fifo_post(sc, &amp;sc-&gt;sc_txt);</span>
+<span class="lineNum">    1159 </span><span class="lineNoCov">          0 : }</span>
+<a name="1160"><span class="lineNum">    1160 </span>            : </a>
+<span class="lineNum">    1161 </span>            : int
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 : tht_load_pkt(struct tht_softc *sc, struct tht_pkt *pkt, struct mbuf *m)</span>
+<span class="lineNum">    1163 </span>            : {
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :         bus_dma_tag_t                   dmat = sc-&gt;sc_thtc-&gt;sc_dmat;</span>
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 :         bus_dmamap_t                    dmap = pkt-&gt;tp_dmap;</span>
+<span class="lineNum">    1166 </span>            :         struct mbuf                     *m0 = NULL;
+<span class="lineNum">    1167 </span>            : 
+<span class="lineNum">    1168 </span><span class="lineNoCov">          0 :         switch(bus_dmamap_load_mbuf(dmat, dmap, m, BUS_DMA_NOWAIT)) {</span>
+<span class="lineNum">    1169 </span>            :         case 0:
+<span class="lineNum">    1170 </span><span class="lineNoCov">          0 :                 pkt-&gt;tp_m = m;</span>
+<span class="lineNum">    1171 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1172 </span>            : 
+<span class="lineNum">    1173 </span>            :         case EFBIG: /* mbuf chain is too fragmented */
+<span class="lineNum">    1174 </span><span class="lineNoCov">          0 :                 MGETHDR(m0, M_DONTWAIT, MT_DATA);</span>
+<span class="lineNum">    1175 </span><span class="lineNoCov">          0 :                 if (m0 == NULL)</span>
+<span class="lineNum">    1176 </span><span class="lineNoCov">          0 :                         return (ENOBUFS);</span>
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :                 if (m-&gt;m_pkthdr.len &gt; MHLEN) {</span>
+<span class="lineNum">    1178 </span><span class="lineNoCov">          0 :                         MCLGET(m0, M_DONTWAIT);</span>
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 :                         if (!(m0-&gt;m_flags &amp; M_EXT)) {</span>
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :                                 m_freem(m0);</span>
+<span class="lineNum">    1181 </span><span class="lineNoCov">          0 :                                 return (ENOBUFS);</span>
+<span class="lineNum">    1182 </span>            :                         }
+<span class="lineNum">    1183 </span>            :                 }
+<span class="lineNum">    1184 </span><span class="lineNoCov">          0 :                 m_copydata(m, 0, m-&gt;m_pkthdr.len, mtod(m0, caddr_t));</span>
+<span class="lineNum">    1185 </span><span class="lineNoCov">          0 :                 m0-&gt;m_pkthdr.len = m0-&gt;m_len = m-&gt;m_pkthdr.len;</span>
+<span class="lineNum">    1186 </span><span class="lineNoCov">          0 :                 if (bus_dmamap_load_mbuf(dmat, dmap, m0, BUS_DMA_NOWAIT)) {</span>
+<span class="lineNum">    1187 </span><span class="lineNoCov">          0 :                         m_freem(m0);</span>
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :                         return (ENOBUFS);</span>
+<span class="lineNum">    1189 </span>            :                 }
+<span class="lineNum">    1190 </span>            : 
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :                 m_freem(m);</span>
+<span class="lineNum">    1192 </span><span class="lineNoCov">          0 :                 pkt-&gt;tp_m = m0;</span>
+<span class="lineNum">    1193 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">    1194 </span>            : 
+<span class="lineNum">    1195 </span>            :         default:
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :                 return (ENOBUFS);</span>
+<span class="lineNum">    1197 </span>            :         }
+<span class="lineNum">    1198 </span>            : 
+<span class="lineNum">    1199 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1200 </span><span class="lineNoCov">          0 : }</span>
+<a name="1201"><span class="lineNum">    1201 </span>            : </a>
+<span class="lineNum">    1202 </span>            : void
+<span class="lineNum">    1203 </span><span class="lineNoCov">          0 : tht_txf(struct tht_softc *sc)</span>
+<span class="lineNum">    1204 </span>            : {
+<span class="lineNum">    1205 </span><span class="lineNoCov">          0 :         struct ifnet                    *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">    1206 </span><span class="lineNoCov">          0 :         bus_dma_tag_t                   dmat = sc-&gt;sc_thtc-&gt;sc_dmat;</span>
+<span class="lineNum">    1207 </span>            :         bus_dmamap_t                    dmap;
+<span class="lineNum">    1208 </span><span class="lineNoCov">          0 :         struct tht_tx_free              txf;</span>
+<span class="lineNum">    1209 </span>            :         struct tht_pkt                  *pkt;
+<span class="lineNum">    1210 </span>            : 
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :         if (tht_fifo_readable(sc, &amp;sc-&gt;sc_txf) &lt; sizeof(txf))</span>
+<span class="lineNum">    1212 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1213 </span>            : 
+<span class="lineNum">    1214 </span><span class="lineNoCov">          0 :         tht_fifo_pre(sc, &amp;sc-&gt;sc_txf);</span>
+<span class="lineNum">    1215 </span>            : 
+<span class="lineNum">    1216 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">    1217 </span><span class="lineNoCov">          0 :                 tht_fifo_read(sc, &amp;sc-&gt;sc_txf, &amp;txf, sizeof(txf));</span>
+<span class="lineNum">    1218 </span>            : 
+<span class="lineNum">    1219 </span>            :                 DPRINTF(THT_D_TX, &quot;%s: txf uid 0x%llx\n&quot;, DEVNAME(sc), txf.uid);
+<span class="lineNum">    1220 </span>            : 
+<span class="lineNum">    1221 </span><span class="lineNoCov">          0 :                 pkt = &amp;sc-&gt;sc_tx_list.tpl_pkts[txf.uid];</span>
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 :                 dmap = pkt-&gt;tp_dmap;</span>
+<span class="lineNum">    1223 </span>            : 
+<span class="lineNum">    1224 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(dmat, dmap, 0, dmap-&gt;dm_mapsize,</span>
+<span class="lineNum">    1225 </span>            :                     BUS_DMASYNC_POSTWRITE);
+<span class="lineNum">    1226 </span><span class="lineNoCov">          0 :                 bus_dmamap_unload(dmat, dmap);</span>
+<span class="lineNum">    1227 </span>            : 
+<span class="lineNum">    1228 </span><span class="lineNoCov">          0 :                 m_freem(pkt-&gt;tp_m);</span>
+<span class="lineNum">    1229 </span>            : 
+<span class="lineNum">    1230 </span><span class="lineNoCov">          0 :                 tht_pkt_put(&amp;sc-&gt;sc_tx_list, pkt);</span>
+<span class="lineNum">    1231 </span>            : 
+<span class="lineNum">    1232 </span><span class="lineNoCov">          0 :         } while (sc-&gt;sc_txf.tf_ready &gt;= sizeof(txf));</span>
+<span class="lineNum">    1233 </span>            : 
+<span class="lineNum">    1234 </span><span class="lineNoCov">          0 :         ifq_clr_oactive(&amp;ifp-&gt;if_snd);</span>
+<span class="lineNum">    1235 </span>            : 
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :         tht_fifo_post(sc, &amp;sc-&gt;sc_txf);</span>
+<span class="lineNum">    1237 </span><span class="lineNoCov">          0 : }</span>
+<a name="1238"><span class="lineNum">    1238 </span>            : </a>
+<span class="lineNum">    1239 </span>            : void
+<span class="lineNum">    1240 </span><span class="lineNoCov">          0 : tht_rxf_fill(struct tht_softc *sc, int wait)</span>
+<span class="lineNum">    1241 </span>            : {
+<span class="lineNum">    1242 </span><span class="lineNoCov">          0 :         bus_dma_tag_t                   dmat = sc-&gt;sc_thtc-&gt;sc_dmat;</span>
+<span class="lineNum">    1243 </span>            :         bus_dmamap_t                    dmap;
+<span class="lineNum">    1244 </span><span class="lineNoCov">          0 :         struct tht_rx_free              rxf;</span>
+<span class="lineNum">    1245 </span>            :         struct tht_pkt                  *pkt;
+<span class="lineNum">    1246 </span>            :         struct mbuf                     *m;
+<span class="lineNum">    1247 </span>            :         int                             bc;
+<span class="lineNum">    1248 </span>            : 
+<span class="lineNum">    1249 </span><span class="lineNoCov">          0 :         if (tht_fifo_writable(sc, &amp;sc-&gt;sc_rxf) &lt;= THT_FIFO_DESC_LEN)</span>
+<span class="lineNum">    1250 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1251 </span>            : 
+<span class="lineNum">    1252 </span><span class="lineNoCov">          0 :         tht_fifo_pre(sc, &amp;sc-&gt;sc_rxf);</span>
+<span class="lineNum">    1253 </span>            : 
+<span class="lineNum">    1254 </span><span class="lineNoCov">          0 :         for (;;) {</span>
+<span class="lineNum">    1255 </span><span class="lineNoCov">          0 :                 if ((pkt = tht_pkt_get(&amp;sc-&gt;sc_rx_list)) == NULL)</span>
+<span class="lineNum">    1256 </span>            :                         goto done;
+<span class="lineNum">    1257 </span>            : 
+<span class="lineNum">    1258 </span><span class="lineNoCov">          0 :                 MGETHDR(m, wait ? M_WAIT : M_DONTWAIT, MT_DATA);</span>
+<span class="lineNum">    1259 </span><span class="lineNoCov">          0 :                 if (m == NULL)</span>
+<span class="lineNum">    1260 </span>            :                         goto put_pkt;
+<span class="lineNum">    1261 </span>            : 
+<span class="lineNum">    1262 </span><span class="lineNoCov">          0 :                 MCLGET(m, wait ? M_WAIT : M_DONTWAIT);</span>
+<span class="lineNum">    1263 </span><span class="lineNoCov">          0 :                 if (!ISSET(m-&gt;m_flags, M_EXT))</span>
+<span class="lineNum">    1264 </span>            :                         goto free_m;
+<span class="lineNum">    1265 </span>            : 
+<span class="lineNum">    1266 </span><span class="lineNoCov">          0 :                 m-&gt;m_data += ETHER_ALIGN;</span>
+<span class="lineNum">    1267 </span><span class="lineNoCov">          0 :                 m-&gt;m_len = m-&gt;m_pkthdr.len = MCLBYTES - ETHER_ALIGN;</span>
+<span class="lineNum">    1268 </span>            : 
+<span class="lineNum">    1269 </span><span class="lineNoCov">          0 :                 dmap = pkt-&gt;tp_dmap;</span>
+<span class="lineNum">    1270 </span><span class="lineNoCov">          0 :                 if (bus_dmamap_load_mbuf(dmat, dmap, m,</span>
+<span class="lineNum">    1271 </span><span class="lineNoCov">          0 :                     wait ? BUS_DMA_WAITOK : BUS_DMA_NOWAIT) != 0)</span>
+<span class="lineNum">    1272 </span>            :                         goto free_m;
+<span class="lineNum">    1273 </span>            : 
+<span class="lineNum">    1274 </span><span class="lineNoCov">          0 :                 pkt-&gt;tp_m = m;</span>
+<span class="lineNum">    1275 </span>            : 
+<span class="lineNum">    1276 </span><span class="lineNoCov">          0 :                 bc = sizeof(rxf) + sizeof(struct tht_pbd) * dmap-&gt;dm_nsegs;</span>
+<span class="lineNum">    1277 </span>            : 
+<span class="lineNum">    1278 </span><span class="lineNoCov">          0 :                 rxf.bc = htole16(LWORDS(bc));</span>
+<span class="lineNum">    1279 </span><span class="lineNoCov">          0 :                 rxf.type = htole16(THT_RXF_TYPE);</span>
+<span class="lineNum">    1280 </span><span class="lineNoCov">          0 :                 rxf.uid = pkt-&gt;tp_id;</span>
+<span class="lineNum">    1281 </span>            : 
+<span class="lineNum">    1282 </span><span class="lineNoCov">          0 :                 tht_fifo_write(sc, &amp;sc-&gt;sc_rxf, &amp;rxf, sizeof(rxf));</span>
+<span class="lineNum">    1283 </span><span class="lineNoCov">          0 :                 tht_fifo_write_dmap(sc, &amp;sc-&gt;sc_rxf, dmap);</span>
+<span class="lineNum">    1284 </span><span class="lineNoCov">          0 :                 tht_fifo_write_pad(sc, &amp;sc-&gt;sc_rxf, bc);</span>
+<span class="lineNum">    1285 </span>            : 
+<span class="lineNum">    1286 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(dmat, dmap, 0, dmap-&gt;dm_mapsize,</span>
+<span class="lineNum">    1287 </span>            :                     BUS_DMASYNC_PREREAD);
+<span class="lineNum">    1288 </span>            : 
+<span class="lineNum">    1289 </span><span class="lineNoCov">          0 :                 if (sc-&gt;sc_rxf.tf_ready &lt;= THT_FIFO_DESC_LEN)</span>
+<span class="lineNum">    1290 </span>            :                         goto done;
+<span class="lineNum">    1291 </span>            :         }
+<span class="lineNum">    1292 </span>            : 
+<span class="lineNum">    1293 </span>            : free_m:
+<span class="lineNum">    1294 </span><span class="lineNoCov">          0 :         m_freem(m);</span>
+<span class="lineNum">    1295 </span>            : put_pkt:
+<span class="lineNum">    1296 </span><span class="lineNoCov">          0 :         tht_pkt_put(&amp;sc-&gt;sc_rx_list, pkt);</span>
+<span class="lineNum">    1297 </span>            : done:
+<span class="lineNum">    1298 </span><span class="lineNoCov">          0 :         tht_fifo_post(sc, &amp;sc-&gt;sc_rxf);</span>
+<span class="lineNum">    1299 </span><span class="lineNoCov">          0 : }</span>
+<a name="1300"><span class="lineNum">    1300 </span>            : </a>
+<span class="lineNum">    1301 </span>            : void
+<span class="lineNum">    1302 </span><span class="lineNoCov">          0 : tht_rxf_drain(struct tht_softc *sc)</span>
+<span class="lineNum">    1303 </span>            : {
+<span class="lineNum">    1304 </span><span class="lineNoCov">          0 :         bus_dma_tag_t                   dmat = sc-&gt;sc_thtc-&gt;sc_dmat;</span>
+<span class="lineNum">    1305 </span>            :         bus_dmamap_t                    dmap;
+<span class="lineNum">    1306 </span>            :         struct tht_pkt                  *pkt;
+<span class="lineNum">    1307 </span>            : 
+<span class="lineNum">    1308 </span><span class="lineNoCov">          0 :         while ((pkt = tht_pkt_used(&amp;sc-&gt;sc_rx_list)) != NULL) {</span>
+<span class="lineNum">    1309 </span><span class="lineNoCov">          0 :                 dmap = pkt-&gt;tp_dmap;</span>
+<span class="lineNum">    1310 </span>            : 
+<span class="lineNum">    1311 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(dmat, dmap, 0, dmap-&gt;dm_mapsize,</span>
+<span class="lineNum">    1312 </span>            :                     BUS_DMASYNC_POSTREAD);
+<span class="lineNum">    1313 </span><span class="lineNoCov">          0 :                 bus_dmamap_unload(dmat, dmap);</span>
+<span class="lineNum">    1314 </span>            : 
+<span class="lineNum">    1315 </span><span class="lineNoCov">          0 :                 m_freem(pkt-&gt;tp_m);</span>
+<span class="lineNum">    1316 </span>            : 
+<span class="lineNum">    1317 </span><span class="lineNoCov">          0 :                 tht_pkt_put(&amp;sc-&gt;sc_rx_list, pkt);</span>
+<span class="lineNum">    1318 </span>            :         }
+<span class="lineNum">    1319 </span><span class="lineNoCov">          0 : }</span>
+<a name="1320"><span class="lineNum">    1320 </span>            : </a>
+<span class="lineNum">    1321 </span>            : void
+<span class="lineNum">    1322 </span><span class="lineNoCov">          0 : tht_rxd(struct tht_softc *sc)</span>
+<span class="lineNum">    1323 </span>            : {
+<span class="lineNum">    1324 </span><span class="lineNoCov">          0 :         struct ifnet                    *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">    1325 </span><span class="lineNoCov">          0 :         bus_dma_tag_t                   dmat = sc-&gt;sc_thtc-&gt;sc_dmat;</span>
+<span class="lineNum">    1326 </span>            :         bus_dmamap_t                    dmap;
+<span class="lineNum">    1327 </span><span class="lineNoCov">          0 :         struct tht_rx_desc              rxd;</span>
+<span class="lineNum">    1328 </span>            :         struct tht_pkt                  *pkt;
+<span class="lineNum">    1329 </span>            :         struct mbuf                     *m;
+<span class="lineNum">    1330 </span><span class="lineNoCov">          0 :         struct mbuf_list                ml = MBUF_LIST_INITIALIZER();</span>
+<span class="lineNum">    1331 </span>            :         int                             bc;
+<span class="lineNum">    1332 </span>            :         u_int32_t                       flags;
+<span class="lineNum">    1333 </span>            : 
+<span class="lineNum">    1334 </span><span class="lineNoCov">          0 :         if (tht_fifo_readable(sc, &amp;sc-&gt;sc_rxd) &lt; sizeof(rxd))</span>
+<span class="lineNum">    1335 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1336 </span>            : 
+<span class="lineNum">    1337 </span><span class="lineNoCov">          0 :         tht_fifo_pre(sc, &amp;sc-&gt;sc_rxd);</span>
+<span class="lineNum">    1338 </span>            : 
+<span class="lineNum">    1339 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">    1340 </span><span class="lineNoCov">          0 :                 tht_fifo_read(sc, &amp;sc-&gt;sc_rxd, &amp;rxd, sizeof(rxd));</span>
+<span class="lineNum">    1341 </span>            : 
+<span class="lineNum">    1342 </span><span class="lineNoCov">          0 :                 flags = letoh32(rxd.flags);</span>
+<span class="lineNum">    1343 </span><span class="lineNoCov">          0 :                 bc = THT_RXD_FLAGS_BC(flags) * 8;</span>
+<span class="lineNum">    1344 </span><span class="lineNoCov">          0 :                 bc -= sizeof(rxd);</span>
+<span class="lineNum">    1345 </span><span class="lineNoCov">          0 :                 pkt = &amp;sc-&gt;sc_rx_list.tpl_pkts[rxd.uid];</span>
+<span class="lineNum">    1346 </span>            : 
+<span class="lineNum">    1347 </span><span class="lineNoCov">          0 :                 dmap = pkt-&gt;tp_dmap;</span>
+<span class="lineNum">    1348 </span>            : 
+<span class="lineNum">    1349 </span><span class="lineNoCov">          0 :                 bus_dmamap_sync(dmat, dmap, 0, dmap-&gt;dm_mapsize,</span>
+<span class="lineNum">    1350 </span>            :                     BUS_DMASYNC_POSTREAD);
+<span class="lineNum">    1351 </span><span class="lineNoCov">          0 :                 bus_dmamap_unload(dmat, dmap);</span>
+<span class="lineNum">    1352 </span>            : 
+<span class="lineNum">    1353 </span><span class="lineNoCov">          0 :                 m = pkt-&gt;tp_m;</span>
+<span class="lineNum">    1354 </span><span class="lineNoCov">          0 :                 m-&gt;m_pkthdr.len = m-&gt;m_len = letoh16(rxd.len);</span>
+<span class="lineNum">    1355 </span>            : 
+<span class="lineNum">    1356 </span>            :                 /* XXX process type 3 rx descriptors */
+<span class="lineNum">    1357 </span>            : 
+<span class="lineNum">    1358 </span><span class="lineNoCov">          0 :                 ml_enqueue(&amp;ml, m);</span>
+<span class="lineNum">    1359 </span>            : 
+<span class="lineNum">    1360 </span><span class="lineNoCov">          0 :                 tht_pkt_put(&amp;sc-&gt;sc_rx_list, pkt);</span>
+<span class="lineNum">    1361 </span>            : 
+<span class="lineNum">    1362 </span><span class="lineNoCov">          0 :                 while (bc &gt; 0) {</span>
+<span class="lineNum">    1363 </span>            :                         static u_int32_t pad;
+<span class="lineNum">    1364 </span>            : 
+<span class="lineNum">    1365 </span><span class="lineNoCov">          0 :                         tht_fifo_read(sc, &amp;sc-&gt;sc_rxd, &amp;pad, sizeof(pad));</span>
+<span class="lineNum">    1366 </span><span class="lineNoCov">          0 :                         bc -= sizeof(pad);</span>
+<span class="lineNum">    1367 </span>            :                 }
+<span class="lineNum">    1368 </span><span class="lineNoCov">          0 :         } while (sc-&gt;sc_rxd.tf_ready &gt;= sizeof(rxd));</span>
+<span class="lineNum">    1369 </span>            : 
+<span class="lineNum">    1370 </span><span class="lineNoCov">          0 :         tht_fifo_post(sc, &amp;sc-&gt;sc_rxd);</span>
+<span class="lineNum">    1371 </span>            : 
+<span class="lineNum">    1372 </span><span class="lineNoCov">          0 :         if_input(ifp, &amp;ml);</span>
+<span class="lineNum">    1373 </span>            : 
+<span class="lineNum">    1374 </span>            :         /* put more pkts on the fifo */
+<span class="lineNum">    1375 </span><span class="lineNoCov">          0 :         tht_rxf_fill(sc, 0);</span>
+<span class="lineNum">    1376 </span><span class="lineNoCov">          0 : }</span>
+<a name="1377"><span class="lineNum">    1377 </span>            : </a>
+<span class="lineNum">    1378 </span>            : void
+<span class="lineNum">    1379 </span><span class="lineNoCov">          0 : tht_watchdog(struct ifnet *ifp)</span>
+<span class="lineNum">    1380 </span>            : {
+<span class="lineNum">    1381 </span>            :         /* do nothing */
+<span class="lineNum">    1382 </span><span class="lineNoCov">          0 : }</span>
+<a name="1383"><span class="lineNum">    1383 </span>            : </a>
+<span class="lineNum">    1384 </span>            : int
+<span class="lineNum">    1385 </span><span class="lineNoCov">          0 : tht_media_change(struct ifnet *ifp)</span>
+<span class="lineNum">    1386 </span>            : {
+<span class="lineNum">    1387 </span>            :         /* ignore */
+<span class="lineNum">    1388 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1389 </span>            : }
+<a name="1390"><span class="lineNum">    1390 </span>            : </a>
+<span class="lineNum">    1391 </span>            : void
+<span class="lineNum">    1392 </span><span class="lineNoCov">          0 : tht_media_status(struct ifnet *ifp, struct ifmediareq *imr)</span>
+<span class="lineNum">    1393 </span>            : {
+<span class="lineNum">    1394 </span><span class="lineNoCov">          0 :         struct tht_softc                *sc = ifp-&gt;if_softc;</span>
+<span class="lineNum">    1395 </span>            : 
+<span class="lineNum">    1396 </span><span class="lineNoCov">          0 :         imr-&gt;ifm_active = IFM_ETHER | IFM_AUTO;</span>
+<span class="lineNum">    1397 </span><span class="lineNoCov">          0 :         imr-&gt;ifm_status = IFM_AVALID;</span>
+<span class="lineNum">    1398 </span>            : 
+<span class="lineNum">    1399 </span><span class="lineNoCov">          0 :         tht_link_state(sc);</span>
+<span class="lineNum">    1400 </span>            : 
+<span class="lineNum">    1401 </span><span class="lineNoCov">          0 :         if (LINK_STATE_IS_UP(ifp-&gt;if_link_state))</span>
+<span class="lineNum">    1402 </span><span class="lineNoCov">          0 :                 imr-&gt;ifm_status |= IFM_ACTIVE;</span>
+<span class="lineNum">    1403 </span><span class="lineNoCov">          0 : }</span>
+<a name="1404"><span class="lineNum">    1404 </span>            : </a>
+<span class="lineNum">    1405 </span>            : int
+<span class="lineNum">    1406 </span><span class="lineNoCov">          0 : tht_fifo_alloc(struct tht_softc *sc, struct tht_fifo *tf,</span>
+<span class="lineNum">    1407 </span>            :     struct tht_fifo_desc *tfd)
+<span class="lineNum">    1408 </span>            : {
+<span class="lineNum">    1409 </span>            :         u_int64_t                       dva;
+<span class="lineNum">    1410 </span>            : 
+<span class="lineNum">    1411 </span><span class="lineNoCov">          0 :         tf-&gt;tf_len = THT_FIFO_SIZE(tfd-&gt;tfd_size);</span>
+<span class="lineNum">    1412 </span><span class="lineNoCov">          0 :         tf-&gt;tf_mem = tht_dmamem_alloc(sc, tf-&gt;tf_len, THT_FIFO_ALIGN);</span>
+<span class="lineNum">    1413 </span><span class="lineNoCov">          0 :         if (tf-&gt;tf_mem == NULL)</span>
+<span class="lineNum">    1414 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1415 </span>            : 
+<span class="lineNum">    1416 </span><span class="lineNoCov">          0 :         tf-&gt;tf_desc = tfd;</span>
+<span class="lineNum">    1417 </span><span class="lineNoCov">          0 :         tf-&gt;tf_rptr = tf-&gt;tf_wptr = 0;</span>
+<span class="lineNum">    1418 </span>            : 
+<span class="lineNum">    1419 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_thtc-&gt;sc_dmat, THT_DMA_MAP(tf-&gt;tf_mem),</span>
+<span class="lineNum">    1420 </span>            :             0, tf-&gt;tf_len, THT_FIFO_PRE_SYNC(tfd));
+<span class="lineNum">    1421 </span>            : 
+<span class="lineNum">    1422 </span><span class="lineNoCov">          0 :         dva = THT_DMA_DVA(tf-&gt;tf_mem);</span>
+<span class="lineNum">    1423 </span><span class="lineNoCov">          0 :         tht_write(sc, tfd-&gt;tfd_cfg0, (u_int32_t)dva | tfd-&gt;tfd_size);</span>
+<span class="lineNum">    1424 </span><span class="lineNoCov">          0 :         tht_write(sc, tfd-&gt;tfd_cfg1, (u_int32_t)(dva &gt;&gt; 32));</span>
+<span class="lineNum">    1425 </span>            : 
+<span class="lineNum">    1426 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1427 </span><span class="lineNoCov">          0 : }</span>
+<a name="1428"><span class="lineNum">    1428 </span>            : </a>
+<span class="lineNum">    1429 </span>            : void
+<span class="lineNum">    1430 </span><span class="lineNoCov">          0 : tht_fifo_free(struct tht_softc *sc, struct tht_fifo *tf)</span>
+<span class="lineNum">    1431 </span>            : {
+<span class="lineNum">    1432 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_thtc-&gt;sc_dmat, THT_DMA_MAP(tf-&gt;tf_mem),</span>
+<span class="lineNum">    1433 </span>            :             0, tf-&gt;tf_len, THT_FIFO_POST_SYNC(tf-&gt;tf_desc));
+<span class="lineNum">    1434 </span><span class="lineNoCov">          0 :         tht_dmamem_free(sc, tf-&gt;tf_mem);</span>
+<span class="lineNum">    1435 </span><span class="lineNoCov">          0 : }</span>
+<a name="1436"><span class="lineNum">    1436 </span>            : </a>
+<span class="lineNum">    1437 </span>            : size_t
+<span class="lineNum">    1438 </span><span class="lineNoCov">          0 : tht_fifo_readable(struct tht_softc *sc, struct tht_fifo *tf)</span>
+<span class="lineNum">    1439 </span>            : {
+<span class="lineNum">    1440 </span><span class="lineNoCov">          0 :         tf-&gt;tf_wptr = tht_read(sc, tf-&gt;tf_desc-&gt;tfd_wptr);</span>
+<span class="lineNum">    1441 </span><span class="lineNoCov">          0 :         tf-&gt;tf_wptr &amp;= THT_FIFO_PTR_MASK;</span>
+<span class="lineNum">    1442 </span><span class="lineNoCov">          0 :         tf-&gt;tf_ready = tf-&gt;tf_wptr - tf-&gt;tf_rptr;</span>
+<span class="lineNum">    1443 </span><span class="lineNoCov">          0 :         if (tf-&gt;tf_ready &lt; 0)</span>
+<span class="lineNum">    1444 </span><span class="lineNoCov">          0 :                 tf-&gt;tf_ready += tf-&gt;tf_len;</span>
+<span class="lineNum">    1445 </span>            : 
+<span class="lineNum">    1446 </span>            :         DPRINTF(THT_D_FIFO, &quot;%s: fifo rdable wptr: %d rptr: %d ready: %d\n&quot;,
+<span class="lineNum">    1447 </span>            :             DEVNAME(sc), tf-&gt;tf_wptr, tf-&gt;tf_rptr, tf-&gt;tf_ready);
+<span class="lineNum">    1448 </span>            : 
+<span class="lineNum">    1449 </span><span class="lineNoCov">          0 :         return (tf-&gt;tf_ready);</span>
+<span class="lineNum">    1450 </span>            : }
+<a name="1451"><span class="lineNum">    1451 </span>            : </a>
+<span class="lineNum">    1452 </span>            : size_t
+<span class="lineNum">    1453 </span><span class="lineNoCov">          0 : tht_fifo_writable(struct tht_softc *sc, struct tht_fifo *tf)</span>
+<span class="lineNum">    1454 </span>            : {
+<span class="lineNum">    1455 </span><span class="lineNoCov">          0 :         tf-&gt;tf_rptr = tht_read(sc, tf-&gt;tf_desc-&gt;tfd_rptr);</span>
+<span class="lineNum">    1456 </span><span class="lineNoCov">          0 :         tf-&gt;tf_rptr &amp;= THT_FIFO_PTR_MASK;</span>
+<span class="lineNum">    1457 </span><span class="lineNoCov">          0 :         tf-&gt;tf_ready = tf-&gt;tf_rptr - tf-&gt;tf_wptr;</span>
+<span class="lineNum">    1458 </span><span class="lineNoCov">          0 :         if (tf-&gt;tf_ready &lt;= 0)</span>
+<span class="lineNum">    1459 </span><span class="lineNoCov">          0 :                 tf-&gt;tf_ready += tf-&gt;tf_len;</span>
+<span class="lineNum">    1460 </span>            : 
+<span class="lineNum">    1461 </span>            :         DPRINTF(THT_D_FIFO, &quot;%s: fifo wrable wptr: %d rptr: %d ready: %d\n&quot;,
+<span class="lineNum">    1462 </span>            :             DEVNAME(sc), tf-&gt;tf_wptr, tf-&gt;tf_rptr, tf-&gt;tf_ready);
+<span class="lineNum">    1463 </span>            : 
+<span class="lineNum">    1464 </span><span class="lineNoCov">          0 :         return (tf-&gt;tf_ready);</span>
+<span class="lineNum">    1465 </span>            : }
+<a name="1466"><span class="lineNum">    1466 </span>            : </a>
+<span class="lineNum">    1467 </span>            : void
+<span class="lineNum">    1468 </span><span class="lineNoCov">          0 : tht_fifo_pre(struct tht_softc *sc, struct tht_fifo *tf)</span>
+<span class="lineNum">    1469 </span>            : {
+<span class="lineNum">    1470 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_thtc-&gt;sc_dmat, THT_DMA_MAP(tf-&gt;tf_mem),</span>
+<span class="lineNum">    1471 </span>            :             0, tf-&gt;tf_len, THT_FIFO_POST_SYNC(tf-&gt;tf_desc));
+<span class="lineNum">    1472 </span><span class="lineNoCov">          0 : }</span>
+<a name="1473"><span class="lineNum">    1473 </span>            : </a>
+<span class="lineNum">    1474 </span>            : void
+<span class="lineNum">    1475 </span><span class="lineNoCov">          0 : tht_fifo_read(struct tht_softc *sc, struct tht_fifo *tf,</span>
+<span class="lineNum">    1476 </span>            :     void *buf, size_t buflen)
+<span class="lineNum">    1477 </span>            : {
+<span class="lineNum">    1478 </span><span class="lineNoCov">          0 :         u_int8_t                        *fifo = THT_DMA_KVA(tf-&gt;tf_mem);</span>
+<span class="lineNum">    1479 </span>            :         u_int8_t                        *desc = buf;
+<span class="lineNum">    1480 </span>            :         size_t                          len;
+<span class="lineNum">    1481 </span>            : 
+<span class="lineNum">    1482 </span><span class="lineNoCov">          0 :         tf-&gt;tf_ready -= buflen;</span>
+<span class="lineNum">    1483 </span>            : 
+<span class="lineNum">    1484 </span><span class="lineNoCov">          0 :         len = tf-&gt;tf_len - tf-&gt;tf_rptr;</span>
+<span class="lineNum">    1485 </span>            : 
+<span class="lineNum">    1486 </span><span class="lineNoCov">          0 :         if (len &lt; buflen) {</span>
+<span class="lineNum">    1487 </span><span class="lineNoCov">          0 :                 memcpy(desc, fifo + tf-&gt;tf_rptr, len);</span>
+<span class="lineNum">    1488 </span>            : 
+<span class="lineNum">    1489 </span><span class="lineNoCov">          0 :                 buflen -= len;</span>
+<span class="lineNum">    1490 </span><span class="lineNoCov">          0 :                 desc += len;</span>
+<span class="lineNum">    1491 </span>            : 
+<span class="lineNum">    1492 </span><span class="lineNoCov">          0 :                 tf-&gt;tf_rptr = 0;</span>
+<span class="lineNum">    1493 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1494 </span>            : 
+<span class="lineNum">    1495 </span><span class="lineNoCov">          0 :         memcpy(desc, fifo + tf-&gt;tf_rptr, buflen);</span>
+<span class="lineNum">    1496 </span><span class="lineNoCov">          0 :         tf-&gt;tf_rptr += buflen;</span>
+<span class="lineNum">    1497 </span>            : 
+<span class="lineNum">    1498 </span>            :         DPRINTF(THT_D_FIFO, &quot;%s: fifo rd wptr: %d rptr: %d ready: %d\n&quot;,
+<span class="lineNum">    1499 </span>            :             DEVNAME(sc), tf-&gt;tf_wptr, tf-&gt;tf_rptr, tf-&gt;tf_ready);
+<span class="lineNum">    1500 </span><span class="lineNoCov">          0 : }</span>
+<a name="1501"><span class="lineNum">    1501 </span>            : </a>
+<span class="lineNum">    1502 </span>            : void
+<span class="lineNum">    1503 </span><span class="lineNoCov">          0 : tht_fifo_write(struct tht_softc *sc, struct tht_fifo *tf,</span>
+<span class="lineNum">    1504 </span>            :     void *buf, size_t buflen)
+<span class="lineNum">    1505 </span>            : {
+<span class="lineNum">    1506 </span><span class="lineNoCov">          0 :         u_int8_t                        *fifo = THT_DMA_KVA(tf-&gt;tf_mem);</span>
+<span class="lineNum">    1507 </span>            :         u_int8_t                        *desc = buf;
+<span class="lineNum">    1508 </span>            :         size_t                          len;
+<span class="lineNum">    1509 </span>            : 
+<span class="lineNum">    1510 </span><span class="lineNoCov">          0 :         tf-&gt;tf_ready -= buflen;</span>
+<span class="lineNum">    1511 </span>            : 
+<span class="lineNum">    1512 </span><span class="lineNoCov">          0 :         len = tf-&gt;tf_len - tf-&gt;tf_wptr;</span>
+<span class="lineNum">    1513 </span>            : 
+<span class="lineNum">    1514 </span><span class="lineNoCov">          0 :         if (len &lt; buflen) {</span>
+<span class="lineNum">    1515 </span><span class="lineNoCov">          0 :                 memcpy(fifo + tf-&gt;tf_wptr, desc, len);</span>
+<span class="lineNum">    1516 </span>            : 
+<span class="lineNum">    1517 </span><span class="lineNoCov">          0 :                 buflen -= len;</span>
+<span class="lineNum">    1518 </span><span class="lineNoCov">          0 :                 desc += len;</span>
+<span class="lineNum">    1519 </span>            : 
+<span class="lineNum">    1520 </span><span class="lineNoCov">          0 :                 tf-&gt;tf_wptr = 0;</span>
+<span class="lineNum">    1521 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1522 </span>            : 
+<span class="lineNum">    1523 </span><span class="lineNoCov">          0 :         memcpy(fifo + tf-&gt;tf_wptr, desc, buflen);</span>
+<span class="lineNum">    1524 </span><span class="lineNoCov">          0 :         tf-&gt;tf_wptr += buflen;</span>
+<span class="lineNum">    1525 </span><span class="lineNoCov">          0 :         tf-&gt;tf_wptr %= tf-&gt;tf_len;</span>
+<span class="lineNum">    1526 </span>            : 
+<span class="lineNum">    1527 </span>            :         DPRINTF(THT_D_FIFO, &quot;%s: fifo wr wptr: %d rptr: %d ready: %d\n&quot;,
+<span class="lineNum">    1528 </span>            :             DEVNAME(sc), tf-&gt;tf_wptr, tf-&gt;tf_rptr, tf-&gt;tf_ready);
+<span class="lineNum">    1529 </span><span class="lineNoCov">          0 : }</span>
+<a name="1530"><span class="lineNum">    1530 </span>            : </a>
+<span class="lineNum">    1531 </span>            : void
+<span class="lineNum">    1532 </span><span class="lineNoCov">          0 : tht_fifo_write_dmap(struct tht_softc *sc, struct tht_fifo *tf,</span>
+<span class="lineNum">    1533 </span>            :     bus_dmamap_t dmap)
+<span class="lineNum">    1534 </span>            : {
+<span class="lineNum">    1535 </span><span class="lineNoCov">          0 :         struct tht_pbd                  pbd;</span>
+<span class="lineNum">    1536 </span>            :         u_int64_t                       dva;
+<span class="lineNum">    1537 </span>            :         int                             i;
+<span class="lineNum">    1538 </span>            : 
+<span class="lineNum">    1539 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; dmap-&gt;dm_nsegs; i++) {</span>
+<span class="lineNum">    1540 </span><span class="lineNoCov">          0 :                 dva = dmap-&gt;dm_segs[i].ds_addr;</span>
+<span class="lineNum">    1541 </span>            : 
+<span class="lineNum">    1542 </span><span class="lineNoCov">          0 :                 pbd.addr_lo = htole32(dva);</span>
+<span class="lineNum">    1543 </span><span class="lineNoCov">          0 :                 pbd.addr_hi = htole32(dva &gt;&gt; 32);</span>
+<span class="lineNum">    1544 </span><span class="lineNoCov">          0 :                 pbd.len = htole32(dmap-&gt;dm_segs[i].ds_len);</span>
+<span class="lineNum">    1545 </span>            : 
+<span class="lineNum">    1546 </span><span class="lineNoCov">          0 :                 tht_fifo_write(sc, tf, &amp;pbd, sizeof(pbd));</span>
+<span class="lineNum">    1547 </span>            :         }
+<span class="lineNum">    1548 </span><span class="lineNoCov">          0 : }</span>
+<a name="1549"><span class="lineNum">    1549 </span>            : </a>
+<span class="lineNum">    1550 </span>            : void
+<span class="lineNum">    1551 </span><span class="lineNoCov">          0 : tht_fifo_write_pad(struct tht_softc *sc, struct tht_fifo *tf, int bc)</span>
+<span class="lineNum">    1552 </span>            : {
+<span class="lineNum">    1553 </span>            :         const static u_int32_t pad = 0x0;
+<span class="lineNum">    1554 </span>            : 
+<span class="lineNum">    1555 </span>            :         /* this assumes you'll only ever be writing multiples of 4 bytes */
+<span class="lineNum">    1556 </span><span class="lineNoCov">          0 :         if (bc % 8)</span>
+<span class="lineNum">    1557 </span><span class="lineNoCov">          0 :                 tht_fifo_write(sc, tf, (void *)&amp;pad, sizeof(pad));</span>
+<span class="lineNum">    1558 </span><span class="lineNoCov">          0 : }</span>
+<a name="1559"><span class="lineNum">    1559 </span>            : </a>
+<span class="lineNum">    1560 </span>            : void
+<span class="lineNum">    1561 </span><span class="lineNoCov">          0 : tht_fifo_post(struct tht_softc *sc, struct tht_fifo *tf)</span>
+<span class="lineNum">    1562 </span>            : {
+<span class="lineNum">    1563 </span><span class="lineNoCov">          0 :         bus_dmamap_sync(sc-&gt;sc_thtc-&gt;sc_dmat, THT_DMA_MAP(tf-&gt;tf_mem),</span>
+<span class="lineNum">    1564 </span>            :             0, tf-&gt;tf_len, THT_FIFO_PRE_SYNC(tf-&gt;tf_desc));
+<span class="lineNum">    1565 </span><span class="lineNoCov">          0 :         if (tf-&gt;tf_desc-&gt;tfd_write)</span>
+<span class="lineNum">    1566 </span><span class="lineNoCov">          0 :                 tht_write(sc, tf-&gt;tf_desc-&gt;tfd_wptr, tf-&gt;tf_wptr);</span>
+<span class="lineNum">    1567 </span>            :         else
+<span class="lineNum">    1568 </span><span class="lineNoCov">          0 :                 tht_write(sc, tf-&gt;tf_desc-&gt;tfd_rptr, tf-&gt;tf_rptr);</span>
+<span class="lineNum">    1569 </span>            : 
+<span class="lineNum">    1570 </span>            :         DPRINTF(THT_D_FIFO, &quot;%s: fifo post wptr: %d rptr: %d\n&quot;, DEVNAME(sc),
+<span class="lineNum">    1571 </span>            :             tf-&gt;tf_wptr, tf-&gt;tf_rptr);
+<span class="lineNum">    1572 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1573 </span>            : 
+<span class="lineNum">    1574 </span>            : const static bus_size_t tht_mac_regs[3] = {
+<span class="lineNum">    1575 </span>            :     THT_REG_RX_UNC_MAC2, THT_REG_RX_UNC_MAC1, THT_REG_RX_UNC_MAC0
+<span class="lineNum">    1576 </span>            : };
+<a name="1577"><span class="lineNum">    1577 </span>            : </a>
+<span class="lineNum">    1578 </span>            : void
+<span class="lineNum">    1579 </span><span class="lineNoCov">          0 : tht_lladdr_read(struct tht_softc *sc)</span>
+<span class="lineNum">    1580 </span>            : {
+<span class="lineNum">    1581 </span>            :         int                             i;
+<span class="lineNum">    1582 </span>            : 
+<span class="lineNum">    1583 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; nitems(tht_mac_regs); i++)</span>
+<span class="lineNum">    1584 </span><span class="lineNoCov">          0 :                 sc-&gt;sc_lladdr[i] = betoh16(tht_read(sc, tht_mac_regs[i]));</span>
+<span class="lineNum">    1585 </span><span class="lineNoCov">          0 : }</span>
+<a name="1586"><span class="lineNum">    1586 </span>            : </a>
+<span class="lineNum">    1587 </span>            : void
+<span class="lineNum">    1588 </span><span class="lineNoCov">          0 : tht_lladdr_write(struct tht_softc *sc)</span>
+<span class="lineNum">    1589 </span>            : {
+<span class="lineNum">    1590 </span>            :         int                             i;
+<span class="lineNum">    1591 </span>            : 
+<span class="lineNum">    1592 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; nitems(tht_mac_regs); i++)</span>
+<span class="lineNum">    1593 </span><span class="lineNoCov">          0 :                 tht_write(sc, tht_mac_regs[i], htobe16(sc-&gt;sc_lladdr[i]));</span>
+<span class="lineNum">    1594 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1595 </span>            : 
+<span class="lineNum">    1596 </span>            : #define tht_swrst_set(_s, _r) tht_write((_s), (_r), 0x1)
+<a name="1597"><span class="lineNum">    1597 </span>            : #define tht_swrst_clr(_s, _r) tht_write((_s), (_r), 0x0)</a>
+<span class="lineNum">    1598 </span>            : int
+<span class="lineNum">    1599 </span><span class="lineNoCov">          0 : tht_sw_reset(struct tht_softc *sc)</span>
+<span class="lineNum">    1600 </span>            : {
+<span class="lineNum">    1601 </span>            :         int                             i;
+<span class="lineNum">    1602 </span>            : 
+<span class="lineNum">    1603 </span>            :         /* this follows SW Reset process in 8.8 of the doco */
+<span class="lineNum">    1604 </span>            : 
+<span class="lineNum">    1605 </span>            :         /* 1. disable rx */
+<span class="lineNum">    1606 </span><span class="lineNoCov">          0 :         tht_clr(sc, THT_REG_RX_FLT, THT_REG_RX_FLT_OSEN);</span>
+<span class="lineNum">    1607 </span>            : 
+<span class="lineNum">    1608 </span>            :         /* 2. initiate port disable */
+<span class="lineNum">    1609 </span><span class="lineNoCov">          0 :         tht_swrst_set(sc, THT_REG_DIS_PRT);</span>
+<span class="lineNum">    1610 </span>            : 
+<span class="lineNum">    1611 </span>            :         /* 3. initiate queue disable */
+<span class="lineNum">    1612 </span><span class="lineNoCov">          0 :         tht_swrst_set(sc, THT_REG_DIS_QU_0);</span>
+<span class="lineNum">    1613 </span><span class="lineNoCov">          0 :         tht_swrst_set(sc, THT_REG_DIS_QU_1);</span>
+<span class="lineNum">    1614 </span>            : 
+<span class="lineNum">    1615 </span>            :         /* 4. wait for successful finish of previous tasks */
+<span class="lineNum">    1616 </span><span class="lineNoCov">          0 :         if (!tht_wait_set(sc, THT_REG_RST_PRT, THT_REG_RST_PRT_ACTIVE, 1000))</span>
+<span class="lineNum">    1617 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1618 </span>            : 
+<span class="lineNum">    1619 </span>            :         /* 5. Reset interrupt registers */
+<span class="lineNum">    1620 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_IMR, 0x0); /* 5.a */</span>
+<span class="lineNum">    1621 </span><span class="lineNoCov">          0 :         tht_read(sc, THT_REG_ISR); /* 5.b */</span>
+<span class="lineNum">    1622 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; THT_NQUEUES; i++) {</span>
+<span class="lineNum">    1623 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_RDINTCM(i), 0x0); /* 5.c/5.d */</span>
+<span class="lineNum">    1624 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_TDINTCM(i), 0x0); /* 5.e */</span>
+<span class="lineNum">    1625 </span>            :         }
+<span class="lineNum">    1626 </span>            : 
+<span class="lineNum">    1627 </span>            :         /* 6. initiate queue reset */
+<span class="lineNum">    1628 </span><span class="lineNoCov">          0 :         tht_swrst_set(sc, THT_REG_RST_QU_0);</span>
+<span class="lineNum">    1629 </span><span class="lineNoCov">          0 :         tht_swrst_set(sc, THT_REG_RST_QU_1);</span>
+<span class="lineNum">    1630 </span>            : 
+<span class="lineNum">    1631 </span>            :         /* 7. initiate port reset */
+<span class="lineNum">    1632 </span><span class="lineNoCov">          0 :         tht_swrst_set(sc, THT_REG_RST_PRT);</span>
+<span class="lineNum">    1633 </span>            : 
+<span class="lineNum">    1634 </span>            :         /* 8. clear txt/rxf/rxd/txf read and write ptrs */
+<span class="lineNum">    1635 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; THT_NQUEUES; i++) {</span>
+<span class="lineNum">    1636 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_TXT_RPTR(i), 0);</span>
+<span class="lineNum">    1637 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_RXF_RPTR(i), 0);</span>
+<span class="lineNum">    1638 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_RXD_RPTR(i), 0);</span>
+<span class="lineNum">    1639 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_TXF_RPTR(i), 0);</span>
+<span class="lineNum">    1640 </span>            : 
+<span class="lineNum">    1641 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_TXT_WPTR(i), 0);</span>
+<span class="lineNum">    1642 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_RXF_WPTR(i), 0);</span>
+<span class="lineNum">    1643 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_RXD_WPTR(i), 0);</span>
+<span class="lineNum">    1644 </span><span class="lineNoCov">          0 :                 tht_write(sc, THT_REG_TXF_WPTR(i), 0);</span>
+<span class="lineNum">    1645 </span>            :         }
+<span class="lineNum">    1646 </span>            : 
+<span class="lineNum">    1647 </span>            :         /* 9. unset port disable */
+<span class="lineNum">    1648 </span><span class="lineNoCov">          0 :         tht_swrst_clr(sc, THT_REG_DIS_PRT);</span>
+<span class="lineNum">    1649 </span>            : 
+<span class="lineNum">    1650 </span>            :         /* 10. unset queue disable */
+<span class="lineNum">    1651 </span><span class="lineNoCov">          0 :         tht_swrst_clr(sc, THT_REG_DIS_QU_0);</span>
+<span class="lineNum">    1652 </span><span class="lineNoCov">          0 :         tht_swrst_clr(sc, THT_REG_DIS_QU_1);</span>
+<span class="lineNum">    1653 </span>            : 
+<span class="lineNum">    1654 </span>            :         /* 11. unset queue reset */
+<span class="lineNum">    1655 </span><span class="lineNoCov">          0 :         tht_swrst_clr(sc, THT_REG_RST_QU_0);</span>
+<span class="lineNum">    1656 </span><span class="lineNoCov">          0 :         tht_swrst_clr(sc, THT_REG_RST_QU_1);</span>
+<span class="lineNum">    1657 </span>            : 
+<span class="lineNum">    1658 </span>            :         /* 12. unset port reset */
+<span class="lineNum">    1659 </span><span class="lineNoCov">          0 :         tht_swrst_clr(sc, THT_REG_RST_PRT);</span>
+<span class="lineNum">    1660 </span>            : 
+<span class="lineNum">    1661 </span>            :         /* 13. enable rx */
+<span class="lineNum">    1662 </span><span class="lineNoCov">          0 :         tht_set(sc, THT_REG_RX_FLT, THT_REG_RX_FLT_OSEN);</span>
+<span class="lineNum">    1663 </span>            : 
+<span class="lineNum">    1664 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1665 </span><span class="lineNoCov">          0 : }</span>
+<a name="1666"><span class="lineNum">    1666 </span>            : </a>
+<span class="lineNum">    1667 </span>            : int
+<span class="lineNum">    1668 </span><span class="lineNoCov">          0 : tht_fw_load(struct tht_softc *sc)</span>
+<span class="lineNum">    1669 </span>            : {
+<span class="lineNum">    1670 </span><span class="lineNoCov">          0 :         struct timeout                  ticker;</span>
+<span class="lineNum">    1671 </span><span class="lineNoCov">          0 :         volatile int                    ok = 1;</span>
+<span class="lineNum">    1672 </span><span class="lineNoCov">          0 :         u_int8_t                        *fw, *buf;</span>
+<span class="lineNum">    1673 </span><span class="lineNoCov">          0 :         size_t                          fwlen, wrlen;</span>
+<span class="lineNum">    1674 </span>            :         int                             error = 1;
+<span class="lineNum">    1675 </span>            : 
+<span class="lineNum">    1676 </span><span class="lineNoCov">          0 :         if (loadfirmware(&quot;tht&quot;, &amp;fw, &amp;fwlen) != 0)</span>
+<span class="lineNum">    1677 </span><span class="lineNoCov">          0 :                 return (1);</span>
+<span class="lineNum">    1678 </span>            : 
+<span class="lineNum">    1679 </span><span class="lineNoCov">          0 :         if ((fwlen % 8) != 0)</span>
+<span class="lineNum">    1680 </span>            :                 goto err;
+<span class="lineNum">    1681 </span>            : 
+<span class="lineNum">    1682 </span><span class="lineNoCov">          0 :         buf = fw;</span>
+<span class="lineNum">    1683 </span><span class="lineNoCov">          0 :         while (fwlen &gt; 0) {</span>
+<span class="lineNum">    1684 </span><span class="lineNoCov">          0 :                 while (tht_fifo_writable(sc, &amp;sc-&gt;sc_txt) &lt;= THT_FIFO_GAP) {</span>
+<span class="lineNum">    1685 </span><span class="lineNoCov">          0 :                         if (tsleep(sc, PCATCH, &quot;thtfw&quot;, 1) == EINTR)</span>
+<span class="lineNum">    1686 </span>            :                                 goto err;
+<span class="lineNum">    1687 </span>            :                 }
+<span class="lineNum">    1688 </span>            : 
+<span class="lineNum">    1689 </span><span class="lineNoCov">          0 :                 wrlen = MIN(sc-&gt;sc_txt.tf_ready - THT_FIFO_GAP, fwlen);</span>
+<span class="lineNum">    1690 </span><span class="lineNoCov">          0 :                 tht_fifo_pre(sc, &amp;sc-&gt;sc_txt);</span>
+<span class="lineNum">    1691 </span><span class="lineNoCov">          0 :                 tht_fifo_write(sc, &amp;sc-&gt;sc_txt, buf, wrlen);</span>
+<span class="lineNum">    1692 </span><span class="lineNoCov">          0 :                 tht_fifo_post(sc, &amp;sc-&gt;sc_txt);</span>
+<span class="lineNum">    1693 </span>            : 
+<span class="lineNum">    1694 </span><span class="lineNoCov">          0 :                 fwlen -= wrlen;</span>
+<span class="lineNum">    1695 </span><span class="lineNoCov">          0 :                 buf += wrlen;</span>
+<span class="lineNum">    1696 </span>            :         }
+<span class="lineNum">    1697 </span>            : 
+<span class="lineNum">    1698 </span><span class="lineNoCov">          0 :         timeout_set(&amp;ticker, tht_fw_tick, (void *)&amp;ok);</span>
+<span class="lineNum">    1699 </span><span class="lineNoCov">          0 :         timeout_add_sec(&amp;ticker, 2);</span>
+<span class="lineNum">    1700 </span><span class="lineNoCov">          0 :         while (ok) {</span>
+<span class="lineNum">    1701 </span><span class="lineNoCov">          0 :                 if (tht_read(sc, THT_REG_INIT_STATUS) != 0) {</span>
+<span class="lineNum">    1702 </span>            :                         error = 0;
+<span class="lineNum">    1703 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">    1704 </span>            :                 }
+<span class="lineNum">    1705 </span>            : 
+<span class="lineNum">    1706 </span><span class="lineNoCov">          0 :                 if (tsleep(sc, PCATCH, &quot;thtinit&quot;, 1) == EINTR)</span>
+<span class="lineNum">    1707 </span>            :                         goto err;
+<span class="lineNum">    1708 </span>            :         }
+<span class="lineNum">    1709 </span><span class="lineNoCov">          0 :         timeout_del(&amp;ticker);</span>
+<span class="lineNum">    1710 </span>            : 
+<span class="lineNum">    1711 </span><span class="lineNoCov">          0 :         tht_write(sc, THT_REG_INIT_SEMAPHORE, 0x1);</span>
+<span class="lineNum">    1712 </span>            : 
+<span class="lineNum">    1713 </span>            : err:
+<span class="lineNum">    1714 </span><span class="lineNoCov">          0 :         free(fw, M_DEVBUF, fwlen);</span>
+<span class="lineNum">    1715 </span><span class="lineNoCov">          0 :         return (error);</span>
+<span class="lineNum">    1716 </span><span class="lineNoCov">          0 : }</span>
+<a name="1717"><span class="lineNum">    1717 </span>            : </a>
+<span class="lineNum">    1718 </span>            : void
+<span class="lineNum">    1719 </span><span class="lineNoCov">          0 : tht_fw_tick(void *arg)</span>
+<span class="lineNum">    1720 </span>            : {
+<span class="lineNum">    1721 </span><span class="lineNoCov">          0 :         volatile int                    *ok = arg;</span>
+<span class="lineNum">    1722 </span>            : 
+<span class="lineNum">    1723 </span><span class="lineNoCov">          0 :         *ok = 0;</span>
+<span class="lineNum">    1724 </span><span class="lineNoCov">          0 : }</span>
+<a name="1725"><span class="lineNum">    1725 </span>            : </a>
+<span class="lineNum">    1726 </span>            : void
+<span class="lineNum">    1727 </span><span class="lineNoCov">          0 : tht_link_state(struct tht_softc *sc)</span>
+<span class="lineNum">    1728 </span>            : {
+<span class="lineNum">    1729 </span>            :         static const struct timeval     interval = { 0, 10000 };
+<span class="lineNum">    1730 </span><span class="lineNoCov">          0 :         struct ifnet                    *ifp = &amp;sc-&gt;sc_ac.ac_if;</span>
+<span class="lineNum">    1731 </span>            :         int                             link_state = LINK_STATE_DOWN;
+<span class="lineNum">    1732 </span>            : 
+<span class="lineNum">    1733 </span><span class="lineNoCov">          0 :         if (!ratecheck(&amp;sc-&gt;sc_mediacheck, &amp;interval))</span>
+<span class="lineNum">    1734 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1735 </span>            : 
+<span class="lineNum">    1736 </span><span class="lineNoCov">          0 :         if (tht_read(sc, THT_REG_MAC_LNK_STAT) &amp; THT_REG_MAC_LNK_STAT_LINK)</span>
+<span class="lineNum">    1737 </span><span class="lineNoCov">          0 :                 link_state = LINK_STATE_FULL_DUPLEX;</span>
+<span class="lineNum">    1738 </span>            : 
+<span class="lineNum">    1739 </span><span class="lineNoCov">          0 :         if (ifp-&gt;if_link_state != link_state) {</span>
+<span class="lineNum">    1740 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_link_state = link_state;</span>
+<span class="lineNum">    1741 </span><span class="lineNoCov">          0 :                 if_link_state_change(ifp);</span>
+<span class="lineNum">    1742 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1743 </span>            : 
+<span class="lineNum">    1744 </span><span class="lineNoCov">          0 :         if (LINK_STATE_IS_UP(ifp-&gt;if_link_state))</span>
+<span class="lineNum">    1745 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_baudrate = IF_Gbps(10);</span>
+<span class="lineNum">    1746 </span>            :         else
+<span class="lineNum">    1747 </span><span class="lineNoCov">          0 :                 ifp-&gt;if_baudrate = 0;</span>
+<span class="lineNum">    1748 </span><span class="lineNoCov">          0 : }</span>
+<a name="1749"><span class="lineNum">    1749 </span>            : </a>
+<span class="lineNum">    1750 </span>            : u_int32_t
+<span class="lineNum">    1751 </span><span class="lineNoCov">          0 : tht_read(struct tht_softc *sc, bus_size_t r)</span>
+<span class="lineNum">    1752 </span>            : {
+<span class="lineNum">    1753 </span><span class="lineNoCov">          0 :         bus_space_barrier(sc-&gt;sc_thtc-&gt;sc_memt, sc-&gt;sc_memh, r, 4,</span>
+<span class="lineNum">    1754 </span>            :             BUS_SPACE_BARRIER_READ);
+<span class="lineNum">    1755 </span><span class="lineNoCov">          0 :         return (bus_space_read_4(sc-&gt;sc_thtc-&gt;sc_memt, sc-&gt;sc_memh, r));</span>
+<span class="lineNum">    1756 </span>            : }
+<a name="1757"><span class="lineNum">    1757 </span>            : </a>
+<span class="lineNum">    1758 </span>            : void
+<span class="lineNum">    1759 </span><span class="lineNoCov">          0 : tht_write(struct tht_softc *sc, bus_size_t r, u_int32_t v)</span>
+<span class="lineNum">    1760 </span>            : {
+<span class="lineNum">    1761 </span><span class="lineNoCov">          0 :         bus_space_write_4(sc-&gt;sc_thtc-&gt;sc_memt, sc-&gt;sc_memh, r, v);</span>
+<span class="lineNum">    1762 </span><span class="lineNoCov">          0 :         bus_space_barrier(sc-&gt;sc_thtc-&gt;sc_memt, sc-&gt;sc_memh, r, 4,</span>
+<span class="lineNum">    1763 </span>            :             BUS_SPACE_BARRIER_WRITE);
+<span class="lineNum">    1764 </span><span class="lineNoCov">          0 : }</span>
+<a name="1765"><span class="lineNum">    1765 </span>            : </a>
+<span class="lineNum">    1766 </span>            : void
+<span class="lineNum">    1767 </span><span class="lineNoCov">          0 : tht_write_region(struct tht_softc *sc, bus_size_t r, void *buf, size_t len)</span>
+<span class="lineNum">    1768 </span>            : {
+<span class="lineNum">    1769 </span><span class="lineNoCov">          0 :         bus_space_write_raw_region_4(sc-&gt;sc_thtc-&gt;sc_memt, sc-&gt;sc_memh, r,</span>
+<span class="lineNum">    1770 </span>            :             buf, len);
+<span class="lineNum">    1771 </span><span class="lineNoCov">          0 :         bus_space_barrier(sc-&gt;sc_thtc-&gt;sc_memt, sc-&gt;sc_memh, r, len,</span>
+<span class="lineNum">    1772 </span>            :             BUS_SPACE_BARRIER_WRITE);
+<span class="lineNum">    1773 </span><span class="lineNoCov">          0 : }</span>
+<a name="1774"><span class="lineNum">    1774 </span>            : </a>
+<span class="lineNum">    1775 </span>            : int
+<span class="lineNum">    1776 </span><span class="lineNoCov">          0 : tht_wait_eq(struct tht_softc *sc, bus_size_t r, u_int32_t m, u_int32_t v,</span>
+<span class="lineNum">    1777 </span>            :     int timeout)
+<span class="lineNum">    1778 </span>            : {
+<span class="lineNum">    1779 </span><span class="lineNoCov">          0 :         while ((tht_read(sc, r) &amp; m) != v) {</span>
+<span class="lineNum">    1780 </span><span class="lineNoCov">          0 :                 if (timeout == 0)</span>
+<span class="lineNum">    1781 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">    1782 </span>            : 
+<span class="lineNum">    1783 </span><span class="lineNoCov">          0 :                 delay(1000);</span>
+<span class="lineNum">    1784 </span><span class="lineNoCov">          0 :                 timeout--;</span>
+<span class="lineNum">    1785 </span>            :         }
+<span class="lineNum">    1786 </span>            : 
+<span class="lineNum">    1787 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">    1788 </span><span class="lineNoCov">          0 : }</span>
+<a name="1789"><span class="lineNum">    1789 </span>            : </a>
+<span class="lineNum">    1790 </span>            : int
+<span class="lineNum">    1791 </span><span class="lineNoCov">          0 : tht_wait_ne(struct tht_softc *sc, bus_size_t r, u_int32_t m, u_int32_t v,</span>
+<span class="lineNum">    1792 </span>            :     int timeout)
+<span class="lineNum">    1793 </span>            : {
+<span class="lineNum">    1794 </span><span class="lineNoCov">          0 :         while ((tht_read(sc, r) &amp; m) == v) {</span>
+<span class="lineNum">    1795 </span><span class="lineNoCov">          0 :                 if (timeout == 0)</span>
+<span class="lineNum">    1796 </span><span class="lineNoCov">          0 :                         return (0);</span>
+<span class="lineNum">    1797 </span>            : 
+<span class="lineNum">    1798 </span><span class="lineNoCov">          0 :                 delay(1000);</span>
+<span class="lineNum">    1799 </span><span class="lineNoCov">          0 :                 timeout--;</span>
+<span class="lineNum">    1800 </span>            :         }
+<span class="lineNum">    1801 </span>            : 
+<span class="lineNum">    1802 </span><span class="lineNoCov">          0 :         return (1);</span>
+<span class="lineNum">    1803 </span><span class="lineNoCov">          0 : }</span>
+<a name="1804"><span class="lineNum">    1804 </span>            : </a>
+<span class="lineNum">    1805 </span>            : struct tht_dmamem *
+<span class="lineNum">    1806 </span><span class="lineNoCov">          0 : tht_dmamem_alloc(struct tht_softc *sc, bus_size_t size, bus_size_t align)</span>
+<span class="lineNum">    1807 </span>            : {
+<span class="lineNum">    1808 </span><span class="lineNoCov">          0 :         bus_dma_tag_t                   dmat = sc-&gt;sc_thtc-&gt;sc_dmat;</span>
+<span class="lineNum">    1809 </span>            :         struct tht_dmamem               *tdm;
+<span class="lineNum">    1810 </span><span class="lineNoCov">          0 :         int                             nsegs;</span>
+<span class="lineNum">    1811 </span>            : 
+<span class="lineNum">    1812 </span><span class="lineNoCov">          0 :         tdm = malloc(sizeof(struct tht_dmamem), M_DEVBUF, M_WAITOK | M_ZERO);</span>
+<span class="lineNum">    1813 </span><span class="lineNoCov">          0 :         tdm-&gt;tdm_size = size;</span>
+<span class="lineNum">    1814 </span>            : 
+<span class="lineNum">    1815 </span><span class="lineNoCov">          0 :         if (bus_dmamap_create(dmat, size, 1, size, 0,</span>
+<span class="lineNum">    1816 </span><span class="lineNoCov">          0 :             BUS_DMA_WAITOK | BUS_DMA_ALLOCNOW, &amp;tdm-&gt;tdm_map) != 0)</span>
+<span class="lineNum">    1817 </span>            :                 goto tdmfree;
+<span class="lineNum">    1818 </span>            : 
+<span class="lineNum">    1819 </span><span class="lineNoCov">          0 :         if (bus_dmamem_alloc(dmat, size, align, 0, &amp;tdm-&gt;tdm_seg, 1, &amp;nsegs,</span>
+<span class="lineNum">    1820 </span><span class="lineNoCov">          0 :             BUS_DMA_WAITOK | BUS_DMA_ZERO) != 0)</span>
+<span class="lineNum">    1821 </span>            :                 goto destroy;
+<span class="lineNum">    1822 </span>            : 
+<span class="lineNum">    1823 </span><span class="lineNoCov">          0 :         if (bus_dmamem_map(dmat, &amp;tdm-&gt;tdm_seg, nsegs, size, &amp;tdm-&gt;tdm_kva,</span>
+<span class="lineNum">    1824 </span><span class="lineNoCov">          0 :             BUS_DMA_WAITOK) != 0)</span>
+<span class="lineNum">    1825 </span>            :                 goto free;
+<span class="lineNum">    1826 </span>            : 
+<span class="lineNum">    1827 </span><span class="lineNoCov">          0 :         if (bus_dmamap_load(dmat, tdm-&gt;tdm_map, tdm-&gt;tdm_kva, size,</span>
+<span class="lineNum">    1828 </span><span class="lineNoCov">          0 :             NULL, BUS_DMA_WAITOK) != 0)</span>
+<span class="lineNum">    1829 </span>            :                 goto unmap;
+<span class="lineNum">    1830 </span>            : 
+<span class="lineNum">    1831 </span><span class="lineNoCov">          0 :         return (tdm);</span>
+<span class="lineNum">    1832 </span>            : 
+<span class="lineNum">    1833 </span>            : unmap:
+<span class="lineNum">    1834 </span><span class="lineNoCov">          0 :         bus_dmamem_unmap(dmat, tdm-&gt;tdm_kva, size);</span>
+<span class="lineNum">    1835 </span>            : free:
+<span class="lineNum">    1836 </span><span class="lineNoCov">          0 :         bus_dmamem_free(dmat, &amp;tdm-&gt;tdm_seg, 1);</span>
+<span class="lineNum">    1837 </span>            : destroy:
+<span class="lineNum">    1838 </span><span class="lineNoCov">          0 :         bus_dmamap_destroy(dmat, tdm-&gt;tdm_map);</span>
+<span class="lineNum">    1839 </span>            : tdmfree:
+<span class="lineNum">    1840 </span><span class="lineNoCov">          0 :         free(tdm, M_DEVBUF, 0);</span>
+<span class="lineNum">    1841 </span>            : 
+<span class="lineNum">    1842 </span><span class="lineNoCov">          0 :         return (NULL);</span>
+<span class="lineNum">    1843 </span><span class="lineNoCov">          0 : }</span>
+<a name="1844"><span class="lineNum">    1844 </span>            : </a>
+<span class="lineNum">    1845 </span>            : void
+<span class="lineNum">    1846 </span><span class="lineNoCov">          0 : tht_dmamem_free(struct tht_softc *sc, struct tht_dmamem *tdm)</span>
+<span class="lineNum">    1847 </span>            : {
+<span class="lineNum">    1848 </span><span class="lineNoCov">          0 :         bus_dma_tag_t                   dmat = sc-&gt;sc_thtc-&gt;sc_dmat;</span>
+<span class="lineNum">    1849 </span>            : 
+<span class="lineNum">    1850 </span><span class="lineNoCov">          0 :         bus_dmamap_unload(dmat, tdm-&gt;tdm_map);</span>
+<span class="lineNum">    1851 </span><span class="lineNoCov">          0 :         bus_dmamem_unmap(dmat, tdm-&gt;tdm_kva, tdm-&gt;tdm_size);</span>
+<span class="lineNum">    1852 </span><span class="lineNoCov">          0 :         bus_dmamem_free(dmat, &amp;tdm-&gt;tdm_seg, 1);</span>
+<span class="lineNum">    1853 </span><span class="lineNoCov">          0 :         bus_dmamap_destroy(dmat, tdm-&gt;tdm_map);</span>
+<span class="lineNum">    1854 </span><span class="lineNoCov">          0 :         free(tdm, M_DEVBUF, 0);</span>
+<span class="lineNum">    1855 </span><span class="lineNoCov">          0 : }</span>
+<a name="1856"><span class="lineNum">    1856 </span>            : </a>
+<span class="lineNum">    1857 </span>            : int
+<span class="lineNum">    1858 </span><span class="lineNoCov">          0 : tht_pkt_alloc(struct tht_softc *sc, struct tht_pkt_list *tpl, int npkts,</span>
+<span class="lineNum">    1859 </span>            :     int nsegs)
+<span class="lineNum">    1860 </span>            : {
+<span class="lineNum">    1861 </span><span class="lineNoCov">          0 :         bus_dma_tag_t                   dmat = sc-&gt;sc_thtc-&gt;sc_dmat;</span>
+<span class="lineNum">    1862 </span>            :         struct tht_pkt                  *pkt;
+<span class="lineNum">    1863 </span>            :         int                             i;
+<span class="lineNum">    1864 </span>            : 
+<span class="lineNum">    1865 </span><span class="lineNoCov">          0 :         tpl-&gt;tpl_pkts = mallocarray(npkts, sizeof(struct tht_pkt),</span>
+<span class="lineNum">    1866 </span>            :             M_DEVBUF, M_WAITOK | M_ZERO);
+<span class="lineNum">    1867 </span>            : 
+<span class="lineNum">    1868 </span><span class="lineNoCov">          0 :         TAILQ_INIT(&amp;tpl-&gt;tpl_free);</span>
+<span class="lineNum">    1869 </span><span class="lineNoCov">          0 :         TAILQ_INIT(&amp;tpl-&gt;tpl_used);</span>
+<span class="lineNum">    1870 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; npkts; i++) {</span>
+<span class="lineNum">    1871 </span><span class="lineNoCov">          0 :                 pkt = &amp;tpl-&gt;tpl_pkts[i];</span>
+<span class="lineNum">    1872 </span>            : 
+<span class="lineNum">    1873 </span><span class="lineNoCov">          0 :                 pkt-&gt;tp_id = i;</span>
+<span class="lineNum">    1874 </span><span class="lineNoCov">          0 :                 if (bus_dmamap_create(dmat, THT_PBD_PKTLEN, nsegs,</span>
+<span class="lineNum">    1875 </span>            :                     THT_PBD_PKTLEN, 0, BUS_DMA_WAITOK | BUS_DMA_ALLOCNOW,
+<span class="lineNum">    1876 </span><span class="lineNoCov">          0 :                     &amp;pkt-&gt;tp_dmap) != 0) {</span>
+<span class="lineNum">    1877 </span><span class="lineNoCov">          0 :                         tht_pkt_free(sc, tpl);</span>
+<span class="lineNum">    1878 </span><span class="lineNoCov">          0 :                         return (1);</span>
+<span class="lineNum">    1879 </span>            :                 }
+<span class="lineNum">    1880 </span>            : 
+<span class="lineNum">    1881 </span><span class="lineNoCov">          0 :                 TAILQ_INSERT_TAIL(&amp;tpl-&gt;tpl_free, pkt, tp_link);</span>
+<span class="lineNum">    1882 </span>            :         }
+<span class="lineNum">    1883 </span>            : 
+<span class="lineNum">    1884 </span><span class="lineNoCov">          0 :         return (0);</span>
+<span class="lineNum">    1885 </span><span class="lineNoCov">          0 : }</span>
+<a name="1886"><span class="lineNum">    1886 </span>            : </a>
+<span class="lineNum">    1887 </span>            : void
+<span class="lineNum">    1888 </span><span class="lineNoCov">          0 : tht_pkt_free(struct tht_softc *sc, struct tht_pkt_list *tpl)</span>
+<span class="lineNum">    1889 </span>            : {
+<span class="lineNum">    1890 </span><span class="lineNoCov">          0 :         bus_dma_tag_t                   dmat = sc-&gt;sc_thtc-&gt;sc_dmat;</span>
+<span class="lineNum">    1891 </span>            :         struct tht_pkt                  *pkt;
+<span class="lineNum">    1892 </span>            : 
+<span class="lineNum">    1893 </span><span class="lineNoCov">          0 :         while ((pkt = tht_pkt_get(tpl)) != NULL)</span>
+<span class="lineNum">    1894 </span><span class="lineNoCov">          0 :                 bus_dmamap_destroy(dmat, pkt-&gt;tp_dmap);</span>
+<span class="lineNum">    1895 </span><span class="lineNoCov">          0 :         free(tpl-&gt;tpl_pkts, M_DEVBUF, 0);</span>
+<span class="lineNum">    1896 </span><span class="lineNoCov">          0 :         tpl-&gt;tpl_pkts = NULL;</span>
+<span class="lineNum">    1897 </span><span class="lineNoCov">          0 : }</span>
+<a name="1898"><span class="lineNum">    1898 </span>            : </a>
+<span class="lineNum">    1899 </span>            : void
+<span class="lineNum">    1900 </span><span class="lineNoCov">          0 : tht_pkt_put(struct tht_pkt_list *tpl, struct tht_pkt *pkt)</span>
+<span class="lineNum">    1901 </span>            : {
+<span class="lineNum">    1902 </span><span class="lineNoCov">          0 :         TAILQ_REMOVE(&amp;tpl-&gt;tpl_used, pkt, tp_link);</span>
+<span class="lineNum">    1903 </span><span class="lineNoCov">          0 :         TAILQ_INSERT_TAIL(&amp;tpl-&gt;tpl_free, pkt, tp_link);</span>
+<span class="lineNum">    1904 </span><span class="lineNoCov">          0 : }</span>
+<a name="1905"><span class="lineNum">    1905 </span>            : </a>
+<span class="lineNum">    1906 </span>            : struct tht_pkt *
+<span class="lineNum">    1907 </span><span class="lineNoCov">          0 : tht_pkt_get(struct tht_pkt_list *tpl)</span>
+<span class="lineNum">    1908 </span>            : {
+<span class="lineNum">    1909 </span>            :         struct tht_pkt                  *pkt;
+<span class="lineNum">    1910 </span>            : 
+<span class="lineNum">    1911 </span><span class="lineNoCov">          0 :         pkt = TAILQ_FIRST(&amp;tpl-&gt;tpl_free);</span>
+<span class="lineNum">    1912 </span><span class="lineNoCov">          0 :         if (pkt != NULL) {</span>
+<span class="lineNum">    1913 </span><span class="lineNoCov">          0 :                 TAILQ_REMOVE(&amp;tpl-&gt;tpl_free, pkt, tp_link);</span>
+<span class="lineNum">    1914 </span><span class="lineNoCov">          0 :                 TAILQ_INSERT_TAIL(&amp;tpl-&gt;tpl_used, pkt, tp_link);</span>
+<span class="lineNum">    1915 </span>            : 
+<span class="lineNum">    1916 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1917 </span>            : 
+<span class="lineNum">    1918 </span><span class="lineNoCov">          0 :         return (pkt);</span>
+<span class="lineNum">    1919 </span>            : }
+<a name="1920"><span class="lineNum">    1920 </span>            : </a>
+<span class="lineNum">    1921 </span>            : struct tht_pkt *
+<span class="lineNum">    1922 </span><span class="lineNoCov">          0 : tht_pkt_used(struct tht_pkt_list *tpl)</span>
+<span class="lineNum">    1923 </span>            : {
+<span class="lineNum">    1924 </span><span class="lineNoCov">          0 :         return (TAILQ_FIRST(&amp;tpl-&gt;tpl_used));</span>
+<span class="lineNum">    1925 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

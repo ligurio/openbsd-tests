@@ -1,0 +1,949 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/drm_mm.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../index.html">top level</a> - <a href="index.html">dev/pci/drm</a> - drm_mm.c<span style="font-size: 80%;"> (source / <a href="drm_mm.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">296</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">19</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /**************************************************************************</a>
+<span class="lineNum">       2 </span>            :  *
+<span class="lineNum">       3 </span>            :  * Copyright 2006 Tungsten Graphics, Inc., Bismarck, ND., USA.
+<span class="lineNum">       4 </span>            :  * All Rights Reserved.
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       7 </span>            :  * copy of this software and associated documentation files (the
+<span class="lineNum">       8 </span>            :  * &quot;Software&quot;), to deal in the Software without restriction, including
+<span class="lineNum">       9 </span>            :  * without limitation the rights to use, copy, modify, merge, publish,
+<span class="lineNum">      10 </span>            :  * distribute, sub license, and/or sell copies of the Software, and to
+<span class="lineNum">      11 </span>            :  * permit persons to whom the Software is furnished to do so, subject to
+<span class="lineNum">      12 </span>            :  * the following conditions:
+<span class="lineNum">      13 </span>            :  *
+<span class="lineNum">      14 </span>            :  * The above copyright notice and this permission notice (including the
+<span class="lineNum">      15 </span>            :  * next paragraph) shall be included in all copies or substantial portions
+<span class="lineNum">      16 </span>            :  * of the Software.
+<span class="lineNum">      17 </span>            :  *
+<span class="lineNum">      18 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      19 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      20 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
+<span class="lineNum">      21 </span>            :  * THE COPYRIGHT HOLDERS, AUTHORS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM,
+<span class="lineNum">      22 </span>            :  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+<span class="lineNum">      23 </span>            :  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+<span class="lineNum">      24 </span>            :  * USE OR OTHER DEALINGS IN THE SOFTWARE.
+<span class="lineNum">      25 </span>            :  *
+<span class="lineNum">      26 </span>            :  *
+<span class="lineNum">      27 </span>            :  **************************************************************************/
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span>            : /*
+<span class="lineNum">      30 </span>            :  * Generic simple memory manager implementation. Intended to be used as a base
+<span class="lineNum">      31 </span>            :  * class implementation for more advanced memory managers.
+<span class="lineNum">      32 </span>            :  *
+<span class="lineNum">      33 </span>            :  * Note that the algorithm used is quite simple and there might be substantial
+<span class="lineNum">      34 </span>            :  * performance gains if a smarter free list is implemented. Currently it is just an
+<span class="lineNum">      35 </span>            :  * unordered stack of free regions. This could easily be improved if an RB-tree
+<span class="lineNum">      36 </span>            :  * is used instead. At least if we expect heavy fragmentation.
+<span class="lineNum">      37 </span>            :  *
+<span class="lineNum">      38 </span>            :  * Aligned allocations can also see improvement.
+<span class="lineNum">      39 </span>            :  *
+<span class="lineNum">      40 </span>            :  * Authors:
+<span class="lineNum">      41 </span>            :  * Thomas Hellström &lt;thomas-at-tungstengraphics-dot-com&gt;
+<span class="lineNum">      42 </span>            :  */
+<span class="lineNum">      43 </span>            : 
+<span class="lineNum">      44 </span>            : #include &lt;dev/pci/drm/drmP.h&gt;
+<span class="lineNum">      45 </span>            : #include &lt;dev/pci/drm/drm_mm.h&gt;
+<span class="lineNum">      46 </span>            : #ifdef __linux__
+<span class="lineNum">      47 </span>            : #include &lt;linux/slab.h&gt;
+<span class="lineNum">      48 </span>            : #include &lt;linux/seq_file.h&gt;
+<span class="lineNum">      49 </span>            : #include &lt;linux/export.h&gt;
+<span class="lineNum">      50 </span>            : #endif
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : /**
+<span class="lineNum">      53 </span>            :  * DOC: Overview
+<span class="lineNum">      54 </span>            :  *
+<span class="lineNum">      55 </span>            :  * drm_mm provides a simple range allocator. The drivers are free to use the
+<span class="lineNum">      56 </span>            :  * resource allocator from the linux core if it suits them, the upside of drm_mm
+<span class="lineNum">      57 </span>            :  * is that it's in the DRM core. Which means that it's easier to extend for
+<span class="lineNum">      58 </span>            :  * some of the crazier special purpose needs of gpus.
+<span class="lineNum">      59 </span>            :  *
+<span class="lineNum">      60 </span>            :  * The main data struct is &amp;drm_mm, allocations are tracked in &amp;drm_mm_node.
+<span class="lineNum">      61 </span>            :  * Drivers are free to embed either of them into their own suitable
+<span class="lineNum">      62 </span>            :  * datastructures. drm_mm itself will not do any allocations of its own, so if
+<span class="lineNum">      63 </span>            :  * drivers choose not to embed nodes they need to still allocate them
+<span class="lineNum">      64 </span>            :  * themselves.
+<span class="lineNum">      65 </span>            :  *
+<span class="lineNum">      66 </span>            :  * The range allocator also supports reservation of preallocated blocks. This is
+<span class="lineNum">      67 </span>            :  * useful for taking over initial mode setting configurations from the firmware,
+<span class="lineNum">      68 </span>            :  * where an object needs to be created which exactly matches the firmware's
+<span class="lineNum">      69 </span>            :  * scanout target. As long as the range is still free it can be inserted anytime
+<span class="lineNum">      70 </span>            :  * after the allocator is initialized, which helps with avoiding looped
+<span class="lineNum">      71 </span>            :  * depencies in the driver load sequence.
+<span class="lineNum">      72 </span>            :  *
+<span class="lineNum">      73 </span>            :  * drm_mm maintains a stack of most recently freed holes, which of all
+<span class="lineNum">      74 </span>            :  * simplistic datastructures seems to be a fairly decent approach to clustering
+<span class="lineNum">      75 </span>            :  * allocations and avoiding too much fragmentation. This means free space
+<span class="lineNum">      76 </span>            :  * searches are O(num_holes). Given that all the fancy features drm_mm supports
+<span class="lineNum">      77 </span>            :  * something better would be fairly complex and since gfx thrashing is a fairly
+<span class="lineNum">      78 </span>            :  * steep cliff not a real concern. Removing a node again is O(1).
+<span class="lineNum">      79 </span>            :  *
+<span class="lineNum">      80 </span>            :  * drm_mm supports a few features: Alignment and range restrictions can be
+<span class="lineNum">      81 </span>            :  * supplied. Further more every &amp;drm_mm_node has a color value (which is just an
+<span class="lineNum">      82 </span>            :  * opaqua unsigned long) which in conjunction with a driver callback can be used
+<span class="lineNum">      83 </span>            :  * to implement sophisticated placement restrictions. The i915 DRM driver uses
+<span class="lineNum">      84 </span>            :  * this to implement guard pages between incompatible caching domains in the
+<span class="lineNum">      85 </span>            :  * graphics TT.
+<span class="lineNum">      86 </span>            :  *
+<span class="lineNum">      87 </span>            :  * Two behaviors are supported for searching and allocating: bottom-up and top-down.
+<span class="lineNum">      88 </span>            :  * The default is bottom-up. Top-down allocation can be used if the memory area
+<span class="lineNum">      89 </span>            :  * has different restrictions, or just to reduce fragmentation.
+<span class="lineNum">      90 </span>            :  *
+<span class="lineNum">      91 </span>            :  * Finally iteration helpers to walk all nodes and all holes are provided as are
+<span class="lineNum">      92 </span>            :  * some basic allocator dumpers for debugging.
+<span class="lineNum">      93 </span>            :  */
+<span class="lineNum">      94 </span>            : 
+<span class="lineNum">      95 </span>            : static struct drm_mm_node *drm_mm_search_free_generic(const struct drm_mm *mm,
+<span class="lineNum">      96 </span>            :                                                 u64 size,
+<span class="lineNum">      97 </span>            :                                                 unsigned alignment,
+<span class="lineNum">      98 </span>            :                                                 unsigned long color,
+<span class="lineNum">      99 </span>            :                                                 enum drm_mm_search_flags flags);
+<span class="lineNum">     100 </span>            : static struct drm_mm_node *drm_mm_search_free_in_range_generic(const struct drm_mm *mm,
+<span class="lineNum">     101 </span>            :                                                 u64 size,
+<span class="lineNum">     102 </span>            :                                                 unsigned alignment,
+<span class="lineNum">     103 </span>            :                                                 unsigned long color,
+<span class="lineNum">     104 </span>            :                                                 u64 start,
+<span class="lineNum">     105 </span>            :                                                 u64 end,
+<a name="106"><span class="lineNum">     106 </span>            :                                                 enum drm_mm_search_flags flags);</a>
+<span class="lineNum">     107 </span>            : 
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 : static void drm_mm_insert_helper(struct drm_mm_node *hole_node,</span>
+<span class="lineNum">     109 </span>            :                                  struct drm_mm_node *node,
+<span class="lineNum">     110 </span>            :                                  u64 size, unsigned alignment,
+<span class="lineNum">     111 </span>            :                                  unsigned long color,
+<span class="lineNum">     112 </span>            :                                  enum drm_mm_allocator_flags flags)
+<span class="lineNum">     113 </span>            : {
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 :         struct drm_mm *mm = hole_node-&gt;mm;</span>
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :         u64 hole_start = drm_mm_hole_node_start(hole_node);</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :         u64 hole_end = drm_mm_hole_node_end(hole_node);</span>
+<span class="lineNum">     117 </span><span class="lineNoCov">          0 :         u64 adj_start = hole_start;</span>
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :         u64 adj_end = hole_end;</span>
+<span class="lineNum">     119 </span>            : 
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :         BUG_ON(node-&gt;allocated);</span>
+<span class="lineNum">     121 </span>            : 
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :         if (mm-&gt;color_adjust)</span>
+<span class="lineNum">     123 </span><span class="lineNoCov">          0 :                 mm-&gt;color_adjust(hole_node, color, &amp;adj_start, &amp;adj_end);</span>
+<span class="lineNum">     124 </span>            : 
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :         if (flags &amp; DRM_MM_CREATE_TOP)</span>
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :                 adj_start = adj_end - size;</span>
+<span class="lineNum">     127 </span>            : 
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :         if (alignment) {</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :                 u64 tmp = adj_start;</span>
+<span class="lineNum">     130 </span>            :                 unsigned rem;
+<span class="lineNum">     131 </span>            : 
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :                 rem = do_div(tmp, alignment);</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :                 if (rem) {</span>
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :                         if (flags &amp; DRM_MM_CREATE_TOP)</span>
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :                                 adj_start -= rem;</span>
+<span class="lineNum">     136 </span>            :                         else
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :                                 adj_start += alignment - rem;</span>
+<span class="lineNum">     138 </span>            :                 }
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     140 </span>            : 
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :         BUG_ON(adj_start &lt; hole_start);</span>
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :         BUG_ON(adj_end &gt; hole_end);</span>
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :         if (adj_start == hole_start) {</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :                 hole_node-&gt;hole_follows = 0;</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :                 list_del(&amp;hole_node-&gt;hole_stack);</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     148 </span>            : 
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :         node-&gt;start = adj_start;</span>
+<span class="lineNum">     150 </span><span class="lineNoCov">          0 :         node-&gt;size = size;</span>
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :         node-&gt;mm = mm;</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         node-&gt;color = color;</span>
+<span class="lineNum">     153 </span><span class="lineNoCov">          0 :         node-&gt;allocated = 1;</span>
+<span class="lineNum">     154 </span>            : 
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;node-&gt;hole_stack);</span>
+<span class="lineNum">     156 </span><span class="lineNoCov">          0 :         list_add(&amp;node-&gt;node_list, &amp;hole_node-&gt;node_list);</span>
+<span class="lineNum">     157 </span>            : 
+<span class="lineNum">     158 </span><span class="lineNoCov">          0 :         BUG_ON(node-&gt;start + node-&gt;size &gt; adj_end);</span>
+<span class="lineNum">     159 </span>            : 
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :         node-&gt;hole_follows = 0;</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :         if (__drm_mm_hole_node_start(node) &lt; hole_end) {</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                 list_add(&amp;node-&gt;hole_stack, &amp;mm-&gt;hole_stack);</span>
+<span class="lineNum">     163 </span><span class="lineNoCov">          0 :                 node-&gt;hole_follows = 1;</span>
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     165 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     166 </span>            : 
+<span class="lineNum">     167 </span>            : /**
+<span class="lineNum">     168 </span>            :  * drm_mm_reserve_node - insert an pre-initialized node
+<span class="lineNum">     169 </span>            :  * @mm: drm_mm allocator to insert @node into
+<span class="lineNum">     170 </span>            :  * @node: drm_mm_node to insert
+<span class="lineNum">     171 </span>            :  *
+<span class="lineNum">     172 </span>            :  * This functions inserts an already set-up drm_mm_node into the allocator,
+<span class="lineNum">     173 </span>            :  * meaning that start, size and color must be set by the caller. This is useful
+<span class="lineNum">     174 </span>            :  * to initialize the allocator with preallocated objects which must be set-up
+<span class="lineNum">     175 </span>            :  * before the range allocator can be set-up, e.g. when taking over a firmware
+<span class="lineNum">     176 </span>            :  * framebuffer.
+<span class="lineNum">     177 </span>            :  *
+<span class="lineNum">     178 </span>            :  * Returns:
+<a name="179"><span class="lineNum">     179 </span>            :  * 0 on success, -ENOSPC if there's no hole where @node is.</a>
+<span class="lineNum">     180 </span>            :  */
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 : int drm_mm_reserve_node(struct drm_mm *mm, struct drm_mm_node *node)</span>
+<span class="lineNum">     182 </span>            : {
+<span class="lineNum">     183 </span>            :         struct drm_mm_node *hole;
+<span class="lineNum">     184 </span>            :         u64 end;
+<span class="lineNum">     185 </span>            :         u64 hole_start;
+<span class="lineNum">     186 </span>            :         u64 hole_end;
+<span class="lineNum">     187 </span>            : 
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :         BUG_ON(node == NULL);</span>
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :         end = node-&gt;start + node-&gt;size;</span>
+<span class="lineNum">     191 </span>            : 
+<span class="lineNum">     192 </span>            :         /* Find the relevant hole to add our node to */
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         drm_mm_for_each_hole(hole, mm, hole_start, hole_end) {</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :                 if (hole_start &gt; node-&gt;start || hole_end &lt; end)</span>
+<span class="lineNum">     195 </span>            :                         continue;
+<span class="lineNum">     196 </span>            : 
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :                 node-&gt;mm = mm;</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :                 node-&gt;allocated = 1;</span>
+<span class="lineNum">     199 </span>            : 
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :                 INIT_LIST_HEAD(&amp;node-&gt;hole_stack);</span>
+<span class="lineNum">     201 </span><span class="lineNoCov">          0 :                 list_add(&amp;node-&gt;node_list, &amp;hole-&gt;node_list);</span>
+<span class="lineNum">     202 </span>            : 
+<span class="lineNum">     203 </span><span class="lineNoCov">          0 :                 if (node-&gt;start == hole_start) {</span>
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 :                         hole-&gt;hole_follows = 0;</span>
+<span class="lineNum">     205 </span><span class="lineNoCov">          0 :                         list_del_init(&amp;hole-&gt;hole_stack);</span>
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :                 node-&gt;hole_follows = 0;</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :                 if (end != hole_end) {</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :                         list_add(&amp;node-&gt;hole_stack, &amp;mm-&gt;hole_stack);</span>
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                         node-&gt;hole_follows = 1;</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     213 </span>            : 
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     215 </span>            :         }
+<span class="lineNum">     216 </span>            : 
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :         return -ENOSPC;</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     219 </span>            : EXPORT_SYMBOL(drm_mm_reserve_node);
+<span class="lineNum">     220 </span>            : 
+<span class="lineNum">     221 </span>            : /**
+<span class="lineNum">     222 </span>            :  * drm_mm_insert_node_generic - search for space and insert @node
+<span class="lineNum">     223 </span>            :  * @mm: drm_mm to allocate from
+<span class="lineNum">     224 </span>            :  * @node: preallocate node to insert
+<span class="lineNum">     225 </span>            :  * @size: size of the allocation
+<span class="lineNum">     226 </span>            :  * @alignment: alignment of the allocation
+<span class="lineNum">     227 </span>            :  * @color: opaque tag value to use for this node
+<span class="lineNum">     228 </span>            :  * @sflags: flags to fine-tune the allocation search
+<span class="lineNum">     229 </span>            :  * @aflags: flags to fine-tune the allocation behavior
+<span class="lineNum">     230 </span>            :  *
+<span class="lineNum">     231 </span>            :  * The preallocated node must be cleared to 0.
+<span class="lineNum">     232 </span>            :  *
+<span class="lineNum">     233 </span>            :  * Returns:
+<a name="234"><span class="lineNum">     234 </span>            :  * 0 on success, -ENOSPC if there's no suitable hole.</a>
+<span class="lineNum">     235 </span>            :  */
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 : int drm_mm_insert_node_generic(struct drm_mm *mm, struct drm_mm_node *node,</span>
+<span class="lineNum">     237 </span>            :                                u64 size, unsigned alignment,
+<span class="lineNum">     238 </span>            :                                unsigned long color,
+<span class="lineNum">     239 </span>            :                                enum drm_mm_search_flags sflags,
+<span class="lineNum">     240 </span>            :                                enum drm_mm_allocator_flags aflags)
+<span class="lineNum">     241 </span>            : {
+<span class="lineNum">     242 </span>            :         struct drm_mm_node *hole_node;
+<span class="lineNum">     243 </span>            : 
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :         hole_node = drm_mm_search_free_generic(mm, size, alignment,</span>
+<span class="lineNum">     245 </span>            :                                                color, sflags);
+<span class="lineNum">     246 </span><span class="lineNoCov">          0 :         if (!hole_node)</span>
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :                 return -ENOSPC;</span>
+<span class="lineNum">     248 </span>            : 
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :         drm_mm_insert_helper(hole_node, node, size, alignment, color, aflags);</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 : }</span>
+<a name="252"><span class="lineNum">     252 </span>            : EXPORT_SYMBOL(drm_mm_insert_node_generic);</a>
+<span class="lineNum">     253 </span>            : 
+<span class="lineNum">     254 </span><span class="lineNoCov">          0 : static void drm_mm_insert_helper_range(struct drm_mm_node *hole_node,</span>
+<span class="lineNum">     255 </span>            :                                        struct drm_mm_node *node,
+<span class="lineNum">     256 </span>            :                                        u64 size, unsigned alignment,
+<span class="lineNum">     257 </span>            :                                        unsigned long color,
+<span class="lineNum">     258 </span>            :                                        u64 start, u64 end,
+<span class="lineNum">     259 </span>            :                                        enum drm_mm_allocator_flags flags)
+<span class="lineNum">     260 </span>            : {
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :         struct drm_mm *mm = hole_node-&gt;mm;</span>
+<span class="lineNum">     262 </span><span class="lineNoCov">          0 :         u64 hole_start = drm_mm_hole_node_start(hole_node);</span>
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :         u64 hole_end = drm_mm_hole_node_end(hole_node);</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         u64 adj_start = hole_start;</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         u64 adj_end = hole_end;</span>
+<span class="lineNum">     266 </span>            : 
+<span class="lineNum">     267 </span><span class="lineNoCov">          0 :         BUG_ON(!hole_node-&gt;hole_follows || node-&gt;allocated);</span>
+<span class="lineNum">     268 </span>            : 
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :         if (adj_start &lt; start)</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :                 adj_start = start;</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :         if (adj_end &gt; end)</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :                 adj_end = end;</span>
+<span class="lineNum">     273 </span>            : 
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :         if (mm-&gt;color_adjust)</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :                 mm-&gt;color_adjust(hole_node, color, &amp;adj_start, &amp;adj_end);</span>
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         if (flags &amp; DRM_MM_CREATE_TOP)</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :                 adj_start = adj_end - size;</span>
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :         if (alignment) {</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :                 u64 tmp = adj_start;</span>
+<span class="lineNum">     282 </span>            :                 unsigned rem;
+<span class="lineNum">     283 </span>            : 
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :                 rem = do_div(tmp, alignment);</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                 if (rem) {</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                         if (flags &amp; DRM_MM_CREATE_TOP)</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                                 adj_start -= rem;</span>
+<span class="lineNum">     288 </span>            :                         else
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :                                 adj_start += alignment - rem;</span>
+<span class="lineNum">     290 </span>            :                 }
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     292 </span>            : 
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :         if (adj_start == hole_start) {</span>
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 :                 hole_node-&gt;hole_follows = 0;</span>
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :                 list_del(&amp;hole_node-&gt;hole_stack);</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     297 </span>            : 
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         node-&gt;start = adj_start;</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :         node-&gt;size = size;</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         node-&gt;mm = mm;</span>
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         node-&gt;color = color;</span>
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :         node-&gt;allocated = 1;</span>
+<span class="lineNum">     303 </span>            : 
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;node-&gt;hole_stack);</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :         list_add(&amp;node-&gt;node_list, &amp;hole_node-&gt;node_list);</span>
+<span class="lineNum">     306 </span>            : 
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :         BUG_ON(node-&gt;start &lt; start);</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         BUG_ON(node-&gt;start &lt; adj_start);</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         BUG_ON(node-&gt;start + node-&gt;size &gt; adj_end);</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :         BUG_ON(node-&gt;start + node-&gt;size &gt; end);</span>
+<span class="lineNum">     311 </span>            : 
+<span class="lineNum">     312 </span><span class="lineNoCov">          0 :         node-&gt;hole_follows = 0;</span>
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 :         if (__drm_mm_hole_node_start(node) &lt; hole_end) {</span>
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                 list_add(&amp;node-&gt;hole_stack, &amp;mm-&gt;hole_stack);</span>
+<span class="lineNum">     315 </span><span class="lineNoCov">          0 :                 node-&gt;hole_follows = 1;</span>
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     318 </span>            : 
+<span class="lineNum">     319 </span>            : /**
+<span class="lineNum">     320 </span>            :  * drm_mm_insert_node_in_range_generic - ranged search for space and insert @node
+<span class="lineNum">     321 </span>            :  * @mm: drm_mm to allocate from
+<span class="lineNum">     322 </span>            :  * @node: preallocate node to insert
+<span class="lineNum">     323 </span>            :  * @size: size of the allocation
+<span class="lineNum">     324 </span>            :  * @alignment: alignment of the allocation
+<span class="lineNum">     325 </span>            :  * @color: opaque tag value to use for this node
+<span class="lineNum">     326 </span>            :  * @start: start of the allowed range for this node
+<span class="lineNum">     327 </span>            :  * @end: end of the allowed range for this node
+<span class="lineNum">     328 </span>            :  * @sflags: flags to fine-tune the allocation search
+<span class="lineNum">     329 </span>            :  * @aflags: flags to fine-tune the allocation behavior
+<span class="lineNum">     330 </span>            :  *
+<span class="lineNum">     331 </span>            :  * The preallocated node must be cleared to 0.
+<span class="lineNum">     332 </span>            :  *
+<span class="lineNum">     333 </span>            :  * Returns:
+<a name="334"><span class="lineNum">     334 </span>            :  * 0 on success, -ENOSPC if there's no suitable hole.</a>
+<span class="lineNum">     335 </span>            :  */
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 : int drm_mm_insert_node_in_range_generic(struct drm_mm *mm, struct drm_mm_node *node,</span>
+<span class="lineNum">     337 </span>            :                                         u64 size, unsigned alignment,
+<span class="lineNum">     338 </span>            :                                         unsigned long color,
+<span class="lineNum">     339 </span>            :                                         u64 start, u64 end,
+<span class="lineNum">     340 </span>            :                                         enum drm_mm_search_flags sflags,
+<span class="lineNum">     341 </span>            :                                         enum drm_mm_allocator_flags aflags)
+<span class="lineNum">     342 </span>            : {
+<span class="lineNum">     343 </span>            :         struct drm_mm_node *hole_node;
+<span class="lineNum">     344 </span>            : 
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :         hole_node = drm_mm_search_free_in_range_generic(mm,</span>
+<span class="lineNum">     346 </span>            :                                                         size, alignment, color,
+<span class="lineNum">     347 </span>            :                                                         start, end, sflags);
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         if (!hole_node)</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                 return -ENOSPC;</span>
+<span class="lineNum">     350 </span>            : 
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :         drm_mm_insert_helper_range(hole_node, node,</span>
+<span class="lineNum">     352 </span>            :                                    size, alignment, color,
+<span class="lineNum">     353 </span>            :                                    start, end, aflags);
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     356 </span>            : EXPORT_SYMBOL(drm_mm_insert_node_in_range_generic);
+<span class="lineNum">     357 </span>            : 
+<span class="lineNum">     358 </span>            : /**
+<span class="lineNum">     359 </span>            :  * drm_mm_remove_node - Remove a memory node from the allocator.
+<span class="lineNum">     360 </span>            :  * @node: drm_mm_node to remove
+<span class="lineNum">     361 </span>            :  *
+<span class="lineNum">     362 </span>            :  * This just removes a node from its drm_mm allocator. The node does not need to
+<span class="lineNum">     363 </span>            :  * be cleared again before it can be re-inserted into this or any other drm_mm
+<a name="364"><span class="lineNum">     364 </span>            :  * allocator. It is a bug to call this function on a un-allocated node.</a>
+<span class="lineNum">     365 </span>            :  */
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 : void drm_mm_remove_node(struct drm_mm_node *node)</span>
+<span class="lineNum">     367 </span>            : {
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :         struct drm_mm *mm = node-&gt;mm;</span>
+<span class="lineNum">     369 </span>            :         struct drm_mm_node *prev_node;
+<span class="lineNum">     370 </span>            : 
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :         if (WARN_ON(!node-&gt;allocated))</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     373 </span>            : 
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :         BUG_ON(node-&gt;scanned_block || node-&gt;scanned_prev_free</span>
+<span class="lineNum">     375 </span>            :                                    || node-&gt;scanned_next_free);
+<span class="lineNum">     376 </span>            : 
+<span class="lineNum">     377 </span>            :         prev_node =
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :             list_entry(node-&gt;node_list.prev, struct drm_mm_node, node_list);</span>
+<span class="lineNum">     379 </span>            : 
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :         if (node-&gt;hole_follows) {</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :                 BUG_ON(__drm_mm_hole_node_start(node) ==</span>
+<span class="lineNum">     382 </span>            :                        __drm_mm_hole_node_end(node));
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :                 list_del(&amp;node-&gt;hole_stack);</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :                 BUG_ON(__drm_mm_hole_node_start(node) !=</span>
+<span class="lineNum">     386 </span>            :                        __drm_mm_hole_node_end(node));
+<span class="lineNum">     387 </span>            : 
+<span class="lineNum">     388 </span>            : 
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :         if (!prev_node-&gt;hole_follows) {</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :                 prev_node-&gt;hole_follows = 1;</span>
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :                 list_add(&amp;prev_node-&gt;hole_stack, &amp;mm-&gt;hole_stack);</span>
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :         } else</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :                 list_move(&amp;prev_node-&gt;hole_stack, &amp;mm-&gt;hole_stack);</span>
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :         list_del(&amp;node-&gt;node_list);</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :         node-&gt;allocated = 0;</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 : }</span>
+<a name="398"><span class="lineNum">     398 </span>            : EXPORT_SYMBOL(drm_mm_remove_node);</a>
+<span class="lineNum">     399 </span>            : 
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 : static int check_free_hole(u64 start, u64 end, u64 size, unsigned alignment)</span>
+<span class="lineNum">     401 </span>            : {
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :         if (end - start &lt; size)</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     404 </span>            : 
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :         if (alignment) {</span>
+<span class="lineNum">     406 </span>            :                 u64 tmp = start;
+<span class="lineNum">     407 </span>            :                 unsigned rem;
+<span class="lineNum">     408 </span>            : 
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                 rem = do_div(tmp, alignment);</span>
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :                 if (rem)</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                         start += alignment - rem;</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     413 </span>            : 
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :         return end &gt;= start + size;</span>
+<a name="415"><span class="lineNum">     415 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     416 </span>            : 
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 : static struct drm_mm_node *drm_mm_search_free_generic(const struct drm_mm *mm,</span>
+<span class="lineNum">     418 </span>            :                                                       u64 size,
+<span class="lineNum">     419 </span>            :                                                       unsigned alignment,
+<span class="lineNum">     420 </span>            :                                                       unsigned long color,
+<span class="lineNum">     421 </span>            :                                                       enum drm_mm_search_flags flags)
+<span class="lineNum">     422 </span>            : {
+<span class="lineNum">     423 </span>            :         struct drm_mm_node *entry;
+<span class="lineNum">     424 </span>            :         struct drm_mm_node *best;
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :         u64 adj_start;</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :         u64 adj_end;</span>
+<span class="lineNum">     427 </span>            :         u64 best_size;
+<span class="lineNum">     428 </span>            : 
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :         BUG_ON(mm-&gt;scanned_blocks);</span>
+<span class="lineNum">     430 </span>            : 
+<span class="lineNum">     431 </span>            :         best = NULL;
+<span class="lineNum">     432 </span>            :         best_size = ~0UL;
+<span class="lineNum">     433 </span>            : 
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :         __drm_mm_for_each_hole(entry, mm, adj_start, adj_end,</span>
+<span class="lineNum">     435 </span>            :                                flags &amp; DRM_MM_SEARCH_BELOW) {
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :                 u64 hole_size = adj_end - adj_start;</span>
+<span class="lineNum">     437 </span>            : 
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                 if (mm-&gt;color_adjust) {</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :                         mm-&gt;color_adjust(entry, color, &amp;adj_start, &amp;adj_end);</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :                         if (adj_end &lt;= adj_start)</span>
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                                 continue;</span>
+<span class="lineNum">     442 </span>            :                 }
+<span class="lineNum">     443 </span>            : 
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :                 if (!check_free_hole(adj_start, adj_end, size, alignment))</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     446 </span>            : 
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :                 if (!(flags &amp; DRM_MM_SEARCH_BEST))</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                         return entry;</span>
+<span class="lineNum">     449 </span>            : 
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                 if (hole_size &lt; best_size) {</span>
+<span class="lineNum">     451 </span>            :                         best = entry;
+<span class="lineNum">     452 </span>            :                         best_size = hole_size;
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     455 </span>            : 
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :         return best;</span>
+<a name="457"><span class="lineNum">     457 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     458 </span>            : 
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 : static struct drm_mm_node *drm_mm_search_free_in_range_generic(const struct drm_mm *mm,</span>
+<span class="lineNum">     460 </span>            :                                                         u64 size,
+<span class="lineNum">     461 </span>            :                                                         unsigned alignment,
+<span class="lineNum">     462 </span>            :                                                         unsigned long color,
+<span class="lineNum">     463 </span>            :                                                         u64 start,
+<span class="lineNum">     464 </span>            :                                                         u64 end,
+<span class="lineNum">     465 </span>            :                                                         enum drm_mm_search_flags flags)
+<span class="lineNum">     466 </span>            : {
+<span class="lineNum">     467 </span>            :         struct drm_mm_node *entry;
+<span class="lineNum">     468 </span>            :         struct drm_mm_node *best;
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :         u64 adj_start;</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :         u64 adj_end;</span>
+<span class="lineNum">     471 </span>            :         u64 best_size;
+<span class="lineNum">     472 </span>            : 
+<span class="lineNum">     473 </span><span class="lineNoCov">          0 :         BUG_ON(mm-&gt;scanned_blocks);</span>
+<span class="lineNum">     474 </span>            : 
+<span class="lineNum">     475 </span>            :         best = NULL;
+<span class="lineNum">     476 </span>            :         best_size = ~0UL;
+<span class="lineNum">     477 </span>            : 
+<span class="lineNum">     478 </span><span class="lineNoCov">          0 :         __drm_mm_for_each_hole(entry, mm, adj_start, adj_end,</span>
+<span class="lineNum">     479 </span>            :                                flags &amp; DRM_MM_SEARCH_BELOW) {
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :                 u64 hole_size = adj_end - adj_start;</span>
+<span class="lineNum">     481 </span>            : 
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :                 if (adj_start &lt; start)</span>
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :                         adj_start = start;</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :                 if (adj_end &gt; end)</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :                         adj_end = end;</span>
+<span class="lineNum">     486 </span>            : 
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 :                 if (mm-&gt;color_adjust) {</span>
+<span class="lineNum">     488 </span><span class="lineNoCov">          0 :                         mm-&gt;color_adjust(entry, color, &amp;adj_start, &amp;adj_end);</span>
+<span class="lineNum">     489 </span><span class="lineNoCov">          0 :                         if (adj_end &lt;= adj_start)</span>
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :                                 continue;</span>
+<span class="lineNum">     491 </span>            :                 }
+<span class="lineNum">     492 </span>            : 
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :                 if (!check_free_hole(adj_start, adj_end, size, alignment))</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :                         continue;</span>
+<span class="lineNum">     495 </span>            : 
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :                 if (!(flags &amp; DRM_MM_SEARCH_BEST))</span>
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :                         return entry;</span>
+<span class="lineNum">     498 </span>            : 
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :                 if (hole_size &lt; best_size) {</span>
+<span class="lineNum">     500 </span>            :                         best = entry;
+<span class="lineNum">     501 </span>            :                         best_size = hole_size;
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     504 </span>            : 
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         return best;</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     507 </span>            : 
+<span class="lineNum">     508 </span>            : /**
+<span class="lineNum">     509 </span>            :  * drm_mm_replace_node - move an allocation from @old to @new
+<span class="lineNum">     510 </span>            :  * @old: drm_mm_node to remove from the allocator
+<span class="lineNum">     511 </span>            :  * @new: drm_mm_node which should inherit @old's allocation
+<span class="lineNum">     512 </span>            :  *
+<span class="lineNum">     513 </span>            :  * This is useful for when drivers embed the drm_mm_node structure and hence
+<span class="lineNum">     514 </span>            :  * can't move allocations by reassigning pointers. It's a combination of remove
+<a name="515"><span class="lineNum">     515 </span>            :  * and insert with the guarantee that the allocation start will match.</a>
+<span class="lineNum">     516 </span>            :  */
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 : void drm_mm_replace_node(struct drm_mm_node *old, struct drm_mm_node *new)</span>
+<span class="lineNum">     518 </span>            : {
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :         list_replace(&amp;old-&gt;node_list, &amp;new-&gt;node_list);</span>
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         list_replace(&amp;old-&gt;hole_stack, &amp;new-&gt;hole_stack);</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :         new-&gt;hole_follows = old-&gt;hole_follows;</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :         new-&gt;mm = old-&gt;mm;</span>
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :         new-&gt;start = old-&gt;start;</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :         new-&gt;size = old-&gt;size;</span>
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :         new-&gt;color = old-&gt;color;</span>
+<span class="lineNum">     526 </span>            : 
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :         old-&gt;allocated = 0;</span>
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :         new-&gt;allocated = 1;</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     530 </span>            : EXPORT_SYMBOL(drm_mm_replace_node);
+<span class="lineNum">     531 </span>            : 
+<span class="lineNum">     532 </span>            : /**
+<span class="lineNum">     533 </span>            :  * DOC: lru scan roaster
+<span class="lineNum">     534 </span>            :  *
+<span class="lineNum">     535 </span>            :  * Very often GPUs need to have continuous allocations for a given object. When
+<span class="lineNum">     536 </span>            :  * evicting objects to make space for a new one it is therefore not most
+<span class="lineNum">     537 </span>            :  * efficient when we simply start to select all objects from the tail of an LRU
+<span class="lineNum">     538 </span>            :  * until there's a suitable hole: Especially for big objects or nodes that
+<span class="lineNum">     539 </span>            :  * otherwise have special allocation constraints there's a good chance we evict
+<span class="lineNum">     540 </span>            :  * lots of (smaller) objects unecessarily.
+<span class="lineNum">     541 </span>            :  *
+<span class="lineNum">     542 </span>            :  * The DRM range allocator supports this use-case through the scanning
+<span class="lineNum">     543 </span>            :  * interfaces. First a scan operation needs to be initialized with
+<span class="lineNum">     544 </span>            :  * drm_mm_init_scan() or drm_mm_init_scan_with_range(). The the driver adds
+<span class="lineNum">     545 </span>            :  * objects to the roaster (probably by walking an LRU list, but this can be
+<span class="lineNum">     546 </span>            :  * freely implemented) until a suitable hole is found or there's no further
+<span class="lineNum">     547 </span>            :  * evitable object.
+<span class="lineNum">     548 </span>            :  *
+<span class="lineNum">     549 </span>            :  * The the driver must walk through all objects again in exactly the reverse
+<span class="lineNum">     550 </span>            :  * order to restore the allocator state. Note that while the allocator is used
+<span class="lineNum">     551 </span>            :  * in the scan mode no other operation is allowed.
+<span class="lineNum">     552 </span>            :  *
+<span class="lineNum">     553 </span>            :  * Finally the driver evicts all objects selected in the scan. Adding and
+<span class="lineNum">     554 </span>            :  * removing an object is O(1), and since freeing a node is also O(1) the overall
+<span class="lineNum">     555 </span>            :  * complexity is O(scanned_objects). So like the free stack which needs to be
+<span class="lineNum">     556 </span>            :  * walked before a scan operation even begins this is linear in the number of
+<span class="lineNum">     557 </span>            :  * objects. It doesn't seem to hurt badly.
+<span class="lineNum">     558 </span>            :  */
+<span class="lineNum">     559 </span>            : 
+<span class="lineNum">     560 </span>            : /**
+<span class="lineNum">     561 </span>            :  * drm_mm_init_scan - initialize lru scanning
+<span class="lineNum">     562 </span>            :  * @mm: drm_mm to scan
+<span class="lineNum">     563 </span>            :  * @size: size of the allocation
+<span class="lineNum">     564 </span>            :  * @alignment: alignment of the allocation
+<span class="lineNum">     565 </span>            :  * @color: opaque tag value to use for the allocation
+<span class="lineNum">     566 </span>            :  *
+<span class="lineNum">     567 </span>            :  * This simply sets up the scanning routines with the parameters for the desired
+<span class="lineNum">     568 </span>            :  * hole. Note that there's no need to specify allocation flags, since they only
+<span class="lineNum">     569 </span>            :  * change the place a node is allocated from within a suitable hole.
+<span class="lineNum">     570 </span>            :  *
+<span class="lineNum">     571 </span>            :  * Warning:
+<span class="lineNum">     572 </span>            :  * As long as the scan list is non-empty, no other operations than
+<a name="573"><span class="lineNum">     573 </span>            :  * adding/removing nodes to/from the scan list are allowed.</a>
+<span class="lineNum">     574 </span>            :  */
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 : void drm_mm_init_scan(struct drm_mm *mm,</span>
+<span class="lineNum">     576 </span>            :                       u64 size,
+<span class="lineNum">     577 </span>            :                       unsigned alignment,
+<span class="lineNum">     578 </span>            :                       unsigned long color)
+<span class="lineNum">     579 </span>            : {
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         mm-&gt;scan_color = color;</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :         mm-&gt;scan_alignment = alignment;</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :         mm-&gt;scan_size = size;</span>
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :         mm-&gt;scanned_blocks = 0;</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :         mm-&gt;scan_hit_start = 0;</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :         mm-&gt;scan_hit_end = 0;</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :         mm-&gt;scan_check_range = 0;</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :         mm-&gt;prev_scanned_node = NULL;</span>
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     589 </span>            : EXPORT_SYMBOL(drm_mm_init_scan);
+<span class="lineNum">     590 </span>            : 
+<span class="lineNum">     591 </span>            : /**
+<span class="lineNum">     592 </span>            :  * drm_mm_init_scan - initialize range-restricted lru scanning
+<span class="lineNum">     593 </span>            :  * @mm: drm_mm to scan
+<span class="lineNum">     594 </span>            :  * @size: size of the allocation
+<span class="lineNum">     595 </span>            :  * @alignment: alignment of the allocation
+<span class="lineNum">     596 </span>            :  * @color: opaque tag value to use for the allocation
+<span class="lineNum">     597 </span>            :  * @start: start of the allowed range for the allocation
+<span class="lineNum">     598 </span>            :  * @end: end of the allowed range for the allocation
+<span class="lineNum">     599 </span>            :  *
+<span class="lineNum">     600 </span>            :  * This simply sets up the scanning routines with the parameters for the desired
+<span class="lineNum">     601 </span>            :  * hole. Note that there's no need to specify allocation flags, since they only
+<span class="lineNum">     602 </span>            :  * change the place a node is allocated from within a suitable hole.
+<span class="lineNum">     603 </span>            :  *
+<span class="lineNum">     604 </span>            :  * Warning:
+<span class="lineNum">     605 </span>            :  * As long as the scan list is non-empty, no other operations than
+<a name="606"><span class="lineNum">     606 </span>            :  * adding/removing nodes to/from the scan list are allowed.</a>
+<span class="lineNum">     607 </span>            :  */
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 : void drm_mm_init_scan_with_range(struct drm_mm *mm,</span>
+<span class="lineNum">     609 </span>            :                                  u64 size,
+<span class="lineNum">     610 </span>            :                                  unsigned alignment,
+<span class="lineNum">     611 </span>            :                                  unsigned long color,
+<span class="lineNum">     612 </span>            :                                  u64 start,
+<span class="lineNum">     613 </span>            :                                  u64 end)
+<span class="lineNum">     614 </span>            : {
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :         mm-&gt;scan_color = color;</span>
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :         mm-&gt;scan_alignment = alignment;</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :         mm-&gt;scan_size = size;</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :         mm-&gt;scanned_blocks = 0;</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :         mm-&gt;scan_hit_start = 0;</span>
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :         mm-&gt;scan_hit_end = 0;</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :         mm-&gt;scan_start = start;</span>
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :         mm-&gt;scan_end = end;</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :         mm-&gt;scan_check_range = 1;</span>
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :         mm-&gt;prev_scanned_node = NULL;</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     626 </span>            : EXPORT_SYMBOL(drm_mm_init_scan_with_range);
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span>            : /**
+<span class="lineNum">     629 </span>            :  * drm_mm_scan_add_block - add a node to the scan list
+<span class="lineNum">     630 </span>            :  * @node: drm_mm_node to add
+<span class="lineNum">     631 </span>            :  *
+<span class="lineNum">     632 </span>            :  * Add a node to the scan list that might be freed to make space for the desired
+<span class="lineNum">     633 </span>            :  * hole.
+<span class="lineNum">     634 </span>            :  *
+<span class="lineNum">     635 </span>            :  * Returns:
+<a name="636"><span class="lineNum">     636 </span>            :  * True if a hole has been found, false otherwise.</a>
+<span class="lineNum">     637 </span>            :  */
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 : bool drm_mm_scan_add_block(struct drm_mm_node *node)</span>
+<span class="lineNum">     639 </span>            : {
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 :         struct drm_mm *mm = node-&gt;mm;</span>
+<span class="lineNum">     641 </span>            :         struct drm_mm_node *prev_node;
+<span class="lineNum">     642 </span>            :         u64 hole_start, hole_end;
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :         u64 adj_start, adj_end;</span>
+<span class="lineNum">     644 </span>            : 
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :         mm-&gt;scanned_blocks++;</span>
+<span class="lineNum">     646 </span>            : 
+<span class="lineNum">     647 </span><span class="lineNoCov">          0 :         BUG_ON(node-&gt;scanned_block);</span>
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :         node-&gt;scanned_block = 1;</span>
+<span class="lineNum">     649 </span>            : 
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :         prev_node = list_entry(node-&gt;node_list.prev, struct drm_mm_node,</span>
+<span class="lineNum">     651 </span>            :                                node_list);
+<span class="lineNum">     652 </span>            : 
+<span class="lineNum">     653 </span><span class="lineNoCov">          0 :         node-&gt;scanned_preceeds_hole = prev_node-&gt;hole_follows;</span>
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :         prev_node-&gt;hole_follows = 1;</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :         list_del(&amp;node-&gt;node_list);</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :         node-&gt;node_list.prev = &amp;prev_node-&gt;node_list;</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :         node-&gt;node_list.next = &amp;mm-&gt;prev_scanned_node-&gt;node_list;</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :         mm-&gt;prev_scanned_node = node;</span>
+<span class="lineNum">     659 </span>            : 
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         adj_start = hole_start = drm_mm_hole_node_start(prev_node);</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :         adj_end = hole_end = drm_mm_hole_node_end(prev_node);</span>
+<span class="lineNum">     662 </span>            : 
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :         if (mm-&gt;scan_check_range) {</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                 if (adj_start &lt; mm-&gt;scan_start)</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :                         adj_start = mm-&gt;scan_start;</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :                 if (adj_end &gt; mm-&gt;scan_end)</span>
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :                         adj_end = mm-&gt;scan_end;</span>
+<span class="lineNum">     668 </span>            :         }
+<span class="lineNum">     669 </span>            : 
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :         if (mm-&gt;color_adjust)</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                 mm-&gt;color_adjust(prev_node, mm-&gt;scan_color,</span>
+<span class="lineNum">     672 </span>            :                                  &amp;adj_start, &amp;adj_end);
+<span class="lineNum">     673 </span>            : 
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :         if (check_free_hole(adj_start, adj_end,</span>
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :                             mm-&gt;scan_size, mm-&gt;scan_alignment)) {</span>
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :                 mm-&gt;scan_hit_start = hole_start;</span>
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :                 mm-&gt;scan_hit_end = hole_end;</span>
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :                 return true;</span>
+<span class="lineNum">     679 </span>            :         }
+<span class="lineNum">     680 </span>            : 
+<span class="lineNum">     681 </span><span class="lineNoCov">          0 :         return false;</span>
+<span class="lineNum">     682 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     683 </span>            : EXPORT_SYMBOL(drm_mm_scan_add_block);
+<span class="lineNum">     684 </span>            : 
+<span class="lineNum">     685 </span>            : /**
+<span class="lineNum">     686 </span>            :  * drm_mm_scan_remove_block - remove a node from the scan list
+<span class="lineNum">     687 </span>            :  * @node: drm_mm_node to remove
+<span class="lineNum">     688 </span>            :  *
+<span class="lineNum">     689 </span>            :  * Nodes _must_ be removed in the exact same order from the scan list as they
+<span class="lineNum">     690 </span>            :  * have been added, otherwise the internal state of the memory manager will be
+<span class="lineNum">     691 </span>            :  * corrupted.
+<span class="lineNum">     692 </span>            :  *
+<span class="lineNum">     693 </span>            :  * When the scan list is empty, the selected memory nodes can be freed. An
+<span class="lineNum">     694 </span>            :  * immediately following drm_mm_search_free with !DRM_MM_SEARCH_BEST will then
+<span class="lineNum">     695 </span>            :  * return the just freed block (because its at the top of the free_stack list).
+<span class="lineNum">     696 </span>            :  *
+<span class="lineNum">     697 </span>            :  * Returns:
+<span class="lineNum">     698 </span>            :  * True if this block should be evicted, false otherwise. Will always
+<a name="699"><span class="lineNum">     699 </span>            :  * return false when no hole has been found.</a>
+<span class="lineNum">     700 </span>            :  */
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 : bool drm_mm_scan_remove_block(struct drm_mm_node *node)</span>
+<span class="lineNum">     702 </span>            : {
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :         struct drm_mm *mm = node-&gt;mm;</span>
+<span class="lineNum">     704 </span>            :         struct drm_mm_node *prev_node;
+<span class="lineNum">     705 </span>            : 
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :         mm-&gt;scanned_blocks--;</span>
+<span class="lineNum">     707 </span>            : 
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :         BUG_ON(!node-&gt;scanned_block);</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :         node-&gt;scanned_block = 0;</span>
+<span class="lineNum">     710 </span>            : 
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :         prev_node = list_entry(node-&gt;node_list.prev, struct drm_mm_node,</span>
+<span class="lineNum">     712 </span>            :                                node_list);
+<span class="lineNum">     713 </span>            : 
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 :         prev_node-&gt;hole_follows = node-&gt;scanned_preceeds_hole;</span>
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :         list_add(&amp;node-&gt;node_list, &amp;prev_node-&gt;node_list);</span>
+<span class="lineNum">     716 </span>            : 
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :          return (drm_mm_hole_node_end(node) &gt; mm-&gt;scan_hit_start &amp;&amp;</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :                  node-&gt;start &lt; mm-&gt;scan_hit_end);</span>
+<span class="lineNum">     719 </span>            : }
+<span class="lineNum">     720 </span>            : EXPORT_SYMBOL(drm_mm_scan_remove_block);
+<span class="lineNum">     721 </span>            : 
+<span class="lineNum">     722 </span>            : /**
+<span class="lineNum">     723 </span>            :  * drm_mm_clean - checks whether an allocator is clean
+<span class="lineNum">     724 </span>            :  * @mm: drm_mm allocator to check
+<span class="lineNum">     725 </span>            :  *
+<span class="lineNum">     726 </span>            :  * Returns:
+<span class="lineNum">     727 </span>            :  * True if the allocator is completely free, false if there's still a node
+<a name="728"><span class="lineNum">     728 </span>            :  * allocated in it.</a>
+<span class="lineNum">     729 </span>            :  */
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 : bool drm_mm_clean(struct drm_mm * mm)</span>
+<span class="lineNum">     731 </span>            : {
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :         struct list_head *head = &amp;mm-&gt;head_node.node_list;</span>
+<span class="lineNum">     733 </span>            : 
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :         return (head-&gt;next-&gt;next == head);</span>
+<span class="lineNum">     735 </span>            : }
+<span class="lineNum">     736 </span>            : EXPORT_SYMBOL(drm_mm_clean);
+<span class="lineNum">     737 </span>            : 
+<span class="lineNum">     738 </span>            : /**
+<span class="lineNum">     739 </span>            :  * drm_mm_init - initialize a drm-mm allocator
+<span class="lineNum">     740 </span>            :  * @mm: the drm_mm structure to initialize
+<span class="lineNum">     741 </span>            :  * @start: start of the range managed by @mm
+<span class="lineNum">     742 </span>            :  * @size: end of the range managed by @mm
+<span class="lineNum">     743 </span>            :  *
+<a name="744"><span class="lineNum">     744 </span>            :  * Note that @mm must be cleared to 0 before calling this function.</a>
+<span class="lineNum">     745 </span>            :  */
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 : void drm_mm_init(struct drm_mm * mm, u64 start, u64 size)</span>
+<span class="lineNum">     747 </span>            : {
+<span class="lineNum">     748 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;mm-&gt;hole_stack);</span>
+<span class="lineNum">     749 </span><span class="lineNoCov">          0 :         mm-&gt;scanned_blocks = 0;</span>
+<span class="lineNum">     750 </span>            : 
+<span class="lineNum">     751 </span>            :         /* Clever trick to avoid a special case in the free hole tracking. */
+<span class="lineNum">     752 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;mm-&gt;head_node.node_list);</span>
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 :         INIT_LIST_HEAD(&amp;mm-&gt;head_node.hole_stack);</span>
+<span class="lineNum">     754 </span><span class="lineNoCov">          0 :         mm-&gt;head_node.hole_follows = 1;</span>
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :         mm-&gt;head_node.scanned_block = 0;</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         mm-&gt;head_node.scanned_prev_free = 0;</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :         mm-&gt;head_node.scanned_next_free = 0;</span>
+<span class="lineNum">     758 </span><span class="lineNoCov">          0 :         mm-&gt;head_node.mm = mm;</span>
+<span class="lineNum">     759 </span><span class="lineNoCov">          0 :         mm-&gt;head_node.start = start + size;</span>
+<span class="lineNum">     760 </span><span class="lineNoCov">          0 :         mm-&gt;head_node.size = start - mm-&gt;head_node.start;</span>
+<span class="lineNum">     761 </span><span class="lineNoCov">          0 :         list_add_tail(&amp;mm-&gt;head_node.hole_stack, &amp;mm-&gt;hole_stack);</span>
+<span class="lineNum">     762 </span>            : 
+<span class="lineNum">     763 </span><span class="lineNoCov">          0 :         mm-&gt;color_adjust = NULL;</span>
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     765 </span>            : EXPORT_SYMBOL(drm_mm_init);
+<span class="lineNum">     766 </span>            : 
+<span class="lineNum">     767 </span>            : /**
+<span class="lineNum">     768 </span>            :  * drm_mm_takedown - clean up a drm_mm allocator
+<span class="lineNum">     769 </span>            :  * @mm: drm_mm allocator to clean up
+<span class="lineNum">     770 </span>            :  *
+<span class="lineNum">     771 </span>            :  * Note that it is a bug to call this function on an allocator which is not
+<a name="772"><span class="lineNum">     772 </span>            :  * clean.</a>
+<span class="lineNum">     773 </span>            :  */
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 : void drm_mm_takedown(struct drm_mm * mm)</span>
+<span class="lineNum">     775 </span>            : {
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :         WARN(!list_empty(&amp;mm-&gt;head_node.node_list),</span>
+<span class="lineNum">     777 </span>            :              &quot;Memory manager not clean during takedown.\n&quot;);
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 : }</span>
+<a name="779"><span class="lineNum">     779 </span>            : EXPORT_SYMBOL(drm_mm_takedown);</a>
+<span class="lineNum">     780 </span>            : 
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 : static u64 drm_mm_debug_hole(struct drm_mm_node *entry,</span>
+<span class="lineNum">     782 </span>            :                                      const char *prefix)
+<span class="lineNum">     783 </span>            : {
+<span class="lineNum">     784 </span>            :         u64 hole_start, hole_end, hole_size;
+<span class="lineNum">     785 </span>            : 
+<span class="lineNum">     786 </span><span class="lineNoCov">          0 :         if (entry-&gt;hole_follows) {</span>
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :                 hole_start = drm_mm_hole_node_start(entry);</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :                 hole_end = drm_mm_hole_node_end(entry);</span>
+<span class="lineNum">     789 </span><span class="lineNoCov">          0 :                 hole_size = hole_end - hole_start;</span>
+<span class="lineNum">     790 </span>            :                 pr_debug(&quot;%s %#llx-%#llx: %llu: free\n&quot;, prefix, hole_start,
+<span class="lineNum">     791 </span>            :                          hole_end, hole_size);
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :                 return hole_size;</span>
+<span class="lineNum">     793 </span>            :         }
+<span class="lineNum">     794 </span>            : 
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     797 </span>            : 
+<span class="lineNum">     798 </span>            : /**
+<span class="lineNum">     799 </span>            :  * drm_mm_debug_table - dump allocator state to dmesg
+<span class="lineNum">     800 </span>            :  * @mm: drm_mm allocator to dump
+<a name="801"><span class="lineNum">     801 </span>            :  * @prefix: prefix to use for dumping to dmesg</a>
+<span class="lineNum">     802 </span>            :  */
+<span class="lineNum">     803 </span><span class="lineNoCov">          0 : void drm_mm_debug_table(struct drm_mm *mm, const char *prefix)</span>
+<span class="lineNum">     804 </span>            : {
+<span class="lineNum">     805 </span>            :         struct drm_mm_node *entry;
+<span class="lineNum">     806 </span>            :         u64 total_used = 0, total_free = 0, total = 0;
+<span class="lineNum">     807 </span>            : 
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :         total_free += drm_mm_debug_hole(&amp;mm-&gt;head_node, prefix);</span>
+<span class="lineNum">     809 </span>            : 
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :         drm_mm_for_each_node(entry, mm) {</span>
+<span class="lineNum">     811 </span>            :                 pr_debug(&quot;%s %#llx-%#llx: %llu: used\n&quot;, prefix, entry-&gt;start,
+<span class="lineNum">     812 </span>            :                          entry-&gt;start + entry-&gt;size, entry-&gt;size);
+<span class="lineNum">     813 </span><span class="lineNoCov">          0 :                 total_used += entry-&gt;size;</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :                 total_free += drm_mm_debug_hole(entry, prefix);</span>
+<span class="lineNum">     815 </span>            :         }
+<span class="lineNum">     816 </span>            :         total = total_free + total_used;
+<span class="lineNum">     817 </span>            : 
+<span class="lineNum">     818 </span>            :         pr_debug(&quot;%s total: %llu, used %llu free %llu\n&quot;, prefix, total,
+<span class="lineNum">     819 </span>            :                  total_used, total_free);
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     821 </span>            : EXPORT_SYMBOL(drm_mm_debug_table);
+<span class="lineNum">     822 </span>            : 
+<span class="lineNum">     823 </span>            : #if defined(CONFIG_DEBUG_FS)
+<span class="lineNum">     824 </span>            : static u64 drm_mm_dump_hole(struct seq_file *m, struct drm_mm_node *entry)
+<span class="lineNum">     825 </span>            : {
+<span class="lineNum">     826 </span>            :         u64 hole_start, hole_end, hole_size;
+<span class="lineNum">     827 </span>            : 
+<span class="lineNum">     828 </span>            :         if (entry-&gt;hole_follows) {
+<span class="lineNum">     829 </span>            :                 hole_start = drm_mm_hole_node_start(entry);
+<span class="lineNum">     830 </span>            :                 hole_end = drm_mm_hole_node_end(entry);
+<span class="lineNum">     831 </span>            :                 hole_size = hole_end - hole_start;
+<span class="lineNum">     832 </span>            :                 seq_printf(m, &quot;%#018llx-%#018llx: %llu: free\n&quot;, hole_start,
+<span class="lineNum">     833 </span>            :                            hole_end, hole_size);
+<span class="lineNum">     834 </span>            :                 return hole_size;
+<span class="lineNum">     835 </span>            :         }
+<span class="lineNum">     836 </span>            : 
+<span class="lineNum">     837 </span>            :         return 0;
+<span class="lineNum">     838 </span>            : }
+<span class="lineNum">     839 </span>            : 
+<span class="lineNum">     840 </span>            : /**
+<span class="lineNum">     841 </span>            :  * drm_mm_dump_table - dump allocator state to a seq_file
+<span class="lineNum">     842 </span>            :  * @m: seq_file to dump to
+<span class="lineNum">     843 </span>            :  * @mm: drm_mm allocator to dump
+<span class="lineNum">     844 </span>            :  */
+<span class="lineNum">     845 </span>            : int drm_mm_dump_table(struct seq_file *m, struct drm_mm *mm)
+<span class="lineNum">     846 </span>            : {
+<span class="lineNum">     847 </span>            :         struct drm_mm_node *entry;
+<span class="lineNum">     848 </span>            :         u64 total_used = 0, total_free = 0, total = 0;
+<span class="lineNum">     849 </span>            : 
+<span class="lineNum">     850 </span>            :         total_free += drm_mm_dump_hole(m, &amp;mm-&gt;head_node);
+<span class="lineNum">     851 </span>            : 
+<span class="lineNum">     852 </span>            :         drm_mm_for_each_node(entry, mm) {
+<span class="lineNum">     853 </span>            :                 seq_printf(m, &quot;%#018llx-%#018llx: %llu: used\n&quot;, entry-&gt;start,
+<span class="lineNum">     854 </span>            :                            entry-&gt;start + entry-&gt;size, entry-&gt;size);
+<span class="lineNum">     855 </span>            :                 total_used += entry-&gt;size;
+<span class="lineNum">     856 </span>            :                 total_free += drm_mm_dump_hole(m, entry);
+<span class="lineNum">     857 </span>            :         }
+<span class="lineNum">     858 </span>            :         total = total_free + total_used;
+<span class="lineNum">     859 </span>            : 
+<span class="lineNum">     860 </span>            :         seq_printf(m, &quot;total: %llu, used %llu free %llu\n&quot;, total,
+<span class="lineNum">     861 </span>            :                    total_used, total_free);
+<span class="lineNum">     862 </span>            :         return 0;
+<span class="lineNum">     863 </span>            : }
+<span class="lineNum">     864 </span>            : EXPORT_SYMBOL(drm_mm_dump_table);
+<span class="lineNum">     865 </span>            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

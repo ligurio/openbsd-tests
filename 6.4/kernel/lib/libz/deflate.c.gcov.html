@@ -1,0 +1,1818 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - lib/libz/deflate.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">lib/libz</a> - deflate.c<span style="font-size: 80%;"> (source / <a href="deflate.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">643</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">22</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: deflate.c,v 1.3 2016/03/14 23:08:06 krw Exp $ */</a>
+<span class="lineNum">       2 </span>            : /* deflate.c -- compress data using the deflation algorithm
+<span class="lineNum">       3 </span>            :  * Copyright (C) 1995-2005 Jean-loup Gailly.
+<span class="lineNum">       4 </span>            :  * For conditions of distribution and use, see copyright notice in zlib.h
+<span class="lineNum">       5 </span>            :  */
+<span class="lineNum">       6 </span>            : 
+<span class="lineNum">       7 </span>            : /*
+<span class="lineNum">       8 </span>            :  *  ALGORITHM
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  *      The &quot;deflation&quot; process depends on being able to identify portions
+<span class="lineNum">      11 </span>            :  *      of the input text which are identical to earlier input (within a
+<span class="lineNum">      12 </span>            :  *      sliding window trailing behind the input currently being processed).
+<span class="lineNum">      13 </span>            :  *
+<span class="lineNum">      14 </span>            :  *      The most straightforward technique turns out to be the fastest for
+<span class="lineNum">      15 </span>            :  *      most input files: try all possible matches and select the longest.
+<span class="lineNum">      16 </span>            :  *      The key feature of this algorithm is that insertions into the string
+<span class="lineNum">      17 </span>            :  *      dictionary are very simple and thus fast, and deletions are avoided
+<span class="lineNum">      18 </span>            :  *      completely. Insertions are performed at each input character, whereas
+<span class="lineNum">      19 </span>            :  *      string matches are performed only when the previous match ends. So it
+<span class="lineNum">      20 </span>            :  *      is preferable to spend more time in matches to allow very fast string
+<span class="lineNum">      21 </span>            :  *      insertions and avoid deletions. The matching algorithm for small
+<span class="lineNum">      22 </span>            :  *      strings is inspired from that of Rabin &amp; Karp. A brute force approach
+<span class="lineNum">      23 </span>            :  *      is used to find longer strings when a small match has been found.
+<span class="lineNum">      24 </span>            :  *      A similar algorithm is used in comic (by Jan-Mark Wams) and freeze
+<span class="lineNum">      25 </span>            :  *      (by Leonid Broukhis).
+<span class="lineNum">      26 </span>            :  *         A previous version of this file used a more sophisticated algorithm
+<span class="lineNum">      27 </span>            :  *      (by Fiala and Greene) which is guaranteed to run in linear amortized
+<span class="lineNum">      28 </span>            :  *      time, but has a larger average cost, uses more memory and is patented.
+<span class="lineNum">      29 </span>            :  *      However the F&amp;G algorithm may be faster for some highly redundant
+<span class="lineNum">      30 </span>            :  *      files if the parameter max_chain_length (described below) is too large.
+<span class="lineNum">      31 </span>            :  *
+<span class="lineNum">      32 </span>            :  *  ACKNOWLEDGEMENTS
+<span class="lineNum">      33 </span>            :  *
+<span class="lineNum">      34 </span>            :  *      The idea of lazy evaluation of matches is due to Jan-Mark Wams, and
+<span class="lineNum">      35 </span>            :  *      I found it in 'freeze' written by Leonid Broukhis.
+<span class="lineNum">      36 </span>            :  *      Thanks to many people for bug reports and testing.
+<span class="lineNum">      37 </span>            :  *
+<span class="lineNum">      38 </span>            :  *  REFERENCES
+<span class="lineNum">      39 </span>            :  *
+<span class="lineNum">      40 </span>            :  *      Deutsch, L.P.,&quot;DEFLATE Compressed Data Format Specification&quot;.
+<span class="lineNum">      41 </span>            :  *      Available in http://www.ietf.org/rfc/rfc1951.txt
+<span class="lineNum">      42 </span>            :  *
+<span class="lineNum">      43 </span>            :  *      A description of the Rabin and Karp algorithm is given in the book
+<span class="lineNum">      44 </span>            :  *         &quot;Algorithms&quot; by R. Sedgewick, Addison-Wesley, p252.
+<span class="lineNum">      45 </span>            :  *
+<span class="lineNum">      46 </span>            :  *      Fiala,E.R., and Greene,D.H.
+<span class="lineNum">      47 </span>            :  *         Data Compression with Finite Windows, Comm.ACM, 32,4 (1989) 490-595
+<span class="lineNum">      48 </span>            :  *
+<span class="lineNum">      49 </span>            :  */
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span>            : #include &quot;deflate.h&quot;
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span>            : /*
+<span class="lineNum">      55 </span>            :   If you use the zlib library in a product, an acknowledgment is welcome
+<span class="lineNum">      56 </span>            :   in the documentation of your product. If for some reason you cannot
+<span class="lineNum">      57 </span>            :   include such an acknowledgment, I would appreciate that you keep this
+<span class="lineNum">      58 </span>            :   copyright string in the executable of your product.
+<span class="lineNum">      59 </span>            :  */
+<span class="lineNum">      60 </span>            : 
+<span class="lineNum">      61 </span>            : /* ===========================================================================
+<span class="lineNum">      62 </span>            :  *  Function prototypes.
+<span class="lineNum">      63 </span>            :  */
+<span class="lineNum">      64 </span>            : typedef enum {
+<span class="lineNum">      65 </span>            :     need_more,      /* block not completed, need more input or more output */
+<span class="lineNum">      66 </span>            :     block_done,     /* block flush performed */
+<span class="lineNum">      67 </span>            :     finish_started, /* finish started, need only more output at next deflate */
+<span class="lineNum">      68 </span>            :     finish_done     /* finish done, accept no more input or output */
+<span class="lineNum">      69 </span>            : } block_state;
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : typedef block_state (*compress_func) OF((deflate_state *s, int flush));
+<span class="lineNum">      72 </span>            : /* Compression function. Returns the block state after the call. */
+<span class="lineNum">      73 </span>            : 
+<span class="lineNum">      74 </span>            : local void fill_window    OF((deflate_state *s));
+<span class="lineNum">      75 </span>            : local block_state deflate_stored OF((deflate_state *s, int flush));
+<span class="lineNum">      76 </span>            : local block_state deflate_fast   OF((deflate_state *s, int flush));
+<span class="lineNum">      77 </span>            : #ifndef FASTEST
+<span class="lineNum">      78 </span>            : local block_state deflate_slow   OF((deflate_state *s, int flush));
+<span class="lineNum">      79 </span>            : #endif
+<span class="lineNum">      80 </span>            : local void lm_init        OF((deflate_state *s));
+<span class="lineNum">      81 </span>            : local void putShortMSB    OF((deflate_state *s, uInt b));
+<span class="lineNum">      82 </span>            : local void flush_pending  OF((z_streamp strm));
+<span class="lineNum">      83 </span>            : local int read_buf        OF((z_streamp strm, Bytef *buf, unsigned size));
+<span class="lineNum">      84 </span>            : #ifndef FASTEST
+<span class="lineNum">      85 </span>            : #ifdef ASMV
+<span class="lineNum">      86 </span>            :       void match_init OF((void)); /* asm code initialization */
+<span class="lineNum">      87 </span>            :       uInt longest_match  OF((deflate_state *s, IPos cur_match));
+<span class="lineNum">      88 </span>            : #else
+<span class="lineNum">      89 </span>            : local uInt longest_match  OF((deflate_state *s, IPos cur_match));
+<span class="lineNum">      90 </span>            : #endif
+<span class="lineNum">      91 </span>            : #endif
+<span class="lineNum">      92 </span>            : local uInt longest_match_fast OF((deflate_state *s, IPos cur_match));
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span>            : #ifdef DEBUG_LIBZ
+<span class="lineNum">      95 </span>            : local  void check_match OF((deflate_state *s, IPos start, IPos match,
+<span class="lineNum">      96 </span>            :                             int length));
+<span class="lineNum">      97 </span>            : #endif
+<span class="lineNum">      98 </span>            : 
+<span class="lineNum">      99 </span>            : /* ===========================================================================
+<span class="lineNum">     100 </span>            :  * Local data
+<span class="lineNum">     101 </span>            :  */
+<span class="lineNum">     102 </span>            : 
+<span class="lineNum">     103 </span>            : #define NIL 0
+<span class="lineNum">     104 </span>            : /* Tail of hash chains */
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span>            : #ifndef TOO_FAR
+<span class="lineNum">     107 </span>            : #  define TOO_FAR 4096
+<span class="lineNum">     108 </span>            : #endif
+<span class="lineNum">     109 </span>            : /* Matches of length 3 are discarded if their distance exceeds TOO_FAR */
+<span class="lineNum">     110 </span>            : 
+<span class="lineNum">     111 </span>            : #define MIN_LOOKAHEAD (MAX_MATCH+MIN_MATCH+1)
+<span class="lineNum">     112 </span>            : /* Minimum amount of lookahead, except at the end of the input file.
+<span class="lineNum">     113 </span>            :  * See deflate.c for comments about the MIN_MATCH+1.
+<span class="lineNum">     114 </span>            :  */
+<span class="lineNum">     115 </span>            : 
+<span class="lineNum">     116 </span>            : /* Values for max_lazy_match, good_match and max_chain_length, depending on
+<span class="lineNum">     117 </span>            :  * the desired pack level (0..9). The values given below have been tuned to
+<span class="lineNum">     118 </span>            :  * exclude worst case performance for pathological files. Better values may be
+<span class="lineNum">     119 </span>            :  * found for specific files.
+<span class="lineNum">     120 </span>            :  */
+<span class="lineNum">     121 </span>            : typedef struct config_s {
+<span class="lineNum">     122 </span>            :    ush good_length; /* reduce lazy search above this match length */
+<span class="lineNum">     123 </span>            :    ush max_lazy;    /* do not perform lazy search above this match length */
+<span class="lineNum">     124 </span>            :    ush nice_length; /* quit search above this match length */
+<span class="lineNum">     125 </span>            :    ush max_chain;
+<span class="lineNum">     126 </span>            :    compress_func func;
+<span class="lineNum">     127 </span>            : } config;
+<span class="lineNum">     128 </span>            : 
+<span class="lineNum">     129 </span>            : #ifdef FASTEST
+<span class="lineNum">     130 </span>            : local const config configuration_table[2] = {
+<span class="lineNum">     131 </span>            : /*      good lazy nice chain */
+<span class="lineNum">     132 </span>            : /* 0 */ {0,    0,  0,    0, deflate_stored},  /* store only */
+<span class="lineNum">     133 </span>            : /* 1 */ {4,    4,  8,    4, deflate_fast}}; /* max speed, no lazy matches */
+<span class="lineNum">     134 </span>            : #else
+<span class="lineNum">     135 </span>            : local const config configuration_table[10] = {
+<span class="lineNum">     136 </span>            : /*      good lazy nice chain */
+<span class="lineNum">     137 </span>            : /* 0 */ {0,    0,  0,    0, deflate_stored},  /* store only */
+<span class="lineNum">     138 </span>            : /* 1 */ {4,    4,  8,    4, deflate_fast}, /* max speed, no lazy matches */
+<span class="lineNum">     139 </span>            : /* 2 */ {4,    5, 16,    8, deflate_fast},
+<span class="lineNum">     140 </span>            : /* 3 */ {4,    6, 32,   32, deflate_fast},
+<span class="lineNum">     141 </span>            : 
+<span class="lineNum">     142 </span>            : /* 4 */ {4,    4, 16,   16, deflate_slow},  /* lazy matches */
+<span class="lineNum">     143 </span>            : /* 5 */ {8,   16, 32,   32, deflate_slow},
+<span class="lineNum">     144 </span>            : /* 6 */ {8,   16, 128, 128, deflate_slow},
+<span class="lineNum">     145 </span>            : /* 7 */ {8,   32, 128, 256, deflate_slow},
+<span class="lineNum">     146 </span>            : /* 8 */ {32, 128, 258, 1024, deflate_slow},
+<span class="lineNum">     147 </span>            : /* 9 */ {32, 258, 258, 4096, deflate_slow}}; /* max compression */
+<span class="lineNum">     148 </span>            : #endif
+<span class="lineNum">     149 </span>            : 
+<span class="lineNum">     150 </span>            : /* Note: the deflate() code requires max_lazy &gt;= MIN_MATCH and max_chain &gt;= 4
+<span class="lineNum">     151 </span>            :  * For deflate_fast() (levels &lt;= 3) good is ignored and lazy has a different
+<span class="lineNum">     152 </span>            :  * meaning.
+<span class="lineNum">     153 </span>            :  */
+<span class="lineNum">     154 </span>            : 
+<span class="lineNum">     155 </span>            : #define EQUAL 0
+<span class="lineNum">     156 </span>            : /* result of memcmp for equal strings */
+<span class="lineNum">     157 </span>            : 
+<span class="lineNum">     158 </span>            : #ifndef NO_DUMMY_DECL
+<span class="lineNum">     159 </span>            : struct static_tree_desc_s {int dummy;}; /* for buggy compilers */
+<span class="lineNum">     160 </span>            : #endif
+<span class="lineNum">     161 </span>            : 
+<span class="lineNum">     162 </span>            : /* ===========================================================================
+<span class="lineNum">     163 </span>            :  * Update a hash value with the given input byte
+<span class="lineNum">     164 </span>            :  * IN  assertion: all calls to UPDATE_HASH are made with consecutive
+<span class="lineNum">     165 </span>            :  *    input characters, so that a running hash key can be computed from the
+<span class="lineNum">     166 </span>            :  *    previous key instead of complete recalculation each time.
+<span class="lineNum">     167 </span>            :  */
+<span class="lineNum">     168 </span>            : #define UPDATE_HASH(s,h,c) (h = (((h)&lt;&lt;s-&gt;hash_shift) ^ (c)) &amp; s-&gt;hash_mask)
+<span class="lineNum">     169 </span>            : 
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span>            : /* ===========================================================================
+<span class="lineNum">     172 </span>            :  * Insert string str in the dictionary and set match_head to the previous head
+<span class="lineNum">     173 </span>            :  * of the hash chain (the most recent string with same hash key). Return
+<span class="lineNum">     174 </span>            :  * the previous length of the hash chain.
+<span class="lineNum">     175 </span>            :  * If this file is compiled with -DFASTEST, the compression level is forced
+<span class="lineNum">     176 </span>            :  * to 1, and no hash chains are maintained.
+<span class="lineNum">     177 </span>            :  * IN  assertion: all calls to INSERT_STRING are made with consecutive
+<span class="lineNum">     178 </span>            :  *    input characters and the first MIN_MATCH bytes of str are valid
+<span class="lineNum">     179 </span>            :  *    (except for the last MIN_MATCH-1 bytes of the input file).
+<span class="lineNum">     180 </span>            :  */
+<span class="lineNum">     181 </span>            : #ifdef FASTEST
+<span class="lineNum">     182 </span>            : #define INSERT_STRING(s, str, match_head) \
+<span class="lineNum">     183 </span>            :    (UPDATE_HASH(s, s-&gt;ins_h, s-&gt;window[(str) + (MIN_MATCH-1)]), \
+<span class="lineNum">     184 </span>            :     match_head = s-&gt;head[s-&gt;ins_h], \
+<span class="lineNum">     185 </span>            :     s-&gt;head[s-&gt;ins_h] = (Pos)(str))
+<span class="lineNum">     186 </span>            : #else
+<span class="lineNum">     187 </span>            : #define INSERT_STRING(s, str, match_head) \
+<span class="lineNum">     188 </span>            :    (UPDATE_HASH(s, s-&gt;ins_h, s-&gt;window[(str) + (MIN_MATCH-1)]), \
+<span class="lineNum">     189 </span>            :     match_head = s-&gt;prev[(str) &amp; s-&gt;w_mask] = s-&gt;head[s-&gt;ins_h], \
+<span class="lineNum">     190 </span>            :     s-&gt;head[s-&gt;ins_h] = (Pos)(str))
+<span class="lineNum">     191 </span>            : #endif
+<span class="lineNum">     192 </span>            : 
+<span class="lineNum">     193 </span>            : /* ===========================================================================
+<span class="lineNum">     194 </span>            :  * Initialize the hash table (avoiding 64K overflow for 16 bit systems).
+<span class="lineNum">     195 </span>            :  * prev[] will be initialized on the fly.
+<span class="lineNum">     196 </span>            :  */
+<span class="lineNum">     197 </span>            : #define CLEAR_HASH(s) \
+<span class="lineNum">     198 </span>            :     s-&gt;head[s-&gt;hash_size-1] = NIL; \
+<span class="lineNum">     199 </span>            :     zmemzero((Bytef *)s-&gt;head, (unsigned)(s-&gt;hash_size-1)*sizeof(*s-&gt;head));
+<a name="200"><span class="lineNum">     200 </span>            : </a>
+<span class="lineNum">     201 </span>            : /* ========================================================================= */
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 : int ZEXPORT deflateInit_(strm, level, version, stream_size)</span>
+<span class="lineNum">     203 </span>            :     z_streamp strm;
+<span class="lineNum">     204 </span>            :     int level;
+<span class="lineNum">     205 </span>            :     const char *version;
+<span class="lineNum">     206 </span>            :     int stream_size;
+<span class="lineNum">     207 </span>            : {
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :     return deflateInit2_(strm, level, Z_DEFLATED, MAX_WBITS, DEF_MEM_LEVEL,</span>
+<span class="lineNum">     209 </span>            :                          Z_DEFAULT_STRATEGY, version, stream_size);
+<span class="lineNum">     210 </span>            :     /* To do: ignore strm-&gt;next_in if we use it as window */
+<span class="lineNum">     211 </span>            : }
+<a name="212"><span class="lineNum">     212 </span>            : </a>
+<span class="lineNum">     213 </span>            : /* ========================================================================= */
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 : int ZEXPORT deflateInit2_(strm, level, method, windowBits, memLevel, strategy,</span>
+<span class="lineNum">     215 </span>            :                   version, stream_size)
+<span class="lineNum">     216 </span>            :     z_streamp strm;
+<span class="lineNum">     217 </span>            :     int  level;
+<span class="lineNum">     218 </span>            :     int  method;
+<span class="lineNum">     219 </span>            :     int  windowBits;
+<span class="lineNum">     220 </span>            :     int  memLevel;
+<span class="lineNum">     221 </span>            :     int  strategy;
+<span class="lineNum">     222 </span>            :     const char *version;
+<span class="lineNum">     223 </span>            :     int stream_size;
+<span class="lineNum">     224 </span>            : {
+<span class="lineNum">     225 </span>            :     deflate_state *s;
+<span class="lineNum">     226 </span>            :     int wrap = 1;
+<span class="lineNum">     227 </span>            :     static const char my_version[] = ZLIB_VERSION;
+<span class="lineNum">     228 </span>            : 
+<span class="lineNum">     229 </span>            :     ushf *overlay;
+<span class="lineNum">     230 </span>            :     /* We overlay pending_buf and d_buf+l_buf. This works since the average
+<span class="lineNum">     231 </span>            :      * output size for (length,distance) codes is &lt;= 24 bits.
+<span class="lineNum">     232 </span>            :      */
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :     if (version == Z_NULL || version[0] != my_version[0] ||</span>
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :         stream_size != sizeof(z_stream)) {</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :         return Z_VERSION_ERROR;</span>
+<span class="lineNum">     237 </span>            :     }
+<span class="lineNum">     238 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL) return Z_STREAM_ERROR;</span>
+<span class="lineNum">     239 </span>            : 
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :     strm-&gt;msg = Z_NULL;</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :     if (strm-&gt;zalloc == (alloc_func)0) {</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         strm-&gt;zalloc = zcalloc;</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         strm-&gt;opaque = (voidpf)0;</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     245 </span><span class="lineNoCov">          0 :     if (strm-&gt;zfree == (free_func)0) strm-&gt;zfree = zcfree;</span>
+<span class="lineNum">     246 </span>            : 
+<span class="lineNum">     247 </span>            : #ifdef FASTEST
+<span class="lineNum">     248 </span>            :     if (level != 0) level = 1;
+<span class="lineNum">     249 </span>            : #else
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :     if (level == Z_DEFAULT_COMPRESSION) level = 6;</span>
+<span class="lineNum">     251 </span>            : #endif
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span><span class="lineNoCov">          0 :     if (windowBits &lt; 0) { /* suppress zlib wrapper */</span>
+<span class="lineNum">     254 </span>            :         wrap = 0;
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         windowBits = -windowBits;</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     257 </span>            : #ifdef GZIP
+<span class="lineNum">     258 </span><span class="lineNoCov">          0 :     else if (windowBits &gt; 15) {</span>
+<span class="lineNum">     259 </span>            :         wrap = 2;       /* write gzip wrapper instead */
+<span class="lineNum">     260 </span><span class="lineNoCov">          0 :         windowBits -= 16;</span>
+<span class="lineNum">     261 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     262 </span>            : #endif
+<span class="lineNum">     263 </span><span class="lineNoCov">          0 :     if (memLevel &lt; 1 || memLevel &gt; MAX_MEM_LEVEL || method != Z_DEFLATED ||</span>
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :         windowBits &lt; 8 || windowBits &gt; 15 || level &lt; 0 || level &gt; 9 ||</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         strategy &lt; 0 || strategy &gt; Z_FIXED) {</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         return Z_STREAM_ERROR;</span>
+<span class="lineNum">     267 </span>            :     }
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :     if (windowBits == 8) windowBits = 9;  /* until 256-byte window bug fixed */</span>
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :     s = (deflate_state *) ZALLOC(strm, 1, sizeof(deflate_state));</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :     if (s == Z_NULL) return Z_MEM_ERROR;</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :     strm-&gt;state = (struct internal_state FAR *)s;</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :     s-&gt;strm = strm;</span>
+<span class="lineNum">     273 </span>            : 
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :     s-&gt;wrap = wrap;</span>
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :     s-&gt;gzhead = Z_NULL;</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :     s-&gt;w_bits = windowBits;</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :     s-&gt;w_size = 1 &lt;&lt; s-&gt;w_bits;</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :     s-&gt;w_mask = s-&gt;w_size - 1;</span>
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 :     s-&gt;hash_bits = memLevel + 7;</span>
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :     s-&gt;hash_size = 1 &lt;&lt; s-&gt;hash_bits;</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :     s-&gt;hash_mask = s-&gt;hash_size - 1;</span>
+<span class="lineNum">     283 </span><span class="lineNoCov">          0 :     s-&gt;hash_shift =  ((s-&gt;hash_bits+MIN_MATCH-1)/MIN_MATCH);</span>
+<span class="lineNum">     284 </span>            : 
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :     s-&gt;window = (Bytef *) ZALLOC(strm, s-&gt;w_size, 2*sizeof(Byte));</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :     s-&gt;prev   = (Posf *)  ZALLOC(strm, s-&gt;w_size, sizeof(Pos));</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :     s-&gt;head   = (Posf *)  ZALLOC(strm, s-&gt;hash_size, sizeof(Pos));</span>
+<span class="lineNum">     288 </span>            : 
+<span class="lineNum">     289 </span><span class="lineNoCov">          0 :     s-&gt;lit_bufsize = 1 &lt;&lt; (memLevel + 6); /* 16K elements by default */</span>
+<span class="lineNum">     290 </span>            : 
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :     overlay = (ushf *) ZALLOC(strm, s-&gt;lit_bufsize, sizeof(ush)+2);</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :     s-&gt;pending_buf = (uchf *) overlay;</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :     s-&gt;pending_buf_size = (ulg)s-&gt;lit_bufsize * (sizeof(ush)+2L);</span>
+<span class="lineNum">     294 </span>            : 
+<span class="lineNum">     295 </span><span class="lineNoCov">          0 :     if (s-&gt;window == Z_NULL || s-&gt;prev == Z_NULL || s-&gt;head == Z_NULL ||</span>
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         s-&gt;pending_buf == Z_NULL) {</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         s-&gt;status = FINISH_STATE;</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :         strm-&gt;msg = (char*)ERR_MSG(Z_MEM_ERROR);</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :         deflateEnd (strm);</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :         return Z_MEM_ERROR;</span>
+<span class="lineNum">     301 </span>            :     }
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :     s-&gt;d_buf = overlay + s-&gt;lit_bufsize/sizeof(ush);</span>
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :     s-&gt;l_buf = s-&gt;pending_buf + (1+sizeof(ush))*s-&gt;lit_bufsize;</span>
+<span class="lineNum">     304 </span>            : 
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :     s-&gt;level = level;</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :     s-&gt;strategy = strategy;</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :     s-&gt;method = (Byte)method;</span>
+<span class="lineNum">     308 </span>            : 
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :     return deflateReset(strm);</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 : }</span>
+<a name="311"><span class="lineNum">     311 </span>            : </a>
+<span class="lineNum">     312 </span>            : /* ========================================================================= */
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 : int ZEXPORT deflateSetDictionary (strm, dictionary, dictLength)</span>
+<span class="lineNum">     314 </span>            :     z_streamp strm;
+<span class="lineNum">     315 </span>            :     const Bytef *dictionary;
+<span class="lineNum">     316 </span>            :     uInt  dictLength;
+<span class="lineNum">     317 </span>            : {
+<span class="lineNum">     318 </span>            :     deflate_state *s;
+<span class="lineNum">     319 </span>            :     uInt length = dictLength;
+<span class="lineNum">     320 </span>            :     uInt n;
+<span class="lineNum">     321 </span>            :     IPos hash_head = 0;
+<span class="lineNum">     322 </span>            : 
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL || dictionary == Z_NULL ||</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :         strm-&gt;state-&gt;wrap == 2 ||</span>
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :         (strm-&gt;state-&gt;wrap == 1 &amp;&amp; strm-&gt;state-&gt;status != INIT_STATE))</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :         return Z_STREAM_ERROR;</span>
+<span class="lineNum">     327 </span>            : 
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :     s = strm-&gt;state;</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :     if (s-&gt;wrap)</span>
+<span class="lineNum">     330 </span><span class="lineNoCov">          0 :         strm-&gt;adler = adler32(strm-&gt;adler, dictionary, dictLength);</span>
+<span class="lineNum">     331 </span>            : 
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :     if (length &lt; MIN_MATCH) return Z_OK;</span>
+<span class="lineNum">     333 </span><span class="lineNoCov">          0 :     if (length &gt; MAX_DIST(s)) {</span>
+<span class="lineNum">     334 </span>            :         length = MAX_DIST(s);
+<span class="lineNum">     335 </span><span class="lineNoCov">          0 :         dictionary += dictLength - length; /* use the tail of the dictionary */</span>
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :     zmemcpy(s-&gt;window, dictionary, length);</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :     s-&gt;strstart = length;</span>
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 :     s-&gt;block_start = (long)length;</span>
+<span class="lineNum">     340 </span>            : 
+<span class="lineNum">     341 </span>            :     /* Insert all strings in the hash table (except for the last two bytes).
+<span class="lineNum">     342 </span>            :      * s-&gt;lookahead stays null, so s-&gt;ins_h will be recomputed at the next
+<span class="lineNum">     343 </span>            :      * call of fill_window.
+<span class="lineNum">     344 </span>            :      */
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :     s-&gt;ins_h = s-&gt;window[0];</span>
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :     UPDATE_HASH(s, s-&gt;ins_h, s-&gt;window[1]);</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :     for (n = 0; n &lt;= length - MIN_MATCH; n++) {</span>
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :         INSERT_STRING(s, n, hash_head);</span>
+<span class="lineNum">     349 </span>            :     }
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :     if (hash_head) hash_head = 0;  /* to make compiler happy */</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :     return Z_OK;</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 : }</span>
+<a name="353"><span class="lineNum">     353 </span>            : </a>
+<span class="lineNum">     354 </span>            : /* ========================================================================= */
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 : int ZEXPORT deflateReset (strm)</span>
+<span class="lineNum">     356 </span>            :     z_streamp strm;
+<span class="lineNum">     357 </span>            : {
+<span class="lineNum">     358 </span>            :     deflate_state *s;
+<span class="lineNum">     359 </span>            : 
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL ||</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :         strm-&gt;zalloc == (alloc_func)0 || strm-&gt;zfree == (free_func)0) {</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :         return Z_STREAM_ERROR;</span>
+<span class="lineNum">     363 </span>            :     }
+<span class="lineNum">     364 </span>            : 
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :     strm-&gt;total_in = strm-&gt;total_out = 0;</span>
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :     strm-&gt;msg = Z_NULL; /* use zfree if we ever allocate msg dynamically */</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :     strm-&gt;data_type = Z_UNKNOWN;</span>
+<span class="lineNum">     368 </span>            : 
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :     s = (deflate_state *)strm-&gt;state;</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :     s-&gt;pending = 0;</span>
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :     s-&gt;pending_out = s-&gt;pending_buf;</span>
+<span class="lineNum">     372 </span>            : 
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :     if (s-&gt;wrap &lt; 0) {</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :         s-&gt;wrap = -s-&gt;wrap; /* was made negative by deflate(..., Z_FINISH); */</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     376 </span><span class="lineNoCov">          0 :     s-&gt;status = s-&gt;wrap ? INIT_STATE : BUSY_STATE;</span>
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :     strm-&gt;adler =</span>
+<span class="lineNum">     378 </span>            : #ifdef GZIP
+<span class="lineNum">     379 </span><span class="lineNoCov">          0 :         s-&gt;wrap == 2 ? crc32(0L, Z_NULL, 0) :</span>
+<span class="lineNum">     380 </span>            : #endif
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :         adler32(0L, Z_NULL, 0);</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :     s-&gt;last_flush = Z_NO_FLUSH;</span>
+<span class="lineNum">     383 </span>            : 
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :     _tr_init(s);</span>
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 :     lm_init(s);</span>
+<span class="lineNum">     386 </span>            : 
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :     return Z_OK;</span>
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 : }</span>
+<a name="389"><span class="lineNum">     389 </span>            : </a>
+<span class="lineNum">     390 </span>            : /* ========================================================================= */
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 : int ZEXPORT deflateSetHeader (strm, head)</span>
+<span class="lineNum">     392 </span>            :     z_streamp strm;
+<span class="lineNum">     393 </span>            :     gz_headerp head;
+<span class="lineNum">     394 </span>            : {
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL) return Z_STREAM_ERROR;</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :     if (strm-&gt;state-&gt;wrap != 2) return Z_STREAM_ERROR;</span>
+<span class="lineNum">     397 </span><span class="lineNoCov">          0 :     strm-&gt;state-&gt;gzhead = head;</span>
+<span class="lineNum">     398 </span><span class="lineNoCov">          0 :     return Z_OK;</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 : }</span>
+<a name="400"><span class="lineNum">     400 </span>            : </a>
+<span class="lineNum">     401 </span>            : /* ========================================================================= */
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 : int ZEXPORT deflatePrime (strm, bits, value)</span>
+<span class="lineNum">     403 </span>            :     z_streamp strm;
+<span class="lineNum">     404 </span>            :     int bits;
+<span class="lineNum">     405 </span>            :     int value;
+<span class="lineNum">     406 </span>            : {
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL) return Z_STREAM_ERROR;</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :     strm-&gt;state-&gt;bi_valid = bits;</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :     strm-&gt;state-&gt;bi_buf = (ush)(value &amp; ((1 &lt;&lt; bits) - 1));</span>
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :     return Z_OK;</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 : }</span>
+<a name="412"><span class="lineNum">     412 </span>            : </a>
+<span class="lineNum">     413 </span>            : /* ========================================================================= */
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 : int ZEXPORT deflateParams(strm, level, strategy)</span>
+<span class="lineNum">     415 </span>            :     z_streamp strm;
+<span class="lineNum">     416 </span>            :     int level;
+<span class="lineNum">     417 </span>            :     int strategy;
+<span class="lineNum">     418 </span>            : {
+<span class="lineNum">     419 </span>            :     deflate_state *s;
+<span class="lineNum">     420 </span>            :     compress_func func;
+<span class="lineNum">     421 </span>            :     int err = Z_OK;
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL) return Z_STREAM_ERROR;</span>
+<span class="lineNum">     424 </span>            :     s = strm-&gt;state;
+<span class="lineNum">     425 </span>            : 
+<span class="lineNum">     426 </span>            : #ifdef FASTEST
+<span class="lineNum">     427 </span>            :     if (level != 0) level = 1;
+<span class="lineNum">     428 </span>            : #else
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :     if (level == Z_DEFAULT_COMPRESSION) level = 6;</span>
+<span class="lineNum">     430 </span>            : #endif
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :     if (level &lt; 0 || level &gt; 9 || strategy &lt; 0 || strategy &gt; Z_FIXED) {</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :         return Z_STREAM_ERROR;</span>
+<span class="lineNum">     433 </span>            :     }
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :     func = configuration_table[s-&gt;level].func;</span>
+<span class="lineNum">     435 </span>            : 
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :     if (func != configuration_table[level].func &amp;&amp; strm-&gt;total_in != 0) {</span>
+<span class="lineNum">     437 </span>            :         /* Flush the last buffer: */
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :         err = deflate(strm, Z_PARTIAL_FLUSH);</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :     if (s-&gt;level != level) {</span>
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :         s-&gt;level = level;</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         s-&gt;max_lazy_match   = configuration_table[level].max_lazy;</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :         s-&gt;good_match       = configuration_table[level].good_length;</span>
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :         s-&gt;nice_match       = configuration_table[level].nice_length;</span>
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :         s-&gt;max_chain_length = configuration_table[level].max_chain;</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     447 </span><span class="lineNoCov">          0 :     s-&gt;strategy = strategy;</span>
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :     return err;</span>
+<span class="lineNum">     449 </span><span class="lineNoCov">          0 : }</span>
+<a name="450"><span class="lineNum">     450 </span>            : </a>
+<span class="lineNum">     451 </span>            : /* ========================================================================= */
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 : int ZEXPORT deflateTune(strm, good_length, max_lazy, nice_length, max_chain)</span>
+<span class="lineNum">     453 </span>            :     z_streamp strm;
+<span class="lineNum">     454 </span>            :     int good_length;
+<span class="lineNum">     455 </span>            :     int max_lazy;
+<span class="lineNum">     456 </span>            :     int nice_length;
+<span class="lineNum">     457 </span>            :     int max_chain;
+<span class="lineNum">     458 </span>            : {
+<span class="lineNum">     459 </span>            :     deflate_state *s;
+<span class="lineNum">     460 </span>            : 
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL) return Z_STREAM_ERROR;</span>
+<span class="lineNum">     462 </span>            :     s = strm-&gt;state;
+<span class="lineNum">     463 </span><span class="lineNoCov">          0 :     s-&gt;good_match = good_length;</span>
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :     s-&gt;max_lazy_match = max_lazy;</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :     s-&gt;nice_match = nice_length;</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :     s-&gt;max_chain_length = max_chain;</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :     return Z_OK;</span>
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     469 </span>            : 
+<span class="lineNum">     470 </span>            : /* =========================================================================
+<span class="lineNum">     471 </span>            :  * For the default windowBits of 15 and memLevel of 8, this function returns
+<span class="lineNum">     472 </span>            :  * a close to exact, as well as small, upper bound on the compressed size.
+<span class="lineNum">     473 </span>            :  * They are coded as constants here for a reason--if the #define's are
+<span class="lineNum">     474 </span>            :  * changed, then this function needs to be changed as well.  The return
+<span class="lineNum">     475 </span>            :  * value for 15 and 8 only works for those exact settings.
+<span class="lineNum">     476 </span>            :  *
+<span class="lineNum">     477 </span>            :  * For any setting other than those defaults for windowBits and memLevel,
+<span class="lineNum">     478 </span>            :  * the value returned is a conservative worst case for the maximum expansion
+<span class="lineNum">     479 </span>            :  * resulting from using fixed blocks instead of stored blocks, which deflate
+<span class="lineNum">     480 </span>            :  * can emit on compressed data for some combinations of the parameters.
+<span class="lineNum">     481 </span>            :  *
+<span class="lineNum">     482 </span>            :  * This function could be more sophisticated to provide closer upper bounds
+<span class="lineNum">     483 </span>            :  * for every combination of windowBits and memLevel, as well as wrap.
+<span class="lineNum">     484 </span>            :  * But even the conservative upper bound of about 14% expansion does not
+<a name="485"><span class="lineNum">     485 </span>            :  * seem onerous for output buffer allocation.</a>
+<span class="lineNum">     486 </span>            :  */
+<span class="lineNum">     487 </span><span class="lineNoCov">          0 : uLong ZEXPORT deflateBound(strm, sourceLen)</span>
+<span class="lineNum">     488 </span>            :     z_streamp strm;
+<span class="lineNum">     489 </span>            :     uLong sourceLen;
+<span class="lineNum">     490 </span>            : {
+<span class="lineNum">     491 </span>            :     deflate_state *s;
+<span class="lineNum">     492 </span>            :     uLong destLen;
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span>            :     /* conservative upper bound */
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :     destLen = sourceLen +</span>
+<span class="lineNum">     496 </span><span class="lineNoCov">          0 :               ((sourceLen + 7) &gt;&gt; 3) + ((sourceLen + 63) &gt;&gt; 6) + 11;</span>
+<span class="lineNum">     497 </span>            : 
+<span class="lineNum">     498 </span>            :     /* if can't get parameters, return conservative bound */
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL)</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :         return destLen;</span>
+<span class="lineNum">     501 </span>            : 
+<span class="lineNum">     502 </span>            :     /* if not default parameters, return conservative bound */
+<span class="lineNum">     503 </span>            :     s = strm-&gt;state;
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :     if (s-&gt;w_bits != 15 || s-&gt;hash_bits != 8 + 7)</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         return destLen;</span>
+<span class="lineNum">     506 </span>            : 
+<span class="lineNum">     507 </span>            :     /* default settings: return tight bound for that case */
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :     return compressBound(sourceLen);</span>
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     510 </span>            : 
+<span class="lineNum">     511 </span>            : /* =========================================================================
+<span class="lineNum">     512 </span>            :  * Put a short in the pending buffer. The 16-bit value is put in MSB order.
+<span class="lineNum">     513 </span>            :  * IN assertion: the stream state is correct and there is enough room in
+<a name="514"><span class="lineNum">     514 </span>            :  * pending_buf.</a>
+<span class="lineNum">     515 </span>            :  */
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 : local void putShortMSB (s, b)</span>
+<span class="lineNum">     517 </span>            :     deflate_state *s;
+<span class="lineNum">     518 </span>            :     uInt b;
+<span class="lineNum">     519 </span>            : {
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :     put_byte(s, (Byte)(b &gt;&gt; 8));</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :     put_byte(s, (Byte)(b &amp; 0xff));</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     523 </span>            : 
+<span class="lineNum">     524 </span>            : /* =========================================================================
+<span class="lineNum">     525 </span>            :  * Flush as much pending output as possible. All deflate() output goes
+<span class="lineNum">     526 </span>            :  * through this function so some applications may wish to modify it
+<span class="lineNum">     527 </span>            :  * to avoid allocating a large strm-&gt;next_out buffer and copying into it.
+<a name="528"><span class="lineNum">     528 </span>            :  * (See also read_buf()).</a>
+<span class="lineNum">     529 </span>            :  */
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 : local void flush_pending(strm)</span>
+<span class="lineNum">     531 </span>            :     z_streamp strm;
+<span class="lineNum">     532 </span>            : {
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :     unsigned len = strm-&gt;state-&gt;pending;</span>
+<span class="lineNum">     534 </span>            : 
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :     if (len &gt; strm-&gt;avail_out) len = strm-&gt;avail_out;</span>
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :     if (len == 0) return;</span>
+<span class="lineNum">     537 </span>            : 
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :     zmemcpy(strm-&gt;next_out, strm-&gt;state-&gt;pending_out, len);</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :     strm-&gt;next_out  += len;</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :     strm-&gt;state-&gt;pending_out  += len;</span>
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :     strm-&gt;total_out += len;</span>
+<span class="lineNum">     542 </span><span class="lineNoCov">          0 :     strm-&gt;avail_out  -= len;</span>
+<span class="lineNum">     543 </span><span class="lineNoCov">          0 :     strm-&gt;state-&gt;pending -= len;</span>
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :     if (strm-&gt;state-&gt;pending == 0) {</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         strm-&gt;state-&gt;pending_out = strm-&gt;state-&gt;pending_buf;</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 : }</span>
+<a name="548"><span class="lineNum">     548 </span>            : </a>
+<span class="lineNum">     549 </span>            : /* ========================================================================= */
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 : int ZEXPORT deflate (strm, flush)</span>
+<span class="lineNum">     551 </span>            :     z_streamp strm;
+<span class="lineNum">     552 </span>            :     int flush;
+<span class="lineNum">     553 </span>            : {
+<span class="lineNum">     554 </span>            :     int old_flush; /* value of flush param for previous deflate call */
+<span class="lineNum">     555 </span>            :     deflate_state *s;
+<span class="lineNum">     556 </span>            : 
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL ||</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :         flush &gt; Z_FINISH || flush &lt; 0) {</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :         return Z_STREAM_ERROR;</span>
+<span class="lineNum">     560 </span>            :     }
+<span class="lineNum">     561 </span>            :     s = strm-&gt;state;
+<span class="lineNum">     562 </span>            : 
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :     if (strm-&gt;next_out == Z_NULL ||</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :         (strm-&gt;next_in == Z_NULL &amp;&amp; strm-&gt;avail_in != 0) ||</span>
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :         (s-&gt;status == FINISH_STATE &amp;&amp; flush != Z_FINISH)) {</span>
+<span class="lineNum">     566 </span><span class="lineNoCov">          0 :         ERR_RETURN(strm, Z_STREAM_ERROR);</span>
+<span class="lineNum">     567 </span>            :     }
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :     if (strm-&gt;avail_out == 0) ERR_RETURN(strm, Z_BUF_ERROR);</span>
+<span class="lineNum">     569 </span>            : 
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :     s-&gt;strm = strm; /* just in case */</span>
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :     old_flush = s-&gt;last_flush;</span>
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :     s-&gt;last_flush = flush;</span>
+<span class="lineNum">     573 </span>            : 
+<span class="lineNum">     574 </span>            :     /* Write the header */
+<span class="lineNum">     575 </span><span class="lineNoCov">          0 :     if (s-&gt;status == INIT_STATE) {</span>
+<span class="lineNum">     576 </span>            : #ifdef GZIP
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :         if (s-&gt;wrap == 2) {</span>
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :             strm-&gt;adler = crc32(0L, Z_NULL, 0);</span>
+<span class="lineNum">     579 </span><span class="lineNoCov">          0 :             put_byte(s, 31);</span>
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :             put_byte(s, 139);</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :             put_byte(s, 8);</span>
+<span class="lineNum">     582 </span><span class="lineNoCov">          0 :             if (s-&gt;gzhead == NULL) {</span>
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :                 put_byte(s, 0);</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                 put_byte(s, 0);</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :                 put_byte(s, 0);</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 put_byte(s, 0);</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :                 put_byte(s, 0);</span>
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :                 put_byte(s, s-&gt;level == 9 ? 2 :</span>
+<span class="lineNum">     589 </span>            :                             (s-&gt;strategy &gt;= Z_HUFFMAN_ONLY || s-&gt;level &lt; 2 ?
+<span class="lineNum">     590 </span>            :                              4 : 0));
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :                 put_byte(s, OS_CODE);</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :                 s-&gt;status = BUSY_STATE;</span>
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     594 </span>            :             else {
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                 put_byte(s, (s-&gt;gzhead-&gt;text ? 1 : 0) +</span>
+<span class="lineNum">     596 </span>            :                             (s-&gt;gzhead-&gt;hcrc ? 2 : 0) +
+<span class="lineNum">     597 </span>            :                             (s-&gt;gzhead-&gt;extra == Z_NULL ? 0 : 4) +
+<span class="lineNum">     598 </span>            :                             (s-&gt;gzhead-&gt;name == Z_NULL ? 0 : 8) +
+<span class="lineNum">     599 </span>            :                             (s-&gt;gzhead-&gt;comment == Z_NULL ? 0 : 16)
+<span class="lineNum">     600 </span>            :                         );
+<span class="lineNum">     601 </span><span class="lineNoCov">          0 :                 put_byte(s, (Byte)(s-&gt;gzhead-&gt;time &amp; 0xff));</span>
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :                 put_byte(s, (Byte)((s-&gt;gzhead-&gt;time &gt;&gt; 8) &amp; 0xff));</span>
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :                 put_byte(s, (Byte)((s-&gt;gzhead-&gt;time &gt;&gt; 16) &amp; 0xff));</span>
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :                 put_byte(s, (Byte)((s-&gt;gzhead-&gt;time &gt;&gt; 24) &amp; 0xff));</span>
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :                 put_byte(s, s-&gt;level == 9 ? 2 :</span>
+<span class="lineNum">     606 </span>            :                             (s-&gt;strategy &gt;= Z_HUFFMAN_ONLY || s-&gt;level &lt; 2 ?
+<span class="lineNum">     607 </span>            :                              4 : 0));
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                 put_byte(s, s-&gt;gzhead-&gt;os &amp; 0xff);</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :                 if (s-&gt;gzhead-&gt;extra != NULL) {</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :                     put_byte(s, s-&gt;gzhead-&gt;extra_len &amp; 0xff);</span>
+<span class="lineNum">     611 </span><span class="lineNoCov">          0 :                     put_byte(s, (s-&gt;gzhead-&gt;extra_len &gt;&gt; 8) &amp; 0xff);</span>
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :                 if (s-&gt;gzhead-&gt;hcrc)</span>
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                     strm-&gt;adler = crc32(strm-&gt;adler, s-&gt;pending_buf,</span>
+<span class="lineNum">     615 </span><span class="lineNoCov">          0 :                                         s-&gt;pending);</span>
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :                 s-&gt;gzindex = 0;</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                 s-&gt;status = EXTRA_STATE;</span>
+<span class="lineNum">     618 </span>            :             }
+<span class="lineNum">     619 </span>            :         }
+<span class="lineNum">     620 </span>            :         else
+<span class="lineNum">     621 </span>            : #endif
+<span class="lineNum">     622 </span>            :         {
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :             uInt header = (Z_DEFLATED + ((s-&gt;w_bits-8)&lt;&lt;4)) &lt;&lt; 8;</span>
+<span class="lineNum">     624 </span>            :             uInt level_flags;
+<span class="lineNum">     625 </span>            : 
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :             if (s-&gt;strategy &gt;= Z_HUFFMAN_ONLY || s-&gt;level &lt; 2)</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :                 level_flags = 0;</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :             else if (s-&gt;level &lt; 6)</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                 level_flags = 1;</span>
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :             else if (s-&gt;level == 6)</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :                 level_flags = 2;</span>
+<span class="lineNum">     632 </span>            :             else
+<span class="lineNum">     633 </span>            :                 level_flags = 3;
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 :             header |= (level_flags &lt;&lt; 6);</span>
+<span class="lineNum">     635 </span><span class="lineNoCov">          0 :             if (s-&gt;strstart != 0) header |= PRESET_DICT;</span>
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :             header += 31 - (header % 31);</span>
+<span class="lineNum">     637 </span>            : 
+<span class="lineNum">     638 </span><span class="lineNoCov">          0 :             s-&gt;status = BUSY_STATE;</span>
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :             putShortMSB(s, header);</span>
+<span class="lineNum">     640 </span>            : 
+<span class="lineNum">     641 </span>            :             /* Save the adler32 of the preset dictionary: */
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :             if (s-&gt;strstart != 0) {</span>
+<span class="lineNum">     643 </span><span class="lineNoCov">          0 :                 putShortMSB(s, (uInt)(strm-&gt;adler &gt;&gt; 16));</span>
+<span class="lineNum">     644 </span><span class="lineNoCov">          0 :                 putShortMSB(s, (uInt)(strm-&gt;adler &amp; 0xffff));</span>
+<span class="lineNum">     645 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 :             strm-&gt;adler = adler32(0L, Z_NULL, 0);</span>
+<span class="lineNum">     647 </span>            :         }
+<span class="lineNum">     648 </span>            :     }
+<span class="lineNum">     649 </span>            : #ifdef GZIP
+<span class="lineNum">     650 </span><span class="lineNoCov">          0 :     if (s-&gt;status == EXTRA_STATE) {</span>
+<span class="lineNum">     651 </span><span class="lineNoCov">          0 :         if (s-&gt;gzhead-&gt;extra != NULL) {</span>
+<span class="lineNum">     652 </span><span class="lineNoCov">          0 :             uInt beg = s-&gt;pending;  /* start of bytes to update crc */</span>
+<span class="lineNum">     653 </span>            : 
+<span class="lineNum">     654 </span><span class="lineNoCov">          0 :             while (s-&gt;gzindex &lt; (s-&gt;gzhead-&gt;extra_len &amp; 0xffff)) {</span>
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :                 if (s-&gt;pending == s-&gt;pending_buf_size) {</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :                     if (s-&gt;gzhead-&gt;hcrc &amp;&amp; s-&gt;pending &gt; beg)</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                         strm-&gt;adler = crc32(strm-&gt;adler, s-&gt;pending_buf + beg,</span>
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :                                             s-&gt;pending - beg);</span>
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :                     flush_pending(strm);</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :                     beg = s-&gt;pending;</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                     if (s-&gt;pending == s-&gt;pending_buf_size)</span>
+<span class="lineNum">     662 </span>            :                         break;
+<span class="lineNum">     663 </span>            :                 }
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :                 put_byte(s, s-&gt;gzhead-&gt;extra[s-&gt;gzindex]);</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :                 s-&gt;gzindex++;</span>
+<span class="lineNum">     666 </span>            :             }
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :             if (s-&gt;gzhead-&gt;hcrc &amp;&amp; s-&gt;pending &gt; beg)</span>
+<span class="lineNum">     668 </span><span class="lineNoCov">          0 :                 strm-&gt;adler = crc32(strm-&gt;adler, s-&gt;pending_buf + beg,</span>
+<span class="lineNum">     669 </span><span class="lineNoCov">          0 :                                     s-&gt;pending - beg);</span>
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :             if (s-&gt;gzindex == s-&gt;gzhead-&gt;extra_len) {</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                 s-&gt;gzindex = 0;</span>
+<span class="lineNum">     672 </span><span class="lineNoCov">          0 :                 s-&gt;status = NAME_STATE;</span>
+<span class="lineNum">     673 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     675 </span>            :         else
+<span class="lineNum">     676 </span><span class="lineNoCov">          0 :             s-&gt;status = NAME_STATE;</span>
+<span class="lineNum">     677 </span>            :     }
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :     if (s-&gt;status == NAME_STATE) {</span>
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :         if (s-&gt;gzhead-&gt;name != NULL) {</span>
+<span class="lineNum">     680 </span><span class="lineNoCov">          0 :             uInt beg = s-&gt;pending;  /* start of bytes to update crc */</span>
+<span class="lineNum">     681 </span>            :             int val;
+<span class="lineNum">     682 </span>            : 
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :             do {</span>
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :                 if (s-&gt;pending == s-&gt;pending_buf_size) {</span>
+<span class="lineNum">     685 </span><span class="lineNoCov">          0 :                     if (s-&gt;gzhead-&gt;hcrc &amp;&amp; s-&gt;pending &gt; beg)</span>
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :                         strm-&gt;adler = crc32(strm-&gt;adler, s-&gt;pending_buf + beg,</span>
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :                                             s-&gt;pending - beg);</span>
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :                     flush_pending(strm);</span>
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :                     beg = s-&gt;pending;</span>
+<span class="lineNum">     690 </span><span class="lineNoCov">          0 :                     if (s-&gt;pending == s-&gt;pending_buf_size) {</span>
+<span class="lineNum">     691 </span>            :                         val = 1;
+<span class="lineNum">     692 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     693 </span>            :                     }
+<span class="lineNum">     694 </span>            :                 }
+<span class="lineNum">     695 </span><span class="lineNoCov">          0 :                 val = s-&gt;gzhead-&gt;name[s-&gt;gzindex++];</span>
+<span class="lineNum">     696 </span><span class="lineNoCov">          0 :                 put_byte(s, val);</span>
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :             } while (val != 0);</span>
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :             if (s-&gt;gzhead-&gt;hcrc &amp;&amp; s-&gt;pending &gt; beg)</span>
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :                 strm-&gt;adler = crc32(strm-&gt;adler, s-&gt;pending_buf + beg,</span>
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 :                                     s-&gt;pending - beg);</span>
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :             if (val == 0) {</span>
+<span class="lineNum">     702 </span><span class="lineNoCov">          0 :                 s-&gt;gzindex = 0;</span>
+<span class="lineNum">     703 </span><span class="lineNoCov">          0 :                 s-&gt;status = COMMENT_STATE;</span>
+<span class="lineNum">     704 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     705 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     706 </span>            :         else
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :             s-&gt;status = COMMENT_STATE;</span>
+<span class="lineNum">     708 </span>            :     }
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :     if (s-&gt;status == COMMENT_STATE) {</span>
+<span class="lineNum">     710 </span><span class="lineNoCov">          0 :         if (s-&gt;gzhead-&gt;comment != NULL) {</span>
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :             uInt beg = s-&gt;pending;  /* start of bytes to update crc */</span>
+<span class="lineNum">     712 </span>            :             int val;
+<span class="lineNum">     713 </span>            : 
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 :             do {</span>
+<span class="lineNum">     715 </span><span class="lineNoCov">          0 :                 if (s-&gt;pending == s-&gt;pending_buf_size) {</span>
+<span class="lineNum">     716 </span><span class="lineNoCov">          0 :                     if (s-&gt;gzhead-&gt;hcrc &amp;&amp; s-&gt;pending &gt; beg)</span>
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :                         strm-&gt;adler = crc32(strm-&gt;adler, s-&gt;pending_buf + beg,</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :                                             s-&gt;pending - beg);</span>
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 :                     flush_pending(strm);</span>
+<span class="lineNum">     720 </span><span class="lineNoCov">          0 :                     beg = s-&gt;pending;</span>
+<span class="lineNum">     721 </span><span class="lineNoCov">          0 :                     if (s-&gt;pending == s-&gt;pending_buf_size) {</span>
+<span class="lineNum">     722 </span>            :                         val = 1;
+<span class="lineNum">     723 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     724 </span>            :                     }
+<span class="lineNum">     725 </span>            :                 }
+<span class="lineNum">     726 </span><span class="lineNoCov">          0 :                 val = s-&gt;gzhead-&gt;comment[s-&gt;gzindex++];</span>
+<span class="lineNum">     727 </span><span class="lineNoCov">          0 :                 put_byte(s, val);</span>
+<span class="lineNum">     728 </span><span class="lineNoCov">          0 :             } while (val != 0);</span>
+<span class="lineNum">     729 </span><span class="lineNoCov">          0 :             if (s-&gt;gzhead-&gt;hcrc &amp;&amp; s-&gt;pending &gt; beg)</span>
+<span class="lineNum">     730 </span><span class="lineNoCov">          0 :                 strm-&gt;adler = crc32(strm-&gt;adler, s-&gt;pending_buf + beg,</span>
+<span class="lineNum">     731 </span><span class="lineNoCov">          0 :                                     s-&gt;pending - beg);</span>
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 :             if (val == 0)</span>
+<span class="lineNum">     733 </span><span class="lineNoCov">          0 :                 s-&gt;status = HCRC_STATE;</span>
+<span class="lineNum">     734 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     735 </span>            :         else
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :             s-&gt;status = HCRC_STATE;</span>
+<span class="lineNum">     737 </span>            :     }
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :     if (s-&gt;status == HCRC_STATE) {</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :         if (s-&gt;gzhead-&gt;hcrc) {</span>
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :             if (s-&gt;pending + 2 &gt; s-&gt;pending_buf_size)</span>
+<span class="lineNum">     741 </span><span class="lineNoCov">          0 :                 flush_pending(strm);</span>
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :             if (s-&gt;pending + 2 &lt;= s-&gt;pending_buf_size) {</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :                 put_byte(s, (Byte)(strm-&gt;adler &amp; 0xff));</span>
+<span class="lineNum">     744 </span><span class="lineNoCov">          0 :                 put_byte(s, (Byte)((strm-&gt;adler &gt;&gt; 8) &amp; 0xff));</span>
+<span class="lineNum">     745 </span><span class="lineNoCov">          0 :                 strm-&gt;adler = crc32(0L, Z_NULL, 0);</span>
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :                 s-&gt;status = BUSY_STATE;</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     748 </span>            :         }
+<span class="lineNum">     749 </span>            :         else
+<span class="lineNum">     750 </span><span class="lineNoCov">          0 :             s-&gt;status = BUSY_STATE;</span>
+<span class="lineNum">     751 </span>            :     }
+<span class="lineNum">     752 </span>            : #endif
+<span class="lineNum">     753 </span>            : 
+<span class="lineNum">     754 </span>            :     /* Flush as much pending output as possible */
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :     if (s-&gt;pending != 0) {</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 :         flush_pending(strm);</span>
+<span class="lineNum">     757 </span><span class="lineNoCov">          0 :         if (strm-&gt;avail_out == 0) {</span>
+<span class="lineNum">     758 </span>            :             /* Since avail_out is 0, deflate will be called again with
+<span class="lineNum">     759 </span>            :              * more output space, but possibly with both pending and
+<span class="lineNum">     760 </span>            :              * avail_in equal to zero. There won't be anything to do,
+<span class="lineNum">     761 </span>            :              * but this is not an error situation so make sure we
+<span class="lineNum">     762 </span>            :              * return OK instead of BUF_ERROR at next call of deflate:
+<span class="lineNum">     763 </span>            :              */
+<span class="lineNum">     764 </span><span class="lineNoCov">          0 :             s-&gt;last_flush = -1;</span>
+<span class="lineNum">     765 </span><span class="lineNoCov">          0 :             return Z_OK;</span>
+<span class="lineNum">     766 </span>            :         }
+<span class="lineNum">     767 </span>            : 
+<span class="lineNum">     768 </span>            :     /* Make sure there is something to do and avoid duplicate consecutive
+<span class="lineNum">     769 </span>            :      * flushes. For repeated and useless calls with Z_FINISH, we keep
+<span class="lineNum">     770 </span>            :      * returning Z_STREAM_END instead of Z_BUF_ERROR.
+<span class="lineNum">     771 </span>            :      */
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 :     } else if (strm-&gt;avail_in == 0 &amp;&amp; flush &lt;= old_flush &amp;&amp;</span>
+<span class="lineNum">     773 </span>            :                flush != Z_FINISH) {
+<span class="lineNum">     774 </span><span class="lineNoCov">          0 :         ERR_RETURN(strm, Z_BUF_ERROR);</span>
+<span class="lineNum">     775 </span>            :     }
+<span class="lineNum">     776 </span>            : 
+<span class="lineNum">     777 </span>            :     /* User must not provide more input after the first FINISH: */
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :     if (s-&gt;status == FINISH_STATE &amp;&amp; strm-&gt;avail_in != 0) {</span>
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :         ERR_RETURN(strm, Z_BUF_ERROR);</span>
+<span class="lineNum">     780 </span>            :     }
+<span class="lineNum">     781 </span>            : 
+<span class="lineNum">     782 </span>            :     /* Start a new block or continue the current one.
+<span class="lineNum">     783 </span>            :      */
+<span class="lineNum">     784 </span><span class="lineNoCov">          0 :     if (strm-&gt;avail_in != 0 || s-&gt;lookahead != 0 ||</span>
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 :         (flush != Z_NO_FLUSH &amp;&amp; s-&gt;status != FINISH_STATE)) {</span>
+<span class="lineNum">     786 </span>            :         block_state bstate;
+<span class="lineNum">     787 </span>            : 
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 :         bstate = (*(configuration_table[s-&gt;level].func))(s, flush);</span>
+<span class="lineNum">     789 </span>            : 
+<span class="lineNum">     790 </span><span class="lineNoCov">          0 :         if (bstate == finish_started || bstate == finish_done) {</span>
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 :             s-&gt;status = FINISH_STATE;</span>
+<span class="lineNum">     792 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     793 </span><span class="lineNoCov">          0 :         if (bstate == need_more || bstate == finish_started) {</span>
+<span class="lineNum">     794 </span><span class="lineNoCov">          0 :             if (strm-&gt;avail_out == 0) {</span>
+<span class="lineNum">     795 </span><span class="lineNoCov">          0 :                 s-&gt;last_flush = -1; /* avoid BUF_ERROR next call, see above */</span>
+<span class="lineNum">     796 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :             return Z_OK;</span>
+<span class="lineNum">     798 </span>            :             /* If flush != Z_NO_FLUSH &amp;&amp; avail_out == 0, the next call
+<span class="lineNum">     799 </span>            :              * of deflate should use the same flush parameter to make sure
+<span class="lineNum">     800 </span>            :              * that the flush is complete. So we don't have to output an
+<span class="lineNum">     801 </span>            :              * empty block here, this will be done at next call. This also
+<span class="lineNum">     802 </span>            :              * ensures that for a very small output buffer, we emit at most
+<span class="lineNum">     803 </span>            :              * one empty block.
+<span class="lineNum">     804 </span>            :              */
+<span class="lineNum">     805 </span>            :         }
+<span class="lineNum">     806 </span><span class="lineNoCov">          0 :         if (bstate == block_done) {</span>
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 :             if (flush == Z_PARTIAL_FLUSH) {</span>
+<span class="lineNum">     808 </span><span class="lineNoCov">          0 :                 _tr_align(s);</span>
+<span class="lineNum">     809 </span><span class="lineNoCov">          0 :             } else { /* FULL_FLUSH or SYNC_FLUSH */</span>
+<span class="lineNum">     810 </span><span class="lineNoCov">          0 :                 _tr_stored_block(s, NULL, 0L, 0);</span>
+<span class="lineNum">     811 </span>            :                 /* For a full flush, this empty block will be recognized
+<span class="lineNum">     812 </span>            :                  * as a special marker by inflate_sync().
+<span class="lineNum">     813 </span>            :                  */
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :                 if (flush == Z_FULL_FLUSH) {</span>
+<span class="lineNum">     815 </span><span class="lineNoCov">          0 :                     CLEAR_HASH(s);             /* forget history */</span>
+<span class="lineNum">     816 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     817 </span>            :             }
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 :             flush_pending(strm);</span>
+<span class="lineNum">     819 </span><span class="lineNoCov">          0 :             if (strm-&gt;avail_out == 0) {</span>
+<span class="lineNum">     820 </span><span class="lineNoCov">          0 :               s-&gt;last_flush = -1; /* avoid BUF_ERROR at next call, see above */</span>
+<span class="lineNum">     821 </span><span class="lineNoCov">          0 :               return Z_OK;</span>
+<span class="lineNum">     822 </span>            :             }
+<span class="lineNum">     823 </span>            :         }
+<span class="lineNum">     824 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     825 </span>            :     Assert(strm-&gt;avail_out &gt; 0, &quot;bug2&quot;);
+<span class="lineNum">     826 </span>            : 
+<span class="lineNum">     827 </span><span class="lineNoCov">          0 :     if (flush != Z_FINISH) return Z_OK;</span>
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :     if (s-&gt;wrap &lt;= 0) return Z_STREAM_END;</span>
+<span class="lineNum">     829 </span>            : 
+<span class="lineNum">     830 </span>            :     /* Write the trailer */
+<span class="lineNum">     831 </span>            : #ifdef GZIP
+<span class="lineNum">     832 </span><span class="lineNoCov">          0 :     if (s-&gt;wrap == 2) {</span>
+<span class="lineNum">     833 </span><span class="lineNoCov">          0 :         put_byte(s, (Byte)(strm-&gt;adler &amp; 0xff));</span>
+<span class="lineNum">     834 </span><span class="lineNoCov">          0 :         put_byte(s, (Byte)((strm-&gt;adler &gt;&gt; 8) &amp; 0xff));</span>
+<span class="lineNum">     835 </span><span class="lineNoCov">          0 :         put_byte(s, (Byte)((strm-&gt;adler &gt;&gt; 16) &amp; 0xff));</span>
+<span class="lineNum">     836 </span><span class="lineNoCov">          0 :         put_byte(s, (Byte)((strm-&gt;adler &gt;&gt; 24) &amp; 0xff));</span>
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :         put_byte(s, (Byte)(strm-&gt;total_in &amp; 0xff));</span>
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :         put_byte(s, (Byte)((strm-&gt;total_in &gt;&gt; 8) &amp; 0xff));</span>
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :         put_byte(s, (Byte)((strm-&gt;total_in &gt;&gt; 16) &amp; 0xff));</span>
+<span class="lineNum">     840 </span><span class="lineNoCov">          0 :         put_byte(s, (Byte)((strm-&gt;total_in &gt;&gt; 24) &amp; 0xff));</span>
+<span class="lineNum">     841 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     842 </span>            :     else
+<span class="lineNum">     843 </span>            : #endif
+<span class="lineNum">     844 </span>            :     {
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :         putShortMSB(s, (uInt)(strm-&gt;adler &gt;&gt; 16));</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :         putShortMSB(s, (uInt)(strm-&gt;adler &amp; 0xffff));</span>
+<span class="lineNum">     847 </span>            :     }
+<span class="lineNum">     848 </span><span class="lineNoCov">          0 :     flush_pending(strm);</span>
+<span class="lineNum">     849 </span>            :     /* If avail_out is zero, the application will call deflate again
+<span class="lineNum">     850 </span>            :      * to flush the rest.
+<span class="lineNum">     851 </span>            :      */
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :     if (s-&gt;wrap &gt; 0) s-&gt;wrap = -s-&gt;wrap; /* write the trailer only once! */</span>
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :     return s-&gt;pending != 0 ? Z_OK : Z_STREAM_END;</span>
+<span class="lineNum">     854 </span><span class="lineNoCov">          0 : }</span>
+<a name="855"><span class="lineNum">     855 </span>            : </a>
+<span class="lineNum">     856 </span>            : /* ========================================================================= */
+<span class="lineNum">     857 </span><span class="lineNoCov">          0 : int ZEXPORT deflateEnd (strm)</span>
+<span class="lineNum">     858 </span>            :     z_streamp strm;
+<span class="lineNum">     859 </span>            : {
+<span class="lineNum">     860 </span>            :     int status;
+<span class="lineNum">     861 </span>            : 
+<span class="lineNum">     862 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL) return Z_STREAM_ERROR;</span>
+<span class="lineNum">     863 </span>            : 
+<span class="lineNum">     864 </span><span class="lineNoCov">          0 :     status = strm-&gt;state-&gt;status;</span>
+<span class="lineNum">     865 </span><span class="lineNoCov">          0 :     if (status != INIT_STATE &amp;&amp;</span>
+<span class="lineNum">     866 </span><span class="lineNoCov">          0 :         status != EXTRA_STATE &amp;&amp;</span>
+<span class="lineNum">     867 </span><span class="lineNoCov">          0 :         status != NAME_STATE &amp;&amp;</span>
+<span class="lineNum">     868 </span><span class="lineNoCov">          0 :         status != COMMENT_STATE &amp;&amp;</span>
+<span class="lineNum">     869 </span><span class="lineNoCov">          0 :         status != HCRC_STATE &amp;&amp;</span>
+<span class="lineNum">     870 </span><span class="lineNoCov">          0 :         status != BUSY_STATE &amp;&amp;</span>
+<span class="lineNum">     871 </span><span class="lineNoCov">          0 :         status != FINISH_STATE) {</span>
+<span class="lineNum">     872 </span><span class="lineNoCov">          0 :       return Z_STREAM_ERROR;</span>
+<span class="lineNum">     873 </span>            :     }
+<span class="lineNum">     874 </span>            : 
+<span class="lineNum">     875 </span>            :     /* Deallocate in reverse order of allocations: */
+<span class="lineNum">     876 </span><span class="lineNoCov">          0 :     TRY_FREE(strm, strm-&gt;state-&gt;pending_buf);</span>
+<span class="lineNum">     877 </span><span class="lineNoCov">          0 :     TRY_FREE(strm, strm-&gt;state-&gt;head);</span>
+<span class="lineNum">     878 </span><span class="lineNoCov">          0 :     TRY_FREE(strm, strm-&gt;state-&gt;prev);</span>
+<span class="lineNum">     879 </span><span class="lineNoCov">          0 :     TRY_FREE(strm, strm-&gt;state-&gt;window);</span>
+<span class="lineNum">     880 </span>            : 
+<span class="lineNum">     881 </span><span class="lineNoCov">          0 :     ZFREE(strm, strm-&gt;state);</span>
+<span class="lineNum">     882 </span><span class="lineNoCov">          0 :     strm-&gt;state = Z_NULL;</span>
+<span class="lineNum">     883 </span>            : 
+<span class="lineNum">     884 </span><span class="lineNoCov">          0 :     return status == BUSY_STATE ? Z_DATA_ERROR : Z_OK;</span>
+<span class="lineNum">     885 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     886 </span>            : 
+<span class="lineNum">     887 </span>            : /* =========================================================================
+<span class="lineNum">     888 </span>            :  * Copy the source state to the destination state.
+<span class="lineNum">     889 </span>            :  * To simplify the source, this is not supported for 16-bit MSDOS (which
+<a name="890"><span class="lineNum">     890 </span>            :  * doesn't have enough memory anyway to duplicate compression states).</a>
+<span class="lineNum">     891 </span>            :  */
+<span class="lineNum">     892 </span><span class="lineNoCov">          0 : int ZEXPORT deflateCopy (dest, source)</span>
+<span class="lineNum">     893 </span>            :     z_streamp dest;
+<span class="lineNum">     894 </span>            :     z_streamp source;
+<span class="lineNum">     895 </span>            : {
+<span class="lineNum">     896 </span>            : #ifdef MAXSEG_64K
+<span class="lineNum">     897 </span>            :     return Z_STREAM_ERROR;
+<span class="lineNum">     898 </span>            : #else
+<span class="lineNum">     899 </span>            :     deflate_state *ds;
+<span class="lineNum">     900 </span>            :     deflate_state *ss;
+<span class="lineNum">     901 </span>            :     ushf *overlay;
+<span class="lineNum">     902 </span>            : 
+<span class="lineNum">     903 </span>            : 
+<span class="lineNum">     904 </span><span class="lineNoCov">          0 :     if (source == Z_NULL || dest == Z_NULL || source-&gt;state == Z_NULL) {</span>
+<span class="lineNum">     905 </span><span class="lineNoCov">          0 :         return Z_STREAM_ERROR;</span>
+<span class="lineNum">     906 </span>            :     }
+<span class="lineNum">     907 </span>            : 
+<span class="lineNum">     908 </span>            :     ss = source-&gt;state;
+<span class="lineNum">     909 </span>            : 
+<span class="lineNum">     910 </span><span class="lineNoCov">          0 :     zmemcpy(dest, source, sizeof(z_stream));</span>
+<span class="lineNum">     911 </span>            : 
+<span class="lineNum">     912 </span><span class="lineNoCov">          0 :     ds = (deflate_state *) ZALLOC(dest, 1, sizeof(deflate_state));</span>
+<span class="lineNum">     913 </span><span class="lineNoCov">          0 :     if (ds == Z_NULL) return Z_MEM_ERROR;</span>
+<span class="lineNum">     914 </span><span class="lineNoCov">          0 :     dest-&gt;state = (struct internal_state FAR *) ds;</span>
+<span class="lineNum">     915 </span><span class="lineNoCov">          0 :     zmemcpy(ds, ss, sizeof(deflate_state));</span>
+<span class="lineNum">     916 </span><span class="lineNoCov">          0 :     ds-&gt;strm = dest;</span>
+<span class="lineNum">     917 </span>            : 
+<span class="lineNum">     918 </span><span class="lineNoCov">          0 :     ds-&gt;window = (Bytef *) ZALLOC(dest, ds-&gt;w_size, 2*sizeof(Byte));</span>
+<span class="lineNum">     919 </span><span class="lineNoCov">          0 :     ds-&gt;prev   = (Posf *)  ZALLOC(dest, ds-&gt;w_size, sizeof(Pos));</span>
+<span class="lineNum">     920 </span><span class="lineNoCov">          0 :     ds-&gt;head   = (Posf *)  ZALLOC(dest, ds-&gt;hash_size, sizeof(Pos));</span>
+<span class="lineNum">     921 </span><span class="lineNoCov">          0 :     overlay = (ushf *) ZALLOC(dest, ds-&gt;lit_bufsize, sizeof(ush)+2);</span>
+<span class="lineNum">     922 </span><span class="lineNoCov">          0 :     ds-&gt;pending_buf = (uchf *) overlay;</span>
+<span class="lineNum">     923 </span>            : 
+<span class="lineNum">     924 </span><span class="lineNoCov">          0 :     if (ds-&gt;window == Z_NULL || ds-&gt;prev == Z_NULL || ds-&gt;head == Z_NULL ||</span>
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 :         ds-&gt;pending_buf == Z_NULL) {</span>
+<span class="lineNum">     926 </span><span class="lineNoCov">          0 :         deflateEnd (dest);</span>
+<span class="lineNum">     927 </span><span class="lineNoCov">          0 :         return Z_MEM_ERROR;</span>
+<span class="lineNum">     928 </span>            :     }
+<span class="lineNum">     929 </span>            :     /* following zmemcpy do not work for 16-bit MSDOS */
+<span class="lineNum">     930 </span><span class="lineNoCov">          0 :     zmemcpy(ds-&gt;window, ss-&gt;window, ds-&gt;w_size * 2 * sizeof(Byte));</span>
+<span class="lineNum">     931 </span><span class="lineNoCov">          0 :     zmemcpy(ds-&gt;prev, ss-&gt;prev, ds-&gt;w_size * sizeof(Pos));</span>
+<span class="lineNum">     932 </span><span class="lineNoCov">          0 :     zmemcpy(ds-&gt;head, ss-&gt;head, ds-&gt;hash_size * sizeof(Pos));</span>
+<span class="lineNum">     933 </span><span class="lineNoCov">          0 :     zmemcpy(ds-&gt;pending_buf, ss-&gt;pending_buf, (uInt)ds-&gt;pending_buf_size);</span>
+<span class="lineNum">     934 </span>            : 
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :     ds-&gt;pending_out = ds-&gt;pending_buf + (ss-&gt;pending_out - ss-&gt;pending_buf);</span>
+<span class="lineNum">     936 </span><span class="lineNoCov">          0 :     ds-&gt;d_buf = overlay + ds-&gt;lit_bufsize/sizeof(ush);</span>
+<span class="lineNum">     937 </span><span class="lineNoCov">          0 :     ds-&gt;l_buf = ds-&gt;pending_buf + (1+sizeof(ush))*ds-&gt;lit_bufsize;</span>
+<span class="lineNum">     938 </span>            : 
+<span class="lineNum">     939 </span><span class="lineNoCov">          0 :     ds-&gt;l_desc.dyn_tree = ds-&gt;dyn_ltree;</span>
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :     ds-&gt;d_desc.dyn_tree = ds-&gt;dyn_dtree;</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :     ds-&gt;bl_desc.dyn_tree = ds-&gt;bl_tree;</span>
+<span class="lineNum">     942 </span>            : 
+<span class="lineNum">     943 </span><span class="lineNoCov">          0 :     return Z_OK;</span>
+<span class="lineNum">     944 </span>            : #endif /* MAXSEG_64K */
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     946 </span>            : 
+<span class="lineNum">     947 </span>            : /* ===========================================================================
+<span class="lineNum">     948 </span>            :  * Read a new buffer from the current input stream, update the adler32
+<span class="lineNum">     949 </span>            :  * and total number of bytes read.  All deflate() input goes through
+<span class="lineNum">     950 </span>            :  * this function so some applications may wish to modify it to avoid
+<span class="lineNum">     951 </span>            :  * allocating a large strm-&gt;next_in buffer and copying from it.
+<a name="952"><span class="lineNum">     952 </span>            :  * (See also flush_pending()).</a>
+<span class="lineNum">     953 </span>            :  */
+<span class="lineNum">     954 </span><span class="lineNoCov">          0 : local int read_buf(strm, buf, size)</span>
+<span class="lineNum">     955 </span>            :     z_streamp strm;
+<span class="lineNum">     956 </span>            :     Bytef *buf;
+<span class="lineNum">     957 </span>            :     unsigned size;
+<span class="lineNum">     958 </span>            : {
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :     unsigned len = strm-&gt;avail_in;</span>
+<span class="lineNum">     960 </span>            : 
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :     if (len &gt; size) len = size;</span>
+<span class="lineNum">     962 </span><span class="lineNoCov">          0 :     if (len == 0) return 0;</span>
+<span class="lineNum">     963 </span>            : 
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :     strm-&gt;avail_in  -= len;</span>
+<span class="lineNum">     965 </span>            : 
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :     if (strm-&gt;state-&gt;wrap == 1) {</span>
+<span class="lineNum">     967 </span><span class="lineNoCov">          0 :         strm-&gt;adler = adler32(strm-&gt;adler, strm-&gt;next_in, len);</span>
+<span class="lineNum">     968 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     969 </span>            : #ifdef GZIP
+<span class="lineNum">     970 </span><span class="lineNoCov">          0 :     else if (strm-&gt;state-&gt;wrap == 2) {</span>
+<span class="lineNum">     971 </span><span class="lineNoCov">          0 :         strm-&gt;adler = crc32(strm-&gt;adler, strm-&gt;next_in, len);</span>
+<span class="lineNum">     972 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">     973 </span>            : #endif
+<span class="lineNum">     974 </span><span class="lineNoCov">          0 :     zmemcpy(buf, strm-&gt;next_in, len);</span>
+<span class="lineNum">     975 </span><span class="lineNoCov">          0 :     strm-&gt;next_in  += len;</span>
+<span class="lineNum">     976 </span><span class="lineNoCov">          0 :     strm-&gt;total_in += len;</span>
+<span class="lineNum">     977 </span>            : 
+<span class="lineNum">     978 </span><span class="lineNoCov">          0 :     return (int)len;</span>
+<span class="lineNum">     979 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     980 </span>            : 
+<span class="lineNum">     981 </span>            : /* ===========================================================================
+<a name="982"><span class="lineNum">     982 </span>            :  * Initialize the &quot;longest match&quot; routines for a new zlib stream</a>
+<span class="lineNum">     983 </span>            :  */
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 : local void lm_init (s)</span>
+<span class="lineNum">     985 </span>            :     deflate_state *s;
+<span class="lineNum">     986 </span>            : {
+<span class="lineNum">     987 </span><span class="lineNoCov">          0 :     s-&gt;window_size = (ulg)2L*s-&gt;w_size;</span>
+<span class="lineNum">     988 </span>            : 
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 :     CLEAR_HASH(s);</span>
+<span class="lineNum">     990 </span>            : 
+<span class="lineNum">     991 </span>            :     /* Set the default configuration parameters:
+<span class="lineNum">     992 </span>            :      */
+<span class="lineNum">     993 </span><span class="lineNoCov">          0 :     s-&gt;max_lazy_match   = configuration_table[s-&gt;level].max_lazy;</span>
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :     s-&gt;good_match       = configuration_table[s-&gt;level].good_length;</span>
+<span class="lineNum">     995 </span><span class="lineNoCov">          0 :     s-&gt;nice_match       = configuration_table[s-&gt;level].nice_length;</span>
+<span class="lineNum">     996 </span><span class="lineNoCov">          0 :     s-&gt;max_chain_length = configuration_table[s-&gt;level].max_chain;</span>
+<span class="lineNum">     997 </span>            : 
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 :     s-&gt;strstart = 0;</span>
+<span class="lineNum">     999 </span><span class="lineNoCov">          0 :     s-&gt;block_start = 0L;</span>
+<span class="lineNum">    1000 </span><span class="lineNoCov">          0 :     s-&gt;lookahead = 0;</span>
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :     s-&gt;match_length = s-&gt;prev_length = MIN_MATCH-1;</span>
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 :     s-&gt;match_available = 0;</span>
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :     s-&gt;ins_h = 0;</span>
+<span class="lineNum">    1004 </span>            : #ifndef FASTEST
+<span class="lineNum">    1005 </span>            : #ifdef ASMV
+<span class="lineNum">    1006 </span>            :     match_init(); /* initialize the asm code */
+<span class="lineNum">    1007 </span>            : #endif
+<span class="lineNum">    1008 </span>            : #endif
+<span class="lineNum">    1009 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1010 </span>            : 
+<span class="lineNum">    1011 </span>            : #ifndef FASTEST
+<span class="lineNum">    1012 </span>            : /* ===========================================================================
+<span class="lineNum">    1013 </span>            :  * Set match_start to the longest match starting at the given string and
+<span class="lineNum">    1014 </span>            :  * return its length. Matches shorter or equal to prev_length are discarded,
+<span class="lineNum">    1015 </span>            :  * in which case the result is equal to prev_length and match_start is
+<span class="lineNum">    1016 </span>            :  * garbage.
+<span class="lineNum">    1017 </span>            :  * IN assertions: cur_match is the head of the hash chain for the current
+<span class="lineNum">    1018 </span>            :  *   string (strstart) and its distance is &lt;= MAX_DIST, and prev_length &gt;= 1
+<span class="lineNum">    1019 </span>            :  * OUT assertion: the match length is not greater than s-&gt;lookahead.
+<span class="lineNum">    1020 </span>            :  */
+<span class="lineNum">    1021 </span>            : #ifndef ASMV
+<span class="lineNum">    1022 </span>            : /* For 80x86 and 680x0, an optimized version will be provided in match.asm or
+<a name="1023"><span class="lineNum">    1023 </span>            :  * match.S. The code will be functionally equivalent.</a>
+<span class="lineNum">    1024 </span>            :  */
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 : local uInt longest_match(s, cur_match)</span>
+<span class="lineNum">    1026 </span>            :     deflate_state *s;
+<span class="lineNum">    1027 </span>            :     IPos cur_match;                             /* current match */
+<span class="lineNum">    1028 </span>            : {
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :     unsigned chain_length = s-&gt;max_chain_length;/* max hash chain length */</span>
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :     register Bytef *scan = s-&gt;window + s-&gt;strstart; /* current string */</span>
+<span class="lineNum">    1031 </span>            :     register Bytef *match;                       /* matched string */
+<span class="lineNum">    1032 </span>            :     register int len;                           /* length of current match */
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :     int best_len = s-&gt;prev_length;              /* best match length so far */</span>
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :     int nice_match = s-&gt;nice_match;             /* stop if match long enough */</span>
+<span class="lineNum">    1035 </span><span class="lineNoCov">          0 :     IPos limit = s-&gt;strstart &gt; (IPos)MAX_DIST(s) ?</span>
+<span class="lineNum">    1036 </span><span class="lineNoCov">          0 :         s-&gt;strstart - (IPos)MAX_DIST(s) : NIL;</span>
+<span class="lineNum">    1037 </span>            :     /* Stop when cur_match becomes &lt;= limit. To simplify the code,
+<span class="lineNum">    1038 </span>            :      * we prevent matches with the string of window index 0.
+<span class="lineNum">    1039 </span>            :      */
+<span class="lineNum">    1040 </span><span class="lineNoCov">          0 :     Posf *prev = s-&gt;prev;</span>
+<span class="lineNum">    1041 </span><span class="lineNoCov">          0 :     uInt wmask = s-&gt;w_mask;</span>
+<span class="lineNum">    1042 </span>            : 
+<span class="lineNum">    1043 </span>            : #ifdef UNALIGNED_OK
+<span class="lineNum">    1044 </span>            :     /* Compare two bytes at a time. Note: this is not always beneficial.
+<span class="lineNum">    1045 </span>            :      * Try with and without -DUNALIGNED_OK to check.
+<span class="lineNum">    1046 </span>            :      */
+<span class="lineNum">    1047 </span>            :     register Bytef *strend = s-&gt;window + s-&gt;strstart + MAX_MATCH - 1;
+<span class="lineNum">    1048 </span>            :     register ush scan_start = *(ushf*)scan;
+<span class="lineNum">    1049 </span>            :     register ush scan_end   = *(ushf*)(scan+best_len-1);
+<span class="lineNum">    1050 </span>            : #else
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :     register Bytef *strend = s-&gt;window + s-&gt;strstart + MAX_MATCH;</span>
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :     register Byte scan_end1  = scan[best_len-1];</span>
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 :     register Byte scan_end   = scan[best_len];</span>
+<span class="lineNum">    1054 </span>            : #endif
+<span class="lineNum">    1055 </span>            : 
+<span class="lineNum">    1056 </span>            :     /* The code is optimized for HASH_BITS &gt;= 8 and MAX_MATCH-2 multiple of 16.
+<span class="lineNum">    1057 </span>            :      * It is easy to get rid of this optimization if necessary.
+<span class="lineNum">    1058 </span>            :      */
+<span class="lineNum">    1059 </span>            :     Assert(s-&gt;hash_bits &gt;= 8 &amp;&amp; MAX_MATCH == 258, &quot;Code too clever&quot;);
+<span class="lineNum">    1060 </span>            : 
+<span class="lineNum">    1061 </span>            :     /* Do not waste too much time if we already have a good match: */
+<span class="lineNum">    1062 </span><span class="lineNoCov">          0 :     if (s-&gt;prev_length &gt;= s-&gt;good_match) {</span>
+<span class="lineNum">    1063 </span><span class="lineNoCov">          0 :         chain_length &gt;&gt;= 2;</span>
+<span class="lineNum">    1064 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">    1065 </span>            :     /* Do not look for matches beyond the end of the input. This is necessary
+<span class="lineNum">    1066 </span>            :      * to make deflate deterministic.
+<span class="lineNum">    1067 </span>            :      */
+<span class="lineNum">    1068 </span><span class="lineNoCov">          0 :     if ((uInt)nice_match &gt; s-&gt;lookahead) nice_match = s-&gt;lookahead;</span>
+<span class="lineNum">    1069 </span>            : 
+<span class="lineNum">    1070 </span>            :     Assert((ulg)s-&gt;strstart &lt;= s-&gt;window_size-MIN_LOOKAHEAD, &quot;need lookahead&quot;);
+<span class="lineNum">    1071 </span>            : 
+<span class="lineNum">    1072 </span><span class="lineNoCov">          0 :     do {</span>
+<span class="lineNum">    1073 </span>            :         Assert(cur_match &lt; s-&gt;strstart, &quot;no future&quot;);
+<span class="lineNum">    1074 </span><span class="lineNoCov">          0 :         match = s-&gt;window + cur_match;</span>
+<span class="lineNum">    1075 </span>            : 
+<span class="lineNum">    1076 </span>            :         /* Skip to next match if the match length cannot increase
+<span class="lineNum">    1077 </span>            :          * or if the match length is less than 2.  Note that the checks below
+<span class="lineNum">    1078 </span>            :          * for insufficient lookahead only occur occasionally for performance
+<span class="lineNum">    1079 </span>            :          * reasons.  Therefore uninitialized memory will be accessed, and
+<span class="lineNum">    1080 </span>            :          * conditional jumps will be made that depend on those values.
+<span class="lineNum">    1081 </span>            :          * However the length of the match is limited to the lookahead, so
+<span class="lineNum">    1082 </span>            :          * the output of deflate is not affected by the uninitialized values.
+<span class="lineNum">    1083 </span>            :          */
+<span class="lineNum">    1084 </span>            : #if (defined(UNALIGNED_OK) &amp;&amp; MAX_MATCH == 258)
+<span class="lineNum">    1085 </span>            :         /* This code assumes sizeof(unsigned short) == 2. Do not use
+<span class="lineNum">    1086 </span>            :          * UNALIGNED_OK if your compiler uses a different size.
+<span class="lineNum">    1087 </span>            :          */
+<span class="lineNum">    1088 </span>            :         if (*(ushf*)(match+best_len-1) != scan_end ||
+<span class="lineNum">    1089 </span>            :             *(ushf*)match != scan_start) continue;
+<span class="lineNum">    1090 </span>            : 
+<span class="lineNum">    1091 </span>            :         /* It is not necessary to compare scan[2] and match[2] since they are
+<span class="lineNum">    1092 </span>            :          * always equal when the other bytes match, given that the hash keys
+<span class="lineNum">    1093 </span>            :          * are equal and that HASH_BITS &gt;= 8. Compare 2 bytes at a time at
+<span class="lineNum">    1094 </span>            :          * strstart+3, +5, ... up to strstart+257. We check for insufficient
+<span class="lineNum">    1095 </span>            :          * lookahead only every 4th comparison; the 128th check will be made
+<span class="lineNum">    1096 </span>            :          * at strstart+257. If MAX_MATCH-2 is not a multiple of 8, it is
+<span class="lineNum">    1097 </span>            :          * necessary to put more guard bytes at the end of the window, or
+<span class="lineNum">    1098 </span>            :          * to check more often for insufficient lookahead.
+<span class="lineNum">    1099 </span>            :          */
+<span class="lineNum">    1100 </span>            :         Assert(scan[2] == match[2], &quot;scan[2]?&quot;);
+<span class="lineNum">    1101 </span>            :         scan++, match++;
+<span class="lineNum">    1102 </span>            :         do {
+<span class="lineNum">    1103 </span>            :         } while (*(ushf*)(scan+=2) == *(ushf*)(match+=2) &amp;&amp;
+<span class="lineNum">    1104 </span>            :                  *(ushf*)(scan+=2) == *(ushf*)(match+=2) &amp;&amp;
+<span class="lineNum">    1105 </span>            :                  *(ushf*)(scan+=2) == *(ushf*)(match+=2) &amp;&amp;
+<span class="lineNum">    1106 </span>            :                  *(ushf*)(scan+=2) == *(ushf*)(match+=2) &amp;&amp;
+<span class="lineNum">    1107 </span>            :                  scan &lt; strend);
+<span class="lineNum">    1108 </span>            :         /* The funny &quot;do {}&quot; generates better code on most compilers */
+<span class="lineNum">    1109 </span>            : 
+<span class="lineNum">    1110 </span>            :         /* Here, scan &lt;= window+strstart+257 */
+<span class="lineNum">    1111 </span>            :         Assert(scan &lt;= s-&gt;window+(unsigned)(s-&gt;window_size-1), &quot;wild scan&quot;);
+<span class="lineNum">    1112 </span>            :         if (*scan == *match) scan++;
+<span class="lineNum">    1113 </span>            : 
+<span class="lineNum">    1114 </span>            :         len = (MAX_MATCH - 1) - (int)(strend-scan);
+<span class="lineNum">    1115 </span>            :         scan = strend - (MAX_MATCH-1);
+<span class="lineNum">    1116 </span>            : 
+<span class="lineNum">    1117 </span>            : #else /* UNALIGNED_OK */
+<span class="lineNum">    1118 </span>            : 
+<span class="lineNum">    1119 </span><span class="lineNoCov">          0 :         if (match[best_len]   != scan_end  ||</span>
+<span class="lineNum">    1120 </span><span class="lineNoCov">          0 :             match[best_len-1] != scan_end1 ||</span>
+<span class="lineNum">    1121 </span><span class="lineNoCov">          0 :             *match            != *scan     ||</span>
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :             *++match          != scan[1])      continue;</span>
+<span class="lineNum">    1123 </span>            : 
+<span class="lineNum">    1124 </span>            :         /* The check at best_len-1 can be removed because it will be made
+<span class="lineNum">    1125 </span>            :          * again later. (This heuristic is not always a win.)
+<span class="lineNum">    1126 </span>            :          * It is not necessary to compare scan[2] and match[2] since they
+<span class="lineNum">    1127 </span>            :          * are always equal when the other bytes match, given that
+<span class="lineNum">    1128 </span>            :          * the hash keys are equal and that HASH_BITS &gt;= 8.
+<span class="lineNum">    1129 </span>            :          */
+<span class="lineNum">    1130 </span><span class="lineNoCov">          0 :         scan += 2, match++;</span>
+<span class="lineNum">    1131 </span>            :         Assert(*scan == *match, &quot;match[2]?&quot;);
+<span class="lineNum">    1132 </span>            : 
+<span class="lineNum">    1133 </span>            :         /* We check for insufficient lookahead only every 8th comparison;
+<span class="lineNum">    1134 </span>            :          * the 256th check will be made at strstart+258.
+<span class="lineNum">    1135 </span>            :          */
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :         do {</span>
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :         } while (*++scan == *++match &amp;&amp; *++scan == *++match &amp;&amp;</span>
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :                  *++scan == *++match &amp;&amp; *++scan == *++match &amp;&amp;</span>
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :                  *++scan == *++match &amp;&amp; *++scan == *++match &amp;&amp;</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :                  *++scan == *++match &amp;&amp; *++scan == *++match &amp;&amp;</span>
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :                  scan &lt; strend);</span>
+<span class="lineNum">    1142 </span>            : 
+<span class="lineNum">    1143 </span>            :         Assert(scan &lt;= s-&gt;window+(unsigned)(s-&gt;window_size-1), &quot;wild scan&quot;);
+<span class="lineNum">    1144 </span>            : 
+<span class="lineNum">    1145 </span><span class="lineNoCov">          0 :         len = MAX_MATCH - (int)(strend - scan);</span>
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :         scan = strend - MAX_MATCH;</span>
+<span class="lineNum">    1147 </span>            : 
+<span class="lineNum">    1148 </span>            : #endif /* UNALIGNED_OK */
+<span class="lineNum">    1149 </span>            : 
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :         if (len &gt; best_len) {</span>
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 :             s-&gt;match_start = cur_match;</span>
+<span class="lineNum">    1152 </span>            :             best_len = len;
+<span class="lineNum">    1153 </span><span class="lineNoCov">          0 :             if (len &gt;= nice_match) break;</span>
+<span class="lineNum">    1154 </span>            : #ifdef UNALIGNED_OK
+<span class="lineNum">    1155 </span>            :             scan_end = *(ushf*)(scan+best_len-1);
+<span class="lineNum">    1156 </span>            : #else
+<span class="lineNum">    1157 </span><span class="lineNoCov">          0 :             scan_end1  = scan[best_len-1];</span>
+<span class="lineNum">    1158 </span><span class="lineNoCov">          0 :             scan_end   = scan[best_len];</span>
+<span class="lineNum">    1159 </span>            : #endif
+<span class="lineNum">    1160 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :     } while ((cur_match = prev[cur_match &amp; wmask]) &gt; limit</span>
+<span class="lineNum">    1162 </span><span class="lineNoCov">          0 :              &amp;&amp; --chain_length != 0);</span>
+<span class="lineNum">    1163 </span>            : 
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 :     if ((uInt)best_len &lt;= s-&gt;lookahead) return (uInt)best_len;</span>
+<span class="lineNum">    1165 </span><span class="lineNoCov">          0 :     return s-&gt;lookahead;</span>
+<span class="lineNum">    1166 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1167 </span>            : #endif /* ASMV */
+<span class="lineNum">    1168 </span>            : #endif /* FASTEST */
+<span class="lineNum">    1169 </span>            : 
+<span class="lineNum">    1170 </span>            : /* ---------------------------------------------------------------------------
+<a name="1171"><span class="lineNum">    1171 </span>            :  * Optimized version for level == 1 or strategy == Z_RLE only</a>
+<span class="lineNum">    1172 </span>            :  */
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 : local uInt longest_match_fast(s, cur_match)</span>
+<span class="lineNum">    1174 </span>            :     deflate_state *s;
+<span class="lineNum">    1175 </span>            :     IPos cur_match;                             /* current match */
+<span class="lineNum">    1176 </span>            : {
+<span class="lineNum">    1177 </span><span class="lineNoCov">          0 :     register Bytef *scan = s-&gt;window + s-&gt;strstart; /* current string */</span>
+<span class="lineNum">    1178 </span>            :     register Bytef *match;                       /* matched string */
+<span class="lineNum">    1179 </span>            :     register int len;                           /* length of current match */
+<span class="lineNum">    1180 </span><span class="lineNoCov">          0 :     register Bytef *strend = s-&gt;window + s-&gt;strstart + MAX_MATCH;</span>
+<span class="lineNum">    1181 </span>            : 
+<span class="lineNum">    1182 </span>            :     /* The code is optimized for HASH_BITS &gt;= 8 and MAX_MATCH-2 multiple of 16.
+<span class="lineNum">    1183 </span>            :      * It is easy to get rid of this optimization if necessary.
+<span class="lineNum">    1184 </span>            :      */
+<span class="lineNum">    1185 </span>            :     Assert(s-&gt;hash_bits &gt;= 8 &amp;&amp; MAX_MATCH == 258, &quot;Code too clever&quot;);
+<span class="lineNum">    1186 </span>            : 
+<span class="lineNum">    1187 </span>            :     Assert((ulg)s-&gt;strstart &lt;= s-&gt;window_size-MIN_LOOKAHEAD, &quot;need lookahead&quot;);
+<span class="lineNum">    1188 </span>            : 
+<span class="lineNum">    1189 </span>            :     Assert(cur_match &lt; s-&gt;strstart, &quot;no future&quot;);
+<span class="lineNum">    1190 </span>            : 
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :     match = s-&gt;window + cur_match;</span>
+<span class="lineNum">    1192 </span>            : 
+<span class="lineNum">    1193 </span>            :     /* Return failure if the match length is less than 2:
+<span class="lineNum">    1194 </span>            :      */
+<span class="lineNum">    1195 </span><span class="lineNoCov">          0 :     if (match[0] != scan[0] || match[1] != scan[1]) return MIN_MATCH-1;</span>
+<span class="lineNum">    1196 </span>            : 
+<span class="lineNum">    1197 </span>            :     /* The check at best_len-1 can be removed because it will be made
+<span class="lineNum">    1198 </span>            :      * again later. (This heuristic is not always a win.)
+<span class="lineNum">    1199 </span>            :      * It is not necessary to compare scan[2] and match[2] since they
+<span class="lineNum">    1200 </span>            :      * are always equal when the other bytes match, given that
+<span class="lineNum">    1201 </span>            :      * the hash keys are equal and that HASH_BITS &gt;= 8.
+<span class="lineNum">    1202 </span>            :      */
+<span class="lineNum">    1203 </span><span class="lineNoCov">          0 :     scan += 2, match += 2;</span>
+<span class="lineNum">    1204 </span>            :     Assert(*scan == *match, &quot;match[2]?&quot;);
+<span class="lineNum">    1205 </span>            : 
+<span class="lineNum">    1206 </span>            :     /* We check for insufficient lookahead only every 8th comparison;
+<span class="lineNum">    1207 </span>            :      * the 256th check will be made at strstart+258.
+<span class="lineNum">    1208 </span>            :      */
+<span class="lineNum">    1209 </span><span class="lineNoCov">          0 :     do {</span>
+<span class="lineNum">    1210 </span><span class="lineNoCov">          0 :     } while (*++scan == *++match &amp;&amp; *++scan == *++match &amp;&amp;</span>
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :              *++scan == *++match &amp;&amp; *++scan == *++match &amp;&amp;</span>
+<span class="lineNum">    1212 </span><span class="lineNoCov">          0 :              *++scan == *++match &amp;&amp; *++scan == *++match &amp;&amp;</span>
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :              *++scan == *++match &amp;&amp; *++scan == *++match &amp;&amp;</span>
+<span class="lineNum">    1214 </span><span class="lineNoCov">          0 :              scan &lt; strend);</span>
+<span class="lineNum">    1215 </span>            : 
+<span class="lineNum">    1216 </span>            :     Assert(scan &lt;= s-&gt;window+(unsigned)(s-&gt;window_size-1), &quot;wild scan&quot;);
+<span class="lineNum">    1217 </span>            : 
+<span class="lineNum">    1218 </span><span class="lineNoCov">          0 :     len = MAX_MATCH - (int)(strend - scan);</span>
+<span class="lineNum">    1219 </span>            : 
+<span class="lineNum">    1220 </span><span class="lineNoCov">          0 :     if (len &lt; MIN_MATCH) return MIN_MATCH - 1;</span>
+<span class="lineNum">    1221 </span>            : 
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 :     s-&gt;match_start = cur_match;</span>
+<span class="lineNum">    1223 </span><span class="lineNoCov">          0 :     return (uInt)len &lt;= s-&gt;lookahead ? (uInt)len : s-&gt;lookahead;</span>
+<span class="lineNum">    1224 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1225 </span>            : 
+<span class="lineNum">    1226 </span>            : #ifdef DEBUG_LIBZ
+<span class="lineNum">    1227 </span>            : /* ===========================================================================
+<span class="lineNum">    1228 </span>            :  * Check that the match at match_start is indeed a match.
+<span class="lineNum">    1229 </span>            :  */
+<span class="lineNum">    1230 </span>            : local void check_match(s, start, match, length)
+<span class="lineNum">    1231 </span>            :     deflate_state *s;
+<span class="lineNum">    1232 </span>            :     IPos start, match;
+<span class="lineNum">    1233 </span>            :     int length;
+<span class="lineNum">    1234 </span>            : {
+<span class="lineNum">    1235 </span>            :     /* check that the match is indeed a match */
+<span class="lineNum">    1236 </span>            :     if (zmemcmp(s-&gt;window + match,
+<span class="lineNum">    1237 </span>            :                 s-&gt;window + start, length) != EQUAL) {
+<span class="lineNum">    1238 </span>            :         fprintf(stderr, &quot; start %u, match %u, length %d\n&quot;,
+<span class="lineNum">    1239 </span>            :                 start, match, length);
+<span class="lineNum">    1240 </span>            :         do {
+<span class="lineNum">    1241 </span>            :             fprintf(stderr, &quot;%c%c&quot;, s-&gt;window[match++], s-&gt;window[start++]);
+<span class="lineNum">    1242 </span>            :         } while (--length != 0);
+<span class="lineNum">    1243 </span>            :         z_error(&quot;invalid match&quot;);
+<span class="lineNum">    1244 </span>            :     }
+<span class="lineNum">    1245 </span>            :     if (z_verbose &gt; 1) {
+<span class="lineNum">    1246 </span>            :         fprintf(stderr,&quot;\\[%d,%d]&quot;, start-match, length);
+<span class="lineNum">    1247 </span>            :         do { putc(s-&gt;window[start++], stderr); } while (--length != 0);
+<span class="lineNum">    1248 </span>            :     }
+<span class="lineNum">    1249 </span>            : }
+<span class="lineNum">    1250 </span>            : #else
+<span class="lineNum">    1251 </span>            : #  define check_match(s, start, match, length)
+<span class="lineNum">    1252 </span>            : #endif /* DEBUG_LIBZ */
+<span class="lineNum">    1253 </span>            : 
+<span class="lineNum">    1254 </span>            : /* ===========================================================================
+<span class="lineNum">    1255 </span>            :  * Fill the window when the lookahead becomes insufficient.
+<span class="lineNum">    1256 </span>            :  * Updates strstart and lookahead.
+<span class="lineNum">    1257 </span>            :  *
+<span class="lineNum">    1258 </span>            :  * IN assertion: lookahead &lt; MIN_LOOKAHEAD
+<span class="lineNum">    1259 </span>            :  * OUT assertions: strstart &lt;= window_size-MIN_LOOKAHEAD
+<span class="lineNum">    1260 </span>            :  *    At least one byte has been read, or avail_in == 0; reads are
+<span class="lineNum">    1261 </span>            :  *    performed for at least two bytes (required for the zip translate_eol
+<a name="1262"><span class="lineNum">    1262 </span>            :  *    option -- not supported here).</a>
+<span class="lineNum">    1263 </span>            :  */
+<span class="lineNum">    1264 </span><span class="lineNoCov">          0 : local void fill_window(s)</span>
+<span class="lineNum">    1265 </span>            :     deflate_state *s;
+<span class="lineNum">    1266 </span>            : {
+<span class="lineNum">    1267 </span>            :     register unsigned n, m;
+<span class="lineNum">    1268 </span>            :     register Posf *p;
+<span class="lineNum">    1269 </span>            :     unsigned more;    /* Amount of free space at the end of the window. */
+<span class="lineNum">    1270 </span><span class="lineNoCov">          0 :     uInt wsize = s-&gt;w_size;</span>
+<span class="lineNum">    1271 </span>            : 
+<span class="lineNum">    1272 </span><span class="lineNoCov">          0 :     do {</span>
+<span class="lineNum">    1273 </span><span class="lineNoCov">          0 :         more = (unsigned)(s-&gt;window_size -(ulg)s-&gt;lookahead -(ulg)s-&gt;strstart);</span>
+<span class="lineNum">    1274 </span>            : 
+<span class="lineNum">    1275 </span>            :         /* Deal with !@#$% 64K limit: */
+<span class="lineNum">    1276 </span>            :         if (sizeof(int) &lt;= 2) {
+<span class="lineNum">    1277 </span>            :             if (more == 0 &amp;&amp; s-&gt;strstart == 0 &amp;&amp; s-&gt;lookahead == 0) {
+<span class="lineNum">    1278 </span>            :                 more = wsize;
+<span class="lineNum">    1279 </span>            : 
+<span class="lineNum">    1280 </span>            :             } else if (more == (unsigned)(-1)) {
+<span class="lineNum">    1281 </span>            :                 /* Very unlikely, but possible on 16 bit machine if
+<span class="lineNum">    1282 </span>            :                  * strstart == 0 &amp;&amp; lookahead == 1 (input done a byte at time)
+<span class="lineNum">    1283 </span>            :                  */
+<span class="lineNum">    1284 </span>            :                 more--;
+<span class="lineNum">    1285 </span>            :             }
+<span class="lineNum">    1286 </span>            :         }
+<span class="lineNum">    1287 </span>            : 
+<span class="lineNum">    1288 </span>            :         /* If the window is almost full and there is insufficient lookahead,
+<span class="lineNum">    1289 </span>            :          * move the upper half to the lower one to make room in the upper half.
+<span class="lineNum">    1290 </span>            :          */
+<span class="lineNum">    1291 </span><span class="lineNoCov">          0 :         if (s-&gt;strstart &gt;= wsize+MAX_DIST(s)) {</span>
+<span class="lineNum">    1292 </span>            : 
+<span class="lineNum">    1293 </span><span class="lineNoCov">          0 :             zmemcpy(s-&gt;window, s-&gt;window+wsize, (unsigned)wsize);</span>
+<span class="lineNum">    1294 </span><span class="lineNoCov">          0 :             s-&gt;match_start -= wsize;</span>
+<span class="lineNum">    1295 </span><span class="lineNoCov">          0 :             s-&gt;strstart    -= wsize; /* we now have strstart &gt;= MAX_DIST */</span>
+<span class="lineNum">    1296 </span><span class="lineNoCov">          0 :             s-&gt;block_start -= (long) wsize;</span>
+<span class="lineNum">    1297 </span>            : 
+<span class="lineNum">    1298 </span>            :             /* Slide the hash table (could be avoided with 32 bit values
+<span class="lineNum">    1299 </span>            :                at the expense of memory usage). We slide even when level == 0
+<span class="lineNum">    1300 </span>            :                to keep the hash table consistent if we switch back to level &gt; 0
+<span class="lineNum">    1301 </span>            :                later. (Using level 0 permanently is not an optimal usage of
+<span class="lineNum">    1302 </span>            :                zlib, so we don't care about this pathological case.)
+<span class="lineNum">    1303 </span>            :              */
+<span class="lineNum">    1304 </span>            :             /* %%% avoid this when Z_RLE */
+<span class="lineNum">    1305 </span><span class="lineNoCov">          0 :             n = s-&gt;hash_size;</span>
+<span class="lineNum">    1306 </span><span class="lineNoCov">          0 :             p = &amp;s-&gt;head[n];</span>
+<span class="lineNum">    1307 </span><span class="lineNoCov">          0 :             do {</span>
+<span class="lineNum">    1308 </span><span class="lineNoCov">          0 :                 m = *--p;</span>
+<span class="lineNum">    1309 </span><span class="lineNoCov">          0 :                 *p = (Pos)(m &gt;= wsize ? m-wsize : NIL);</span>
+<span class="lineNum">    1310 </span><span class="lineNoCov">          0 :             } while (--n);</span>
+<span class="lineNum">    1311 </span>            : 
+<span class="lineNum">    1312 </span>            :             n = wsize;
+<span class="lineNum">    1313 </span>            : #ifndef FASTEST
+<span class="lineNum">    1314 </span><span class="lineNoCov">          0 :             p = &amp;s-&gt;prev[n];</span>
+<span class="lineNum">    1315 </span><span class="lineNoCov">          0 :             do {</span>
+<span class="lineNum">    1316 </span><span class="lineNoCov">          0 :                 m = *--p;</span>
+<span class="lineNum">    1317 </span><span class="lineNoCov">          0 :                 *p = (Pos)(m &gt;= wsize ? m-wsize : NIL);</span>
+<span class="lineNum">    1318 </span>            :                 /* If n is not on any hash chain, prev[n] is garbage but
+<span class="lineNum">    1319 </span>            :                  * its value will never be used.
+<span class="lineNum">    1320 </span>            :                  */
+<span class="lineNum">    1321 </span><span class="lineNoCov">          0 :             } while (--n);</span>
+<span class="lineNum">    1322 </span>            : #endif
+<span class="lineNum">    1323 </span><span class="lineNoCov">          0 :             more += wsize;</span>
+<span class="lineNum">    1324 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1325 </span><span class="lineNoCov">          0 :         if (s-&gt;strm-&gt;avail_in == 0) return;</span>
+<span class="lineNum">    1326 </span>            : 
+<span class="lineNum">    1327 </span>            :         /* If there was no sliding:
+<span class="lineNum">    1328 </span>            :          *    strstart &lt;= WSIZE+MAX_DIST-1 &amp;&amp; lookahead &lt;= MIN_LOOKAHEAD - 1 &amp;&amp;
+<span class="lineNum">    1329 </span>            :          *    more == window_size - lookahead - strstart
+<span class="lineNum">    1330 </span>            :          * =&gt; more &gt;= window_size - (MIN_LOOKAHEAD-1 + WSIZE + MAX_DIST-1)
+<span class="lineNum">    1331 </span>            :          * =&gt; more &gt;= window_size - 2*WSIZE + 2
+<span class="lineNum">    1332 </span>            :          * In the BIG_MEM or MMAP case (not yet supported),
+<span class="lineNum">    1333 </span>            :          *   window_size == input_size + MIN_LOOKAHEAD  &amp;&amp;
+<span class="lineNum">    1334 </span>            :          *   strstart + s-&gt;lookahead &lt;= input_size =&gt; more &gt;= MIN_LOOKAHEAD.
+<span class="lineNum">    1335 </span>            :          * Otherwise, window_size == 2*WSIZE so more &gt;= 2.
+<span class="lineNum">    1336 </span>            :          * If there was sliding, more &gt;= WSIZE. So in all cases, more &gt;= 2.
+<span class="lineNum">    1337 </span>            :          */
+<span class="lineNum">    1338 </span>            :         Assert(more &gt;= 2, &quot;more &lt; 2&quot;);
+<span class="lineNum">    1339 </span>            : 
+<span class="lineNum">    1340 </span><span class="lineNoCov">          0 :         n = read_buf(s-&gt;strm, s-&gt;window + s-&gt;strstart + s-&gt;lookahead, more);</span>
+<span class="lineNum">    1341 </span><span class="lineNoCov">          0 :         s-&gt;lookahead += n;</span>
+<span class="lineNum">    1342 </span>            : 
+<span class="lineNum">    1343 </span>            :         /* Initialize the hash value now that we have some input: */
+<span class="lineNum">    1344 </span><span class="lineNoCov">          0 :         if (s-&gt;lookahead &gt;= MIN_MATCH) {</span>
+<span class="lineNum">    1345 </span><span class="lineNoCov">          0 :             s-&gt;ins_h = s-&gt;window[s-&gt;strstart];</span>
+<span class="lineNum">    1346 </span><span class="lineNoCov">          0 :             UPDATE_HASH(s, s-&gt;ins_h, s-&gt;window[s-&gt;strstart+1]);</span>
+<span class="lineNum">    1347 </span>            : #if MIN_MATCH != 3
+<span class="lineNum">    1348 </span>            :             Call UPDATE_HASH() MIN_MATCH-3 more times
+<span class="lineNum">    1349 </span>            : #endif
+<span class="lineNum">    1350 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1351 </span>            :         /* If the whole input has less than MIN_MATCH bytes, ins_h is garbage,
+<span class="lineNum">    1352 </span>            :          * but this is not important since only literal bytes will be emitted.
+<span class="lineNum">    1353 </span>            :          */
+<span class="lineNum">    1354 </span>            : 
+<span class="lineNum">    1355 </span><span class="lineNoCov">          0 :     } while (s-&gt;lookahead &lt; MIN_LOOKAHEAD &amp;&amp; s-&gt;strm-&gt;avail_in != 0);</span>
+<span class="lineNum">    1356 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1357 </span>            : 
+<span class="lineNum">    1358 </span>            : /* ===========================================================================
+<span class="lineNum">    1359 </span>            :  * Flush the current block, with given end-of-file flag.
+<span class="lineNum">    1360 </span>            :  * IN assertion: strstart is set to the end of the current match.
+<span class="lineNum">    1361 </span>            :  */
+<span class="lineNum">    1362 </span>            : #define FLUSH_BLOCK_ONLY(s, eof) { \
+<span class="lineNum">    1363 </span>            :    _tr_flush_block(s, (s-&gt;block_start &gt;= 0L ? \
+<span class="lineNum">    1364 </span>            :                    (charf *)&amp;s-&gt;window[(unsigned)s-&gt;block_start] : \
+<span class="lineNum">    1365 </span>            :                    (charf *)Z_NULL), \
+<span class="lineNum">    1366 </span>            :                 (ulg)((long)s-&gt;strstart - s-&gt;block_start), \
+<span class="lineNum">    1367 </span>            :                 (eof)); \
+<span class="lineNum">    1368 </span>            :    s-&gt;block_start = s-&gt;strstart; \
+<span class="lineNum">    1369 </span>            :    flush_pending(s-&gt;strm); \
+<span class="lineNum">    1370 </span>            :    Tracev((stderr,&quot;[FLUSH]&quot;)); \
+<span class="lineNum">    1371 </span>            : }
+<span class="lineNum">    1372 </span>            : 
+<span class="lineNum">    1373 </span>            : /* Same but force premature exit if necessary. */
+<span class="lineNum">    1374 </span>            : #define FLUSH_BLOCK(s, eof) { \
+<span class="lineNum">    1375 </span>            :    FLUSH_BLOCK_ONLY(s, eof); \
+<span class="lineNum">    1376 </span>            :    if (s-&gt;strm-&gt;avail_out == 0) return (eof) ? finish_started : need_more; \
+<span class="lineNum">    1377 </span>            : }
+<span class="lineNum">    1378 </span>            : 
+<span class="lineNum">    1379 </span>            : /* ===========================================================================
+<span class="lineNum">    1380 </span>            :  * Copy without compression as much as possible from the input stream, return
+<span class="lineNum">    1381 </span>            :  * the current block state.
+<span class="lineNum">    1382 </span>            :  * This function does not insert new strings in the dictionary since
+<span class="lineNum">    1383 </span>            :  * uncompressible data is probably not useful. This function is used
+<span class="lineNum">    1384 </span>            :  * only for the level=0 compression option.
+<span class="lineNum">    1385 </span>            :  * NOTE: this function should be optimized to avoid extra copying from
+<a name="1386"><span class="lineNum">    1386 </span>            :  * window to pending_buf.</a>
+<span class="lineNum">    1387 </span>            :  */
+<span class="lineNum">    1388 </span><span class="lineNoCov">          0 : local block_state deflate_stored(s, flush)</span>
+<span class="lineNum">    1389 </span>            :     deflate_state *s;
+<span class="lineNum">    1390 </span>            :     int flush;
+<span class="lineNum">    1391 </span>            : {
+<span class="lineNum">    1392 </span>            :     /* Stored blocks are limited to 0xffff bytes, pending_buf is limited
+<span class="lineNum">    1393 </span>            :      * to pending_buf_size, and each stored block has a 5 byte header:
+<span class="lineNum">    1394 </span>            :      */
+<span class="lineNum">    1395 </span>            :     ulg max_block_size = 0xffff;
+<span class="lineNum">    1396 </span>            :     ulg max_start;
+<span class="lineNum">    1397 </span>            : 
+<span class="lineNum">    1398 </span><span class="lineNoCov">          0 :     if (max_block_size &gt; s-&gt;pending_buf_size - 5) {</span>
+<span class="lineNum">    1399 </span>            :         max_block_size = s-&gt;pending_buf_size - 5;
+<span class="lineNum">    1400 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">    1401 </span>            : 
+<span class="lineNum">    1402 </span>            :     /* Copy as much as possible from input to output: */
+<span class="lineNum">    1403 </span><span class="lineNoCov">          0 :     for (;;) {</span>
+<span class="lineNum">    1404 </span>            :         /* Fill the window as much as possible: */
+<span class="lineNum">    1405 </span><span class="lineNoCov">          0 :         if (s-&gt;lookahead &lt;= 1) {</span>
+<span class="lineNum">    1406 </span>            : 
+<span class="lineNum">    1407 </span>            :             Assert(s-&gt;strstart &lt; s-&gt;w_size+MAX_DIST(s) ||
+<span class="lineNum">    1408 </span>            :                    s-&gt;block_start &gt;= (long)s-&gt;w_size, &quot;slide too late&quot;);
+<span class="lineNum">    1409 </span>            : 
+<span class="lineNum">    1410 </span><span class="lineNoCov">          0 :             fill_window(s);</span>
+<span class="lineNum">    1411 </span><span class="lineNoCov">          0 :             if (s-&gt;lookahead == 0 &amp;&amp; flush == Z_NO_FLUSH) return need_more;</span>
+<span class="lineNum">    1412 </span>            : 
+<span class="lineNum">    1413 </span><span class="lineNoCov">          0 :             if (s-&gt;lookahead == 0) break; /* flush the current block */</span>
+<span class="lineNum">    1414 </span>            :         }
+<span class="lineNum">    1415 </span>            :         Assert(s-&gt;block_start &gt;= 0L, &quot;block gone&quot;);
+<span class="lineNum">    1416 </span>            : 
+<span class="lineNum">    1417 </span><span class="lineNoCov">          0 :         s-&gt;strstart += s-&gt;lookahead;</span>
+<span class="lineNum">    1418 </span><span class="lineNoCov">          0 :         s-&gt;lookahead = 0;</span>
+<span class="lineNum">    1419 </span>            : 
+<span class="lineNum">    1420 </span>            :         /* Emit a stored block if pending_buf will be full: */
+<span class="lineNum">    1421 </span><span class="lineNoCov">          0 :         max_start = s-&gt;block_start + max_block_size;</span>
+<span class="lineNum">    1422 </span><span class="lineNoCov">          0 :         if (s-&gt;strstart == 0 || (ulg)s-&gt;strstart &gt;= max_start) {</span>
+<span class="lineNum">    1423 </span>            :             /* strstart == 0 is possible when wraparound on 16-bit machine */
+<span class="lineNum">    1424 </span><span class="lineNoCov">          0 :             s-&gt;lookahead = (uInt)(s-&gt;strstart - max_start);</span>
+<span class="lineNum">    1425 </span><span class="lineNoCov">          0 :             s-&gt;strstart = (uInt)max_start;</span>
+<span class="lineNum">    1426 </span><span class="lineNoCov">          0 :             FLUSH_BLOCK(s, 0);</span>
+<span class="lineNum">    1427 </span>            :         }
+<span class="lineNum">    1428 </span>            :         /* Flush if we may have to slide, otherwise block_start may become
+<span class="lineNum">    1429 </span>            :          * negative and the data will be gone:
+<span class="lineNum">    1430 </span>            :          */
+<span class="lineNum">    1431 </span><span class="lineNoCov">          0 :         if (s-&gt;strstart - (uInt)s-&gt;block_start &gt;= MAX_DIST(s)) {</span>
+<span class="lineNum">    1432 </span><span class="lineNoCov">          0 :             FLUSH_BLOCK(s, 0);</span>
+<span class="lineNum">    1433 </span>            :         }
+<span class="lineNum">    1434 </span>            :     }
+<span class="lineNum">    1435 </span><span class="lineNoCov">          0 :     FLUSH_BLOCK(s, flush == Z_FINISH);</span>
+<span class="lineNum">    1436 </span><span class="lineNoCov">          0 :     return flush == Z_FINISH ? finish_done : block_done;</span>
+<span class="lineNum">    1437 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1438 </span>            : 
+<span class="lineNum">    1439 </span>            : /* ===========================================================================
+<span class="lineNum">    1440 </span>            :  * Compress as much as possible from the input stream, return the current
+<span class="lineNum">    1441 </span>            :  * block state.
+<span class="lineNum">    1442 </span>            :  * This function does not perform lazy evaluation of matches and inserts
+<span class="lineNum">    1443 </span>            :  * new strings in the dictionary only for unmatched strings or for short
+<a name="1444"><span class="lineNum">    1444 </span>            :  * matches. It is used only for the fast compression options.</a>
+<span class="lineNum">    1445 </span>            :  */
+<span class="lineNum">    1446 </span><span class="lineNoCov">          0 : local block_state deflate_fast(s, flush)</span>
+<span class="lineNum">    1447 </span>            :     deflate_state *s;
+<span class="lineNum">    1448 </span>            :     int flush;
+<span class="lineNum">    1449 </span>            : {
+<span class="lineNum">    1450 </span>            :     IPos hash_head = NIL; /* head of the hash chain */
+<span class="lineNum">    1451 </span>            :     int bflush;           /* set if current block must be flushed */
+<span class="lineNum">    1452 </span>            : 
+<span class="lineNum">    1453 </span><span class="lineNoCov">          0 :     for (;;) {</span>
+<span class="lineNum">    1454 </span>            :         /* Make sure that we always have enough lookahead, except
+<span class="lineNum">    1455 </span>            :          * at the end of the input file. We need MAX_MATCH bytes
+<span class="lineNum">    1456 </span>            :          * for the next match, plus MIN_MATCH bytes to insert the
+<span class="lineNum">    1457 </span>            :          * string following the next match.
+<span class="lineNum">    1458 </span>            :          */
+<span class="lineNum">    1459 </span><span class="lineNoCov">          0 :         if (s-&gt;lookahead &lt; MIN_LOOKAHEAD) {</span>
+<span class="lineNum">    1460 </span><span class="lineNoCov">          0 :             fill_window(s);</span>
+<span class="lineNum">    1461 </span><span class="lineNoCov">          0 :             if (s-&gt;lookahead &lt; MIN_LOOKAHEAD &amp;&amp; flush == Z_NO_FLUSH) {</span>
+<span class="lineNum">    1462 </span><span class="lineNoCov">          0 :                 return need_more;</span>
+<span class="lineNum">    1463 </span>            :             }
+<span class="lineNum">    1464 </span><span class="lineNoCov">          0 :             if (s-&gt;lookahead == 0) break; /* flush the current block */</span>
+<span class="lineNum">    1465 </span>            :         }
+<span class="lineNum">    1466 </span>            : 
+<span class="lineNum">    1467 </span>            :         /* Insert the string window[strstart .. strstart+2] in the
+<span class="lineNum">    1468 </span>            :          * dictionary, and set hash_head to the head of the hash chain:
+<span class="lineNum">    1469 </span>            :          */
+<span class="lineNum">    1470 </span><span class="lineNoCov">          0 :         if (s-&gt;lookahead &gt;= MIN_MATCH) {</span>
+<span class="lineNum">    1471 </span><span class="lineNoCov">          0 :             INSERT_STRING(s, s-&gt;strstart, hash_head);</span>
+<span class="lineNum">    1472 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1473 </span>            : 
+<span class="lineNum">    1474 </span>            :         /* Find the longest match, discarding those &lt;= prev_length.
+<span class="lineNum">    1475 </span>            :          * At this point we have always match_length &lt; MIN_MATCH
+<span class="lineNum">    1476 </span>            :          */
+<span class="lineNum">    1477 </span><span class="lineNoCov">          0 :         if (hash_head != NIL &amp;&amp; s-&gt;strstart - hash_head &lt;= MAX_DIST(s)) {</span>
+<span class="lineNum">    1478 </span>            :             /* To simplify the code, we prevent matches with the string
+<span class="lineNum">    1479 </span>            :              * of window index 0 (in particular we have to avoid a match
+<span class="lineNum">    1480 </span>            :              * of the string with itself at the start of the input file).
+<span class="lineNum">    1481 </span>            :              */
+<span class="lineNum">    1482 </span>            : #ifdef FASTEST
+<span class="lineNum">    1483 </span>            :             if ((s-&gt;strategy != Z_HUFFMAN_ONLY &amp;&amp; s-&gt;strategy != Z_RLE) ||
+<span class="lineNum">    1484 </span>            :                 (s-&gt;strategy == Z_RLE &amp;&amp; s-&gt;strstart - hash_head == 1)) {
+<span class="lineNum">    1485 </span>            :                 s-&gt;match_length = longest_match_fast (s, hash_head);
+<span class="lineNum">    1486 </span>            :             }
+<span class="lineNum">    1487 </span>            : #else
+<span class="lineNum">    1488 </span><span class="lineNoCov">          0 :             if (s-&gt;strategy != Z_HUFFMAN_ONLY &amp;&amp; s-&gt;strategy != Z_RLE) {</span>
+<span class="lineNum">    1489 </span><span class="lineNoCov">          0 :                 s-&gt;match_length = longest_match (s, hash_head);</span>
+<span class="lineNum">    1490 </span><span class="lineNoCov">          0 :             } else if (s-&gt;strategy == Z_RLE &amp;&amp; s-&gt;strstart - hash_head == 1) {</span>
+<span class="lineNum">    1491 </span><span class="lineNoCov">          0 :                 s-&gt;match_length = longest_match_fast (s, hash_head);</span>
+<span class="lineNum">    1492 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">    1493 </span>            : #endif
+<span class="lineNum">    1494 </span>            :             /* longest_match() or longest_match_fast() sets match_start */
+<span class="lineNum">    1495 </span>            :         }
+<span class="lineNum">    1496 </span><span class="lineNoCov">          0 :         if (s-&gt;match_length &gt;= MIN_MATCH) {</span>
+<span class="lineNum">    1497 </span>            :             check_match(s, s-&gt;strstart, s-&gt;match_start, s-&gt;match_length);
+<span class="lineNum">    1498 </span>            : 
+<span class="lineNum">    1499 </span><span class="lineNoCov">          0 :             _tr_tally_dist(s, s-&gt;strstart - s-&gt;match_start,</span>
+<span class="lineNum">    1500 </span>            :                            s-&gt;match_length - MIN_MATCH, bflush);
+<span class="lineNum">    1501 </span>            : 
+<span class="lineNum">    1502 </span><span class="lineNoCov">          0 :             s-&gt;lookahead -= s-&gt;match_length;</span>
+<span class="lineNum">    1503 </span>            : 
+<span class="lineNum">    1504 </span>            :             /* Insert new strings in the hash table only if the match length
+<span class="lineNum">    1505 </span>            :              * is not too large. This saves time but degrades compression.
+<span class="lineNum">    1506 </span>            :              */
+<span class="lineNum">    1507 </span>            : #ifndef FASTEST
+<span class="lineNum">    1508 </span><span class="lineNoCov">          0 :             if (s-&gt;match_length &lt;= s-&gt;max_insert_length &amp;&amp;</span>
+<span class="lineNum">    1509 </span><span class="lineNoCov">          0 :                 s-&gt;lookahead &gt;= MIN_MATCH) {</span>
+<span class="lineNum">    1510 </span><span class="lineNoCov">          0 :                 s-&gt;match_length--; /* string at strstart already in table */</span>
+<span class="lineNum">    1511 </span><span class="lineNoCov">          0 :                 do {</span>
+<span class="lineNum">    1512 </span><span class="lineNoCov">          0 :                     s-&gt;strstart++;</span>
+<span class="lineNum">    1513 </span><span class="lineNoCov">          0 :                     INSERT_STRING(s, s-&gt;strstart, hash_head);</span>
+<span class="lineNum">    1514 </span>            :                     /* strstart never exceeds WSIZE-MAX_MATCH, so there are
+<span class="lineNum">    1515 </span>            :                      * always MIN_MATCH bytes ahead.
+<span class="lineNum">    1516 </span>            :                      */
+<span class="lineNum">    1517 </span><span class="lineNoCov">          0 :                 } while (--s-&gt;match_length != 0);</span>
+<span class="lineNum">    1518 </span><span class="lineNoCov">          0 :                 s-&gt;strstart++;</span>
+<span class="lineNum">    1519 </span><span class="lineNoCov">          0 :             } else</span>
+<span class="lineNum">    1520 </span>            : #endif
+<span class="lineNum">    1521 </span>            :             {
+<span class="lineNum">    1522 </span><span class="lineNoCov">          0 :                 s-&gt;strstart += s-&gt;match_length;</span>
+<span class="lineNum">    1523 </span><span class="lineNoCov">          0 :                 s-&gt;match_length = 0;</span>
+<span class="lineNum">    1524 </span><span class="lineNoCov">          0 :                 s-&gt;ins_h = s-&gt;window[s-&gt;strstart];</span>
+<span class="lineNum">    1525 </span><span class="lineNoCov">          0 :                 UPDATE_HASH(s, s-&gt;ins_h, s-&gt;window[s-&gt;strstart+1]);</span>
+<span class="lineNum">    1526 </span>            : #if MIN_MATCH != 3
+<span class="lineNum">    1527 </span>            :                 Call UPDATE_HASH() MIN_MATCH-3 more times
+<span class="lineNum">    1528 </span>            : #endif
+<span class="lineNum">    1529 </span>            :                 /* If lookahead &lt; MIN_MATCH, ins_h is garbage, but it does not
+<span class="lineNum">    1530 </span>            :                  * matter since it will be recomputed at next deflate call.
+<span class="lineNum">    1531 </span>            :                  */
+<span class="lineNum">    1532 </span>            :             }
+<span class="lineNum">    1533 </span>            :         } else {
+<span class="lineNum">    1534 </span>            :             /* No match, output a literal byte */
+<span class="lineNum">    1535 </span>            :             Tracevv((stderr,&quot;%c&quot;, s-&gt;window[s-&gt;strstart]));
+<span class="lineNum">    1536 </span><span class="lineNoCov">          0 :             _tr_tally_lit (s, s-&gt;window[s-&gt;strstart], bflush);</span>
+<span class="lineNum">    1537 </span><span class="lineNoCov">          0 :             s-&gt;lookahead--;</span>
+<span class="lineNum">    1538 </span><span class="lineNoCov">          0 :             s-&gt;strstart++;</span>
+<span class="lineNum">    1539 </span>            :         }
+<span class="lineNum">    1540 </span><span class="lineNoCov">          0 :         if (bflush) FLUSH_BLOCK(s, 0);</span>
+<span class="lineNum">    1541 </span>            :     }
+<span class="lineNum">    1542 </span><span class="lineNoCov">          0 :     FLUSH_BLOCK(s, flush == Z_FINISH);</span>
+<span class="lineNum">    1543 </span><span class="lineNoCov">          0 :     return flush == Z_FINISH ? finish_done : block_done;</span>
+<span class="lineNum">    1544 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1545 </span>            : 
+<span class="lineNum">    1546 </span>            : #ifndef FASTEST
+<span class="lineNum">    1547 </span>            : /* ===========================================================================
+<span class="lineNum">    1548 </span>            :  * Same as above, but achieves better compression. We use a lazy
+<span class="lineNum">    1549 </span>            :  * evaluation for matches: a match is finally adopted only if there is
+<a name="1550"><span class="lineNum">    1550 </span>            :  * no better match at the next window position.</a>
+<span class="lineNum">    1551 </span>            :  */
+<span class="lineNum">    1552 </span><span class="lineNoCov">          0 : local block_state deflate_slow(s, flush)</span>
+<span class="lineNum">    1553 </span>            :     deflate_state *s;
+<span class="lineNum">    1554 </span>            :     int flush;
+<span class="lineNum">    1555 </span>            : {
+<span class="lineNum">    1556 </span>            :     IPos hash_head = NIL;    /* head of hash chain */
+<span class="lineNum">    1557 </span>            :     int bflush;              /* set if current block must be flushed */
+<span class="lineNum">    1558 </span>            : 
+<span class="lineNum">    1559 </span>            :     /* Process the input block. */
+<span class="lineNum">    1560 </span><span class="lineNoCov">          0 :     for (;;) {</span>
+<span class="lineNum">    1561 </span>            :         /* Make sure that we always have enough lookahead, except
+<span class="lineNum">    1562 </span>            :          * at the end of the input file. We need MAX_MATCH bytes
+<span class="lineNum">    1563 </span>            :          * for the next match, plus MIN_MATCH bytes to insert the
+<span class="lineNum">    1564 </span>            :          * string following the next match.
+<span class="lineNum">    1565 </span>            :          */
+<span class="lineNum">    1566 </span><span class="lineNoCov">          0 :         if (s-&gt;lookahead &lt; MIN_LOOKAHEAD) {</span>
+<span class="lineNum">    1567 </span><span class="lineNoCov">          0 :             fill_window(s);</span>
+<span class="lineNum">    1568 </span><span class="lineNoCov">          0 :             if (s-&gt;lookahead &lt; MIN_LOOKAHEAD &amp;&amp; flush == Z_NO_FLUSH) {</span>
+<span class="lineNum">    1569 </span><span class="lineNoCov">          0 :                 return need_more;</span>
+<span class="lineNum">    1570 </span>            :             }
+<span class="lineNum">    1571 </span><span class="lineNoCov">          0 :             if (s-&gt;lookahead == 0) break; /* flush the current block */</span>
+<span class="lineNum">    1572 </span>            :         }
+<span class="lineNum">    1573 </span>            : 
+<span class="lineNum">    1574 </span>            :         /* Insert the string window[strstart .. strstart+2] in the
+<span class="lineNum">    1575 </span>            :          * dictionary, and set hash_head to the head of the hash chain:
+<span class="lineNum">    1576 </span>            :          */
+<span class="lineNum">    1577 </span><span class="lineNoCov">          0 :         if (s-&gt;lookahead &gt;= MIN_MATCH) {</span>
+<span class="lineNum">    1578 </span><span class="lineNoCov">          0 :             INSERT_STRING(s, s-&gt;strstart, hash_head);</span>
+<span class="lineNum">    1579 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">    1580 </span>            : 
+<span class="lineNum">    1581 </span>            :         /* Find the longest match, discarding those &lt;= prev_length.
+<span class="lineNum">    1582 </span>            :          */
+<span class="lineNum">    1583 </span><span class="lineNoCov">          0 :         s-&gt;prev_length = s-&gt;match_length, s-&gt;prev_match = s-&gt;match_start;</span>
+<span class="lineNum">    1584 </span><span class="lineNoCov">          0 :         s-&gt;match_length = MIN_MATCH-1;</span>
+<span class="lineNum">    1585 </span>            : 
+<span class="lineNum">    1586 </span><span class="lineNoCov">          0 :         if (hash_head != NIL &amp;&amp; s-&gt;prev_length &lt; s-&gt;max_lazy_match &amp;&amp;</span>
+<span class="lineNum">    1587 </span><span class="lineNoCov">          0 :             s-&gt;strstart - hash_head &lt;= MAX_DIST(s)) {</span>
+<span class="lineNum">    1588 </span>            :             /* To simplify the code, we prevent matches with the string
+<span class="lineNum">    1589 </span>            :              * of window index 0 (in particular we have to avoid a match
+<span class="lineNum">    1590 </span>            :              * of the string with itself at the start of the input file).
+<span class="lineNum">    1591 </span>            :              */
+<span class="lineNum">    1592 </span><span class="lineNoCov">          0 :             if (s-&gt;strategy != Z_HUFFMAN_ONLY &amp;&amp; s-&gt;strategy != Z_RLE) {</span>
+<span class="lineNum">    1593 </span><span class="lineNoCov">          0 :                 s-&gt;match_length = longest_match (s, hash_head);</span>
+<span class="lineNum">    1594 </span><span class="lineNoCov">          0 :             } else if (s-&gt;strategy == Z_RLE &amp;&amp; s-&gt;strstart - hash_head == 1) {</span>
+<span class="lineNum">    1595 </span><span class="lineNoCov">          0 :                 s-&gt;match_length = longest_match_fast (s, hash_head);</span>
+<span class="lineNum">    1596 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">    1597 </span>            :             /* longest_match() or longest_match_fast() sets match_start */
+<span class="lineNum">    1598 </span>            : 
+<span class="lineNum">    1599 </span><span class="lineNoCov">          0 :             if (s-&gt;match_length &lt;= 5 &amp;&amp; (s-&gt;strategy == Z_FILTERED</span>
+<span class="lineNum">    1600 </span>            : #if TOO_FAR &lt;= 32767
+<span class="lineNum">    1601 </span><span class="lineNoCov">          0 :                 || (s-&gt;match_length == MIN_MATCH &amp;&amp;</span>
+<span class="lineNum">    1602 </span><span class="lineNoCov">          0 :                     s-&gt;strstart - s-&gt;match_start &gt; TOO_FAR)</span>
+<span class="lineNum">    1603 </span>            : #endif
+<span class="lineNum">    1604 </span>            :                 )) {
+<span class="lineNum">    1605 </span>            : 
+<span class="lineNum">    1606 </span>            :                 /* If prev_match is also MIN_MATCH, match_start is garbage
+<span class="lineNum">    1607 </span>            :                  * but we will ignore the current match anyway.
+<span class="lineNum">    1608 </span>            :                  */
+<span class="lineNum">    1609 </span><span class="lineNoCov">          0 :                 s-&gt;match_length = MIN_MATCH-1;</span>
+<span class="lineNum">    1610 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">    1611 </span>            :         }
+<span class="lineNum">    1612 </span>            :         /* If there was a match at the previous step and the current
+<span class="lineNum">    1613 </span>            :          * match is not better, output the previous match:
+<span class="lineNum">    1614 </span>            :          */
+<span class="lineNum">    1615 </span><span class="lineNoCov">          0 :         if (s-&gt;prev_length &gt;= MIN_MATCH &amp;&amp; s-&gt;match_length &lt;= s-&gt;prev_length) {</span>
+<span class="lineNum">    1616 </span><span class="lineNoCov">          0 :             uInt max_insert = s-&gt;strstart + s-&gt;lookahead - MIN_MATCH;</span>
+<span class="lineNum">    1617 </span>            :             /* Do not insert strings in hash table beyond this. */
+<span class="lineNum">    1618 </span>            : 
+<span class="lineNum">    1619 </span>            :             check_match(s, s-&gt;strstart-1, s-&gt;prev_match, s-&gt;prev_length);
+<span class="lineNum">    1620 </span>            : 
+<span class="lineNum">    1621 </span><span class="lineNoCov">          0 :             _tr_tally_dist(s, s-&gt;strstart -1 - s-&gt;prev_match,</span>
+<span class="lineNum">    1622 </span>            :                            s-&gt;prev_length - MIN_MATCH, bflush);
+<span class="lineNum">    1623 </span>            : 
+<span class="lineNum">    1624 </span>            :             /* Insert in hash table all strings up to the end of the match.
+<span class="lineNum">    1625 </span>            :              * strstart-1 and strstart are already inserted. If there is not
+<span class="lineNum">    1626 </span>            :              * enough lookahead, the last two strings are not inserted in
+<span class="lineNum">    1627 </span>            :              * the hash table.
+<span class="lineNum">    1628 </span>            :              */
+<span class="lineNum">    1629 </span><span class="lineNoCov">          0 :             s-&gt;lookahead -= s-&gt;prev_length-1;</span>
+<span class="lineNum">    1630 </span><span class="lineNoCov">          0 :             s-&gt;prev_length -= 2;</span>
+<span class="lineNum">    1631 </span><span class="lineNoCov">          0 :             do {</span>
+<span class="lineNum">    1632 </span><span class="lineNoCov">          0 :                 if (++s-&gt;strstart &lt;= max_insert) {</span>
+<span class="lineNum">    1633 </span><span class="lineNoCov">          0 :                     INSERT_STRING(s, s-&gt;strstart, hash_head);</span>
+<span class="lineNum">    1634 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1635 </span><span class="lineNoCov">          0 :             } while (--s-&gt;prev_length != 0);</span>
+<span class="lineNum">    1636 </span><span class="lineNoCov">          0 :             s-&gt;match_available = 0;</span>
+<span class="lineNum">    1637 </span><span class="lineNoCov">          0 :             s-&gt;match_length = MIN_MATCH-1;</span>
+<span class="lineNum">    1638 </span><span class="lineNoCov">          0 :             s-&gt;strstart++;</span>
+<span class="lineNum">    1639 </span>            : 
+<span class="lineNum">    1640 </span><span class="lineNoCov">          0 :             if (bflush) FLUSH_BLOCK(s, 0);</span>
+<span class="lineNum">    1641 </span>            : 
+<span class="lineNum">    1642 </span><span class="lineNoCov">          0 :         } else if (s-&gt;match_available) {</span>
+<span class="lineNum">    1643 </span>            :             /* If there was no match at the previous position, output a
+<span class="lineNum">    1644 </span>            :              * single literal. If there was a match but the current match
+<span class="lineNum">    1645 </span>            :              * is longer, truncate the previous match to a single literal.
+<span class="lineNum">    1646 </span>            :              */
+<span class="lineNum">    1647 </span>            :             Tracevv((stderr,&quot;%c&quot;, s-&gt;window[s-&gt;strstart-1]));
+<span class="lineNum">    1648 </span><span class="lineNoCov">          0 :             _tr_tally_lit(s, s-&gt;window[s-&gt;strstart-1], bflush);</span>
+<span class="lineNum">    1649 </span><span class="lineNoCov">          0 :             if (bflush) {</span>
+<span class="lineNum">    1650 </span><span class="lineNoCov">          0 :                 FLUSH_BLOCK_ONLY(s, 0);</span>
+<span class="lineNum">    1651 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">    1652 </span><span class="lineNoCov">          0 :             s-&gt;strstart++;</span>
+<span class="lineNum">    1653 </span><span class="lineNoCov">          0 :             s-&gt;lookahead--;</span>
+<span class="lineNum">    1654 </span><span class="lineNoCov">          0 :             if (s-&gt;strm-&gt;avail_out == 0) return need_more;</span>
+<span class="lineNum">    1655 </span>            :         } else {
+<span class="lineNum">    1656 </span>            :             /* There is no previous match to compare with, wait for
+<span class="lineNum">    1657 </span>            :              * the next step to decide.
+<span class="lineNum">    1658 </span>            :              */
+<span class="lineNum">    1659 </span><span class="lineNoCov">          0 :             s-&gt;match_available = 1;</span>
+<span class="lineNum">    1660 </span><span class="lineNoCov">          0 :             s-&gt;strstart++;</span>
+<span class="lineNum">    1661 </span><span class="lineNoCov">          0 :             s-&gt;lookahead--;</span>
+<span class="lineNum">    1662 </span>            :         }
+<span class="lineNum">    1663 </span>            :     }
+<span class="lineNum">    1664 </span>            :     Assert (flush != Z_NO_FLUSH, &quot;no flush?&quot;);
+<span class="lineNum">    1665 </span><span class="lineNoCov">          0 :     if (s-&gt;match_available) {</span>
+<span class="lineNum">    1666 </span>            :         Tracevv((stderr,&quot;%c&quot;, s-&gt;window[s-&gt;strstart-1]));
+<span class="lineNum">    1667 </span><span class="lineNoCov">          0 :         _tr_tally_lit(s, s-&gt;window[s-&gt;strstart-1], bflush);</span>
+<span class="lineNum">    1668 </span><span class="lineNoCov">          0 :         s-&gt;match_available = 0;</span>
+<span class="lineNum">    1669 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">    1670 </span><span class="lineNoCov">          0 :     FLUSH_BLOCK(s, flush == Z_FINISH);</span>
+<span class="lineNum">    1671 </span><span class="lineNoCov">          0 :     return flush == Z_FINISH ? finish_done : block_done;</span>
+<span class="lineNum">    1672 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1673 </span>            : #endif /* FASTEST */
+<span class="lineNum">    1674 </span>            : 
+<span class="lineNum">    1675 </span>            : #if 0
+<span class="lineNum">    1676 </span>            : /* ===========================================================================
+<span class="lineNum">    1677 </span>            :  * For Z_RLE, simply look for runs of bytes, generate matches only of distance
+<span class="lineNum">    1678 </span>            :  * one.  Do not maintain a hash table.  (It will be regenerated if this run of
+<span class="lineNum">    1679 </span>            :  * deflate switches away from Z_RLE.)
+<span class="lineNum">    1680 </span>            :  */
+<span class="lineNum">    1681 </span>            : local block_state deflate_rle(s, flush)
+<span class="lineNum">    1682 </span>            :     deflate_state *s;
+<span class="lineNum">    1683 </span>            :     int flush;
+<span class="lineNum">    1684 </span>            : {
+<span class="lineNum">    1685 </span>            :     int bflush;         /* set if current block must be flushed */
+<span class="lineNum">    1686 </span>            :     uInt run;           /* length of run */
+<span class="lineNum">    1687 </span>            :     uInt max;           /* maximum length of run */
+<span class="lineNum">    1688 </span>            :     uInt prev;          /* byte at distance one to match */
+<span class="lineNum">    1689 </span>            :     Bytef *scan;        /* scan for end of run */
+<span class="lineNum">    1690 </span>            : 
+<span class="lineNum">    1691 </span>            :     for (;;) {
+<span class="lineNum">    1692 </span>            :         /* Make sure that we always have enough lookahead, except
+<span class="lineNum">    1693 </span>            :          * at the end of the input file. We need MAX_MATCH bytes
+<span class="lineNum">    1694 </span>            :          * for the longest encodable run.
+<span class="lineNum">    1695 </span>            :          */
+<span class="lineNum">    1696 </span>            :         if (s-&gt;lookahead &lt; MAX_MATCH) {
+<span class="lineNum">    1697 </span>            :             fill_window(s);
+<span class="lineNum">    1698 </span>            :             if (s-&gt;lookahead &lt; MAX_MATCH &amp;&amp; flush == Z_NO_FLUSH) {
+<span class="lineNum">    1699 </span>            :                 return need_more;
+<span class="lineNum">    1700 </span>            :             }
+<span class="lineNum">    1701 </span>            :             if (s-&gt;lookahead == 0) break; /* flush the current block */
+<span class="lineNum">    1702 </span>            :         }
+<span class="lineNum">    1703 </span>            : 
+<span class="lineNum">    1704 </span>            :         /* See how many times the previous byte repeats */
+<span class="lineNum">    1705 </span>            :         run = 0;
+<span class="lineNum">    1706 </span>            :         if (s-&gt;strstart &gt; 0) {      /* if there is a previous byte, that is */
+<span class="lineNum">    1707 </span>            :             max = s-&gt;lookahead &lt; MAX_MATCH ? s-&gt;lookahead : MAX_MATCH;
+<span class="lineNum">    1708 </span>            :             scan = s-&gt;window + s-&gt;strstart - 1;
+<span class="lineNum">    1709 </span>            :             prev = *scan++;
+<span class="lineNum">    1710 </span>            :             do {
+<span class="lineNum">    1711 </span>            :                 if (*scan++ != prev)
+<span class="lineNum">    1712 </span>            :                     break;
+<span class="lineNum">    1713 </span>            :             } while (++run &lt; max);
+<span class="lineNum">    1714 </span>            :         }
+<span class="lineNum">    1715 </span>            : 
+<span class="lineNum">    1716 </span>            :         /* Emit match if have run of MIN_MATCH or longer, else emit literal */
+<span class="lineNum">    1717 </span>            :         if (run &gt;= MIN_MATCH) {
+<span class="lineNum">    1718 </span>            :             check_match(s, s-&gt;strstart, s-&gt;strstart - 1, run);
+<span class="lineNum">    1719 </span>            :             _tr_tally_dist(s, 1, run - MIN_MATCH, bflush);
+<span class="lineNum">    1720 </span>            :             s-&gt;lookahead -= run;
+<span class="lineNum">    1721 </span>            :             s-&gt;strstart += run;
+<span class="lineNum">    1722 </span>            :         } else {
+<span class="lineNum">    1723 </span>            :             /* No match, output a literal byte */
+<span class="lineNum">    1724 </span>            :             Tracevv((stderr,&quot;%c&quot;, s-&gt;window[s-&gt;strstart]));
+<span class="lineNum">    1725 </span>            :             _tr_tally_lit (s, s-&gt;window[s-&gt;strstart], bflush);
+<span class="lineNum">    1726 </span>            :             s-&gt;lookahead--;
+<span class="lineNum">    1727 </span>            :             s-&gt;strstart++;
+<span class="lineNum">    1728 </span>            :         }
+<span class="lineNum">    1729 </span>            :         if (bflush) FLUSH_BLOCK(s, 0);
+<span class="lineNum">    1730 </span>            :     }
+<span class="lineNum">    1731 </span>            :     FLUSH_BLOCK(s, flush == Z_FINISH);
+<span class="lineNum">    1732 </span>            :     return flush == Z_FINISH ? finish_done : block_done;
+<span class="lineNum">    1733 </span>            : }
+<span class="lineNum">    1734 </span>            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

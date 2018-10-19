@@ -1,0 +1,721 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - lib/libz/infback.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">lib/libz</a> - infback.c<span style="font-size: 80%;"> (source / <a href="infback.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">266</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /* infback.c -- inflate using a call-back interface</a>
+<span class="lineNum">       2 </span>            :  * Copyright (C) 1995-2005 Mark Adler
+<span class="lineNum">       3 </span>            :  * For conditions of distribution and use, see copyright notice in zlib.h
+<span class="lineNum">       4 </span>            :  */
+<span class="lineNum">       5 </span>            : 
+<span class="lineNum">       6 </span>            : /*
+<span class="lineNum">       7 </span>            :    This code is largely copied from inflate.c.  Normally either infback.o or
+<span class="lineNum">       8 </span>            :    inflate.o would be linked into an application--not both.  The interface
+<span class="lineNum">       9 </span>            :    with inffast.c is retained so that optimized assembler-coded versions of
+<span class="lineNum">      10 </span>            :    inflate_fast() can be used with either inflate.c or infback.c.
+<span class="lineNum">      11 </span>            :  */
+<span class="lineNum">      12 </span>            : 
+<span class="lineNum">      13 </span>            : #include &quot;zutil.h&quot;
+<span class="lineNum">      14 </span>            : #include &quot;inftrees.h&quot;
+<span class="lineNum">      15 </span>            : #include &quot;inflate.h&quot;
+<span class="lineNum">      16 </span>            : #include &quot;inffast.h&quot;
+<span class="lineNum">      17 </span>            : 
+<span class="lineNum">      18 </span>            : /* function prototypes */
+<span class="lineNum">      19 </span>            : local void fixedtables OF((struct inflate_state FAR *state));
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : /*
+<span class="lineNum">      22 </span>            :    strm provides memory allocation functions in zalloc and zfree, or
+<span class="lineNum">      23 </span>            :    Z_NULL to use the library memory allocation functions.
+<span class="lineNum">      24 </span>            : 
+<span class="lineNum">      25 </span>            :    windowBits is in the range 8..15, and window is a user-supplied
+<a name="26"><span class="lineNum">      26 </span>            :    window and output buffer that is 2**windowBits bytes.</a>
+<span class="lineNum">      27 </span>            :  */
+<span class="lineNum">      28 </span><span class="lineNoCov">          0 : int ZEXPORT inflateBackInit_(strm, windowBits, window, version, stream_size)</span>
+<span class="lineNum">      29 </span>            : z_streamp strm;
+<span class="lineNum">      30 </span>            : int windowBits;
+<span class="lineNum">      31 </span>            : unsigned char FAR *window;
+<span class="lineNum">      32 </span>            : const char *version;
+<span class="lineNum">      33 </span>            : int stream_size;
+<span class="lineNum">      34 </span>            : {
+<span class="lineNum">      35 </span>            :     struct inflate_state FAR *state;
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span><span class="lineNoCov">          0 :     if (version == Z_NULL || version[0] != ZLIB_VERSION[0] ||</span>
+<span class="lineNum">      38 </span><span class="lineNoCov">          0 :         stream_size != (int)(sizeof(z_stream)))</span>
+<span class="lineNum">      39 </span><span class="lineNoCov">          0 :         return Z_VERSION_ERROR;</span>
+<span class="lineNum">      40 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || window == Z_NULL ||</span>
+<span class="lineNum">      41 </span><span class="lineNoCov">          0 :         windowBits &lt; 8 || windowBits &gt; 15)</span>
+<span class="lineNum">      42 </span><span class="lineNoCov">          0 :         return Z_STREAM_ERROR;</span>
+<span class="lineNum">      43 </span><span class="lineNoCov">          0 :     strm-&gt;msg = Z_NULL;                 /* in case we return an error */</span>
+<span class="lineNum">      44 </span><span class="lineNoCov">          0 :     if (strm-&gt;zalloc == (alloc_func)0) {</span>
+<span class="lineNum">      45 </span><span class="lineNoCov">          0 :         strm-&gt;zalloc = zcalloc;</span>
+<span class="lineNum">      46 </span><span class="lineNoCov">          0 :         strm-&gt;opaque = (voidpf)0;</span>
+<span class="lineNum">      47 </span><span class="lineNoCov">          0 :     }</span>
+<span class="lineNum">      48 </span><span class="lineNoCov">          0 :     if (strm-&gt;zfree == (free_func)0) strm-&gt;zfree = zcfree;</span>
+<span class="lineNum">      49 </span><span class="lineNoCov">          0 :     state = (struct inflate_state FAR *)ZALLOC(strm, 1,</span>
+<span class="lineNum">      50 </span>            :                                                sizeof(struct inflate_state));
+<span class="lineNum">      51 </span><span class="lineNoCov">          0 :     if (state == Z_NULL) return Z_MEM_ERROR;</span>
+<span class="lineNum">      52 </span>            :     Tracev((stderr, &quot;inflate: allocated\n&quot;));
+<span class="lineNum">      53 </span><span class="lineNoCov">          0 :     strm-&gt;state = (struct internal_state FAR *)state;</span>
+<span class="lineNum">      54 </span><span class="lineNoCov">          0 :     state-&gt;dmax = 32768U;</span>
+<span class="lineNum">      55 </span><span class="lineNoCov">          0 :     state-&gt;wbits = windowBits;</span>
+<span class="lineNum">      56 </span><span class="lineNoCov">          0 :     state-&gt;wsize = 1U &lt;&lt; windowBits;</span>
+<span class="lineNum">      57 </span><span class="lineNoCov">          0 :     state-&gt;window = window;</span>
+<span class="lineNum">      58 </span><span class="lineNoCov">          0 :     state-&gt;write = 0;</span>
+<span class="lineNum">      59 </span><span class="lineNoCov">          0 :     state-&gt;whave = 0;</span>
+<span class="lineNum">      60 </span><span class="lineNoCov">          0 :     return Z_OK;</span>
+<span class="lineNum">      61 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">      62 </span>            : 
+<span class="lineNum">      63 </span>            : /*
+<span class="lineNum">      64 </span>            :    Return state with length and distance decoding tables and index sizes set to
+<span class="lineNum">      65 </span>            :    fixed code decoding.  Normally this returns fixed tables from inffixed.h.
+<span class="lineNum">      66 </span>            :    If BUILDFIXED is defined, then instead this routine builds the tables the
+<span class="lineNum">      67 </span>            :    first time it's called, and returns those tables the first time and
+<span class="lineNum">      68 </span>            :    thereafter.  This reduces the size of the code by about 2K bytes, in
+<span class="lineNum">      69 </span>            :    exchange for a little execution time.  However, BUILDFIXED should not be
+<span class="lineNum">      70 </span>            :    used for threaded applications, since the rewriting of the tables and virgin
+<a name="71"><span class="lineNum">      71 </span>            :    may not be thread-safe.</a>
+<span class="lineNum">      72 </span>            :  */
+<span class="lineNum">      73 </span><span class="lineNoCov">          0 : local void fixedtables(state)</span>
+<span class="lineNum">      74 </span>            : struct inflate_state FAR *state;
+<span class="lineNum">      75 </span>            : {
+<span class="lineNum">      76 </span>            : #ifdef BUILDFIXED
+<span class="lineNum">      77 </span>            :     static int virgin = 1;
+<span class="lineNum">      78 </span>            :     static code *lenfix, *distfix;
+<span class="lineNum">      79 </span>            :     static code fixed[544];
+<span class="lineNum">      80 </span>            : 
+<span class="lineNum">      81 </span>            :     /* build fixed huffman tables if first call (may not be thread safe) */
+<span class="lineNum">      82 </span>            :     if (virgin) {
+<span class="lineNum">      83 </span>            :         unsigned sym, bits;
+<span class="lineNum">      84 </span>            :         static code *next;
+<span class="lineNum">      85 </span>            : 
+<span class="lineNum">      86 </span>            :         /* literal/length table */
+<span class="lineNum">      87 </span>            :         sym = 0;
+<span class="lineNum">      88 </span>            :         while (sym &lt; 144) state-&gt;lens[sym++] = 8;
+<span class="lineNum">      89 </span>            :         while (sym &lt; 256) state-&gt;lens[sym++] = 9;
+<span class="lineNum">      90 </span>            :         while (sym &lt; 280) state-&gt;lens[sym++] = 7;
+<span class="lineNum">      91 </span>            :         while (sym &lt; 288) state-&gt;lens[sym++] = 8;
+<span class="lineNum">      92 </span>            :         next = fixed;
+<span class="lineNum">      93 </span>            :         lenfix = next;
+<span class="lineNum">      94 </span>            :         bits = 9;
+<span class="lineNum">      95 </span>            :         inflate_table(LENS, state-&gt;lens, 288, &amp;(next), &amp;(bits), state-&gt;work);
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span>            :         /* distance table */
+<span class="lineNum">      98 </span>            :         sym = 0;
+<span class="lineNum">      99 </span>            :         while (sym &lt; 32) state-&gt;lens[sym++] = 5;
+<span class="lineNum">     100 </span>            :         distfix = next;
+<span class="lineNum">     101 </span>            :         bits = 5;
+<span class="lineNum">     102 </span>            :         inflate_table(DISTS, state-&gt;lens, 32, &amp;(next), &amp;(bits), state-&gt;work);
+<span class="lineNum">     103 </span>            : 
+<span class="lineNum">     104 </span>            :         /* do this just once */
+<span class="lineNum">     105 </span>            :         virgin = 0;
+<span class="lineNum">     106 </span>            :     }
+<span class="lineNum">     107 </span>            : #else /* !BUILDFIXED */
+<span class="lineNum">     108 </span>            : #   include &quot;inffixed.h&quot;
+<span class="lineNum">     109 </span>            : #endif /* BUILDFIXED */
+<span class="lineNum">     110 </span><span class="lineNoCov">          0 :     state-&gt;lencode = lenfix;</span>
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :     state-&gt;lenbits = 9;</span>
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :     state-&gt;distcode = distfix;</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :     state-&gt;distbits = 5;</span>
+<span class="lineNum">     114 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     115 </span>            : 
+<span class="lineNum">     116 </span>            : /* Macros for inflateBack(): */
+<span class="lineNum">     117 </span>            : 
+<span class="lineNum">     118 </span>            : /* Load returned state from inflate_fast() */
+<span class="lineNum">     119 </span>            : #define LOAD() \
+<span class="lineNum">     120 </span>            :     do { \
+<span class="lineNum">     121 </span>            :         put = strm-&gt;next_out; \
+<span class="lineNum">     122 </span>            :         left = strm-&gt;avail_out; \
+<span class="lineNum">     123 </span>            :         next = strm-&gt;next_in; \
+<span class="lineNum">     124 </span>            :         have = strm-&gt;avail_in; \
+<span class="lineNum">     125 </span>            :         hold = state-&gt;hold; \
+<span class="lineNum">     126 </span>            :         bits = state-&gt;bits; \
+<span class="lineNum">     127 </span>            :     } while (0)
+<span class="lineNum">     128 </span>            : 
+<span class="lineNum">     129 </span>            : /* Set state from registers for inflate_fast() */
+<span class="lineNum">     130 </span>            : #define RESTORE() \
+<span class="lineNum">     131 </span>            :     do { \
+<span class="lineNum">     132 </span>            :         strm-&gt;next_out = put; \
+<span class="lineNum">     133 </span>            :         strm-&gt;avail_out = left; \
+<span class="lineNum">     134 </span>            :         strm-&gt;next_in = next; \
+<span class="lineNum">     135 </span>            :         strm-&gt;avail_in = have; \
+<span class="lineNum">     136 </span>            :         state-&gt;hold = hold; \
+<span class="lineNum">     137 </span>            :         state-&gt;bits = bits; \
+<span class="lineNum">     138 </span>            :     } while (0)
+<span class="lineNum">     139 </span>            : 
+<span class="lineNum">     140 </span>            : /* Clear the input bit accumulator */
+<span class="lineNum">     141 </span>            : #define INITBITS() \
+<span class="lineNum">     142 </span>            :     do { \
+<span class="lineNum">     143 </span>            :         hold = 0; \
+<span class="lineNum">     144 </span>            :         bits = 0; \
+<span class="lineNum">     145 </span>            :     } while (0)
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span>            : /* Assure that some input is available.  If input is requested, but denied,
+<span class="lineNum">     148 </span>            :    then return a Z_BUF_ERROR from inflateBack(). */
+<span class="lineNum">     149 </span>            : #define PULL() \
+<span class="lineNum">     150 </span>            :     do { \
+<span class="lineNum">     151 </span>            :         if (have == 0) { \
+<span class="lineNum">     152 </span>            :             have = in(in_desc, &amp;next); \
+<span class="lineNum">     153 </span>            :             if (have == 0) { \
+<span class="lineNum">     154 </span>            :                 next = Z_NULL; \
+<span class="lineNum">     155 </span>            :                 ret = Z_BUF_ERROR; \
+<span class="lineNum">     156 </span>            :                 goto inf_leave; \
+<span class="lineNum">     157 </span>            :             } \
+<span class="lineNum">     158 </span>            :         } \
+<span class="lineNum">     159 </span>            :     } while (0)
+<span class="lineNum">     160 </span>            : 
+<span class="lineNum">     161 </span>            : /* Get a byte of input into the bit accumulator, or return from inflateBack()
+<span class="lineNum">     162 </span>            :    with an error if there is no input available. */
+<span class="lineNum">     163 </span>            : #define PULLBYTE() \
+<span class="lineNum">     164 </span>            :     do { \
+<span class="lineNum">     165 </span>            :         PULL(); \
+<span class="lineNum">     166 </span>            :         have--; \
+<span class="lineNum">     167 </span>            :         hold += (unsigned long)(*next++) &lt;&lt; bits; \
+<span class="lineNum">     168 </span>            :         bits += 8; \
+<span class="lineNum">     169 </span>            :     } while (0)
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span>            : /* Assure that there are at least n bits in the bit accumulator.  If there is
+<span class="lineNum">     172 </span>            :    not enough available input to do that, then return from inflateBack() with
+<span class="lineNum">     173 </span>            :    an error. */
+<span class="lineNum">     174 </span>            : #define NEEDBITS(n) \
+<span class="lineNum">     175 </span>            :     do { \
+<span class="lineNum">     176 </span>            :         while (bits &lt; (unsigned)(n)) \
+<span class="lineNum">     177 </span>            :             PULLBYTE(); \
+<span class="lineNum">     178 </span>            :     } while (0)
+<span class="lineNum">     179 </span>            : 
+<span class="lineNum">     180 </span>            : /* Return the low n bits of the bit accumulator (n &lt; 16) */
+<span class="lineNum">     181 </span>            : #define BITS(n) \
+<span class="lineNum">     182 </span>            :     ((unsigned)hold &amp; ((1U &lt;&lt; (n)) - 1))
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span>            : /* Remove n bits from the bit accumulator */
+<span class="lineNum">     185 </span>            : #define DROPBITS(n) \
+<span class="lineNum">     186 </span>            :     do { \
+<span class="lineNum">     187 </span>            :         hold &gt;&gt;= (n); \
+<span class="lineNum">     188 </span>            :         bits -= (unsigned)(n); \
+<span class="lineNum">     189 </span>            :     } while (0)
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span>            : /* Remove zero to seven bits as needed to go to a byte boundary */
+<span class="lineNum">     192 </span>            : #define BYTEBITS() \
+<span class="lineNum">     193 </span>            :     do { \
+<span class="lineNum">     194 </span>            :         hold &gt;&gt;= bits &amp; 7; \
+<span class="lineNum">     195 </span>            :         bits -= bits &amp; 7; \
+<span class="lineNum">     196 </span>            :     } while (0)
+<span class="lineNum">     197 </span>            : 
+<span class="lineNum">     198 </span>            : /* Assure that some output space is available, by writing out the window
+<span class="lineNum">     199 </span>            :    if it's full.  If the write fails, return from inflateBack() with a
+<span class="lineNum">     200 </span>            :    Z_BUF_ERROR. */
+<span class="lineNum">     201 </span>            : #define ROOM() \
+<span class="lineNum">     202 </span>            :     do { \
+<span class="lineNum">     203 </span>            :         if (left == 0) { \
+<span class="lineNum">     204 </span>            :             put = state-&gt;window; \
+<span class="lineNum">     205 </span>            :             left = state-&gt;wsize; \
+<span class="lineNum">     206 </span>            :             state-&gt;whave = left; \
+<span class="lineNum">     207 </span>            :             if (out(out_desc, put, left)) { \
+<span class="lineNum">     208 </span>            :                 ret = Z_BUF_ERROR; \
+<span class="lineNum">     209 </span>            :                 goto inf_leave; \
+<span class="lineNum">     210 </span>            :             } \
+<span class="lineNum">     211 </span>            :         } \
+<span class="lineNum">     212 </span>            :     } while (0)
+<span class="lineNum">     213 </span>            : 
+<span class="lineNum">     214 </span>            : /*
+<span class="lineNum">     215 </span>            :    strm provides the memory allocation functions and window buffer on input,
+<span class="lineNum">     216 </span>            :    and provides information on the unused input on return.  For Z_DATA_ERROR
+<span class="lineNum">     217 </span>            :    returns, strm will also provide an error message.
+<span class="lineNum">     218 </span>            : 
+<span class="lineNum">     219 </span>            :    in() and out() are the call-back input and output functions.  When
+<span class="lineNum">     220 </span>            :    inflateBack() needs more input, it calls in().  When inflateBack() has
+<span class="lineNum">     221 </span>            :    filled the window with output, or when it completes with data in the
+<span class="lineNum">     222 </span>            :    window, it calls out() to write out the data.  The application must not
+<span class="lineNum">     223 </span>            :    change the provided input until in() is called again or inflateBack()
+<span class="lineNum">     224 </span>            :    returns.  The application must not change the window/output buffer until
+<span class="lineNum">     225 </span>            :    inflateBack() returns.
+<span class="lineNum">     226 </span>            : 
+<span class="lineNum">     227 </span>            :    in() and out() are called with a descriptor parameter provided in the
+<span class="lineNum">     228 </span>            :    inflateBack() call.  This parameter can be a structure that provides the
+<span class="lineNum">     229 </span>            :    information required to do the read or write, as well as accumulated
+<span class="lineNum">     230 </span>            :    information on the input and output such as totals and check values.
+<span class="lineNum">     231 </span>            : 
+<span class="lineNum">     232 </span>            :    in() should return zero on failure.  out() should return non-zero on
+<span class="lineNum">     233 </span>            :    failure.  If either in() or out() fails, than inflateBack() returns a
+<span class="lineNum">     234 </span>            :    Z_BUF_ERROR.  strm-&gt;next_in can be checked for Z_NULL to see whether it
+<span class="lineNum">     235 </span>            :    was in() or out() that caused in the error.  Otherwise,  inflateBack()
+<span class="lineNum">     236 </span>            :    returns Z_STREAM_END on success, Z_DATA_ERROR for an deflate format
+<span class="lineNum">     237 </span>            :    error, or Z_MEM_ERROR if it could not allocate memory for the state.
+<span class="lineNum">     238 </span>            :    inflateBack() can also return Z_STREAM_ERROR if the input parameters
+<a name="239"><span class="lineNum">     239 </span>            :    are not correct, i.e. strm is Z_NULL or the state was not initialized.</a>
+<span class="lineNum">     240 </span>            :  */
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 : int ZEXPORT inflateBack(strm, in, in_desc, out, out_desc)</span>
+<span class="lineNum">     242 </span>            : z_streamp strm;
+<span class="lineNum">     243 </span>            : in_func in;
+<span class="lineNum">     244 </span>            : void FAR *in_desc;
+<span class="lineNum">     245 </span>            : out_func out;
+<span class="lineNum">     246 </span>            : void FAR *out_desc;
+<span class="lineNum">     247 </span>            : {
+<span class="lineNum">     248 </span>            :     struct inflate_state FAR *state;
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :     unsigned char FAR *next;    /* next input */</span>
+<span class="lineNum">     250 </span>            :     unsigned char FAR *put;     /* next output */
+<span class="lineNum">     251 </span>            :     unsigned have, left;        /* available input and output */
+<span class="lineNum">     252 </span>            :     unsigned long hold;         /* bit buffer */
+<span class="lineNum">     253 </span>            :     unsigned bits;              /* bits in bit buffer */
+<span class="lineNum">     254 </span>            :     unsigned copy;              /* number of stored or match bytes to copy */
+<span class="lineNum">     255 </span>            :     unsigned char FAR *from;    /* where to copy match bytes from */
+<span class="lineNum">     256 </span>            :     code this;                  /* current decoding table entry */
+<span class="lineNum">     257 </span>            :     code last;                  /* parent table entry */
+<span class="lineNum">     258 </span>            :     unsigned len;               /* length to copy for repeats, bits to drop */
+<span class="lineNum">     259 </span>            :     int ret;                    /* return code */
+<span class="lineNum">     260 </span>            :     static const unsigned short order[19] = /* permutation of code lengths */
+<span class="lineNum">     261 </span>            :         {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+<span class="lineNum">     262 </span>            : 
+<span class="lineNum">     263 </span>            :     /* Check that the strm exists and that the state was initialized */
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL)</span>
+<span class="lineNum">     265 </span><span class="lineNoCov">          0 :         return Z_STREAM_ERROR;</span>
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :     state = (struct inflate_state FAR *)strm-&gt;state;</span>
+<span class="lineNum">     267 </span>            : 
+<span class="lineNum">     268 </span>            :     /* Reset the state */
+<span class="lineNum">     269 </span><span class="lineNoCov">          0 :     strm-&gt;msg = Z_NULL;</span>
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :     state-&gt;mode = TYPE;</span>
+<span class="lineNum">     271 </span><span class="lineNoCov">          0 :     state-&gt;last = 0;</span>
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :     state-&gt;whave = 0;</span>
+<span class="lineNum">     273 </span><span class="lineNoCov">          0 :     next = strm-&gt;next_in;</span>
+<span class="lineNum">     274 </span><span class="lineNoCov">          0 :     have = next != Z_NULL ? strm-&gt;avail_in : 0;</span>
+<span class="lineNum">     275 </span>            :     hold = 0;
+<span class="lineNum">     276 </span>            :     bits = 0;
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :     put = state-&gt;window;</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 :     left = state-&gt;wsize;</span>
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span>            :     /* Inflate until end of block marked as last */
+<span class="lineNum">     281 </span><span class="lineNoCov">          0 :     for (;;)</span>
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :         switch (state-&gt;mode) {</span>
+<span class="lineNum">     283 </span>            :         case TYPE:
+<span class="lineNum">     284 </span>            :             /* determine and dispatch block type */
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :             if (state-&gt;last) {</span>
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :                 BYTEBITS();</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                 state-&gt;mode = DONE;</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     289 </span>            :             }
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 :             NEEDBITS(3);</span>
+<span class="lineNum">     291 </span><span class="lineNoCov">          0 :             state-&gt;last = BITS(1);</span>
+<span class="lineNum">     292 </span><span class="lineNoCov">          0 :             DROPBITS(1);</span>
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :             switch (BITS(2)) {</span>
+<span class="lineNum">     294 </span>            :             case 0:                             /* stored block */
+<span class="lineNum">     295 </span>            :                 Tracev((stderr, &quot;inflate:     stored block%s\n&quot;,
+<span class="lineNum">     296 </span>            :                         state-&gt;last ? &quot; (last)&quot; : &quot;&quot;));
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                 state-&gt;mode = STORED;</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     299 </span>            :             case 1:                             /* fixed block */
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :                 fixedtables(state);</span>
+<span class="lineNum">     301 </span>            :                 Tracev((stderr, &quot;inflate:     fixed codes block%s\n&quot;,
+<span class="lineNum">     302 </span>            :                         state-&gt;last ? &quot; (last)&quot; : &quot;&quot;));
+<span class="lineNum">     303 </span><span class="lineNoCov">          0 :                 state-&gt;mode = LEN;              /* decode codes */</span>
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     305 </span>            :             case 2:                             /* dynamic block */
+<span class="lineNum">     306 </span>            :                 Tracev((stderr, &quot;inflate:     dynamic codes block%s\n&quot;,
+<span class="lineNum">     307 </span>            :                         state-&gt;last ? &quot; (last)&quot; : &quot;&quot;));
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :                 state-&gt;mode = TABLE;</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     310 </span>            :             case 3:
+<span class="lineNum">     311 </span>            : #ifdef SMALL  
+<span class="lineNum">     312 </span>            :                 strm-&gt;msg = &quot;error&quot;;
+<span class="lineNum">     313 </span>            : #else
+<span class="lineNum">     314 </span><span class="lineNoCov">          0 :                 strm-&gt;msg = (char *)&quot;invalid block type&quot;;</span>
+<span class="lineNum">     315 </span>            : #endif
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :                 state-&gt;mode = BAD;</span>
+<span class="lineNum">     317 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :             DROPBITS(2);</span>
+<span class="lineNum">     319 </span><span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     320 </span>            : 
+<span class="lineNum">     321 </span>            :         case STORED:
+<span class="lineNum">     322 </span>            :             /* get and verify stored block length */
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :             BYTEBITS();                         /* go to byte boundary */</span>
+<span class="lineNum">     324 </span><span class="lineNoCov">          0 :             NEEDBITS(32);</span>
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :             if ((hold &amp; 0xffff) != ((hold &gt;&gt; 16) ^ 0xffff)) {</span>
+<span class="lineNum">     326 </span>            : #ifdef SMALL  
+<span class="lineNum">     327 </span>            :                 strm-&gt;msg = &quot;error&quot;;
+<span class="lineNum">     328 </span>            : #else
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                 strm-&gt;msg = (char *)&quot;invalid stored block lengths&quot;;</span>
+<span class="lineNum">     330 </span>            : #endif
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :                 state-&gt;mode = BAD;</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     333 </span>            :             }
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :             state-&gt;length = (unsigned)hold &amp; 0xffff;</span>
+<span class="lineNum">     335 </span>            :             Tracev((stderr, &quot;inflate:       stored length %u\n&quot;,
+<span class="lineNum">     336 </span>            :                     state-&gt;length));
+<span class="lineNum">     337 </span>            :             INITBITS();
+<span class="lineNum">     338 </span>            : 
+<span class="lineNum">     339 </span>            :             /* copy stored block from input to output */
+<span class="lineNum">     340 </span><span class="lineNoCov">          0 :             while (state-&gt;length != 0) {</span>
+<span class="lineNum">     341 </span>            :                 copy = state-&gt;length;
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :                 PULL();</span>
+<span class="lineNum">     343 </span><span class="lineNoCov">          0 :                 ROOM();</span>
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :                 if (copy &gt; have) copy = have;</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :                 if (copy &gt; left) copy = left;</span>
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :                 zmemcpy(put, next, copy);</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :                 have -= copy;</span>
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :                 next += copy;</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                 left -= copy;</span>
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :                 put += copy;</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                 state-&gt;length -= copy;</span>
+<span class="lineNum">     352 </span>            :             }
+<span class="lineNum">     353 </span>            :             Tracev((stderr, &quot;inflate:       stored end\n&quot;));
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :             state-&gt;mode = TYPE;</span>
+<span class="lineNum">     355 </span><span class="lineNoCov">          0 :             break;</span>
+<span class="lineNum">     356 </span>            : 
+<span class="lineNum">     357 </span>            :         case TABLE:
+<span class="lineNum">     358 </span>            :             /* get dynamic table entries descriptor */
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :             NEEDBITS(14);</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :             state-&gt;nlen = BITS(5) + 257;</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :             DROPBITS(5);</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :             state-&gt;ndist = BITS(5) + 1;</span>
+<span class="lineNum">     363 </span><span class="lineNoCov">          0 :             DROPBITS(5);</span>
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :             state-&gt;ncode = BITS(4) + 4;</span>
+<span class="lineNum">     365 </span><span class="lineNoCov">          0 :             DROPBITS(4);</span>
+<span class="lineNum">     366 </span>            : #ifndef PKZIP_BUG_WORKAROUND
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :             if (state-&gt;nlen &gt; 286 || state-&gt;ndist &gt; 30) {</span>
+<span class="lineNum">     368 </span>            : #ifdef SMALL  
+<span class="lineNum">     369 </span>            :                 strm-&gt;msg = &quot;error&quot;;
+<span class="lineNum">     370 </span>            : #else
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                 strm-&gt;msg = (char *)&quot;too many length or distance symbols&quot;;</span>
+<span class="lineNum">     372 </span>            : #endif
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                 state-&gt;mode = BAD;</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     375 </span>            :             }
+<span class="lineNum">     376 </span>            : #endif
+<span class="lineNum">     377 </span>            :             Tracev((stderr, &quot;inflate:       table sizes ok\n&quot;));
+<span class="lineNum">     378 </span>            : 
+<span class="lineNum">     379 </span>            :             /* get code length code lengths (not a typo) */
+<span class="lineNum">     380 </span><span class="lineNoCov">          0 :             state-&gt;have = 0;</span>
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :             while (state-&gt;have &lt; state-&gt;ncode) {</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 :                 NEEDBITS(3);</span>
+<span class="lineNum">     383 </span><span class="lineNoCov">          0 :                 state-&gt;lens[order[state-&gt;have++]] = (unsigned short)BITS(3);</span>
+<span class="lineNum">     384 </span><span class="lineNoCov">          0 :                 DROPBITS(3);</span>
+<span class="lineNum">     385 </span>            :             }
+<span class="lineNum">     386 </span><span class="lineNoCov">          0 :             while (state-&gt;have &lt; 19)</span>
+<span class="lineNum">     387 </span><span class="lineNoCov">          0 :                 state-&gt;lens[order[state-&gt;have++]] = 0;</span>
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :             state-&gt;next = state-&gt;codes;</span>
+<span class="lineNum">     389 </span><span class="lineNoCov">          0 :             state-&gt;lencode = (code const FAR *)(state-&gt;next);</span>
+<span class="lineNum">     390 </span><span class="lineNoCov">          0 :             state-&gt;lenbits = 7;</span>
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :             ret = inflate_table(CODES, state-&gt;lens, 19, &amp;(state-&gt;next),</span>
+<span class="lineNum">     392 </span><span class="lineNoCov">          0 :                                 &amp;(state-&gt;lenbits), state-&gt;work);</span>
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :             if (ret) {</span>
+<span class="lineNum">     394 </span><span class="lineNoCov">          0 :                 strm-&gt;msg = (char *)&quot;invalid code lengths set&quot;;</span>
+<span class="lineNum">     395 </span><span class="lineNoCov">          0 :                 state-&gt;mode = BAD;</span>
+<span class="lineNum">     396 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     397 </span>            :             }
+<span class="lineNum">     398 </span>            :             Tracev((stderr, &quot;inflate:       code lengths ok\n&quot;));
+<span class="lineNum">     399 </span>            : 
+<span class="lineNum">     400 </span>            :             /* get length and distance code code lengths */
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :             state-&gt;have = 0;</span>
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :             while (state-&gt;have &lt; state-&gt;nlen + state-&gt;ndist) {</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :                 for (;;) {</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                     this = state-&gt;lencode[BITS(state-&gt;lenbits)];</span>
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 :                     if ((unsigned)(this.bits) &lt;= bits) break;</span>
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :                     PULLBYTE();</span>
+<span class="lineNum">     407 </span>            :                 }
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :                 if (this.val &lt; 16) {</span>
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :                     NEEDBITS(this.bits);</span>
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :                     DROPBITS(this.bits);</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                     state-&gt;lens[state-&gt;have++] = this.val;</span>
+<span class="lineNum">     412 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     413 </span>            :                 else {
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :                     if (this.val == 16) {</span>
+<span class="lineNum">     415 </span><span class="lineNoCov">          0 :                         NEEDBITS(this.bits + 2);</span>
+<span class="lineNum">     416 </span><span class="lineNoCov">          0 :                         DROPBITS(this.bits);</span>
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                         if (state-&gt;have == 0) {</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                             strm-&gt;msg = (char *)&quot;invalid bit length repeat&quot;;</span>
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :                             state-&gt;mode = BAD;</span>
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :                             break;</span>
+<span class="lineNum">     421 </span>            :                         }
+<span class="lineNum">     422 </span><span class="lineNoCov">          0 :                         len = (unsigned)(state-&gt;lens[state-&gt;have - 1]);</span>
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :                         copy = 3 + BITS(2);</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :                         DROPBITS(2);</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :                     }</span>
+<span class="lineNum">     426 </span><span class="lineNoCov">          0 :                     else if (this.val == 17) {</span>
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :                         NEEDBITS(this.bits + 3);</span>
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 :                         DROPBITS(this.bits);</span>
+<span class="lineNum">     429 </span>            :                         len = 0;
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :                         copy = 3 + BITS(3);</span>
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :                         DROPBITS(3);</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                     }</span>
+<span class="lineNum">     433 </span>            :                     else {
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :                         NEEDBITS(this.bits + 7);</span>
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :                         DROPBITS(this.bits);</span>
+<span class="lineNum">     436 </span>            :                         len = 0;
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :                         copy = 11 + BITS(7);</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :                         DROPBITS(7);</span>
+<span class="lineNum">     439 </span>            :                     }
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :                     if (state-&gt;have + copy &gt; state-&gt;nlen + state-&gt;ndist) {</span>
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                         strm-&gt;msg = (char *)&quot;invalid bit length repeat&quot;;</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :                         state-&gt;mode = BAD;</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 :                         break;</span>
+<span class="lineNum">     444 </span>            :                     }
+<span class="lineNum">     445 </span><span class="lineNoCov">          0 :                     while (copy--)</span>
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                         state-&gt;lens[state-&gt;have++] = (unsigned short)len;</span>
+<span class="lineNum">     447 </span>            :                 }
+<span class="lineNum">     448 </span>            :             }
+<span class="lineNum">     449 </span>            : 
+<span class="lineNum">     450 </span>            :             /* handle error breaks in while */
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 :             if (state-&gt;mode == BAD) break;</span>
+<span class="lineNum">     452 </span>            : 
+<span class="lineNum">     453 </span>            :             /* build code tables */
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :             state-&gt;next = state-&gt;codes;</span>
+<span class="lineNum">     455 </span><span class="lineNoCov">          0 :             state-&gt;lencode = (code const FAR *)(state-&gt;next);</span>
+<span class="lineNum">     456 </span><span class="lineNoCov">          0 :             state-&gt;lenbits = 9;</span>
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :             ret = inflate_table(LENS, state-&gt;lens, state-&gt;nlen, &amp;(state-&gt;next),</span>
+<span class="lineNum">     458 </span>            :                                 &amp;(state-&gt;lenbits), state-&gt;work);
+<span class="lineNum">     459 </span><span class="lineNoCov">          0 :             if (ret) {</span>
+<span class="lineNum">     460 </span><span class="lineNoCov">          0 :                 strm-&gt;msg = (char *)&quot;invalid literal/lengths set&quot;;</span>
+<span class="lineNum">     461 </span><span class="lineNoCov">          0 :                 state-&gt;mode = BAD;</span>
+<span class="lineNum">     462 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     463 </span>            :             }
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :             state-&gt;distcode = (code const FAR *)(state-&gt;next);</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :             state-&gt;distbits = 6;</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :             ret = inflate_table(DISTS, state-&gt;lens + state-&gt;nlen, state-&gt;ndist,</span>
+<span class="lineNum">     467 </span>            :                             &amp;(state-&gt;next), &amp;(state-&gt;distbits), state-&gt;work);
+<span class="lineNum">     468 </span><span class="lineNoCov">          0 :             if (ret) {</span>
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :                 strm-&gt;msg = (char *)&quot;invalid distances set&quot;;</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :                 state-&gt;mode = BAD;</span>
+<span class="lineNum">     471 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     472 </span>            :             }
+<span class="lineNum">     473 </span>            :             Tracev((stderr, &quot;inflate:       codes ok\n&quot;));
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :             state-&gt;mode = LEN;</span>
+<span class="lineNum">     475 </span>            : 
+<span class="lineNum">     476 </span>            :         case LEN:
+<span class="lineNum">     477 </span>            : #ifndef SLOW
+<span class="lineNum">     478 </span>            :             /* use inflate_fast() if we have enough input and output */
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :             if (have &gt;= 6 &amp;&amp; left &gt;= 258) {</span>
+<span class="lineNum">     480 </span><span class="lineNoCov">          0 :                 RESTORE();</span>
+<span class="lineNum">     481 </span><span class="lineNoCov">          0 :                 if (state-&gt;whave &lt; state-&gt;wsize)</span>
+<span class="lineNum">     482 </span><span class="lineNoCov">          0 :                     state-&gt;whave = state-&gt;wsize - left;</span>
+<span class="lineNum">     483 </span><span class="lineNoCov">          0 :                 inflate_fast(strm, state-&gt;wsize);</span>
+<span class="lineNum">     484 </span><span class="lineNoCov">          0 :                 LOAD();</span>
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     486 </span>            :             }
+<span class="lineNum">     487 </span>            : #endif
+<span class="lineNum">     488 </span>            : 
+<span class="lineNum">     489 </span>            :             /* get a literal, length, or end-of-block code */
+<span class="lineNum">     490 </span><span class="lineNoCov">          0 :             for (;;) {</span>
+<span class="lineNum">     491 </span><span class="lineNoCov">          0 :                 this = state-&gt;lencode[BITS(state-&gt;lenbits)];</span>
+<span class="lineNum">     492 </span><span class="lineNoCov">          0 :                 if ((unsigned)(this.bits) &lt;= bits) break;</span>
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :                 PULLBYTE();</span>
+<span class="lineNum">     494 </span>            :             }
+<span class="lineNum">     495 </span><span class="lineNoCov">          0 :             if (this.op &amp;&amp; (this.op &amp; 0xf0) == 0) {</span>
+<span class="lineNum">     496 </span>            :                 last = this;
+<span class="lineNum">     497 </span><span class="lineNoCov">          0 :                 for (;;) {</span>
+<span class="lineNum">     498 </span><span class="lineNoCov">          0 :                     this = state-&gt;lencode[last.val +</span>
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :                             (BITS(last.bits + last.op) &gt;&gt; last.bits)];</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :                     if ((unsigned)(last.bits + this.bits) &lt;= bits) break;</span>
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :                     PULLBYTE();</span>
+<span class="lineNum">     502 </span>            :                 }
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :                 DROPBITS(last.bits);</span>
+<span class="lineNum">     504 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :             DROPBITS(this.bits);</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :             state-&gt;length = (unsigned)this.val;</span>
+<span class="lineNum">     507 </span>            : 
+<span class="lineNum">     508 </span>            :             /* process literal */
+<span class="lineNum">     509 </span><span class="lineNoCov">          0 :             if (this.op == 0) {</span>
+<span class="lineNum">     510 </span>            :                 Tracevv((stderr, this.val &gt;= 0x20 &amp;&amp; this.val &lt; 0x7f ?
+<span class="lineNum">     511 </span>            :                         &quot;inflate:         literal '%c'\n&quot; :
+<span class="lineNum">     512 </span>            :                         &quot;inflate:         literal 0x%02x\n&quot;, this.val));
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :                 ROOM();</span>
+<span class="lineNum">     514 </span><span class="lineNoCov">          0 :                 *put++ = (unsigned char)(state-&gt;length);</span>
+<span class="lineNum">     515 </span><span class="lineNoCov">          0 :                 left--;</span>
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :                 state-&gt;mode = LEN;</span>
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     518 </span>            :             }
+<span class="lineNum">     519 </span>            : 
+<span class="lineNum">     520 </span>            :             /* process end of block */
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :             if (this.op &amp; 32) {</span>
+<span class="lineNum">     522 </span>            :                 Tracevv((stderr, &quot;inflate:         end of block\n&quot;));
+<span class="lineNum">     523 </span><span class="lineNoCov">          0 :                 state-&gt;mode = TYPE;</span>
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     525 </span>            :             }
+<span class="lineNum">     526 </span>            : 
+<span class="lineNum">     527 </span>            :             /* invalid code */
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :             if (this.op &amp; 64) {</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :                 strm-&gt;msg = (char *)&quot;invalid literal/length code&quot;;</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :                 state-&gt;mode = BAD;</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     532 </span>            :             }
+<span class="lineNum">     533 </span>            : 
+<span class="lineNum">     534 </span>            :             /* length code -- get extra bits, if any */
+<span class="lineNum">     535 </span><span class="lineNoCov">          0 :             state-&gt;extra = (unsigned)(this.op) &amp; 15;</span>
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :             if (state-&gt;extra != 0) {</span>
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 :                 NEEDBITS(state-&gt;extra);</span>
+<span class="lineNum">     538 </span><span class="lineNoCov">          0 :                 state-&gt;length += BITS(state-&gt;extra);</span>
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 :                 DROPBITS(state-&gt;extra);</span>
+<span class="lineNum">     540 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     541 </span>            :             Tracevv((stderr, &quot;inflate:         length %u\n&quot;, state-&gt;length));
+<span class="lineNum">     542 </span>            : 
+<span class="lineNum">     543 </span>            :             /* get distance code */
+<span class="lineNum">     544 </span><span class="lineNoCov">          0 :             for (;;) {</span>
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :                 this = state-&gt;distcode[BITS(state-&gt;distbits)];</span>
+<span class="lineNum">     546 </span><span class="lineNoCov">          0 :                 if ((unsigned)(this.bits) &lt;= bits) break;</span>
+<span class="lineNum">     547 </span><span class="lineNoCov">          0 :                 PULLBYTE();</span>
+<span class="lineNum">     548 </span>            :             }
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :             if ((this.op &amp; 0xf0) == 0) {</span>
+<span class="lineNum">     550 </span>            :                 last = this;
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :                 for (;;) {</span>
+<span class="lineNum">     552 </span><span class="lineNoCov">          0 :                     this = state-&gt;distcode[last.val +</span>
+<span class="lineNum">     553 </span><span class="lineNoCov">          0 :                             (BITS(last.bits + last.op) &gt;&gt; last.bits)];</span>
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :                     if ((unsigned)(last.bits + this.bits) &lt;= bits) break;</span>
+<span class="lineNum">     555 </span><span class="lineNoCov">          0 :                     PULLBYTE();</span>
+<span class="lineNum">     556 </span>            :                 }
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :                 DROPBITS(last.bits);</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :             DROPBITS(this.bits);</span>
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :             if (this.op &amp; 64) {</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                 strm-&gt;msg = (char *)&quot;invalid distance code&quot;;</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :                 state-&gt;mode = BAD;</span>
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     564 </span>            :             }
+<span class="lineNum">     565 </span><span class="lineNoCov">          0 :             state-&gt;offset = (unsigned)this.val;</span>
+<span class="lineNum">     566 </span>            : 
+<span class="lineNum">     567 </span>            :             /* get distance extra bits, if any */
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :             state-&gt;extra = (unsigned)(this.op) &amp; 15;</span>
+<span class="lineNum">     569 </span><span class="lineNoCov">          0 :             if (state-&gt;extra != 0) {</span>
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :                 NEEDBITS(state-&gt;extra);</span>
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 :                 state-&gt;offset += BITS(state-&gt;extra);</span>
+<span class="lineNum">     572 </span><span class="lineNoCov">          0 :                 DROPBITS(state-&gt;extra);</span>
+<span class="lineNum">     573 </span><span class="lineNoCov">          0 :             }</span>
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :             if (state-&gt;offset &gt; state-&gt;wsize - (state-&gt;whave &lt; state-&gt;wsize ?</span>
+<span class="lineNum">     575 </span>            :                                                 left : 0)) {
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :                 strm-&gt;msg = (char *)&quot;invalid distance too far back&quot;;</span>
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :                 state-&gt;mode = BAD;</span>
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     579 </span>            :             }
+<span class="lineNum">     580 </span>            :             Tracevv((stderr, &quot;inflate:         distance %u\n&quot;, state-&gt;offset));
+<span class="lineNum">     581 </span>            : 
+<span class="lineNum">     582 </span>            :             /* copy match from window to output */
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :             do {</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                 ROOM();</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :                 copy = state-&gt;wsize - state-&gt;offset;</span>
+<span class="lineNum">     586 </span><span class="lineNoCov">          0 :                 if (copy &lt; left) {</span>
+<span class="lineNum">     587 </span><span class="lineNoCov">          0 :                     from = put + copy;</span>
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :                     copy = left - copy;</span>
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     590 </span>            :                 else {
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :                     from = put - state-&gt;offset;</span>
+<span class="lineNum">     592 </span>            :                     copy = left;
+<span class="lineNum">     593 </span>            :                 }
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :                 if (copy &gt; state-&gt;length) copy = state-&gt;length;</span>
+<span class="lineNum">     595 </span><span class="lineNoCov">          0 :                 state-&gt;length -= copy;</span>
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :                 left -= copy;</span>
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :                 do {</span>
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :                     *put++ = *from++;</span>
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 :                 } while (--copy);</span>
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :             } while (state-&gt;length != 0);</span>
+<span class="lineNum">     601 </span>            :             break;
+<span class="lineNum">     602 </span>            : 
+<span class="lineNum">     603 </span>            :         case DONE:
+<span class="lineNum">     604 </span>            :             /* inflate stream terminated properly -- write leftover output */
+<span class="lineNum">     605 </span>            :             ret = Z_STREAM_END;
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :             if (left &lt; state-&gt;wsize) {</span>
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :                 if (out(out_desc, state-&gt;window, state-&gt;wsize - left))</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                     ret = Z_BUF_ERROR;</span>
+<span class="lineNum">     609 </span>            :             }
+<span class="lineNum">     610 </span>            :             goto inf_leave;
+<span class="lineNum">     611 </span>            : 
+<span class="lineNum">     612 </span>            :         case BAD:
+<span class="lineNum">     613 </span>            :             ret = Z_DATA_ERROR;
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :             goto inf_leave;</span>
+<span class="lineNum">     615 </span>            : 
+<span class="lineNum">     616 </span>            :         default:                /* can't happen, but makes compilers happy */
+<span class="lineNum">     617 </span>            :             ret = Z_STREAM_ERROR;
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :             goto inf_leave;</span>
+<span class="lineNum">     619 </span>            :         }
+<span class="lineNum">     620 </span>            : 
+<span class="lineNum">     621 </span>            :     /* Return unused input */
+<span class="lineNum">     622 </span>            :   inf_leave:
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :     strm-&gt;next_in = next;</span>
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :     strm-&gt;avail_in = have;</span>
+<span class="lineNum">     625 </span><span class="lineNoCov">          0 :     return ret;</span>
+<a name="626"><span class="lineNum">     626 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     627 </span>            : 
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 : int ZEXPORT inflateBackEnd(strm)</span>
+<span class="lineNum">     629 </span>            : z_streamp strm;
+<span class="lineNum">     630 </span>            : {
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :     if (strm == Z_NULL || strm-&gt;state == Z_NULL || strm-&gt;zfree == (free_func)0)</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :         return Z_STREAM_ERROR;</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :     ZFREE(strm, strm-&gt;state);</span>
+<span class="lineNum">     634 </span><span class="lineNoCov">          0 :     strm-&gt;state = Z_NULL;</span>
+<span class="lineNum">     635 </span>            :     Tracev((stderr, &quot;inflate: end\n&quot;));
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 :     return Z_OK;</span>
+<span class="lineNum">     637 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

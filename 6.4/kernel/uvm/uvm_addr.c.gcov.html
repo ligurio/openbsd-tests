@@ -1,0 +1,1504 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - uvm/uvm_addr.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">uvm</a> - uvm_addr.c<span style="font-size: 80%;"> (source / <a href="uvm_addr.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">15</td>
+            <td class="headerCovTableEntry">433</td>
+            <td class="headerCovTableEntryLo">3.5 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">36</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*      $OpenBSD: uvm_addr.c,v 1.27 2018/05/16 09:02:11 otto Exp $      */</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : /*
+<span class="lineNum">       4 </span>            :  * Copyright (c) 2011 Ariane van der Steldt &lt;ariane@stack.nl&gt;
+<span class="lineNum">       5 </span>            :  *
+<span class="lineNum">       6 </span>            :  * Permission to use, copy, modify, and distribute this software for any
+<span class="lineNum">       7 </span>            :  * purpose with or without fee is hereby granted, provided that the above
+<span class="lineNum">       8 </span>            :  * copyright notice and this permission notice appear in all copies.
+<span class="lineNum">       9 </span>            :  *
+<span class="lineNum">      10 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+<span class="lineNum">      11 </span>            :  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+<span class="lineNum">      12 </span>            :  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+<span class="lineNum">      13 </span>            :  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+<span class="lineNum">      14 </span>            :  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+<span class="lineNum">      15 </span>            :  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+<span class="lineNum">      16 </span>            :  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+<span class="lineNum">      17 </span>            :  */
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : /* #define DEBUG */
+<span class="lineNum">      20 </span>            : 
+<span class="lineNum">      21 </span>            : #include &lt;sys/param.h&gt;
+<span class="lineNum">      22 </span>            : #include &lt;uvm/uvm.h&gt;
+<span class="lineNum">      23 </span>            : #include &lt;uvm/uvm_addr.h&gt;
+<span class="lineNum">      24 </span>            : #include &lt;sys/pool.h&gt;
+<span class="lineNum">      25 </span>            : 
+<span class="lineNum">      26 </span>            : /* Max gap between hint allocations. */
+<span class="lineNum">      27 </span>            : #define UADDR_HINT_MAXGAP       (4 * PAGE_SIZE)
+<span class="lineNum">      28 </span>            : /* Number of pivots in pivot allocator. */
+<span class="lineNum">      29 </span>            : #define NUM_PIVOTS              16
+<span class="lineNum">      30 </span>            : /*
+<span class="lineNum">      31 </span>            :  * Max number (inclusive) of pages the pivot allocator
+<span class="lineNum">      32 </span>            :  * will place between allocations.
+<span class="lineNum">      33 </span>            :  *
+<span class="lineNum">      34 </span>            :  * The uaddr_pivot_random() function attempts to bias towards
+<span class="lineNum">      35 </span>            :  * small space between allocations, so putting a large number here is fine.
+<span class="lineNum">      36 </span>            :  */
+<span class="lineNum">      37 </span>            : #define PIVOT_RND               8
+<span class="lineNum">      38 </span>            : /*
+<span class="lineNum">      39 </span>            :  * Number of allocations that a pivot can supply before expiring.
+<span class="lineNum">      40 </span>            :  * When a pivot expires, a new pivot has to be found.
+<span class="lineNum">      41 </span>            :  *
+<span class="lineNum">      42 </span>            :  * Must be at least 1.
+<span class="lineNum">      43 </span>            :  */
+<span class="lineNum">      44 </span>            : #define PIVOT_EXPIRE            1024
+<span class="lineNum">      45 </span>            : 
+<span class="lineNum">      46 </span>            : 
+<span class="lineNum">      47 </span>            : /* Pool with uvm_addr_state structures. */
+<span class="lineNum">      48 </span>            : struct pool uaddr_pool;
+<span class="lineNum">      49 </span>            : struct pool uaddr_bestfit_pool;
+<span class="lineNum">      50 </span>            : struct pool uaddr_pivot_pool;
+<span class="lineNum">      51 </span>            : struct pool uaddr_rnd_pool;
+<span class="lineNum">      52 </span>            : 
+<span class="lineNum">      53 </span>            : /* uvm_addr state for bestfit selector. */
+<span class="lineNum">      54 </span>            : struct uaddr_bestfit_state {
+<span class="lineNum">      55 </span>            :         struct uvm_addr_state            ubf_uaddr;
+<span class="lineNum">      56 </span>            :         struct uaddr_free_rbtree         ubf_free;
+<span class="lineNum">      57 </span>            : };
+<span class="lineNum">      58 </span>            : 
+<span class="lineNum">      59 </span>            : /* uvm_addr state for rnd selector. */
+<span class="lineNum">      60 </span>            : struct uaddr_rnd_state {
+<span class="lineNum">      61 </span>            :         struct uvm_addr_state            ur_uaddr;
+<span class="lineNum">      62 </span>            : #if 0
+<span class="lineNum">      63 </span>            :         TAILQ_HEAD(, vm_map_entry)       ur_free;
+<span class="lineNum">      64 </span>            : #endif
+<span class="lineNum">      65 </span>            : };
+<span class="lineNum">      66 </span>            : 
+<span class="lineNum">      67 </span>            : /* Definition of a pivot in pivot selector. */
+<span class="lineNum">      68 </span>            : struct uaddr_pivot {
+<span class="lineNum">      69 </span>            :         vaddr_t                          addr;  /* End of prev. allocation. */
+<span class="lineNum">      70 </span>            :         int                              expire;/* Best before date. */
+<span class="lineNum">      71 </span>            :         int                              dir;   /* Direction. */
+<span class="lineNum">      72 </span>            :         struct vm_map_entry             *entry; /* Will contain next alloc. */
+<span class="lineNum">      73 </span>            : };
+<span class="lineNum">      74 </span>            : /* uvm_addr state for pivot selector. */
+<span class="lineNum">      75 </span>            : struct uaddr_pivot_state {
+<span class="lineNum">      76 </span>            :         struct uvm_addr_state            up_uaddr;
+<span class="lineNum">      77 </span>            : 
+<span class="lineNum">      78 </span>            :         /* Free space tree, for fast pivot selection. */
+<span class="lineNum">      79 </span>            :         struct uaddr_free_rbtree         up_free;
+<span class="lineNum">      80 </span>            : 
+<span class="lineNum">      81 </span>            :         /* List of pivots. The pointers point to after the last allocation. */
+<span class="lineNum">      82 </span>            :         struct uaddr_pivot               up_pivots[NUM_PIVOTS];
+<span class="lineNum">      83 </span>            : };
+<span class="lineNum">      84 </span>            : 
+<span class="lineNum">      85 </span>            : /* Forward declaration (see below). */
+<span class="lineNum">      86 </span>            : extern const struct uvm_addr_functions uaddr_kernel_functions;
+<span class="lineNum">      87 </span>            : struct uvm_addr_state uaddr_kbootstrap;
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span>            : /* Support functions. */
+<span class="lineNum">      90 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">      91 </span>            : struct vm_map_entry     *uvm_addr_entrybyspace(struct uaddr_free_rbtree*,
+<span class="lineNum">      92 </span>            :                             vsize_t);
+<span class="lineNum">      93 </span>            : #endif /* !SMALL_KERNEL */
+<span class="lineNum">      94 </span>            : void                     uaddr_kinsert(struct vm_map *,
+<span class="lineNum">      95 </span>            :                             struct uvm_addr_state *, struct vm_map_entry *);
+<span class="lineNum">      96 </span>            : void                     uaddr_kremove(struct vm_map *,
+<span class="lineNum">      97 </span>            :                             struct uvm_addr_state *, struct vm_map_entry *);
+<span class="lineNum">      98 </span>            : void                     uaddr_kbootstrapdestroy(struct uvm_addr_state *);
+<span class="lineNum">      99 </span>            : 
+<span class="lineNum">     100 </span>            : void                     uaddr_destroy(struct uvm_addr_state *);
+<span class="lineNum">     101 </span>            : void                     uaddr_kbootstrap_destroy(struct uvm_addr_state *);
+<span class="lineNum">     102 </span>            : void                     uaddr_rnd_destroy(struct uvm_addr_state *);
+<span class="lineNum">     103 </span>            : void                     uaddr_bestfit_destroy(struct uvm_addr_state *);
+<span class="lineNum">     104 </span>            : void                     uaddr_pivot_destroy(struct uvm_addr_state *);
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span>            : #if 0
+<span class="lineNum">     107 </span>            : int                      uaddr_lin_select(struct vm_map *,
+<span class="lineNum">     108 </span>            :                             struct uvm_addr_state *, struct vm_map_entry **,
+<span class="lineNum">     109 </span>            :                             vaddr_t *, vsize_t, vaddr_t, vaddr_t, vm_prot_t,
+<span class="lineNum">     110 </span>            :                             vaddr_t);
+<span class="lineNum">     111 </span>            : #endif
+<span class="lineNum">     112 </span>            : int                      uaddr_kbootstrap_select(struct vm_map *,
+<span class="lineNum">     113 </span>            :                             struct uvm_addr_state *, struct vm_map_entry **,
+<span class="lineNum">     114 </span>            :                             vaddr_t *, vsize_t, vaddr_t, vaddr_t, vm_prot_t,
+<span class="lineNum">     115 </span>            :                             vaddr_t);
+<span class="lineNum">     116 </span>            : int                      uaddr_rnd_select(struct vm_map *,
+<span class="lineNum">     117 </span>            :                             struct uvm_addr_state *, struct vm_map_entry **,
+<span class="lineNum">     118 </span>            :                             vaddr_t *, vsize_t, vaddr_t, vaddr_t, vm_prot_t,
+<span class="lineNum">     119 </span>            :                             vaddr_t);
+<span class="lineNum">     120 </span>            : int                      uaddr_bestfit_select(struct vm_map *,
+<span class="lineNum">     121 </span>            :                             struct uvm_addr_state*, struct vm_map_entry **,
+<span class="lineNum">     122 </span>            :                             vaddr_t *, vsize_t, vaddr_t, vaddr_t, vm_prot_t,
+<span class="lineNum">     123 </span>            :                             vaddr_t);
+<span class="lineNum">     124 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">     125 </span>            : int                      uaddr_pivot_select(struct vm_map *,
+<span class="lineNum">     126 </span>            :                             struct uvm_addr_state *, struct vm_map_entry **,
+<span class="lineNum">     127 </span>            :                             vaddr_t *, vsize_t, vaddr_t, vaddr_t, vm_prot_t,
+<span class="lineNum">     128 </span>            :                             vaddr_t);
+<span class="lineNum">     129 </span>            : int                      uaddr_stack_brk_select(struct vm_map *,
+<span class="lineNum">     130 </span>            :                             struct uvm_addr_state *, struct vm_map_entry **,
+<span class="lineNum">     131 </span>            :                             vaddr_t *, vsize_t, vaddr_t, vaddr_t, vm_prot_t,
+<span class="lineNum">     132 </span>            :                             vaddr_t);
+<span class="lineNum">     133 </span>            : #endif /* !SMALL_KERNEL */
+<span class="lineNum">     134 </span>            : 
+<span class="lineNum">     135 </span>            : void                     uaddr_rnd_insert(struct vm_map *,
+<span class="lineNum">     136 </span>            :                             struct uvm_addr_state *, struct vm_map_entry *);
+<span class="lineNum">     137 </span>            : void                     uaddr_rnd_remove(struct vm_map *,
+<span class="lineNum">     138 </span>            :                             struct uvm_addr_state *, struct vm_map_entry *);
+<span class="lineNum">     139 </span>            : void                     uaddr_bestfit_insert(struct vm_map *,
+<span class="lineNum">     140 </span>            :                             struct uvm_addr_state *, struct vm_map_entry *);
+<span class="lineNum">     141 </span>            : void                     uaddr_bestfit_remove(struct vm_map *,
+<span class="lineNum">     142 </span>            :                             struct uvm_addr_state *, struct vm_map_entry *);
+<span class="lineNum">     143 </span>            : void                     uaddr_pivot_insert(struct vm_map *,
+<span class="lineNum">     144 </span>            :                             struct uvm_addr_state *, struct vm_map_entry *);
+<span class="lineNum">     145 </span>            : void                     uaddr_pivot_remove(struct vm_map *,
+<span class="lineNum">     146 </span>            :                             struct uvm_addr_state *, struct vm_map_entry *);
+<span class="lineNum">     147 </span>            : 
+<span class="lineNum">     148 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">     149 </span>            : vsize_t                  uaddr_pivot_random(void);
+<span class="lineNum">     150 </span>            : int                      uaddr_pivot_newpivot(struct vm_map *,
+<span class="lineNum">     151 </span>            :                             struct uaddr_pivot_state *, struct uaddr_pivot *,
+<span class="lineNum">     152 </span>            :                             struct vm_map_entry **, vaddr_t *,
+<span class="lineNum">     153 </span>            :                             vsize_t, vaddr_t, vaddr_t, vsize_t, vsize_t);
+<span class="lineNum">     154 </span>            : #endif /* !SMALL_KERNEL */
+<span class="lineNum">     155 </span>            : 
+<span class="lineNum">     156 </span>            : #if defined(DEBUG) || defined(DDB)
+<span class="lineNum">     157 </span>            : void                     uaddr_pivot_print(struct uvm_addr_state *, boolean_t,
+<span class="lineNum">     158 </span>            :                             int (*)(const char *, ...));
+<span class="lineNum">     159 </span>            : #if 0
+<span class="lineNum">     160 </span>            : void                     uaddr_rnd_print(struct uvm_addr_state *, boolean_t,
+<span class="lineNum">     161 </span>            :                             int (*)(const char *, ...));
+<span class="lineNum">     162 </span>            : #endif
+<span class="lineNum">     163 </span>            : #endif /* DEBUG || DDB */
+<span class="lineNum">     164 </span>            : 
+<span class="lineNum">     165 </span>            : 
+<span class="lineNum">     166 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">     167 </span>            : /*
+<span class="lineNum">     168 </span>            :  * Find smallest entry in tree that will fit sz bytes.
+<a name="169"><span class="lineNum">     169 </span>            :  */</a>
+<span class="lineNum">     170 </span>            : struct vm_map_entry *
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 : uvm_addr_entrybyspace(struct uaddr_free_rbtree *free, vsize_t sz)</span>
+<span class="lineNum">     172 </span>            : {
+<span class="lineNum">     173 </span>            :         struct vm_map_entry     *tmp, *res;
+<span class="lineNum">     174 </span>            : 
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :         tmp = RBT_ROOT(uaddr_free_rbtree, free);</span>
+<span class="lineNum">     176 </span>            :         res = NULL;
+<span class="lineNum">     177 </span><span class="lineCov">        370 :         while (tmp) {</span>
+<span class="lineNum">     178 </span><span class="lineNoCov">          0 :                 if (tmp-&gt;fspace &gt;= sz) {</span>
+<span class="lineNum">     179 </span>            :                         res = tmp;
+<span class="lineNum">     180 </span><span class="lineNoCov">          0 :                         tmp = RBT_LEFT(uaddr_free_rbtree, tmp);</span>
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                 } else if (tmp-&gt;fspace &lt; sz)</span>
+<span class="lineNum">     182 </span><span class="lineNoCov">          0 :                         tmp = RBT_RIGHT(uaddr_free_rbtree, tmp);</span>
+<span class="lineNum">     183 </span>            :         }
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :         return res;</span>
+<span class="lineNum">     185 </span>            : }
+<span class="lineNum">     186 </span>            : #endif /* !SMALL_KERNEL */
+<a name="187"><span class="lineNum">     187 </span>            : </a>
+<span class="lineNum">     188 </span>            : static __inline vaddr_t
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 : uvm_addr_align_forward(vaddr_t addr, vaddr_t align, vaddr_t offset)</span>
+<span class="lineNum">     190 </span>            : {
+<span class="lineNum">     191 </span>            :         vaddr_t adjusted;
+<span class="lineNum">     192 </span>            : 
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :         KASSERT(offset &lt; align || (align == 0 &amp;&amp; offset == 0));</span>
+<span class="lineNum">     194 </span><span class="lineNoCov">          0 :         KASSERT((align &amp; (align - 1)) == 0);</span>
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :         KASSERT((offset &amp; PAGE_MASK) == 0);</span>
+<span class="lineNum">     196 </span>            : 
+<span class="lineNum">     197 </span><span class="lineNoCov">          0 :         align = MAX(align, PAGE_SIZE);</span>
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         adjusted = addr &amp; ~(align - 1);</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :         adjusted += offset;</span>
+<span class="lineNum">     200 </span><span class="lineNoCov">          0 :         return (adjusted &lt; addr ? adjusted + align : adjusted);</span>
+<span class="lineNum">     201 </span>            : }
+<a name="202"><span class="lineNum">     202 </span>            : </a>
+<span class="lineNum">     203 </span>            : static __inline vaddr_t
+<span class="lineNum">     204 </span><span class="lineNoCov">          0 : uvm_addr_align_backward(vaddr_t addr, vaddr_t align, vaddr_t offset)</span>
+<span class="lineNum">     205 </span>            : {
+<span class="lineNum">     206 </span>            :         vaddr_t adjusted;
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span><span class="lineNoCov">          0 :         KASSERT(offset &lt; align || (align == 0 &amp;&amp; offset == 0));</span>
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         KASSERT((align &amp; (align - 1)) == 0);</span>
+<span class="lineNum">     210 </span><span class="lineNoCov">          0 :         KASSERT((offset &amp; PAGE_MASK) == 0);</span>
+<span class="lineNum">     211 </span>            : 
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :         align = MAX(align, PAGE_SIZE);</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :         adjusted = addr &amp; ~(align - 1);</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :         adjusted += offset;</span>
+<span class="lineNum">     215 </span><span class="lineNoCov">          0 :         return (adjusted &gt; addr ? adjusted - align : adjusted);</span>
+<span class="lineNum">     216 </span>            : }
+<span class="lineNum">     217 </span>            : 
+<span class="lineNum">     218 </span>            : /*
+<span class="lineNum">     219 </span>            :  * Try to fit the requested space into the entry.
+<a name="220"><span class="lineNum">     220 </span>            :  */</a>
+<span class="lineNum">     221 </span>            : int
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 : uvm_addr_fitspace(vaddr_t *min_result, vaddr_t *max_result,</span>
+<span class="lineNum">     223 </span>            :     vaddr_t low_addr, vaddr_t high_addr, vsize_t sz,
+<span class="lineNum">     224 </span>            :     vaddr_t align, vaddr_t offset,
+<span class="lineNum">     225 </span>            :     vsize_t before_gap, vsize_t after_gap)
+<span class="lineNum">     226 </span>            : {
+<span class="lineNum">     227 </span>            :         vaddr_t tmp;
+<span class="lineNum">     228 </span>            :         vsize_t fspace;
+<span class="lineNum">     229 </span>            : 
+<span class="lineNum">     230 </span><span class="lineCov">         60 :         if (low_addr &gt; high_addr)</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :         fspace = high_addr - low_addr;</span>
+<span class="lineNum">     233 </span><span class="lineNoCov">          0 :         if (fspace &lt; before_gap + after_gap)</span>
+<span class="lineNum">     234 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     235 </span><span class="lineNoCov">          0 :         if (fspace - before_gap - after_gap &lt; sz)</span>
+<span class="lineNum">     236 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     237 </span>            : 
+<span class="lineNum">     238 </span>            :         /* Calculate lowest address. */
+<span class="lineNum">     239 </span><span class="lineNoCov">          0 :         low_addr += before_gap;</span>
+<span class="lineNum">     240 </span><span class="lineNoCov">          0 :         low_addr = uvm_addr_align_forward(tmp = low_addr, align, offset);</span>
+<span class="lineNum">     241 </span><span class="lineNoCov">          0 :         if (low_addr &lt; tmp)  /* Overflow during alignment. */</span>
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     243 </span><span class="lineNoCov">          0 :         if (high_addr - after_gap - sz &lt; low_addr)</span>
+<span class="lineNum">     244 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     245 </span>            : 
+<span class="lineNum">     246 </span>            :         /* Calculate highest address. */
+<span class="lineNum">     247 </span><span class="lineNoCov">          0 :         high_addr -= after_gap + sz;</span>
+<span class="lineNum">     248 </span><span class="lineNoCov">          0 :         high_addr = uvm_addr_align_backward(tmp = high_addr, align, offset);</span>
+<span class="lineNum">     249 </span><span class="lineNoCov">          0 :         if (high_addr &gt; tmp) /* Overflow during alignment. */</span>
+<span class="lineNum">     250 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     251 </span><span class="lineNoCov">          0 :         if (low_addr &gt; high_addr)</span>
+<span class="lineNum">     252 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     253 </span>            : 
+<span class="lineNum">     254 </span><span class="lineCov">         60 :         *min_result = low_addr;</span>
+<span class="lineNum">     255 </span><span class="lineNoCov">          0 :         *max_result = high_addr;</span>
+<span class="lineNum">     256 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     257 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     258 </span>            : 
+<span class="lineNum">     259 </span>            : 
+<span class="lineNum">     260 </span>            : /*
+<span class="lineNum">     261 </span>            :  * Initialize uvm_addr.
+<a name="262"><span class="lineNum">     262 </span>            :  */</a>
+<span class="lineNum">     263 </span>            : void
+<span class="lineNum">     264 </span><span class="lineNoCov">          0 : uvm_addr_init(void)</span>
+<span class="lineNum">     265 </span>            : {
+<span class="lineNum">     266 </span><span class="lineNoCov">          0 :         pool_init(&amp;uaddr_pool, sizeof(struct uvm_addr_state), 0,</span>
+<span class="lineNum">     267 </span>            :             IPL_VM, PR_WAITOK, &quot;uaddr&quot;, NULL);
+<span class="lineNum">     268 </span><span class="lineNoCov">          0 :         pool_init(&amp;uaddr_bestfit_pool, sizeof(struct uaddr_bestfit_state), 0,</span>
+<span class="lineNum">     269 </span>            :             IPL_VM, PR_WAITOK, &quot;uaddrbest&quot;, NULL);
+<span class="lineNum">     270 </span><span class="lineNoCov">          0 :         pool_init(&amp;uaddr_pivot_pool, sizeof(struct uaddr_pivot_state), 0,</span>
+<span class="lineNum">     271 </span>            :             IPL_VM, PR_WAITOK, &quot;uaddrpivot&quot;, NULL);
+<span class="lineNum">     272 </span><span class="lineNoCov">          0 :         pool_init(&amp;uaddr_rnd_pool, sizeof(struct uaddr_rnd_state), 0,</span>
+<span class="lineNum">     273 </span>            :             IPL_VM, PR_WAITOK, &quot;uaddrrnd&quot;, NULL);
+<span class="lineNum">     274 </span>            : 
+<span class="lineNum">     275 </span><span class="lineNoCov">          0 :         uaddr_kbootstrap.uaddr_minaddr = PAGE_SIZE;</span>
+<span class="lineNum">     276 </span><span class="lineNoCov">          0 :         uaddr_kbootstrap.uaddr_maxaddr = -(vaddr_t)PAGE_SIZE;</span>
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         uaddr_kbootstrap.uaddr_functions = &amp;uaddr_kernel_functions;</span>
+<span class="lineNum">     278 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span>            : /*
+<span class="lineNum">     281 </span>            :  * Invoke destructor function of uaddr.
+<a name="282"><span class="lineNum">     282 </span>            :  */</a>
+<span class="lineNum">     283 </span>            : void
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 : uvm_addr_destroy(struct uvm_addr_state *uaddr)</span>
+<span class="lineNum">     285 </span>            : {
+<span class="lineNum">     286 </span><span class="lineNoCov">          0 :         if (uaddr)</span>
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :                 (*uaddr-&gt;uaddr_functions-&gt;uaddr_destroy)(uaddr);</span>
+<span class="lineNum">     288 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     289 </span>            : 
+<span class="lineNum">     290 </span>            : /*
+<span class="lineNum">     291 </span>            :  * Move address forward to satisfy align, offset.
+<a name="292"><span class="lineNum">     292 </span>            :  */</a>
+<span class="lineNum">     293 </span>            : vaddr_t
+<span class="lineNum">     294 </span><span class="lineNoCov">          0 : uvm_addr_align(vaddr_t addr, vaddr_t align, vaddr_t offset)</span>
+<span class="lineNum">     295 </span>            : {
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         vaddr_t result = (addr &amp; ~(align - 1)) + offset;</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :         if (result &lt; addr)</span>
+<span class="lineNum">     298 </span><span class="lineNoCov">          0 :                 result += align;</span>
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :         return result;</span>
+<span class="lineNum">     300 </span>            : }
+<span class="lineNum">     301 </span>            : 
+<span class="lineNum">     302 </span>            : /*
+<span class="lineNum">     303 </span>            :  * Move address backwards to satisfy align, offset.
+<a name="304"><span class="lineNum">     304 </span>            :  */</a>
+<span class="lineNum">     305 </span>            : vaddr_t
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 : uvm_addr_align_back(vaddr_t addr, vaddr_t align, vaddr_t offset)</span>
+<span class="lineNum">     307 </span>            : {
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :         vaddr_t result = (addr &amp; ~(align - 1)) + offset;</span>
+<span class="lineNum">     309 </span><span class="lineNoCov">          0 :         if (result &gt; addr)</span>
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :                 result -= align;</span>
+<span class="lineNum">     311 </span><span class="lineNoCov">          0 :         return result;</span>
+<span class="lineNum">     312 </span>            : }
+<span class="lineNum">     313 </span>            : 
+<span class="lineNum">     314 </span>            : /*
+<span class="lineNum">     315 </span>            :  * Directional first fit.
+<span class="lineNum">     316 </span>            :  *
+<span class="lineNum">     317 </span>            :  * Do a linear search for free space, starting at addr in entry.
+<span class="lineNum">     318 </span>            :  * direction ==  1: search forward
+<span class="lineNum">     319 </span>            :  * direction == -1: search backward
+<span class="lineNum">     320 </span>            :  *
+<span class="lineNum">     321 </span>            :  * Output: low &lt;= addr &lt;= high and entry will contain addr.
+<span class="lineNum">     322 </span>            :  * 0 will be returned if no space is available.
+<span class="lineNum">     323 </span>            :  *
+<span class="lineNum">     324 </span>            :  * gap describes the space that must appear between the preceding entry.
+<a name="325"><span class="lineNum">     325 </span>            :  */</a>
+<span class="lineNum">     326 </span>            : int
+<span class="lineNum">     327 </span><span class="lineNoCov">          0 : uvm_addr_linsearch(struct vm_map *map, struct uvm_addr_state *uaddr,</span>
+<span class="lineNum">     328 </span>            :     struct vm_map_entry **entry_out, vaddr_t *addr_out,
+<span class="lineNum">     329 </span>            :     vaddr_t hint, vsize_t sz, vaddr_t align, vaddr_t offset,
+<span class="lineNum">     330 </span>            :     int direction, vaddr_t low, vaddr_t high,
+<span class="lineNum">     331 </span>            :     vsize_t before_gap, vsize_t after_gap)
+<span class="lineNum">     332 </span>            : {
+<span class="lineNum">     333 </span>            :         struct vm_map_entry     *entry;
+<span class="lineNum">     334 </span><span class="lineNoCov">          0 :         vaddr_t                  low_addr, high_addr;</span>
+<span class="lineNum">     335 </span>            : 
+<span class="lineNum">     336 </span><span class="lineNoCov">          0 :         KASSERT(entry_out != NULL &amp;&amp; addr_out != NULL);</span>
+<span class="lineNum">     337 </span><span class="lineNoCov">          0 :         KASSERT(direction == -1 || direction == 1);</span>
+<span class="lineNum">     338 </span><span class="lineNoCov">          0 :         KASSERT((hint &amp; PAGE_MASK) == 0 &amp;&amp; (high &amp; PAGE_MASK) == 0 &amp;&amp;</span>
+<span class="lineNum">     339 </span>            :             (low &amp; PAGE_MASK) == 0 &amp;&amp;
+<span class="lineNum">     340 </span>            :             (before_gap &amp; PAGE_MASK) == 0 &amp;&amp; (after_gap &amp; PAGE_MASK) == 0);
+<span class="lineNum">     341 </span><span class="lineNoCov">          0 :         KASSERT(high + sz &gt; high); /* Check for overflow. */</span>
+<span class="lineNum">     342 </span>            : 
+<span class="lineNum">     343 </span>            :         /* Hint magic. */
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         if (hint == 0)</span>
+<span class="lineNum">     345 </span><span class="lineNoCov">          0 :                 hint = (direction == 1 ? low : high);</span>
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         else if (hint &gt; high) {</span>
+<span class="lineNum">     347 </span><span class="lineNoCov">          0 :                 if (direction != -1)</span>
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :                         return ENOMEM;</span>
+<span class="lineNum">     349 </span>            :                 hint = high;
+<span class="lineNum">     350 </span><span class="lineNoCov">          0 :         } else if (hint &lt; low) {</span>
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                 if (direction != 1)</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                         return ENOMEM;</span>
+<span class="lineNum">     353 </span>            :                 hint = low;
+<span class="lineNum">     354 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     355 </span>            : 
+<span class="lineNum">     356 </span><span class="lineNoCov">          0 :         for (entry = uvm_map_entrybyaddr(&amp;map-&gt;addr,</span>
+<span class="lineNum">     357 </span><span class="lineNoCov">          0 :             hint - (direction == -1 ? 1 : 0)); entry != NULL;</span>
+<span class="lineNum">     358 </span><span class="lineNoCov">          0 :             entry = (direction == 1 ?</span>
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 :             RBT_NEXT(uvm_map_addr, entry) :</span>
+<span class="lineNum">     360 </span><span class="lineNoCov">          0 :             RBT_PREV(uvm_map_addr, entry))) {</span>
+<span class="lineNum">     361 </span><span class="lineNoCov">          0 :                 if ((direction == 1 &amp;&amp; VMMAP_FREE_START(entry) &gt; high) ||</span>
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :                     (direction == -1 &amp;&amp; VMMAP_FREE_END(entry) &lt; low)) {</span>
+<span class="lineNum">     363 </span>            :                         break;
+<span class="lineNum">     364 </span>            :                 }
+<span class="lineNum">     365 </span>            : 
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :                 if (uvm_addr_fitspace(&amp;low_addr, &amp;high_addr,</span>
+<span class="lineNum">     367 </span><span class="lineNoCov">          0 :                     MAX(low, VMMAP_FREE_START(entry)),</span>
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :                     MIN(high, VMMAP_FREE_END(entry)),</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                     sz, align, offset, before_gap, after_gap) == 0) {</span>
+<span class="lineNum">     370 </span><span class="lineNoCov">          0 :                         *entry_out = entry;</span>
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                         if (hint &gt;= low_addr &amp;&amp; hint &lt;= high_addr) {</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                                 *addr_out = hint;</span>
+<span class="lineNum">     373 </span><span class="lineNoCov">          0 :                         } else {</span>
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                                 *addr_out = (direction == 1 ?</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                                     low_addr : high_addr);</span>
+<span class="lineNum">     376 </span>            :                         }
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">     378 </span>            :                 }
+<span class="lineNum">     379 </span>            :         }
+<span class="lineNum">     380 </span>            : 
+<span class="lineNum">     381 </span><span class="lineNoCov">          0 :         return ENOMEM;</span>
+<span class="lineNum">     382 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     383 </span>            : 
+<span class="lineNum">     384 </span>            : /*
+<span class="lineNum">     385 </span>            :  * Invoke address selector of uaddr.
+<span class="lineNum">     386 </span>            :  * uaddr may be NULL, in which case the algorithm will fail with ENOMEM.
+<span class="lineNum">     387 </span>            :  *
+<span class="lineNum">     388 </span>            :  * Will invoke uvm_addr_isavail to fill in last_out.
+<a name="389"><span class="lineNum">     389 </span>            :  */</a>
+<span class="lineNum">     390 </span>            : int
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 : uvm_addr_invoke(struct vm_map *map, struct uvm_addr_state *uaddr,</span>
+<span class="lineNum">     392 </span>            :     struct vm_map_entry **entry_out, struct vm_map_entry **last_out,
+<span class="lineNum">     393 </span>            :     vaddr_t *addr_out,
+<span class="lineNum">     394 </span>            :     vsize_t sz, vaddr_t align, vaddr_t offset, vm_prot_t prot, vaddr_t hint)
+<span class="lineNum">     395 </span>            : {
+<span class="lineNum">     396 </span>            :         int error;
+<span class="lineNum">     397 </span>            : 
+<span class="lineNum">     398 </span><span class="lineCov">        420 :         if (uaddr == NULL)</span>
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     400 </span>            : 
+<span class="lineNum">     401 </span><span class="lineNoCov">          0 :         hint &amp;= ~((vaddr_t)PAGE_MASK);</span>
+<span class="lineNum">     402 </span><span class="lineCov">         60 :         if (hint != 0 &amp;&amp;</span>
+<span class="lineNum">     403 </span><span class="lineNoCov">          0 :             !(hint &gt;= uaddr-&gt;uaddr_minaddr &amp;&amp; hint &lt; uaddr-&gt;uaddr_maxaddr))</span>
+<span class="lineNum">     404 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     405 </span>            : 
+<span class="lineNum">     406 </span><span class="lineNoCov">          0 :         error = (*uaddr-&gt;uaddr_functions-&gt;uaddr_select)(map, uaddr,</span>
+<span class="lineNum">     407 </span>            :             entry_out, addr_out, sz, align, offset, prot, hint);
+<span class="lineNum">     408 </span>            : 
+<span class="lineNum">     409 </span><span class="lineNoCov">          0 :         if (error == 0) {</span>
+<span class="lineNum">     410 </span><span class="lineNoCov">          0 :                 KASSERT(*entry_out != NULL);</span>
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :                 *last_out = NULL;</span>
+<span class="lineNum">     412 </span><span class="lineCov">         60 :                 if (!uvm_map_isavail(map, uaddr, entry_out, last_out,</span>
+<span class="lineNum">     413 </span><span class="lineNoCov">          0 :                     *addr_out, sz)) {</span>
+<span class="lineNum">     414 </span><span class="lineNoCov">          0 :                         panic(&quot;uvm_addr_invoke: address selector %p &quot;</span>
+<span class="lineNum">     415 </span>            :                             &quot;(%s 0x%lx-0x%lx) &quot;
+<span class="lineNum">     416 </span>            :                             &quot;returned unavailable address 0x%lx sz 0x%lx&quot;,
+<span class="lineNum">     417 </span><span class="lineNoCov">          0 :                             uaddr, uaddr-&gt;uaddr_functions-&gt;uaddr_name,</span>
+<span class="lineNum">     418 </span><span class="lineNoCov">          0 :                             uaddr-&gt;uaddr_minaddr, uaddr-&gt;uaddr_maxaddr,</span>
+<span class="lineNum">     419 </span><span class="lineNoCov">          0 :                             *addr_out, sz);</span>
+<span class="lineNum">     420 </span>            :                 }
+<span class="lineNum">     421 </span>            :         }
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         return error;</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     425 </span>            : 
+<a name="426"><span class="lineNum">     426 </span>            : #if defined(DEBUG) || defined(DDB)</a>
+<span class="lineNum">     427 </span>            : void
+<span class="lineNum">     428 </span><span class="lineNoCov">          0 : uvm_addr_print(struct uvm_addr_state *uaddr, const char *slot, boolean_t full,</span>
+<span class="lineNum">     429 </span>            :     int (*pr)(const char *, ...))
+<span class="lineNum">     430 </span>            : {
+<span class="lineNum">     431 </span><span class="lineNoCov">          0 :         if (uaddr == NULL) {</span>
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :                 (*pr)(&quot;- uvm_addr %s: NULL\n&quot;, slot);</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     434 </span>            :         }
+<span class="lineNum">     435 </span>            : 
+<span class="lineNum">     436 </span><span class="lineNoCov">          0 :         (*pr)(&quot;- uvm_addr %s: %p (%s 0x%lx-0x%lx)\n&quot;, slot, uaddr,</span>
+<span class="lineNum">     437 </span><span class="lineNoCov">          0 :             uaddr-&gt;uaddr_functions-&gt;uaddr_name,</span>
+<span class="lineNum">     438 </span><span class="lineNoCov">          0 :             uaddr-&gt;uaddr_minaddr, uaddr-&gt;uaddr_maxaddr);</span>
+<span class="lineNum">     439 </span><span class="lineNoCov">          0 :         if (uaddr-&gt;uaddr_functions-&gt;uaddr_print == NULL)</span>
+<span class="lineNum">     440 </span>            :                 return;
+<span class="lineNum">     441 </span>            : 
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :         (*uaddr-&gt;uaddr_functions-&gt;uaddr_print)(uaddr, full, pr);</span>
+<span class="lineNum">     443 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     444 </span>            : #endif /* DEBUG || DDB */
+<span class="lineNum">     445 </span>            : 
+<span class="lineNum">     446 </span>            : /*
+<span class="lineNum">     447 </span>            :  * Destroy a uvm_addr_state structure.
+<span class="lineNum">     448 </span>            :  * The uaddr must have been previously allocated from uaddr_state_pool.
+<a name="449"><span class="lineNum">     449 </span>            :  */</a>
+<span class="lineNum">     450 </span>            : void
+<span class="lineNum">     451 </span><span class="lineNoCov">          0 : uaddr_destroy(struct uvm_addr_state *uaddr)</span>
+<span class="lineNum">     452 </span>            : {
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :         pool_put(&amp;uaddr_pool, uaddr);</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     455 </span>            : 
+<span class="lineNum">     456 </span>            : 
+<span class="lineNum">     457 </span>            : #if 0
+<span class="lineNum">     458 </span>            : /*
+<span class="lineNum">     459 </span>            :  * Linear allocator.
+<span class="lineNum">     460 </span>            :  * This allocator uses a first-fit algorithm.
+<span class="lineNum">     461 </span>            :  *
+<span class="lineNum">     462 </span>            :  * If hint is set, search will start at the hint position.
+<span class="lineNum">     463 </span>            :  * Only searches forward.
+<span class="lineNum">     464 </span>            :  */
+<span class="lineNum">     465 </span>            : const struct uvm_addr_functions uaddr_lin_functions = {
+<span class="lineNum">     466 </span>            :         .uaddr_select = &amp;uaddr_lin_select,
+<span class="lineNum">     467 </span>            :         .uaddr_destroy = &amp;uaddr_destroy,
+<span class="lineNum">     468 </span>            :         .uaddr_name = &quot;uaddr_lin&quot;
+<span class="lineNum">     469 </span>            : };
+<span class="lineNum">     470 </span>            : 
+<span class="lineNum">     471 </span>            : struct uvm_addr_state *
+<span class="lineNum">     472 </span>            : uaddr_lin_create(vaddr_t minaddr, vaddr_t maxaddr)
+<span class="lineNum">     473 </span>            : {
+<span class="lineNum">     474 </span>            :         struct uvm_addr_state *uaddr;
+<span class="lineNum">     475 </span>            : 
+<span class="lineNum">     476 </span>            :         uaddr = pool_get(&amp;uaddr_pool, PR_WAITOK);
+<span class="lineNum">     477 </span>            :         uaddr-&gt;uaddr_minaddr = minaddr;
+<span class="lineNum">     478 </span>            :         uaddr-&gt;uaddr_maxaddr = maxaddr;
+<span class="lineNum">     479 </span>            :         uaddr-&gt;uaddr_functions = &amp;uaddr_lin_functions;
+<span class="lineNum">     480 </span>            :         return uaddr;
+<span class="lineNum">     481 </span>            : }
+<span class="lineNum">     482 </span>            : 
+<span class="lineNum">     483 </span>            : int
+<span class="lineNum">     484 </span>            : uaddr_lin_select(struct vm_map *map, struct uvm_addr_state *uaddr,
+<span class="lineNum">     485 </span>            :     struct vm_map_entry **entry_out, vaddr_t *addr_out,
+<span class="lineNum">     486 </span>            :     vsize_t sz, vaddr_t align, vaddr_t offset,
+<span class="lineNum">     487 </span>            :     vm_prot_t prot, vaddr_t hint)
+<span class="lineNum">     488 </span>            : {
+<span class="lineNum">     489 </span>            :         vaddr_t guard_sz;
+<span class="lineNum">     490 </span>            : 
+<span class="lineNum">     491 </span>            :         /* Deal with guardpages: search for space with one extra page. */
+<span class="lineNum">     492 </span>            :         guard_sz = ((map-&gt;flags &amp; VM_MAP_GUARDPAGES) == 0 ? 0 : PAGE_SIZE);
+<span class="lineNum">     493 </span>            : 
+<span class="lineNum">     494 </span>            :         if (uaddr-&gt;uaddr_maxaddr - uaddr-&gt;uaddr_minaddr - guard_sz &lt; sz)
+<span class="lineNum">     495 </span>            :                 return ENOMEM;
+<span class="lineNum">     496 </span>            :         return uvm_addr_linsearch(map, uaddr, entry_out, addr_out, 0, sz,
+<span class="lineNum">     497 </span>            :             align, offset, 1, uaddr-&gt;uaddr_minaddr, uaddr-&gt;uaddr_maxaddr - sz,
+<span class="lineNum">     498 </span>            :             0, guard_sz);
+<span class="lineNum">     499 </span>            : }
+<span class="lineNum">     500 </span>            : #endif
+<span class="lineNum">     501 </span>            : 
+<span class="lineNum">     502 </span>            : /*
+<span class="lineNum">     503 </span>            :  * Randomized allocator.
+<span class="lineNum">     504 </span>            :  * This allocator use uvm_map_hint to acquire a random address and searches
+<span class="lineNum">     505 </span>            :  * from there.
+<span class="lineNum">     506 </span>            :  */
+<span class="lineNum">     507 </span>            : 
+<span class="lineNum">     508 </span>            : const struct uvm_addr_functions uaddr_rnd_functions = {
+<span class="lineNum">     509 </span>            :         .uaddr_select = &amp;uaddr_rnd_select,
+<span class="lineNum">     510 </span>            :         .uaddr_free_insert = &amp;uaddr_rnd_insert,
+<span class="lineNum">     511 </span>            :         .uaddr_free_remove = &amp;uaddr_rnd_remove,
+<span class="lineNum">     512 </span>            :         .uaddr_destroy = &amp;uaddr_rnd_destroy,
+<span class="lineNum">     513 </span>            : #if defined(DEBUG) || defined(DDB)
+<span class="lineNum">     514 </span>            : #if 0
+<span class="lineNum">     515 </span>            :         .uaddr_print = &amp;uaddr_rnd_print,
+<span class="lineNum">     516 </span>            : #endif
+<span class="lineNum">     517 </span>            : #endif /* DEBUG || DDB */
+<span class="lineNum">     518 </span>            :         .uaddr_name = &quot;uaddr_rnd&quot;
+<span class="lineNum">     519 </span>            : };
+<a name="520"><span class="lineNum">     520 </span>            : </a>
+<span class="lineNum">     521 </span>            : struct uvm_addr_state *
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 : uaddr_rnd_create(vaddr_t minaddr, vaddr_t maxaddr)</span>
+<span class="lineNum">     523 </span>            : {
+<span class="lineNum">     524 </span>            :         struct uaddr_rnd_state *uaddr;
+<span class="lineNum">     525 </span>            : 
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :         uaddr = pool_get(&amp;uaddr_rnd_pool, PR_WAITOK);</span>
+<span class="lineNum">     527 </span><span class="lineNoCov">          0 :         uaddr-&gt;ur_uaddr.uaddr_minaddr = minaddr;</span>
+<span class="lineNum">     528 </span><span class="lineNoCov">          0 :         uaddr-&gt;ur_uaddr.uaddr_maxaddr = maxaddr;</span>
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :         uaddr-&gt;ur_uaddr.uaddr_functions = &amp;uaddr_rnd_functions;</span>
+<span class="lineNum">     530 </span>            : #if 0
+<span class="lineNum">     531 </span>            :         TAILQ_INIT(&amp;uaddr-&gt;ur_free);
+<span class="lineNum">     532 </span>            : #endif
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :         return &amp;uaddr-&gt;ur_uaddr;</span>
+<span class="lineNum">     534 </span>            : }
+<a name="535"><span class="lineNum">     535 </span>            : </a>
+<span class="lineNum">     536 </span>            : int
+<span class="lineNum">     537 </span><span class="lineNoCov">          0 : uaddr_rnd_select(struct vm_map *map, struct uvm_addr_state *uaddr,</span>
+<span class="lineNum">     538 </span>            :     struct vm_map_entry **entry_out, vaddr_t *addr_out,
+<span class="lineNum">     539 </span>            :     vsize_t sz, vaddr_t align, vaddr_t offset,
+<span class="lineNum">     540 </span>            :     vm_prot_t prot, vaddr_t hint)
+<span class="lineNum">     541 </span>            : {
+<span class="lineNum">     542 </span>            :         struct vmspace          *vm;
+<span class="lineNum">     543 </span>            :         vaddr_t                  minaddr, maxaddr;
+<span class="lineNum">     544 </span>            :         vaddr_t                  guard_sz;
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 :         vaddr_t                  low_addr, high_addr;</span>
+<span class="lineNum">     546 </span>            :         struct vm_map_entry     *entry, *next;
+<span class="lineNum">     547 </span>            :         vsize_t                  before_gap, after_gap;
+<span class="lineNum">     548 </span>            :         vaddr_t                  tmp;
+<span class="lineNum">     549 </span>            : 
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 :         KASSERT((map-&gt;flags &amp; VM_MAP_ISVMSPACE) != 0);</span>
+<span class="lineNum">     551 </span><span class="lineNoCov">          0 :         vm = (struct vmspace *)map;</span>
+<span class="lineNum">     552 </span>            : 
+<span class="lineNum">     553 </span>            :         /* Deal with guardpages: search for space with one extra page. */
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 :         guard_sz = ((map-&gt;flags &amp; VM_MAP_GUARDPAGES) == 0 ? 0 : PAGE_SIZE);</span>
+<span class="lineNum">     555 </span>            : 
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :         if (uaddr-&gt;uaddr_maxaddr - guard_sz &lt; sz)</span>
+<span class="lineNum">     557 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :         minaddr = uvm_addr_align_forward(uaddr-&gt;uaddr_minaddr, align, offset);</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :         maxaddr = uvm_addr_align_backward(uaddr-&gt;uaddr_maxaddr - sz - guard_sz,</span>
+<span class="lineNum">     560 </span>            :             align, offset);
+<span class="lineNum">     561 </span>            : 
+<span class="lineNum">     562 </span>            :         /* Quick fail if the allocation won't fit. */
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 :         if (minaddr &gt;= maxaddr)</span>
+<span class="lineNum">     564 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     565 </span>            : 
+<span class="lineNum">     566 </span>            :         /* Select a hint. */
+<span class="lineNum">     567 </span><span class="lineNoCov">          0 :         if (hint == 0)</span>
+<span class="lineNum">     568 </span><span class="lineNoCov">          0 :                 hint = uvm_map_hint(vm, prot, minaddr, maxaddr);</span>
+<span class="lineNum">     569 </span>            :         /* Clamp hint to uaddr range. */
+<span class="lineNum">     570 </span><span class="lineNoCov">          0 :         hint = MIN(MAX(hint, minaddr), maxaddr);</span>
+<span class="lineNum">     571 </span>            : 
+<span class="lineNum">     572 </span>            :         /* Align hint to align,offset parameters. */
+<span class="lineNum">     573 </span>            :         tmp = hint;
+<span class="lineNum">     574 </span><span class="lineNoCov">          0 :         hint = uvm_addr_align_forward(tmp, align, offset);</span>
+<span class="lineNum">     575 </span>            :         /* Check for overflow during alignment. */
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :         if (hint &lt; tmp || hint &gt; maxaddr)</span>
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :                 return ENOMEM; /* Compatibility mode: never look backwards. */</span>
+<span class="lineNum">     578 </span>            : 
+<span class="lineNum">     579 </span>            :         before_gap = 0;
+<span class="lineNum">     580 </span>            :         after_gap = guard_sz;
+<span class="lineNum">     581 </span>            :         hint -= MIN(hint, before_gap);
+<span class="lineNum">     582 </span>            : 
+<span class="lineNum">     583 </span>            :         /*
+<span class="lineNum">     584 </span>            :          * Use the augmented address tree to look up the first entry
+<span class="lineNum">     585 </span>            :          * at or after hint with sufficient space.
+<span class="lineNum">     586 </span>            :          *
+<span class="lineNum">     587 </span>            :          * This code is the original optimized code, but will fail if the
+<span class="lineNum">     588 </span>            :          * subtree it looks at does have sufficient space, but fails to meet
+<span class="lineNum">     589 </span>            :          * the align constraint.
+<span class="lineNum">     590 </span>            :          *
+<span class="lineNum">     591 </span>            :          * Guard: subtree is not exhausted and max(fspace) &gt;= required.
+<span class="lineNum">     592 </span>            :          */
+<span class="lineNum">     593 </span><span class="lineNoCov">          0 :         entry = uvm_map_entrybyaddr(&amp;map-&gt;addr, hint);</span>
+<span class="lineNum">     594 </span>            : 
+<span class="lineNum">     595 </span>            :         /* Walk up the tree, until there is at least sufficient space. */
+<span class="lineNum">     596 </span><span class="lineNoCov">          0 :         while (entry != NULL &amp;&amp;</span>
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :             entry-&gt;fspace_augment &lt; before_gap + after_gap + sz)</span>
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :                 entry = RBT_PARENT(uvm_map_addr, entry);</span>
+<span class="lineNum">     599 </span>            : 
+<span class="lineNum">     600 </span><span class="lineNoCov">          0 :         while (entry != NULL) {</span>
+<span class="lineNum">     601 </span>            :                 /* Test if this fits. */
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 :                 if (VMMAP_FREE_END(entry) &gt; hint &amp;&amp;</span>
+<span class="lineNum">     603 </span><span class="lineNoCov">          0 :                     uvm_map_uaddr_e(map, entry) == uaddr &amp;&amp;</span>
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :                     uvm_addr_fitspace(&amp;low_addr, &amp;high_addr,</span>
+<span class="lineNum">     605 </span><span class="lineNoCov">          0 :                     MAX(uaddr-&gt;uaddr_minaddr, VMMAP_FREE_START(entry)),</span>
+<span class="lineNum">     606 </span><span class="lineNoCov">          0 :                     MIN(uaddr-&gt;uaddr_maxaddr, VMMAP_FREE_END(entry)),</span>
+<span class="lineNum">     607 </span><span class="lineNoCov">          0 :                     sz, align, offset, before_gap, after_gap) == 0) {</span>
+<span class="lineNum">     608 </span><span class="lineNoCov">          0 :                         *entry_out = entry;</span>
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :                         if (hint &gt;= low_addr &amp;&amp; hint &lt;= high_addr)</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :                                 *addr_out = hint;</span>
+<span class="lineNum">     611 </span>            :                         else
+<span class="lineNum">     612 </span><span class="lineNoCov">          0 :                                 *addr_out = low_addr;</span>
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">     614 </span>            :                 }
+<span class="lineNum">     615 </span>            : 
+<span class="lineNum">     616 </span>            :                 /* RBT_NEXT, but skip subtrees that cannot possible fit. */
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :                 next = RBT_RIGHT(uvm_map_addr, entry);</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                 if (next != NULL &amp;&amp;</span>
+<span class="lineNum">     619 </span><span class="lineNoCov">          0 :                     next-&gt;fspace_augment &gt;= before_gap + after_gap + sz) {</span>
+<span class="lineNum">     620 </span>            :                         entry = next;
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :                         while ((next = RBT_LEFT(uvm_map_addr, entry)) !=</span>
+<span class="lineNum">     622 </span>            :                             NULL)
+<span class="lineNum">     623 </span>            :                                 entry = next;
+<span class="lineNum">     624 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     625 </span>            : do_parent:
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :                         next = RBT_PARENT(uvm_map_addr, entry);</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :                         if (next == NULL)</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                                 entry = NULL;</span>
+<span class="lineNum">     629 </span><span class="lineNoCov">          0 :                         else if (RBT_LEFT(uvm_map_addr, next) == entry)</span>
+<span class="lineNum">     630 </span>            :                                 entry = next;
+<span class="lineNum">     631 </span>            :                         else {
+<span class="lineNum">     632 </span>            :                                 entry = next;
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 :                                 goto do_parent;</span>
+<span class="lineNum">     634 </span>            :                         }
+<span class="lineNum">     635 </span>            :                 }
+<span class="lineNum">     636 </span>            :         }
+<span class="lineNum">     637 </span>            : 
+<span class="lineNum">     638 </span>            :         /* Lookup failed. */
+<span class="lineNum">     639 </span><span class="lineNoCov">          0 :         return ENOMEM;</span>
+<span class="lineNum">     640 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     641 </span>            : 
+<span class="lineNum">     642 </span>            : /*
+<span class="lineNum">     643 </span>            :  * Destroy a uaddr_rnd_state structure.
+<a name="644"><span class="lineNum">     644 </span>            :  */</a>
+<span class="lineNum">     645 </span>            : void
+<span class="lineNum">     646 </span><span class="lineNoCov">          0 : uaddr_rnd_destroy(struct uvm_addr_state *uaddr)</span>
+<span class="lineNum">     647 </span>            : {
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :         pool_put(&amp;uaddr_rnd_pool, uaddr);</span>
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     650 </span>            : 
+<span class="lineNum">     651 </span>            : /*
+<span class="lineNum">     652 </span>            :  * Add entry to tailq.
+<a name="653"><span class="lineNum">     653 </span>            :  */</a>
+<span class="lineNum">     654 </span>            : void
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 : uaddr_rnd_insert(struct vm_map *map, struct uvm_addr_state *uaddr_p,</span>
+<span class="lineNum">     656 </span>            :     struct vm_map_entry *entry)
+<span class="lineNum">     657 </span>            : {
+<span class="lineNum">     658 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     659 </span>            : }
+<span class="lineNum">     660 </span>            : 
+<span class="lineNum">     661 </span>            : /*
+<span class="lineNum">     662 </span>            :  * Remove entry from tailq.
+<a name="663"><span class="lineNum">     663 </span>            :  */</a>
+<span class="lineNum">     664 </span>            : void
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 : uaddr_rnd_remove(struct vm_map *map, struct uvm_addr_state *uaddr_p,</span>
+<span class="lineNum">     666 </span>            :     struct vm_map_entry *entry)
+<span class="lineNum">     667 </span>            : {
+<span class="lineNum">     668 </span><span class="lineNoCov">          0 :         return;</span>
+<span class="lineNum">     669 </span>            : }
+<span class="lineNum">     670 </span>            : 
+<span class="lineNum">     671 </span>            : #if 0
+<span class="lineNum">     672 </span>            : #if defined(DEBUG) || defined(DDB)
+<span class="lineNum">     673 </span>            : void
+<span class="lineNum">     674 </span>            : uaddr_rnd_print(struct uvm_addr_state *uaddr_p, boolean_t full,
+<span class="lineNum">     675 </span>            :     int (*pr)(const char*, ...))
+<span class="lineNum">     676 </span>            : {
+<span class="lineNum">     677 </span>            :         struct vm_map_entry     *entry;
+<span class="lineNum">     678 </span>            :         struct uaddr_rnd_state  *uaddr;
+<span class="lineNum">     679 </span>            :         vaddr_t                  addr;
+<span class="lineNum">     680 </span>            :         size_t                   count;
+<span class="lineNum">     681 </span>            :         vsize_t                  space;
+<span class="lineNum">     682 </span>            : 
+<span class="lineNum">     683 </span>            :         uaddr = (struct uaddr_rnd_state *)uaddr_p;
+<span class="lineNum">     684 </span>            :         addr = 0;
+<span class="lineNum">     685 </span>            :         count = 0;
+<span class="lineNum">     686 </span>            :         space = 0;
+<span class="lineNum">     687 </span>            :         TAILQ_FOREACH(entry, &amp;uaddr-&gt;ur_free, dfree.tailq) {
+<span class="lineNum">     688 </span>            :                 count++;
+<span class="lineNum">     689 </span>            :                 space += entry-&gt;fspace;
+<span class="lineNum">     690 </span>            : 
+<span class="lineNum">     691 </span>            :                 if (full) {
+<span class="lineNum">     692 </span>            :                         (*pr)(&quot;\tentry %p: 0x%lx-0x%lx G=0x%lx F=0x%lx\n&quot;,
+<span class="lineNum">     693 </span>            :                             entry, entry-&gt;start, entry-&gt;end,
+<span class="lineNum">     694 </span>            :                             entry-&gt;guard, entry-&gt;fspace);
+<span class="lineNum">     695 </span>            :                         (*pr)(&quot;\t\tfree: 0x%lx-0x%lx\n&quot;,
+<span class="lineNum">     696 </span>            :                             VMMAP_FREE_START(entry), VMMAP_FREE_END(entry));
+<span class="lineNum">     697 </span>            :                 }
+<span class="lineNum">     698 </span>            :                 if (entry-&gt;start &lt; addr) {
+<span class="lineNum">     699 </span>            :                         if (!full)
+<span class="lineNum">     700 </span>            :                                 (*pr)(&quot;\tentry %p: 0x%lx-0x%lx &quot;
+<span class="lineNum">     701 </span>            :                                     &quot;G=0x%lx F=0x%lx\n&quot;,
+<span class="lineNum">     702 </span>            :                                     entry, entry-&gt;start, entry-&gt;end,
+<span class="lineNum">     703 </span>            :                                     entry-&gt;guard, entry-&gt;fspace);
+<span class="lineNum">     704 </span>            :                         (*pr)(&quot;\t\tstart=0x%lx, expected at least 0x%lx\n&quot;,
+<span class="lineNum">     705 </span>            :                             entry-&gt;start, addr);
+<span class="lineNum">     706 </span>            :                 }
+<span class="lineNum">     707 </span>            : 
+<span class="lineNum">     708 </span>            :                 addr = VMMAP_FREE_END(entry);
+<span class="lineNum">     709 </span>            :         }
+<span class="lineNum">     710 </span>            :         (*pr)(&quot;\t0x%lu entries, 0x%lx free bytes\n&quot;, count, space);
+<span class="lineNum">     711 </span>            : }
+<span class="lineNum">     712 </span>            : #endif /* DEBUG || DDB */
+<span class="lineNum">     713 </span>            : #endif
+<span class="lineNum">     714 </span>            : 
+<span class="lineNum">     715 </span>            : /*
+<span class="lineNum">     716 </span>            :  * Kernel allocation bootstrap logic.
+<span class="lineNum">     717 </span>            :  */
+<span class="lineNum">     718 </span>            : const struct uvm_addr_functions uaddr_kernel_functions = {
+<span class="lineNum">     719 </span>            :         .uaddr_select = &amp;uaddr_kbootstrap_select,
+<span class="lineNum">     720 </span>            :         .uaddr_destroy = &amp;uaddr_kbootstrap_destroy,
+<span class="lineNum">     721 </span>            :         .uaddr_name = &quot;uaddr_kbootstrap&quot;
+<span class="lineNum">     722 </span>            : };
+<span class="lineNum">     723 </span>            : 
+<span class="lineNum">     724 </span>            : /*
+<span class="lineNum">     725 </span>            :  * Select an address from the map.
+<span class="lineNum">     726 </span>            :  *
+<span class="lineNum">     727 </span>            :  * This function ignores the uaddr spec and instead uses the map directly.
+<span class="lineNum">     728 </span>            :  * Because of that property, the uaddr algorithm can be shared across all
+<span class="lineNum">     729 </span>            :  * kernel maps.
+<a name="730"><span class="lineNum">     730 </span>            :  */</a>
+<span class="lineNum">     731 </span>            : int
+<span class="lineNum">     732 </span><span class="lineNoCov">          0 : uaddr_kbootstrap_select(struct vm_map *map, struct uvm_addr_state *uaddr,</span>
+<span class="lineNum">     733 </span>            :     struct vm_map_entry **entry_out, vaddr_t *addr_out,
+<span class="lineNum">     734 </span>            :     vsize_t sz, vaddr_t align, vaddr_t offset, vm_prot_t prot, vaddr_t hint)
+<span class="lineNum">     735 </span>            : {
+<span class="lineNum">     736 </span><span class="lineNoCov">          0 :         vaddr_t tmp;</span>
+<span class="lineNum">     737 </span>            : 
+<span class="lineNum">     738 </span><span class="lineNoCov">          0 :         RBT_FOREACH(*entry_out, uvm_map_addr, &amp;map-&gt;addr) {</span>
+<span class="lineNum">     739 </span><span class="lineNoCov">          0 :                 if (VMMAP_FREE_END(*entry_out) &lt;= uvm_maxkaddr &amp;&amp;</span>
+<span class="lineNum">     740 </span><span class="lineNoCov">          0 :                     uvm_addr_fitspace(addr_out, &amp;tmp,</span>
+<span class="lineNum">     741 </span>            :                     VMMAP_FREE_START(*entry_out), VMMAP_FREE_END(*entry_out),
+<span class="lineNum">     742 </span><span class="lineNoCov">          0 :                     sz, align, offset, 0, 0) == 0)</span>
+<span class="lineNum">     743 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">     744 </span>            :         }
+<span class="lineNum">     745 </span>            : 
+<span class="lineNum">     746 </span><span class="lineNoCov">          0 :         return ENOMEM;</span>
+<span class="lineNum">     747 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     748 </span>            : 
+<span class="lineNum">     749 </span>            : /*
+<span class="lineNum">     750 </span>            :  * Don't destroy the kernel bootstrap allocator.
+<a name="751"><span class="lineNum">     751 </span>            :  */</a>
+<span class="lineNum">     752 </span>            : void
+<span class="lineNum">     753 </span><span class="lineNoCov">          0 : uaddr_kbootstrap_destroy(struct uvm_addr_state *uaddr)</span>
+<span class="lineNum">     754 </span>            : {
+<span class="lineNum">     755 </span><span class="lineNoCov">          0 :         KASSERT(uaddr == (struct uvm_addr_state *)&amp;uaddr_kbootstrap);</span>
+<span class="lineNum">     756 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     757 </span>            : 
+<span class="lineNum">     758 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">     759 </span>            : /*
+<span class="lineNum">     760 </span>            :  * Best fit algorithm.
+<span class="lineNum">     761 </span>            :  */
+<span class="lineNum">     762 </span>            : 
+<span class="lineNum">     763 </span>            : const struct uvm_addr_functions uaddr_bestfit_functions = {
+<span class="lineNum">     764 </span>            :         .uaddr_select = &amp;uaddr_bestfit_select,
+<span class="lineNum">     765 </span>            :         .uaddr_free_insert = &amp;uaddr_bestfit_insert,
+<span class="lineNum">     766 </span>            :         .uaddr_free_remove = &amp;uaddr_bestfit_remove,
+<span class="lineNum">     767 </span>            :         .uaddr_destroy = &amp;uaddr_bestfit_destroy,
+<span class="lineNum">     768 </span>            :         .uaddr_name = &quot;uaddr_bestfit&quot;
+<span class="lineNum">     769 </span>            : };
+<a name="770"><span class="lineNum">     770 </span>            : </a>
+<span class="lineNum">     771 </span>            : struct uvm_addr_state *
+<span class="lineNum">     772 </span><span class="lineNoCov">          0 : uaddr_bestfit_create(vaddr_t minaddr, vaddr_t maxaddr)</span>
+<span class="lineNum">     773 </span>            : {
+<span class="lineNum">     774 </span>            :         struct uaddr_bestfit_state *uaddr;
+<span class="lineNum">     775 </span>            : 
+<span class="lineNum">     776 </span><span class="lineNoCov">          0 :         uaddr = pool_get(&amp;uaddr_bestfit_pool, PR_WAITOK);</span>
+<span class="lineNum">     777 </span><span class="lineNoCov">          0 :         uaddr-&gt;ubf_uaddr.uaddr_minaddr = minaddr;</span>
+<span class="lineNum">     778 </span><span class="lineNoCov">          0 :         uaddr-&gt;ubf_uaddr.uaddr_maxaddr = maxaddr;</span>
+<span class="lineNum">     779 </span><span class="lineNoCov">          0 :         uaddr-&gt;ubf_uaddr.uaddr_functions = &amp;uaddr_bestfit_functions;</span>
+<span class="lineNum">     780 </span><span class="lineNoCov">          0 :         RBT_INIT(uaddr_free_rbtree, &amp;uaddr-&gt;ubf_free);</span>
+<span class="lineNum">     781 </span><span class="lineNoCov">          0 :         return &amp;uaddr-&gt;ubf_uaddr;</span>
+<span class="lineNum">     782 </span>            : }
+<a name="783"><span class="lineNum">     783 </span>            : </a>
+<span class="lineNum">     784 </span>            : void
+<span class="lineNum">     785 </span><span class="lineNoCov">          0 : uaddr_bestfit_destroy(struct uvm_addr_state *uaddr)</span>
+<span class="lineNum">     786 </span>            : {
+<span class="lineNum">     787 </span><span class="lineNoCov">          0 :         pool_put(&amp;uaddr_bestfit_pool, uaddr);</span>
+<span class="lineNum">     788 </span><span class="lineNoCov">          0 : }</span>
+<a name="789"><span class="lineNum">     789 </span>            : </a>
+<span class="lineNum">     790 </span>            : void
+<span class="lineNum">     791 </span><span class="lineNoCov">          0 : uaddr_bestfit_insert(struct vm_map *map, struct uvm_addr_state *uaddr_p,</span>
+<span class="lineNum">     792 </span>            :     struct vm_map_entry *entry)
+<span class="lineNum">     793 </span>            : {
+<span class="lineNum">     794 </span>            :         struct uaddr_bestfit_state      *uaddr;
+<span class="lineNum">     795 </span>            :         struct vm_map_entry             *rb_rv;
+<span class="lineNum">     796 </span>            : 
+<span class="lineNum">     797 </span><span class="lineNoCov">          0 :         uaddr = (struct uaddr_bestfit_state *)uaddr_p;</span>
+<span class="lineNum">     798 </span><span class="lineCov">        180 :         if ((rb_rv = RBT_INSERT(uaddr_free_rbtree, &amp;uaddr-&gt;ubf_free, entry)) !=</span>
+<span class="lineNum">     799 </span>            :             NULL) {
+<span class="lineNum">     800 </span><span class="lineNoCov">          0 :                 panic(&quot;%s: duplicate insertion: state %p &quot;</span>
+<span class="lineNum">     801 </span>            :                     &quot;interting %p, colliding with %p&quot;, __func__,
+<span class="lineNum">     802 </span>            :                     uaddr, entry, rb_rv);
+<span class="lineNum">     803 </span>            :         }
+<span class="lineNum">     804 </span><span class="lineCov">        180 : }</span>
+<a name="805"><span class="lineNum">     805 </span>            : </a>
+<span class="lineNum">     806 </span>            : void
+<span class="lineNum">     807 </span><span class="lineNoCov">          0 : uaddr_bestfit_remove(struct vm_map *map, struct uvm_addr_state *uaddr_p,</span>
+<span class="lineNum">     808 </span>            :     struct vm_map_entry *entry)
+<span class="lineNum">     809 </span>            : {
+<span class="lineNum">     810 </span>            :         struct uaddr_bestfit_state      *uaddr;
+<span class="lineNum">     811 </span>            : 
+<span class="lineNum">     812 </span><span class="lineNoCov">          0 :         uaddr = (struct uaddr_bestfit_state *)uaddr_p;</span>
+<span class="lineNum">     813 </span><span class="lineCov">        180 :         if (RBT_REMOVE(uaddr_free_rbtree, &amp;uaddr-&gt;ubf_free, entry) != entry)</span>
+<span class="lineNum">     814 </span><span class="lineNoCov">          0 :                 panic(&quot;%s: entry was not in tree&quot;, __func__);</span>
+<span class="lineNum">     815 </span><span class="lineCov">        180 : }</span>
+<a name="816"><span class="lineNum">     816 </span>            : </a>
+<span class="lineNum">     817 </span>            : int
+<span class="lineNum">     818 </span><span class="lineNoCov">          0 : uaddr_bestfit_select(struct vm_map *map, struct uvm_addr_state *uaddr_p,</span>
+<span class="lineNum">     819 </span>            :     struct vm_map_entry **entry_out, vaddr_t *addr_out,
+<span class="lineNum">     820 </span>            :     vsize_t sz, vaddr_t align, vaddr_t offset,
+<span class="lineNum">     821 </span>            :     vm_prot_t prot, vaddr_t hint)
+<span class="lineNum">     822 </span>            : {
+<span class="lineNum">     823 </span><span class="lineNoCov">          0 :         vaddr_t                          min, max;</span>
+<span class="lineNum">     824 </span>            :         struct uaddr_bestfit_state      *uaddr;
+<span class="lineNum">     825 </span>            :         struct vm_map_entry             *entry;
+<span class="lineNum">     826 </span>            :         vsize_t                          guardsz;
+<span class="lineNum">     827 </span>            : 
+<span class="lineNum">     828 </span><span class="lineNoCov">          0 :         uaddr = (struct uaddr_bestfit_state *)uaddr_p;</span>
+<span class="lineNum">     829 </span><span class="lineCov">         60 :         guardsz = ((map-&gt;flags &amp; VM_MAP_GUARDPAGES) ? PAGE_SIZE : 0);</span>
+<span class="lineNum">     830 </span><span class="lineNoCov">          0 :         if (sz + guardsz &lt; sz)</span>
+<span class="lineNum">     831 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     832 </span>            : 
+<span class="lineNum">     833 </span>            :         /*
+<span class="lineNum">     834 </span>            :          * Find smallest item on freelist capable of holding item.
+<span class="lineNum">     835 </span>            :          * Deal with guardpages: search for space with one extra page.
+<span class="lineNum">     836 </span>            :          */
+<span class="lineNum">     837 </span><span class="lineNoCov">          0 :         entry = uvm_addr_entrybyspace(&amp;uaddr-&gt;ubf_free, sz + guardsz);</span>
+<span class="lineNum">     838 </span><span class="lineNoCov">          0 :         if (entry == NULL)</span>
+<span class="lineNum">     839 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">     840 </span>            : 
+<span class="lineNum">     841 </span>            :         /* Walk the tree until we find an entry that fits.  */
+<span class="lineNum">     842 </span><span class="lineNoCov">          0 :         while (uvm_addr_fitspace(&amp;min, &amp;max,</span>
+<span class="lineNum">     843 </span><span class="lineNoCov">          0 :             VMMAP_FREE_START(entry), VMMAP_FREE_END(entry),</span>
+<span class="lineNum">     844 </span><span class="lineNoCov">          0 :             sz, align, offset, 0, guardsz) != 0) {</span>
+<span class="lineNum">     845 </span><span class="lineNoCov">          0 :                 entry = RBT_NEXT(uaddr_free_rbtree, entry);</span>
+<span class="lineNum">     846 </span><span class="lineNoCov">          0 :                 if (entry == NULL)</span>
+<span class="lineNum">     847 </span><span class="lineNoCov">          0 :                         return ENOMEM;</span>
+<span class="lineNum">     848 </span>            :         }
+<span class="lineNum">     849 </span>            : 
+<span class="lineNum">     850 </span>            :         /* Return the address that generates the least fragmentation. */
+<span class="lineNum">     851 </span><span class="lineCov">         60 :         *entry_out = entry;</span>
+<span class="lineNum">     852 </span><span class="lineNoCov">          0 :         *addr_out = (min - VMMAP_FREE_START(entry) &lt;=</span>
+<span class="lineNum">     853 </span><span class="lineNoCov">          0 :             VMMAP_FREE_END(entry) - guardsz - sz - max ?</span>
+<span class="lineNum">     854 </span>            :             min : max);
+<span class="lineNum">     855 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     856 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     857 </span>            : #endif /* !SMALL_KERNEL */
+<span class="lineNum">     858 </span>            : 
+<span class="lineNum">     859 </span>            : 
+<span class="lineNum">     860 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">     861 </span>            : /*
+<span class="lineNum">     862 </span>            :  * A userspace allocator based on pivots.
+<span class="lineNum">     863 </span>            :  */
+<span class="lineNum">     864 </span>            : 
+<span class="lineNum">     865 </span>            : const struct uvm_addr_functions uaddr_pivot_functions = {
+<span class="lineNum">     866 </span>            :         .uaddr_select = &amp;uaddr_pivot_select,
+<span class="lineNum">     867 </span>            :         .uaddr_free_insert = &amp;uaddr_pivot_insert,
+<span class="lineNum">     868 </span>            :         .uaddr_free_remove = &amp;uaddr_pivot_remove,
+<span class="lineNum">     869 </span>            :         .uaddr_destroy = &amp;uaddr_pivot_destroy,
+<span class="lineNum">     870 </span>            : #if defined(DEBUG) || defined(DDB)
+<span class="lineNum">     871 </span>            :         .uaddr_print = &amp;uaddr_pivot_print,
+<span class="lineNum">     872 </span>            : #endif /* DEBUG || DDB */
+<span class="lineNum">     873 </span>            :         .uaddr_name = &quot;uaddr_pivot&quot;
+<span class="lineNum">     874 </span>            : };
+<span class="lineNum">     875 </span>            : 
+<span class="lineNum">     876 </span>            : /*
+<span class="lineNum">     877 </span>            :  * A special random function for pivots.
+<span class="lineNum">     878 </span>            :  *
+<span class="lineNum">     879 </span>            :  * This function will return:
+<span class="lineNum">     880 </span>            :  * - a random number
+<span class="lineNum">     881 </span>            :  * - a multiple of PAGE_SIZE
+<span class="lineNum">     882 </span>            :  * - at least PAGE_SIZE
+<span class="lineNum">     883 </span>            :  *
+<span class="lineNum">     884 </span>            :  * The random function has a slightly higher change to return a small number.
+<a name="885"><span class="lineNum">     885 </span>            :  */</a>
+<span class="lineNum">     886 </span>            : vsize_t
+<span class="lineNum">     887 </span><span class="lineNoCov">          0 : uaddr_pivot_random(void)</span>
+<span class="lineNum">     888 </span>            : {
+<span class="lineNum">     889 </span>            :         int                     r;
+<span class="lineNum">     890 </span>            : 
+<span class="lineNum">     891 </span>            :         /*
+<span class="lineNum">     892 </span>            :          * The sum of two six-sided dice will have a normal distribution.
+<span class="lineNum">     893 </span>            :          * We map the highest probable number to 1, by folding the curve
+<span class="lineNum">     894 </span>            :          * (think of a graph on a piece of paper, that you fold).
+<span class="lineNum">     895 </span>            :          *
+<span class="lineNum">     896 </span>            :          * Because the fold happens at PIVOT_RND - 1, the numbers 0 and 1
+<span class="lineNum">     897 </span>            :          * have the same and highest probability of happening.
+<span class="lineNum">     898 </span>            :          */
+<span class="lineNum">     899 </span><span class="lineNoCov">          0 :         r = arc4random_uniform(PIVOT_RND) + arc4random_uniform(PIVOT_RND) -</span>
+<span class="lineNum">     900 </span>            :             (PIVOT_RND - 1);
+<span class="lineNum">     901 </span><span class="lineNoCov">          0 :         if (r &lt; 0)</span>
+<span class="lineNum">     902 </span><span class="lineNoCov">          0 :                 r = -r;</span>
+<span class="lineNum">     903 </span>            : 
+<span class="lineNum">     904 </span>            :         /*
+<span class="lineNum">     905 </span>            :          * Make the returned value at least PAGE_SIZE and a multiple of
+<span class="lineNum">     906 </span>            :          * PAGE_SIZE.
+<span class="lineNum">     907 </span>            :          */
+<span class="lineNum">     908 </span><span class="lineNoCov">          0 :         return (vaddr_t)(1 + r) &lt;&lt; PAGE_SHIFT;</span>
+<span class="lineNum">     909 </span>            : }
+<span class="lineNum">     910 </span>            : 
+<span class="lineNum">     911 </span>            : /*
+<span class="lineNum">     912 </span>            :  * Select a new pivot.
+<span class="lineNum">     913 </span>            :  *
+<span class="lineNum">     914 </span>            :  * A pivot must:
+<span class="lineNum">     915 </span>            :  * - be chosen random
+<span class="lineNum">     916 </span>            :  * - have a randomly chosen gap before it, where the uaddr_state starts
+<span class="lineNum">     917 </span>            :  * - have a randomly chosen gap after it, before the uaddr_state ends
+<span class="lineNum">     918 </span>            :  *
+<span class="lineNum">     919 </span>            :  * Furthermore, the pivot must provide sufficient space for the allocation.
+<span class="lineNum">     920 </span>            :  * The addr will be set to the selected address.
+<span class="lineNum">     921 </span>            :  *
+<span class="lineNum">     922 </span>            :  * Returns ENOMEM on failure.
+<a name="923"><span class="lineNum">     923 </span>            :  */</a>
+<span class="lineNum">     924 </span>            : int
+<span class="lineNum">     925 </span><span class="lineNoCov">          0 : uaddr_pivot_newpivot(struct vm_map *map, struct uaddr_pivot_state *uaddr,</span>
+<span class="lineNum">     926 </span>            :     struct uaddr_pivot *pivot,
+<span class="lineNum">     927 </span>            :     struct vm_map_entry **entry_out, vaddr_t *addr_out,
+<span class="lineNum">     928 </span>            :     vsize_t sz, vaddr_t align, vaddr_t offset,
+<span class="lineNum">     929 </span>            :     vsize_t before_gap, vsize_t after_gap)
+<span class="lineNum">     930 </span>            : {
+<span class="lineNum">     931 </span>            :         struct vm_map_entry             *entry, *found;
+<span class="lineNum">     932 </span>            :         vaddr_t                          minaddr, maxaddr;
+<span class="lineNum">     933 </span>            :         vsize_t                          dist;
+<span class="lineNum">     934 </span>            :         vaddr_t                          found_minaddr, found_maxaddr;
+<span class="lineNum">     935 </span><span class="lineNoCov">          0 :         vaddr_t                          min, max;</span>
+<span class="lineNum">     936 </span>            :         vsize_t                          arc4_arg;
+<span class="lineNum">     937 </span>            :         int                              fit_error;
+<span class="lineNum">     938 </span>            :         u_int32_t                        path;
+<span class="lineNum">     939 </span>            : 
+<span class="lineNum">     940 </span><span class="lineNoCov">          0 :         minaddr = uaddr-&gt;up_uaddr.uaddr_minaddr;</span>
+<span class="lineNum">     941 </span><span class="lineNoCov">          0 :         maxaddr = uaddr-&gt;up_uaddr.uaddr_maxaddr;</span>
+<span class="lineNum">     942 </span><span class="lineNoCov">          0 :         KASSERT(minaddr &lt; maxaddr);</span>
+<span class="lineNum">     943 </span>            : #ifdef DIAGNOSTIC
+<span class="lineNum">     944 </span><span class="lineNoCov">          0 :         if (minaddr + 2 * PAGE_SIZE &gt; maxaddr) {</span>
+<span class="lineNum">     945 </span><span class="lineNoCov">          0 :                 panic(&quot;uaddr_pivot_newpivot: cannot grant random pivot &quot;</span>
+<span class="lineNum">     946 </span>            :                     &quot;in area less than 2 pages (size = 0x%lx)&quot;,
+<span class="lineNum">     947 </span>            :                     maxaddr - minaddr);
+<span class="lineNum">     948 </span>            :         }
+<span class="lineNum">     949 </span>            : #endif /* DIAGNOSTIC */
+<span class="lineNum">     950 </span>            : 
+<span class="lineNum">     951 </span>            :         /*
+<span class="lineNum">     952 </span>            :          * Gap calculation: 1/32 of the size of the managed area.
+<span class="lineNum">     953 </span>            :          *
+<span class="lineNum">     954 </span>            :          * At most: sufficient to not get truncated at arc4random.
+<span class="lineNum">     955 </span>            :          * At least: 2 PAGE_SIZE
+<span class="lineNum">     956 </span>            :          *
+<span class="lineNum">     957 </span>            :          * minaddr and maxaddr will be changed according to arc4random.
+<span class="lineNum">     958 </span>            :          */
+<span class="lineNum">     959 </span><span class="lineNoCov">          0 :         dist = MAX((maxaddr - minaddr) / 32, 2 * (vaddr_t)PAGE_SIZE);</span>
+<span class="lineNum">     960 </span><span class="lineNoCov">          0 :         if (dist &gt;&gt; PAGE_SHIFT &gt; 0xffffffff) {</span>
+<span class="lineNum">     961 </span><span class="lineNoCov">          0 :                 minaddr += (vsize_t)arc4random() &lt;&lt; PAGE_SHIFT;</span>
+<span class="lineNum">     962 </span><span class="lineNoCov">          0 :                 maxaddr -= (vsize_t)arc4random() &lt;&lt; PAGE_SHIFT;</span>
+<span class="lineNum">     963 </span><span class="lineNoCov">          0 :         } else {</span>
+<span class="lineNum">     964 </span><span class="lineNoCov">          0 :                 minaddr += (vsize_t)arc4random_uniform(dist &gt;&gt; PAGE_SHIFT) &lt;&lt;</span>
+<span class="lineNum">     965 </span>            :                     PAGE_SHIFT;
+<span class="lineNum">     966 </span><span class="lineNoCov">          0 :                 maxaddr -= (vsize_t)arc4random_uniform(dist &gt;&gt; PAGE_SHIFT) &lt;&lt;</span>
+<span class="lineNum">     967 </span>            :                     PAGE_SHIFT;
+<span class="lineNum">     968 </span>            :         }
+<span class="lineNum">     969 </span>            : 
+<span class="lineNum">     970 </span>            :         /*
+<span class="lineNum">     971 </span>            :          * A very fast way to find an entry that will be large enough
+<span class="lineNum">     972 </span>            :          * to hold the allocation, but still is found more or less
+<span class="lineNum">     973 </span>            :          * randomly: the tree path selector has a 50% chance to go for
+<span class="lineNum">     974 </span>            :          * a bigger or smaller entry.
+<span class="lineNum">     975 </span>            :          *
+<span class="lineNum">     976 </span>            :          * Note that the memory may actually be available,
+<span class="lineNum">     977 </span>            :          * but the fragmentation may be so bad and the gaps chosen
+<span class="lineNum">     978 </span>            :          * so unfortunately, that the allocation will not succeed.
+<span class="lineNum">     979 </span>            :          * Or the alignment can only be satisfied by an entry that
+<span class="lineNum">     980 </span>            :          * is not visited in the randomly selected path.
+<span class="lineNum">     981 </span>            :          *
+<span class="lineNum">     982 </span>            :          * This code finds an entry with sufficient space in O(log n) time.
+<span class="lineNum">     983 </span>            :          */
+<span class="lineNum">     984 </span><span class="lineNoCov">          0 :         path = arc4random();</span>
+<span class="lineNum">     985 </span>            :         found = NULL;
+<span class="lineNum">     986 </span><span class="lineNoCov">          0 :         entry = RBT_ROOT(uaddr_free_rbtree, &amp;uaddr-&gt;up_free);</span>
+<span class="lineNum">     987 </span><span class="lineNoCov">          0 :         while (entry != NULL) {</span>
+<span class="lineNum">     988 </span><span class="lineNoCov">          0 :                 fit_error = uvm_addr_fitspace(&amp;min, &amp;max,</span>
+<span class="lineNum">     989 </span><span class="lineNoCov">          0 :                     MAX(VMMAP_FREE_START(entry), minaddr),</span>
+<span class="lineNum">     990 </span><span class="lineNoCov">          0 :                     MIN(VMMAP_FREE_END(entry), maxaddr),</span>
+<span class="lineNum">     991 </span>            :                     sz, align, offset, before_gap, after_gap);
+<span class="lineNum">     992 </span>            : 
+<span class="lineNum">     993 </span>            :                 /* It fits, save this entry. */
+<span class="lineNum">     994 </span><span class="lineNoCov">          0 :                 if (fit_error == 0) {</span>
+<span class="lineNum">     995 </span>            :                         found = entry;
+<span class="lineNum">     996 </span><span class="lineNoCov">          0 :                         found_minaddr = min;</span>
+<span class="lineNum">     997 </span><span class="lineNoCov">          0 :                         found_maxaddr = max;</span>
+<span class="lineNum">     998 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">     999 </span>            : 
+<span class="lineNum">    1000 </span>            :                 /* Next. */
+<span class="lineNum">    1001 </span><span class="lineNoCov">          0 :                 if (fit_error != 0)</span>
+<span class="lineNum">    1002 </span><span class="lineNoCov">          0 :                         entry = RBT_RIGHT(uaddr_free_rbtree, entry);</span>
+<span class="lineNum">    1003 </span><span class="lineNoCov">          0 :                 else if ((path &amp; 0x1) == 0) {</span>
+<span class="lineNum">    1004 </span>            :                         path &gt;&gt;= 1;
+<span class="lineNum">    1005 </span><span class="lineNoCov">          0 :                         entry = RBT_RIGHT(uaddr_free_rbtree, entry);</span>
+<span class="lineNum">    1006 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">    1007 </span>            :                         path &gt;&gt;= 1;
+<span class="lineNum">    1008 </span><span class="lineNoCov">          0 :                         entry = RBT_LEFT(uaddr_free_rbtree, entry);</span>
+<span class="lineNum">    1009 </span>            :                 }
+<span class="lineNum">    1010 </span>            :         }
+<span class="lineNum">    1011 </span><span class="lineNoCov">          0 :         if (found == NULL)</span>
+<span class="lineNum">    1012 </span><span class="lineNoCov">          0 :                 return ENOMEM;  /* Not found a large enough region. */</span>
+<span class="lineNum">    1013 </span>            : 
+<span class="lineNum">    1014 </span>            :         /*
+<span class="lineNum">    1015 </span>            :          * Calculate a random address within found.
+<span class="lineNum">    1016 </span>            :          *
+<span class="lineNum">    1017 </span>            :          * found_minaddr and found_maxaddr are already aligned, so be sure
+<span class="lineNum">    1018 </span>            :          * to select a multiple of align as the offset in the entry.
+<span class="lineNum">    1019 </span>            :          * Preferably, arc4random_uniform is used to provide no bias within
+<span class="lineNum">    1020 </span>            :          * the entry.
+<span class="lineNum">    1021 </span>            :          * However if the size of the entry exceeds arc4random_uniforms
+<span class="lineNum">    1022 </span>            :          * argument limit, we simply use arc4random (thus limiting ourselves
+<span class="lineNum">    1023 </span>            :          * to 4G * PAGE_SIZE bytes offset).
+<span class="lineNum">    1024 </span>            :          */
+<span class="lineNum">    1025 </span><span class="lineNoCov">          0 :         if (found_maxaddr == found_minaddr)</span>
+<span class="lineNum">    1026 </span><span class="lineNoCov">          0 :                 *addr_out = found_minaddr;</span>
+<span class="lineNum">    1027 </span>            :         else {
+<span class="lineNum">    1028 </span><span class="lineNoCov">          0 :                 KASSERT(align &gt;= PAGE_SIZE &amp;&amp; (align &amp; (align - 1)) == 0);</span>
+<span class="lineNum">    1029 </span><span class="lineNoCov">          0 :                 arc4_arg = found_maxaddr - found_minaddr;</span>
+<span class="lineNum">    1030 </span><span class="lineNoCov">          0 :                 if (arc4_arg &gt; 0xffffffff) {</span>
+<span class="lineNum">    1031 </span><span class="lineNoCov">          0 :                         *addr_out = found_minaddr +</span>
+<span class="lineNum">    1032 </span><span class="lineNoCov">          0 :                             (arc4random() &amp; ~(align - 1));</span>
+<span class="lineNum">    1033 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">    1034 </span><span class="lineNoCov">          0 :                         *addr_out = found_minaddr +</span>
+<span class="lineNum">    1035 </span><span class="lineNoCov">          0 :                             (arc4random_uniform(arc4_arg) &amp; ~(align - 1));</span>
+<span class="lineNum">    1036 </span>            :                 }
+<span class="lineNum">    1037 </span>            :         }
+<span class="lineNum">    1038 </span>            :         /* Address was found in this entry. */
+<span class="lineNum">    1039 </span><span class="lineNoCov">          0 :         *entry_out = found;</span>
+<span class="lineNum">    1040 </span>            : 
+<span class="lineNum">    1041 </span>            :         /*
+<span class="lineNum">    1042 </span>            :          * Set up new pivot and return selected address.
+<span class="lineNum">    1043 </span>            :          *
+<span class="lineNum">    1044 </span>            :          * Depending on the direction of the pivot, the pivot must be placed
+<span class="lineNum">    1045 </span>            :          * at the bottom or the top of the allocation:
+<span class="lineNum">    1046 </span>            :          * - if the pivot moves upwards, place the pivot at the top of the
+<span class="lineNum">    1047 </span>            :          *   allocation,
+<span class="lineNum">    1048 </span>            :          * - if the pivot moves downwards, place the pivot at the bottom
+<span class="lineNum">    1049 </span>            :          *   of the allocation.
+<span class="lineNum">    1050 </span>            :          */
+<span class="lineNum">    1051 </span><span class="lineNoCov">          0 :         pivot-&gt;entry = found;</span>
+<span class="lineNum">    1052 </span><span class="lineNoCov">          0 :         pivot-&gt;dir = (arc4random() &amp; 0x1 ? 1 : -1);</span>
+<span class="lineNum">    1053 </span><span class="lineNoCov">          0 :         if (pivot-&gt;dir &gt; 0)</span>
+<span class="lineNum">    1054 </span><span class="lineNoCov">          0 :                 pivot-&gt;addr = *addr_out + sz;</span>
+<span class="lineNum">    1055 </span>            :         else
+<span class="lineNum">    1056 </span><span class="lineNoCov">          0 :                 pivot-&gt;addr = *addr_out;</span>
+<span class="lineNum">    1057 </span><span class="lineNoCov">          0 :         pivot-&gt;expire = PIVOT_EXPIRE - 1; /* First use is right now. */</span>
+<span class="lineNum">    1058 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">    1059 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1060 </span>            : 
+<span class="lineNum">    1061 </span>            : /*
+<span class="lineNum">    1062 </span>            :  * Pivot selector.
+<span class="lineNum">    1063 </span>            :  *
+<span class="lineNum">    1064 </span>            :  * Each time the selector is invoked, it will select a random pivot, which
+<span class="lineNum">    1065 </span>            :  * it will use to select memory with. The memory will be placed at the pivot,
+<span class="lineNum">    1066 </span>            :  * with a randomly sized gap between the allocation and the pivot.
+<span class="lineNum">    1067 </span>            :  * The pivot will then move so it will never revisit this address.
+<span class="lineNum">    1068 </span>            :  *
+<span class="lineNum">    1069 </span>            :  * Each allocation, the pivot expiry timer ticks. Once the pivot becomes
+<span class="lineNum">    1070 </span>            :  * expired, it will be replaced with a newly created pivot. Pivots also
+<span class="lineNum">    1071 </span>            :  * automatically expire if they fail to provide memory for an allocation.
+<span class="lineNum">    1072 </span>            :  *
+<span class="lineNum">    1073 </span>            :  * Expired pivots are replaced using the uaddr_pivot_newpivot() function,
+<span class="lineNum">    1074 </span>            :  * which will ensure the pivot points at memory in such a way that the
+<span class="lineNum">    1075 </span>            :  * allocation will succeed.
+<span class="lineNum">    1076 </span>            :  * As an added bonus, the uaddr_pivot_newpivot() function will perform the
+<span class="lineNum">    1077 </span>            :  * allocation immediately and move the pivot as appropriate.
+<span class="lineNum">    1078 </span>            :  *
+<span class="lineNum">    1079 </span>            :  * If uaddr_pivot_newpivot() fails to find a new pivot that will allow the
+<span class="lineNum">    1080 </span>            :  * allocation to succeed, it will not create a new pivot and the allocation
+<span class="lineNum">    1081 </span>            :  * will fail.
+<span class="lineNum">    1082 </span>            :  *
+<span class="lineNum">    1083 </span>            :  * A pivot running into used memory will automatically expire (because it will
+<span class="lineNum">    1084 </span>            :  * fail to allocate).
+<span class="lineNum">    1085 </span>            :  *
+<span class="lineNum">    1086 </span>            :  * Characteristics of the allocator:
+<span class="lineNum">    1087 </span>            :  * - best case, an allocation is O(log N)
+<span class="lineNum">    1088 </span>            :  *   (it would be O(1), if it werent for the need to check if the memory is
+<span class="lineNum">    1089 </span>            :  *   free; although that can be avoided...)
+<span class="lineNum">    1090 </span>            :  * - worst case, an allocation is O(log N)
+<span class="lineNum">    1091 </span>            :  *   (the uaddr_pivot_newpivot() function has that complexity)
+<span class="lineNum">    1092 </span>            :  * - failed allocations always take O(log N)
+<span class="lineNum">    1093 </span>            :  *   (the uaddr_pivot_newpivot() function will walk that deep into the tree).
+<a name="1094"><span class="lineNum">    1094 </span>            :  */</a>
+<span class="lineNum">    1095 </span>            : int
+<span class="lineNum">    1096 </span><span class="lineNoCov">          0 : uaddr_pivot_select(struct vm_map *map, struct uvm_addr_state *uaddr_p,</span>
+<span class="lineNum">    1097 </span>            :     struct vm_map_entry **entry_out, vaddr_t *addr_out,
+<span class="lineNum">    1098 </span>            :     vsize_t sz, vaddr_t align, vaddr_t offset,
+<span class="lineNum">    1099 </span>            :     vm_prot_t prot, vaddr_t hint)
+<span class="lineNum">    1100 </span>            : {
+<span class="lineNum">    1101 </span>            :         struct uaddr_pivot_state        *uaddr;
+<span class="lineNum">    1102 </span>            :         struct vm_map_entry             *entry;
+<span class="lineNum">    1103 </span>            :         struct uaddr_pivot              *pivot;
+<span class="lineNum">    1104 </span><span class="lineNoCov">          0 :         vaddr_t                          min, max;</span>
+<span class="lineNum">    1105 </span>            :         vsize_t                          before_gap, after_gap;
+<span class="lineNum">    1106 </span>            :         int                              err;
+<span class="lineNum">    1107 </span>            : 
+<span class="lineNum">    1108 </span>            :         /*
+<span class="lineNum">    1109 </span>            :          * When we have a hint, use the rnd allocator that finds the
+<span class="lineNum">    1110 </span>            :          * area that is closest to the hint, if there is such an area.
+<span class="lineNum">    1111 </span>            :          */
+<span class="lineNum">    1112 </span><span class="lineNoCov">          0 :         if (hint != 0) {</span>
+<span class="lineNum">    1113 </span><span class="lineNoCov">          0 :                 if (uaddr_rnd_select(map, uaddr_p, entry_out, addr_out,</span>
+<span class="lineNum">    1114 </span><span class="lineNoCov">          0 :                     sz, align, offset, prot, hint) == 0)</span>
+<span class="lineNum">    1115 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">    1116 </span><span class="lineNoCov">          0 :                 return ENOMEM;</span>
+<span class="lineNum">    1117 </span>            :         }
+<span class="lineNum">    1118 </span>            : 
+<span class="lineNum">    1119 </span>            :         /*
+<span class="lineNum">    1120 </span>            :          * Select a random pivot and a random gap sizes around the allocation.
+<span class="lineNum">    1121 </span>            :          */
+<span class="lineNum">    1122 </span><span class="lineNoCov">          0 :         uaddr = (struct uaddr_pivot_state *)uaddr_p;</span>
+<span class="lineNum">    1123 </span><span class="lineNoCov">          0 :         pivot = &amp;uaddr-&gt;up_pivots[</span>
+<span class="lineNum">    1124 </span><span class="lineNoCov">          0 :             arc4random_uniform(nitems(uaddr-&gt;up_pivots))];</span>
+<span class="lineNum">    1125 </span><span class="lineNoCov">          0 :         before_gap = uaddr_pivot_random();</span>
+<span class="lineNum">    1126 </span><span class="lineNoCov">          0 :         after_gap = uaddr_pivot_random();</span>
+<span class="lineNum">    1127 </span><span class="lineNoCov">          0 :         if (pivot-&gt;addr == 0 || pivot-&gt;entry == NULL || pivot-&gt;expire == 0)</span>
+<span class="lineNum">    1128 </span>            :                 goto expired;   /* Pivot is invalid (null or expired). */
+<span class="lineNum">    1129 </span>            : 
+<span class="lineNum">    1130 </span>            :         /* Attempt to use the pivot to map the entry. */
+<span class="lineNum">    1131 </span>            :         entry = pivot-&gt;entry;
+<span class="lineNum">    1132 </span><span class="lineNoCov">          0 :         if (pivot-&gt;dir &gt; 0) {</span>
+<span class="lineNum">    1133 </span><span class="lineNoCov">          0 :                 if (uvm_addr_fitspace(&amp;min, &amp;max,</span>
+<span class="lineNum">    1134 </span><span class="lineNoCov">          0 :                     MAX(VMMAP_FREE_START(entry), pivot-&gt;addr),</span>
+<span class="lineNum">    1135 </span><span class="lineNoCov">          0 :                     VMMAP_FREE_END(entry), sz, align, offset,</span>
+<span class="lineNum">    1136 </span><span class="lineNoCov">          0 :                     before_gap, after_gap) == 0) {</span>
+<span class="lineNum">    1137 </span><span class="lineNoCov">          0 :                         *addr_out = min;</span>
+<span class="lineNum">    1138 </span><span class="lineNoCov">          0 :                         *entry_out = entry;</span>
+<span class="lineNum">    1139 </span><span class="lineNoCov">          0 :                         pivot-&gt;addr = min + sz;</span>
+<span class="lineNum">    1140 </span><span class="lineNoCov">          0 :                         pivot-&gt;expire--;</span>
+<span class="lineNum">    1141 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">    1142 </span>            :                 }
+<span class="lineNum">    1143 </span>            :         } else {
+<span class="lineNum">    1144 </span><span class="lineNoCov">          0 :                 if (uvm_addr_fitspace(&amp;min, &amp;max,</span>
+<span class="lineNum">    1145 </span>            :                     VMMAP_FREE_START(entry),
+<span class="lineNum">    1146 </span><span class="lineNoCov">          0 :                     MIN(VMMAP_FREE_END(entry), pivot-&gt;addr),</span>
+<span class="lineNum">    1147 </span><span class="lineNoCov">          0 :                     sz, align, offset, before_gap, after_gap) == 0) {</span>
+<span class="lineNum">    1148 </span><span class="lineNoCov">          0 :                         *addr_out = max;</span>
+<span class="lineNum">    1149 </span><span class="lineNoCov">          0 :                         *entry_out = entry;</span>
+<span class="lineNum">    1150 </span><span class="lineNoCov">          0 :                         pivot-&gt;addr = max;</span>
+<span class="lineNum">    1151 </span><span class="lineNoCov">          0 :                         pivot-&gt;expire--;</span>
+<span class="lineNum">    1152 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">    1153 </span>            :                 }
+<span class="lineNum">    1154 </span>            :         }
+<span class="lineNum">    1155 </span>            : 
+<span class="lineNum">    1156 </span>            : expired:
+<span class="lineNum">    1157 </span>            :         /*
+<span class="lineNum">    1158 </span>            :          * Pivot expired or allocation failed.
+<span class="lineNum">    1159 </span>            :          * Use pivot selector to do the allocation and find a new pivot.
+<span class="lineNum">    1160 </span>            :          */
+<span class="lineNum">    1161 </span><span class="lineNoCov">          0 :         err = uaddr_pivot_newpivot(map, uaddr, pivot, entry_out, addr_out,</span>
+<span class="lineNum">    1162 </span>            :             sz, align, offset, before_gap, after_gap);
+<span class="lineNum">    1163 </span><span class="lineNoCov">          0 :         return err;</span>
+<span class="lineNum">    1164 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1165 </span>            : 
+<span class="lineNum">    1166 </span>            : /*
+<span class="lineNum">    1167 </span>            :  * Free the pivot.
+<a name="1168"><span class="lineNum">    1168 </span>            :  */</a>
+<span class="lineNum">    1169 </span>            : void
+<span class="lineNum">    1170 </span><span class="lineNoCov">          0 : uaddr_pivot_destroy(struct uvm_addr_state *uaddr)</span>
+<span class="lineNum">    1171 </span>            : {
+<span class="lineNum">    1172 </span><span class="lineNoCov">          0 :         pool_put(&amp;uaddr_pivot_pool, uaddr);</span>
+<span class="lineNum">    1173 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1174 </span>            : 
+<span class="lineNum">    1175 </span>            : /*
+<span class="lineNum">    1176 </span>            :  * Insert an entry with free space in the space tree.
+<a name="1177"><span class="lineNum">    1177 </span>            :  */</a>
+<span class="lineNum">    1178 </span>            : void
+<span class="lineNum">    1179 </span><span class="lineNoCov">          0 : uaddr_pivot_insert(struct vm_map *map, struct uvm_addr_state *uaddr_p,</span>
+<span class="lineNum">    1180 </span>            :     struct vm_map_entry *entry)
+<span class="lineNum">    1181 </span>            : {
+<span class="lineNum">    1182 </span>            :         struct uaddr_pivot_state        *uaddr;
+<span class="lineNum">    1183 </span>            :         struct vm_map_entry             *rb_rv;
+<span class="lineNum">    1184 </span>            :         struct uaddr_pivot              *p;
+<span class="lineNum">    1185 </span>            :         vaddr_t                          check_addr;
+<span class="lineNum">    1186 </span>            :         vaddr_t                          start, end;
+<span class="lineNum">    1187 </span>            : 
+<span class="lineNum">    1188 </span><span class="lineNoCov">          0 :         uaddr = (struct uaddr_pivot_state *)uaddr_p;</span>
+<span class="lineNum">    1189 </span><span class="lineNoCov">          0 :         if ((rb_rv = RBT_INSERT(uaddr_free_rbtree, &amp;uaddr-&gt;up_free, entry)) !=</span>
+<span class="lineNum">    1190 </span>            :             NULL) {
+<span class="lineNum">    1191 </span><span class="lineNoCov">          0 :                 panic(&quot;%s: duplicate insertion: state %p &quot;</span>
+<span class="lineNum">    1192 </span>            :                     &quot;inserting entry %p which collides with %p&quot;, __func__,
+<span class="lineNum">    1193 </span>            :                     uaddr, entry, rb_rv);
+<span class="lineNum">    1194 </span>            :         }
+<span class="lineNum">    1195 </span>            : 
+<span class="lineNum">    1196 </span><span class="lineNoCov">          0 :         start = VMMAP_FREE_START(entry);</span>
+<span class="lineNum">    1197 </span><span class="lineNoCov">          0 :         end = VMMAP_FREE_END(entry);</span>
+<span class="lineNum">    1198 </span>            : 
+<span class="lineNum">    1199 </span>            :         /*
+<span class="lineNum">    1200 </span>            :          * Update all pivots that are contained in this entry.
+<span class="lineNum">    1201 </span>            :          */
+<span class="lineNum">    1202 </span><span class="lineNoCov">          0 :         for (p = &amp;uaddr-&gt;up_pivots[0];</span>
+<span class="lineNum">    1203 </span><span class="lineNoCov">          0 :             p != &amp;uaddr-&gt;up_pivots[nitems(uaddr-&gt;up_pivots)]; p++) {</span>
+<span class="lineNum">    1204 </span><span class="lineNoCov">          0 :                 check_addr = p-&gt;addr;</span>
+<span class="lineNum">    1205 </span><span class="lineNoCov">          0 :                 if (check_addr == 0)</span>
+<span class="lineNum">    1206 </span>            :                         continue;
+<span class="lineNum">    1207 </span><span class="lineNoCov">          0 :                 if (p-&gt;dir &lt; 0)</span>
+<span class="lineNum">    1208 </span><span class="lineNoCov">          0 :                         check_addr--;</span>
+<span class="lineNum">    1209 </span>            : 
+<span class="lineNum">    1210 </span><span class="lineNoCov">          0 :                 if (start &lt;= check_addr &amp;&amp;</span>
+<span class="lineNum">    1211 </span><span class="lineNoCov">          0 :                     check_addr &lt; end) {</span>
+<span class="lineNum">    1212 </span><span class="lineNoCov">          0 :                         KASSERT(p-&gt;entry == NULL);</span>
+<span class="lineNum">    1213 </span><span class="lineNoCov">          0 :                         p-&gt;entry = entry;</span>
+<span class="lineNum">    1214 </span><span class="lineNoCov">          0 :                 }</span>
+<span class="lineNum">    1215 </span>            :         }
+<span class="lineNum">    1216 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1217 </span>            : 
+<span class="lineNum">    1218 </span>            : /*
+<span class="lineNum">    1219 </span>            :  * Remove an entry with free space from the space tree.
+<a name="1220"><span class="lineNum">    1220 </span>            :  */</a>
+<span class="lineNum">    1221 </span>            : void
+<span class="lineNum">    1222 </span><span class="lineNoCov">          0 : uaddr_pivot_remove(struct vm_map *map, struct uvm_addr_state *uaddr_p,</span>
+<span class="lineNum">    1223 </span>            :     struct vm_map_entry *entry)
+<span class="lineNum">    1224 </span>            : {
+<span class="lineNum">    1225 </span>            :         struct uaddr_pivot_state        *uaddr;
+<span class="lineNum">    1226 </span>            :         struct uaddr_pivot              *p;
+<span class="lineNum">    1227 </span>            : 
+<span class="lineNum">    1228 </span><span class="lineNoCov">          0 :         uaddr = (struct uaddr_pivot_state *)uaddr_p;</span>
+<span class="lineNum">    1229 </span><span class="lineNoCov">          0 :         if (RBT_REMOVE(uaddr_free_rbtree, &amp;uaddr-&gt;up_free, entry) != entry)</span>
+<span class="lineNum">    1230 </span><span class="lineNoCov">          0 :                 panic(&quot;%s: entry was not in tree&quot;, __func__);</span>
+<span class="lineNum">    1231 </span>            : 
+<span class="lineNum">    1232 </span>            :         /*
+<span class="lineNum">    1233 </span>            :          * Inform any pivot with this entry that the entry is gone.
+<span class="lineNum">    1234 </span>            :          * Note that this does not automatically invalidate the pivot.
+<span class="lineNum">    1235 </span>            :          */
+<span class="lineNum">    1236 </span><span class="lineNoCov">          0 :         for (p = &amp;uaddr-&gt;up_pivots[0];</span>
+<span class="lineNum">    1237 </span><span class="lineNoCov">          0 :             p != &amp;uaddr-&gt;up_pivots[nitems(uaddr-&gt;up_pivots)]; p++) {</span>
+<span class="lineNum">    1238 </span><span class="lineNoCov">          0 :                 if (p-&gt;entry == entry)</span>
+<span class="lineNum">    1239 </span><span class="lineNoCov">          0 :                         p-&gt;entry = NULL;</span>
+<span class="lineNum">    1240 </span>            :         }
+<span class="lineNum">    1241 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1242 </span>            : 
+<span class="lineNum">    1243 </span>            : /*
+<span class="lineNum">    1244 </span>            :  * Create a new pivot selector.
+<span class="lineNum">    1245 </span>            :  *
+<span class="lineNum">    1246 </span>            :  * Initially, all pivots are in the expired state.
+<span class="lineNum">    1247 </span>            :  * Two reasons for this:
+<span class="lineNum">    1248 </span>            :  * - it means this allocator will not take a huge amount of time
+<span class="lineNum">    1249 </span>            :  * - pivots select better on demand, because the pivot selection will be
+<span class="lineNum">    1250 </span>            :  *   affected by preceding allocations:
+<span class="lineNum">    1251 </span>            :  *   the next pivots will likely end up in different segments of free memory,
+<span class="lineNum">    1252 </span>            :  *   that was segmented by an earlier allocation; better spread.
+<a name="1253"><span class="lineNum">    1253 </span>            :  */</a>
+<span class="lineNum">    1254 </span>            : struct uvm_addr_state *
+<span class="lineNum">    1255 </span><span class="lineNoCov">          0 : uaddr_pivot_create(vaddr_t minaddr, vaddr_t maxaddr)</span>
+<span class="lineNum">    1256 </span>            : {
+<span class="lineNum">    1257 </span>            :         struct uaddr_pivot_state *uaddr;
+<span class="lineNum">    1258 </span>            : 
+<span class="lineNum">    1259 </span><span class="lineNoCov">          0 :         uaddr = pool_get(&amp;uaddr_pivot_pool, PR_WAITOK);</span>
+<span class="lineNum">    1260 </span><span class="lineNoCov">          0 :         uaddr-&gt;up_uaddr.uaddr_minaddr = minaddr;</span>
+<span class="lineNum">    1261 </span><span class="lineNoCov">          0 :         uaddr-&gt;up_uaddr.uaddr_maxaddr = maxaddr;</span>
+<span class="lineNum">    1262 </span><span class="lineNoCov">          0 :         uaddr-&gt;up_uaddr.uaddr_functions = &amp;uaddr_pivot_functions;</span>
+<span class="lineNum">    1263 </span><span class="lineNoCov">          0 :         RBT_INIT(uaddr_free_rbtree, &amp;uaddr-&gt;up_free);</span>
+<span class="lineNum">    1264 </span><span class="lineNoCov">          0 :         memset(uaddr-&gt;up_pivots, 0, sizeof(uaddr-&gt;up_pivots));</span>
+<span class="lineNum">    1265 </span>            : 
+<span class="lineNum">    1266 </span><span class="lineNoCov">          0 :         return &amp;uaddr-&gt;up_uaddr;</span>
+<span class="lineNum">    1267 </span>            : }
+<span class="lineNum">    1268 </span>            : 
+<span class="lineNum">    1269 </span>            : #if defined(DEBUG) || defined(DDB)
+<span class="lineNum">    1270 </span>            : /*
+<span class="lineNum">    1271 </span>            :  * Print the uaddr_pivot_state.
+<span class="lineNum">    1272 </span>            :  *
+<span class="lineNum">    1273 </span>            :  * If full, a listing of all entries in the state will be provided.
+<a name="1274"><span class="lineNum">    1274 </span>            :  */</a>
+<span class="lineNum">    1275 </span>            : void
+<span class="lineNum">    1276 </span><span class="lineNoCov">          0 : uaddr_pivot_print(struct uvm_addr_state *uaddr_p, boolean_t full,</span>
+<span class="lineNum">    1277 </span>            :     int (*pr)(const char *, ...))
+<span class="lineNum">    1278 </span>            : {
+<span class="lineNum">    1279 </span>            :         struct uaddr_pivot_state        *uaddr;
+<span class="lineNum">    1280 </span>            :         struct uaddr_pivot              *pivot;
+<span class="lineNum">    1281 </span>            :         struct vm_map_entry             *entry;
+<span class="lineNum">    1282 </span>            :         int                              i;
+<span class="lineNum">    1283 </span>            :         vaddr_t                          check_addr;
+<span class="lineNum">    1284 </span>            : 
+<span class="lineNum">    1285 </span><span class="lineNoCov">          0 :         uaddr = (struct uaddr_pivot_state *)uaddr_p;</span>
+<span class="lineNum">    1286 </span>            : 
+<span class="lineNum">    1287 </span><span class="lineNoCov">          0 :         for (i = 0; i &lt; NUM_PIVOTS; i++) {</span>
+<span class="lineNum">    1288 </span><span class="lineNoCov">          0 :                 pivot = &amp;uaddr-&gt;up_pivots[i];</span>
+<span class="lineNum">    1289 </span>            : 
+<span class="lineNum">    1290 </span><span class="lineNoCov">          0 :                 (*pr)(&quot;\tpivot 0x%lx, epires in %d, direction %d\n&quot;,</span>
+<span class="lineNum">    1291 </span><span class="lineNoCov">          0 :                     pivot-&gt;addr, pivot-&gt;expire, pivot-&gt;dir);</span>
+<span class="lineNum">    1292 </span>            :         }
+<span class="lineNum">    1293 </span><span class="lineNoCov">          0 :         if (!full)</span>
+<span class="lineNum">    1294 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">    1295 </span>            : 
+<span class="lineNum">    1296 </span><span class="lineNoCov">          0 :         if (RBT_EMPTY(uaddr_free_rbtree, &amp;uaddr-&gt;up_free))</span>
+<span class="lineNum">    1297 </span><span class="lineNoCov">          0 :                 (*pr)(&quot;\tempty\n&quot;);</span>
+<span class="lineNum">    1298 </span>            :         /* Print list of free space. */
+<span class="lineNum">    1299 </span><span class="lineNoCov">          0 :         RBT_FOREACH(entry, uaddr_free_rbtree, &amp;uaddr-&gt;up_free) {</span>
+<span class="lineNum">    1300 </span><span class="lineNoCov">          0 :                 (*pr)(&quot;\t0x%lx - 0x%lx free (0x%lx bytes)\n&quot;,</span>
+<span class="lineNum">    1301 </span><span class="lineNoCov">          0 :                     VMMAP_FREE_START(entry), VMMAP_FREE_END(entry),</span>
+<span class="lineNum">    1302 </span>            :                     VMMAP_FREE_END(entry) - VMMAP_FREE_START(entry));
+<span class="lineNum">    1303 </span>            : 
+<span class="lineNum">    1304 </span><span class="lineNoCov">          0 :                 for (i = 0; i &lt; NUM_PIVOTS; i++) {</span>
+<span class="lineNum">    1305 </span><span class="lineNoCov">          0 :                         pivot = &amp;uaddr-&gt;up_pivots[i];</span>
+<span class="lineNum">    1306 </span><span class="lineNoCov">          0 :                         check_addr = pivot-&gt;addr;</span>
+<span class="lineNum">    1307 </span><span class="lineNoCov">          0 :                         if (check_addr == 0)</span>
+<span class="lineNum">    1308 </span>            :                                 continue;
+<span class="lineNum">    1309 </span><span class="lineNoCov">          0 :                         if (pivot-&gt;dir &lt; 0)</span>
+<span class="lineNum">    1310 </span><span class="lineNoCov">          0 :                                 check_addr--;</span>
+<span class="lineNum">    1311 </span>            : 
+<span class="lineNum">    1312 </span><span class="lineNoCov">          0 :                         if (VMMAP_FREE_START(entry) &lt;= check_addr &amp;&amp;</span>
+<span class="lineNum">    1313 </span><span class="lineNoCov">          0 :                             check_addr &lt; VMMAP_FREE_END(entry)) {</span>
+<span class="lineNum">    1314 </span><span class="lineNoCov">          0 :                                 (*pr)(&quot;\t\tcontains pivot %d (0x%lx)\n&quot;,</span>
+<span class="lineNum">    1315 </span><span class="lineNoCov">          0 :                                     i, pivot-&gt;addr);</span>
+<span class="lineNum">    1316 </span><span class="lineNoCov">          0 :                         }</span>
+<span class="lineNum">    1317 </span>            :                 }
+<span class="lineNum">    1318 </span>            :         }
+<span class="lineNum">    1319 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">    1320 </span>            : #endif /* DEBUG || DDB */
+<span class="lineNum">    1321 </span>            : #endif /* !SMALL_KERNEL */
+<span class="lineNum">    1322 </span>            : 
+<span class="lineNum">    1323 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">    1324 </span>            : /*
+<span class="lineNum">    1325 </span>            :  * Stack/break allocator.
+<span class="lineNum">    1326 </span>            :  *
+<span class="lineNum">    1327 </span>            :  * Stack area is grown into in the opposite direction of the stack growth,
+<span class="lineNum">    1328 </span>            :  * brk area is grown downward (because sbrk() grows upward).
+<span class="lineNum">    1329 </span>            :  *
+<span class="lineNum">    1330 </span>            :  * Both areas are grown into proportially: a weighted chance is used to
+<span class="lineNum">    1331 </span>            :  * select which one (stack or brk area) to try. If the allocation fails,
+<span class="lineNum">    1332 </span>            :  * the other one is tested.
+<span class="lineNum">    1333 </span>            :  */
+<span class="lineNum">    1334 </span>            : const struct uvm_addr_functions uaddr_stack_brk_functions = {
+<span class="lineNum">    1335 </span>            :         .uaddr_select = &amp;uaddr_stack_brk_select,
+<span class="lineNum">    1336 </span>            :         .uaddr_destroy = &amp;uaddr_destroy,
+<span class="lineNum">    1337 </span>            :         .uaddr_name = &quot;uaddr_stckbrk&quot;
+<span class="lineNum">    1338 </span>            : };
+<span class="lineNum">    1339 </span>            : 
+<span class="lineNum">    1340 </span>            : /*
+<span class="lineNum">    1341 </span>            :  * Stack/brk address selector.
+<a name="1342"><span class="lineNum">    1342 </span>            :  */</a>
+<span class="lineNum">    1343 </span>            : int
+<span class="lineNum">    1344 </span><span class="lineNoCov">          0 : uaddr_stack_brk_select(struct vm_map *map, struct uvm_addr_state *uaddr,</span>
+<span class="lineNum">    1345 </span>            :     struct vm_map_entry **entry_out, vaddr_t *addr_out,
+<span class="lineNum">    1346 </span>            :     vsize_t sz, vaddr_t align, vaddr_t offset,
+<span class="lineNum">    1347 </span>            :     vm_prot_t prot, vaddr_t hint)
+<span class="lineNum">    1348 </span>            : {
+<span class="lineNum">    1349 </span>            :         vaddr_t                 start;
+<span class="lineNum">    1350 </span>            :         vaddr_t                 end;
+<span class="lineNum">    1351 </span>            :         vsize_t                 before_gap;
+<span class="lineNum">    1352 </span>            :         vsize_t                 after_gap;
+<span class="lineNum">    1353 </span>            :         int                     dir;
+<span class="lineNum">    1354 </span>            : 
+<span class="lineNum">    1355 </span>            :         /* Set up brk search strategy. */
+<span class="lineNum">    1356 </span><span class="lineNoCov">          0 :         start = MAX(map-&gt;b_start, uaddr-&gt;uaddr_minaddr);</span>
+<span class="lineNum">    1357 </span><span class="lineNoCov">          0 :         end = MIN(map-&gt;b_end, uaddr-&gt;uaddr_maxaddr);</span>
+<span class="lineNum">    1358 </span>            :         before_gap = 0;
+<span class="lineNum">    1359 </span>            :         after_gap = 0;
+<span class="lineNum">    1360 </span>            :         dir = -1;       /* Opposite of brk() growth. */
+<span class="lineNum">    1361 </span>            : 
+<span class="lineNum">    1362 </span><span class="lineNoCov">          0 :         if (end - start &gt;= sz) {</span>
+<span class="lineNum">    1363 </span><span class="lineNoCov">          0 :                 if (uvm_addr_linsearch(map, uaddr, entry_out, addr_out,</span>
+<span class="lineNum">    1364 </span><span class="lineNoCov">          0 :                     0, sz, align, offset, dir, start, end - sz,</span>
+<span class="lineNum">    1365 </span><span class="lineNoCov">          0 :                     before_gap, after_gap) == 0)</span>
+<span class="lineNum">    1366 </span><span class="lineNoCov">          0 :                         return 0;</span>
+<span class="lineNum">    1367 </span>            :         }
+<span class="lineNum">    1368 </span>            : 
+<span class="lineNum">    1369 </span>            :         /* Set up stack search strategy. */
+<span class="lineNum">    1370 </span><span class="lineNoCov">          0 :         start = MAX(map-&gt;s_start, uaddr-&gt;uaddr_minaddr);</span>
+<span class="lineNum">    1371 </span><span class="lineNoCov">          0 :         end = MIN(map-&gt;s_end, uaddr-&gt;uaddr_maxaddr);</span>
+<span class="lineNum">    1372 </span><span class="lineNoCov">          0 :         before_gap = ((arc4random() &amp; 0x3) + 1) &lt;&lt; PAGE_SHIFT;</span>
+<span class="lineNum">    1373 </span><span class="lineNoCov">          0 :         after_gap = ((arc4random() &amp; 0x3) + 1) &lt;&lt; PAGE_SHIFT;</span>
+<span class="lineNum">    1374 </span>            : #ifdef MACHINE_STACK_GROWS_UP
+<span class="lineNum">    1375 </span>            :         dir = -1;
+<span class="lineNum">    1376 </span>            : #else
+<span class="lineNum">    1377 </span>            :         dir =  1;
+<span class="lineNum">    1378 </span>            : #endif
+<span class="lineNum">    1379 </span><span class="lineNoCov">          0 :         if (end - start &gt;= before_gap + after_gap &amp;&amp;</span>
+<span class="lineNum">    1380 </span><span class="lineNoCov">          0 :             end - start - before_gap - after_gap &gt;= sz) {</span>
+<span class="lineNum">    1381 </span><span class="lineNoCov">          0 :                 if (uvm_addr_linsearch(map, uaddr, entry_out, addr_out,</span>
+<span class="lineNum">    1382 </span><span class="lineNoCov">          0 :                     0, sz, align, offset, dir, start, end - sz,</span>
+<span class="lineNum">    1383 </span><span class="lineNoCov">          0 :                     before_gap, after_gap) == 0)</span>
+<span class="lineNum">    1384 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">    1385 </span>            :         }
+<span class="lineNum">    1386 </span>            : 
+<span class="lineNum">    1387 </span><span class="lineNoCov">          0 :         return ENOMEM;</span>
+<span class="lineNum">    1388 </span><span class="lineNoCov">          0 : }</span>
+<a name="1389"><span class="lineNum">    1389 </span>            : </a>
+<span class="lineNum">    1390 </span>            : struct uvm_addr_state *
+<span class="lineNum">    1391 </span><span class="lineNoCov">          0 : uaddr_stack_brk_create(vaddr_t minaddr, vaddr_t maxaddr)</span>
+<span class="lineNum">    1392 </span>            : {
+<span class="lineNum">    1393 </span>            :         struct uvm_addr_state* uaddr;
+<span class="lineNum">    1394 </span>            : 
+<span class="lineNum">    1395 </span><span class="lineNoCov">          0 :         uaddr = pool_get(&amp;uaddr_pool, PR_WAITOK);</span>
+<span class="lineNum">    1396 </span><span class="lineNoCov">          0 :         uaddr-&gt;uaddr_minaddr = minaddr;</span>
+<span class="lineNum">    1397 </span><span class="lineNoCov">          0 :         uaddr-&gt;uaddr_maxaddr = maxaddr;</span>
+<span class="lineNum">    1398 </span><span class="lineNoCov">          0 :         uaddr-&gt;uaddr_functions = &amp;uaddr_stack_brk_functions;</span>
+<span class="lineNum">    1399 </span><span class="lineNoCov">          0 :         return uaddr;</span>
+<span class="lineNum">    1400 </span>            : }
+<span class="lineNum">    1401 </span>            : #endif /* !SMALL_KERNEL */
+<span class="lineNum">    1402 </span>            : 
+<span class="lineNum">    1403 </span>            : 
+<span class="lineNum">    1404 </span>            : #ifndef SMALL_KERNEL
+<span class="lineNum">    1405 </span>            : /*
+<span class="lineNum">    1406 </span>            :  * Free space comparison.
+<span class="lineNum">    1407 </span>            :  * Compares smaller free-space before larger free-space.
+<a name="1408"><span class="lineNum">    1408 </span>            :  */</a>
+<span class="lineNum">    1409 </span>            : static inline int
+<span class="lineNum">    1410 </span><span class="lineNoCov">          0 : uvm_mapent_fspace_cmp(const struct vm_map_entry *e1,</span>
+<span class="lineNum">    1411 </span>            :     const struct vm_map_entry *e2)
+<span class="lineNum">    1412 </span>            : {
+<span class="lineNum">    1413 </span><span class="lineCov">       1030 :         if (e1-&gt;fspace != e2-&gt;fspace)</span>
+<span class="lineNum">    1414 </span><span class="lineCov">        370 :                 return (e1-&gt;fspace &lt; e2-&gt;fspace ? -1 : 1);</span>
+<span class="lineNum">    1415 </span><span class="lineCov">        660 :         return (e1-&gt;start &lt; e2-&gt;start ? -1 : e1-&gt;start &gt; e2-&gt;start);</span>
+<a name="1416"><span class="lineNum">    1416 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">    1417 </span>            : 
+<span class="lineNum">    1418 </span><span class="lineNoCov">          0 : RBT_GENERATE(uaddr_free_rbtree, vm_map_entry, dfree.rbtree,</span>
+<span class="lineNum">    1419 </span>            :     uvm_mapent_fspace_cmp);
+<span class="lineNum">    1420 </span>            : #endif /* !SMALL_KERNEL */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

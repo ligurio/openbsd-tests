@@ -1,0 +1,803 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - 6.4 - dev/pci/drm/i915/i915_gem_stolen.c</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">dev/pci/drm/i915</a> - i915_gem_stolen.c<span style="font-size: 80%;"> (source / <a href="i915_gem_stolen.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">6.4</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">294</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-10-19 03:25:38</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">18</td>
+            <td class="headerCovTableEntryLo">0.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Legend:</td>
+            <td class="headerValueLeg">            Lines:
+            <span class="coverLegendCov">hit</span>
+            <span class="coverLegendNoCov">not hit</span>
+</td>
+            <td></td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * Copyright © 2008-2012 Intel Corporation
+<span class="lineNum">       3 </span>            :  *
+<span class="lineNum">       4 </span>            :  * Permission is hereby granted, free of charge, to any person obtaining a
+<span class="lineNum">       5 </span>            :  * copy of this software and associated documentation files (the &quot;Software&quot;),
+<span class="lineNum">       6 </span>            :  * to deal in the Software without restriction, including without limitation
+<span class="lineNum">       7 </span>            :  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+<span class="lineNum">       8 </span>            :  * and/or sell copies of the Software, and to permit persons to whom the
+<span class="lineNum">       9 </span>            :  * Software is furnished to do so, subject to the following conditions:
+<span class="lineNum">      10 </span>            :  *
+<span class="lineNum">      11 </span>            :  * The above copyright notice and this permission notice (including the next
+<span class="lineNum">      12 </span>            :  * paragraph) shall be included in all copies or substantial portions of the
+<span class="lineNum">      13 </span>            :  * Software.
+<span class="lineNum">      14 </span>            :  *
+<span class="lineNum">      15 </span>            :  * THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+<span class="lineNum">      16 </span>            :  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+<span class="lineNum">      17 </span>            :  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+<span class="lineNum">      18 </span>            :  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+<span class="lineNum">      19 </span>            :  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+<span class="lineNum">      20 </span>            :  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+<span class="lineNum">      21 </span>            :  * IN THE SOFTWARE.
+<span class="lineNum">      22 </span>            :  *
+<span class="lineNum">      23 </span>            :  * Authors:
+<span class="lineNum">      24 </span>            :  *    Eric Anholt &lt;eric@anholt.net&gt;
+<span class="lineNum">      25 </span>            :  *    Chris Wilson &lt;chris@chris-wilson.co.uk&gt;
+<span class="lineNum">      26 </span>            :  *
+<span class="lineNum">      27 </span>            :  */
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span>            : #include &lt;dev/pci/drm/drmP.h&gt;
+<span class="lineNum">      30 </span>            : #include &lt;dev/pci/drm/i915_drm.h&gt;
+<span class="lineNum">      31 </span>            : #include &quot;i915_drv.h&quot;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            : #define KB(x) ((x) * 1024)
+<span class="lineNum">      34 </span>            : #define MB(x) (KB(x) * 1024)
+<span class="lineNum">      35 </span>            : 
+<span class="lineNum">      36 </span>            : /*
+<span class="lineNum">      37 </span>            :  * The BIOS typically reserves some of the system's memory for the exclusive
+<span class="lineNum">      38 </span>            :  * use of the integrated graphics. This memory is no longer available for
+<span class="lineNum">      39 </span>            :  * use by the OS and so the user finds that his system has less memory
+<span class="lineNum">      40 </span>            :  * available than he put in. We refer to this memory as stolen.
+<span class="lineNum">      41 </span>            :  *
+<span class="lineNum">      42 </span>            :  * The BIOS will allocate its framebuffer from the stolen memory. Our
+<span class="lineNum">      43 </span>            :  * goal is try to reuse that object for our own fbcon which must always
+<span class="lineNum">      44 </span>            :  * be available for panics. Anything else we can reuse the stolen memory
+<span class="lineNum">      45 </span>            :  * for is a boon.
+<a name="46"><span class="lineNum">      46 </span>            :  */</a>
+<span class="lineNum">      47 </span>            : 
+<span class="lineNum">      48 </span><span class="lineNoCov">          0 : int i915_gem_stolen_insert_node_in_range(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">      49 </span>            :                                          struct drm_mm_node *node, u64 size,
+<span class="lineNum">      50 </span>            :                                          unsigned alignment, u64 start, u64 end)
+<span class="lineNum">      51 </span>            : {
+<span class="lineNum">      52 </span>            :         int ret;
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span><span class="lineNoCov">          0 :         if (!drm_mm_initialized(&amp;dev_priv-&gt;mm.stolen))</span>
+<span class="lineNum">      55 </span><span class="lineNoCov">          0 :                 return -ENODEV;</span>
+<span class="lineNum">      56 </span>            : 
+<span class="lineNum">      57 </span>            :         /* See the comment at the drm_mm_init() call for more about this check.
+<span class="lineNum">      58 </span>            :          * WaSkipStolenMemoryFirstPage:bdw,chv (incomplete) */
+<span class="lineNum">      59 </span><span class="lineNoCov">          0 :         if (start &lt; 4096 &amp;&amp; (IS_GEN8(dev_priv) ||</span>
+<span class="lineNum">      60 </span><span class="lineNoCov">          0 :                         IS_KBL_REVID(dev_priv, 0, KBL_REVID_A0)))</span>
+<span class="lineNum">      61 </span><span class="lineNoCov">          0 :                 start = 4096;</span>
+<span class="lineNum">      62 </span>            : 
+<span class="lineNum">      63 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev_priv-&gt;mm.stolen_lock);</span>
+<span class="lineNum">      64 </span><span class="lineNoCov">          0 :         ret = drm_mm_insert_node_in_range(&amp;dev_priv-&gt;mm.stolen, node, size,</span>
+<span class="lineNum">      65 </span>            :                                           alignment, start, end,
+<span class="lineNum">      66 </span>            :                                           DRM_MM_SEARCH_DEFAULT);
+<span class="lineNum">      67 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev_priv-&gt;mm.stolen_lock);</span>
+<span class="lineNum">      68 </span>            : 
+<span class="lineNum">      69 </span><span class="lineNoCov">          0 :         return ret;</span>
+<a name="70"><span class="lineNum">      70 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">      71 </span>            : 
+<span class="lineNum">      72 </span><span class="lineNoCov">          0 : int i915_gem_stolen_insert_node(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">      73 </span>            :                                 struct drm_mm_node *node, u64 size,
+<span class="lineNum">      74 </span>            :                                 unsigned alignment)
+<span class="lineNum">      75 </span>            : {
+<span class="lineNum">      76 </span><span class="lineNoCov">          0 :         return i915_gem_stolen_insert_node_in_range(dev_priv, node, size,</span>
+<span class="lineNum">      77 </span>            :                                         alignment, 0,
+<span class="lineNum">      78 </span><span class="lineNoCov">          0 :                                         dev_priv-&gt;gtt.stolen_usable_size);</span>
+<a name="79"><span class="lineNum">      79 </span>            : }</a>
+<span class="lineNum">      80 </span>            : 
+<span class="lineNum">      81 </span><span class="lineNoCov">          0 : void i915_gem_stolen_remove_node(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">      82 </span>            :                                  struct drm_mm_node *node)
+<span class="lineNum">      83 </span>            : {
+<span class="lineNum">      84 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev_priv-&gt;mm.stolen_lock);</span>
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :         drm_mm_remove_node(node);</span>
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev_priv-&gt;mm.stolen_lock);</span>
+<a name="87"><span class="lineNum">      87 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 : static unsigned long i915_stolen_to_physical(struct drm_device *dev)</span>
+<span class="lineNum">      90 </span>            : {
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">      92 </span>            : #ifdef __linux__
+<span class="lineNum">      93 </span>            :         struct resource *r;
+<span class="lineNum">      94 </span>            : #endif
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :         u32 base;</span>
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span>            :         /* Almost universally we can find the Graphics Base of Stolen Memory
+<span class="lineNum">      98 </span>            :          * at offset 0x5c in the igfx configuration space. On a few (desktop)
+<span class="lineNum">      99 </span>            :          * machines this is also mirrored in the bridge device at different
+<span class="lineNum">     100 </span>            :          * locations, or in the MCHBAR.
+<span class="lineNum">     101 </span>            :          *
+<span class="lineNum">     102 </span>            :          * On 865 we just check the TOUD register.
+<span class="lineNum">     103 </span>            :          *
+<span class="lineNum">     104 </span>            :          * On 830/845/85x the stolen memory base isn't available in any
+<span class="lineNum">     105 </span>            :          * register. We need to calculate it as TOM-TSEG_SIZE-stolen_size.
+<span class="lineNum">     106 </span>            :          *
+<span class="lineNum">     107 </span>            :          */
+<span class="lineNum">     108 </span><span class="lineNoCov">          0 :         base = 0;</span>
+<span class="lineNum">     109 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev)-&gt;gen &gt;= 3) {</span>
+<span class="lineNum">     110 </span>            :                 /* Read Graphics Base of Stolen Memory directly */
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :                 pci_read_config_dword(dev-&gt;pdev, 0x5c, &amp;base);</span>
+<span class="lineNum">     112 </span><span class="lineNoCov">          0 :                 base &amp;= ~((1&lt;&lt;20) - 1);</span>
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :         } else if (IS_I865G(dev)) {</span>
+<span class="lineNum">     114 </span>            :                 u32 tseg_size = 0;
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :                 u16 toud = 0;</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :                 u8 tmp;</span>
+<span class="lineNum">     117 </span>            : 
+<span class="lineNum">     118 </span><span class="lineNoCov">          0 :                 pci_bus_read_config_byte(dev-&gt;pdev-&gt;bus, PCI_DEVFN(0, 0),</span>
+<span class="lineNum">     119 </span>            :                                          I845_ESMRAMC, &amp;tmp);
+<span class="lineNum">     120 </span>            : 
+<span class="lineNum">     121 </span><span class="lineNoCov">          0 :                 if (tmp &amp; TSEG_ENABLE) {</span>
+<span class="lineNum">     122 </span><span class="lineNoCov">          0 :                         switch (tmp &amp; I845_TSEG_SIZE_MASK) {</span>
+<span class="lineNum">     123 </span>            :                         case I845_TSEG_SIZE_512K:
+<span class="lineNum">     124 </span>            :                                 tseg_size = KB(512);
+<span class="lineNum">     125 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     126 </span>            :                         case I845_TSEG_SIZE_1M:
+<span class="lineNum">     127 </span>            :                                 tseg_size = MB(1);
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     129 </span>            :                         }
+<span class="lineNum">     130 </span>            :                 }
+<span class="lineNum">     131 </span>            : 
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :                 pci_bus_read_config_word(dev-&gt;pdev-&gt;bus, PCI_DEVFN(0, 0),</span>
+<span class="lineNum">     133 </span>            :                                          I865_TOUD, &amp;toud);
+<span class="lineNum">     134 </span>            : 
+<span class="lineNum">     135 </span><span class="lineNoCov">          0 :                 base = (toud &lt;&lt; 16) + tseg_size;</span>
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :         } else if (IS_I85X(dev)) {</span>
+<span class="lineNum">     137 </span>            :                 u32 tseg_size = 0;
+<span class="lineNum">     138 </span>            :                 u32 tom;
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :                 u8 tmp;</span>
+<span class="lineNum">     140 </span>            : 
+<span class="lineNum">     141 </span><span class="lineNoCov">          0 :                 pci_bus_read_config_byte(dev-&gt;pdev-&gt;bus, PCI_DEVFN(0, 0),</span>
+<span class="lineNum">     142 </span>            :                                          I85X_ESMRAMC, &amp;tmp);
+<span class="lineNum">     143 </span>            : 
+<span class="lineNum">     144 </span><span class="lineNoCov">          0 :                 if (tmp &amp; TSEG_ENABLE)</span>
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :                         tseg_size = MB(1);</span>
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :                 pci_bus_read_config_byte(dev-&gt;pdev-&gt;bus, PCI_DEVFN(0, 1),</span>
+<span class="lineNum">     148 </span>            :                                          I85X_DRB3, &amp;tmp);
+<span class="lineNum">     149 </span><span class="lineNoCov">          0 :                 tom = tmp * MB(32);</span>
+<span class="lineNum">     150 </span>            : 
+<span class="lineNum">     151 </span><span class="lineNoCov">          0 :                 base = tom - tseg_size - dev_priv-&gt;gtt.stolen_size;</span>
+<span class="lineNum">     152 </span><span class="lineNoCov">          0 :         } else if (IS_845G(dev)) {</span>
+<span class="lineNum">     153 </span>            :                 u32 tseg_size = 0;
+<span class="lineNum">     154 </span>            :                 u32 tom;
+<span class="lineNum">     155 </span><span class="lineNoCov">          0 :                 u8 tmp;</span>
+<span class="lineNum">     156 </span>            : 
+<span class="lineNum">     157 </span><span class="lineNoCov">          0 :                 pci_bus_read_config_byte(dev-&gt;pdev-&gt;bus, PCI_DEVFN(0, 0),</span>
+<span class="lineNum">     158 </span>            :                                          I845_ESMRAMC, &amp;tmp);
+<span class="lineNum">     159 </span>            : 
+<span class="lineNum">     160 </span><span class="lineNoCov">          0 :                 if (tmp &amp; TSEG_ENABLE) {</span>
+<span class="lineNum">     161 </span><span class="lineNoCov">          0 :                         switch (tmp &amp; I845_TSEG_SIZE_MASK) {</span>
+<span class="lineNum">     162 </span>            :                         case I845_TSEG_SIZE_512K:
+<span class="lineNum">     163 </span>            :                                 tseg_size = KB(512);
+<span class="lineNum">     164 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     165 </span>            :                         case I845_TSEG_SIZE_1M:
+<span class="lineNum">     166 </span>            :                                 tseg_size = MB(1);
+<span class="lineNum">     167 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     168 </span>            :                         }
+<span class="lineNum">     169 </span>            :                 }
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span><span class="lineNoCov">          0 :                 pci_bus_read_config_byte(dev-&gt;pdev-&gt;bus, PCI_DEVFN(0, 0),</span>
+<span class="lineNum">     172 </span>            :                                          I830_DRB3, &amp;tmp);
+<span class="lineNum">     173 </span><span class="lineNoCov">          0 :                 tom = tmp * MB(32);</span>
+<span class="lineNum">     174 </span>            : 
+<span class="lineNum">     175 </span><span class="lineNoCov">          0 :                 base = tom - tseg_size - dev_priv-&gt;gtt.stolen_size;</span>
+<span class="lineNum">     176 </span><span class="lineNoCov">          0 :         } else if (IS_I830(dev)) {</span>
+<span class="lineNum">     177 </span>            :                 u32 tseg_size = 0;
+<span class="lineNum">     178 </span>            :                 u32 tom;
+<span class="lineNum">     179 </span><span class="lineNoCov">          0 :                 u8 tmp;</span>
+<span class="lineNum">     180 </span>            : 
+<span class="lineNum">     181 </span><span class="lineNoCov">          0 :                 pci_bus_read_config_byte(dev-&gt;pdev-&gt;bus, PCI_DEVFN(0, 0),</span>
+<span class="lineNum">     182 </span>            :                                          I830_ESMRAMC, &amp;tmp);
+<span class="lineNum">     183 </span>            : 
+<span class="lineNum">     184 </span><span class="lineNoCov">          0 :                 if (tmp &amp; TSEG_ENABLE) {</span>
+<span class="lineNum">     185 </span><span class="lineNoCov">          0 :                         if (tmp &amp; I830_TSEG_SIZE_1M)</span>
+<span class="lineNum">     186 </span><span class="lineNoCov">          0 :                                 tseg_size = MB(1);</span>
+<span class="lineNum">     187 </span>            :                         else
+<span class="lineNum">     188 </span>            :                                 tseg_size = KB(512);
+<span class="lineNum">     189 </span>            :                 }
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span><span class="lineNoCov">          0 :                 pci_bus_read_config_byte(dev-&gt;pdev-&gt;bus, PCI_DEVFN(0, 0),</span>
+<span class="lineNum">     192 </span>            :                                          I830_DRB3, &amp;tmp);
+<span class="lineNum">     193 </span><span class="lineNoCov">          0 :                 tom = tmp * MB(32);</span>
+<span class="lineNum">     194 </span>            : 
+<span class="lineNum">     195 </span><span class="lineNoCov">          0 :                 base = tom - tseg_size - dev_priv-&gt;gtt.stolen_size;</span>
+<span class="lineNum">     196 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     197 </span>            : 
+<span class="lineNum">     198 </span><span class="lineNoCov">          0 :         if (base == 0)</span>
+<span class="lineNum">     199 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     200 </span>            : 
+<span class="lineNum">     201 </span>            :         /* make sure we don't clobber the GTT if it's within stolen memory */
+<span class="lineNum">     202 </span><span class="lineNoCov">          0 :         if (INTEL_INFO(dev)-&gt;gen &lt;= 4 &amp;&amp; !IS_G33(dev) &amp;&amp; !IS_G4X(dev)) {</span>
+<span class="lineNum">     203 </span>            :                 struct {
+<span class="lineNum">     204 </span>            :                         u32 start, end;
+<span class="lineNum">     205 </span>            :                 } stolen[2] = {
+<span class="lineNum">     206 </span><span class="lineNoCov">          0 :                         { .start = base, .end = base + dev_priv-&gt;gtt.stolen_size, },</span>
+<span class="lineNum">     207 </span>            :                         { .start = base, .end = base + dev_priv-&gt;gtt.stolen_size, },
+<span class="lineNum">     208 </span>            :                 };
+<span class="lineNum">     209 </span>            :                 u64 gtt_start, gtt_end;
+<span class="lineNum">     210 </span>            : 
+<span class="lineNum">     211 </span><span class="lineNoCov">          0 :                 gtt_start = I915_READ(PGTBL_CTL);</span>
+<span class="lineNum">     212 </span><span class="lineNoCov">          0 :                 if (IS_GEN4(dev))</span>
+<span class="lineNum">     213 </span><span class="lineNoCov">          0 :                         gtt_start = (gtt_start &amp; PGTBL_ADDRESS_LO_MASK) |</span>
+<span class="lineNum">     214 </span><span class="lineNoCov">          0 :                                 (gtt_start &amp; PGTBL_ADDRESS_HI_MASK) &lt;&lt; 28;</span>
+<span class="lineNum">     215 </span>            :                 else
+<span class="lineNum">     216 </span>            :                         gtt_start &amp;= PGTBL_ADDRESS_LO_MASK;
+<span class="lineNum">     217 </span><span class="lineNoCov">          0 :                 gtt_end = gtt_start + gtt_total_entries(dev_priv-&gt;gtt) * 4;</span>
+<span class="lineNum">     218 </span>            : 
+<span class="lineNum">     219 </span><span class="lineNoCov">          0 :                 if (gtt_start &gt;= stolen[0].start &amp;&amp; gtt_start &lt; stolen[0].end)</span>
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :                         stolen[0].end = gtt_start;</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                 if (gtt_end &gt; stolen[1].start &amp;&amp; gtt_end &lt;= stolen[1].end)</span>
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :                         stolen[1].start = gtt_end;</span>
+<span class="lineNum">     223 </span>            : 
+<span class="lineNum">     224 </span>            :                 /* pick the larger of the two chunks */
+<span class="lineNum">     225 </span><span class="lineNoCov">          0 :                 if (stolen[0].end - stolen[0].start &gt;</span>
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                     stolen[1].end - stolen[1].start) {</span>
+<span class="lineNum">     227 </span><span class="lineNoCov">          0 :                         base = stolen[0].start;</span>
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                         dev_priv-&gt;gtt.stolen_size = stolen[0].end - stolen[0].start;</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                 } else {</span>
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :                         base = stolen[1].start;</span>
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                         dev_priv-&gt;gtt.stolen_size = stolen[1].end - stolen[1].start;</span>
+<span class="lineNum">     232 </span>            :                 }
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span>            :                 if (stolen[0].start != stolen[1].start ||
+<span class="lineNum">     235 </span>            :                     stolen[0].end != stolen[1].end) {
+<span class="lineNum">     236 </span>            :                         DRM_DEBUG_KMS(&quot;GTT within stolen memory at 0x%llx-0x%llx\n&quot;,
+<span class="lineNum">     237 </span>            :                                       (unsigned long long) gtt_start,
+<span class="lineNum">     238 </span>            :                                       (unsigned long long) gtt_end - 1);
+<span class="lineNum">     239 </span>            :                         DRM_DEBUG_KMS(&quot;Stolen memory adjusted to 0x%x-0x%x\n&quot;,
+<span class="lineNum">     240 </span>            :                                       base, base + (u32) dev_priv-&gt;gtt.stolen_size - 1);
+<span class="lineNum">     241 </span>            :                 }
+<span class="lineNum">     242 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     243 </span>            : 
+<span class="lineNum">     244 </span>            : 
+<span class="lineNum">     245 </span>            : #ifdef __linux__
+<span class="lineNum">     246 </span>            :         /* Verify that nothing else uses this physical address. Stolen
+<span class="lineNum">     247 </span>            :          * memory should be reserved by the BIOS and hidden from the
+<span class="lineNum">     248 </span>            :          * kernel. So if the region is already marked as busy, something
+<span class="lineNum">     249 </span>            :          * is seriously wrong.
+<span class="lineNum">     250 </span>            :          */
+<span class="lineNum">     251 </span>            :         r = devm_request_mem_region(dev-&gt;dev, base, dev_priv-&gt;gtt.stolen_size,
+<span class="lineNum">     252 </span>            :                                     &quot;Graphics Stolen Memory&quot;);
+<span class="lineNum">     253 </span>            :         if (r == NULL) {
+<span class="lineNum">     254 </span>            :                 /*
+<span class="lineNum">     255 </span>            :                  * One more attempt but this time requesting region from
+<span class="lineNum">     256 </span>            :                  * base + 1, as we have seen that this resolves the region
+<span class="lineNum">     257 </span>            :                  * conflict with the PCI Bus.
+<span class="lineNum">     258 </span>            :                  * This is a BIOS w/a: Some BIOS wrap stolen in the root
+<span class="lineNum">     259 </span>            :                  * PCI bus, but have an off-by-one error. Hence retry the
+<span class="lineNum">     260 </span>            :                  * reservation starting from 1 instead of 0.
+<span class="lineNum">     261 </span>            :                  */
+<span class="lineNum">     262 </span>            :                 r = devm_request_mem_region(dev-&gt;dev, base + 1,
+<span class="lineNum">     263 </span>            :                                             dev_priv-&gt;gtt.stolen_size - 1,
+<span class="lineNum">     264 </span>            :                                             &quot;Graphics Stolen Memory&quot;);
+<span class="lineNum">     265 </span>            :                 /*
+<span class="lineNum">     266 </span>            :                  * GEN3 firmware likes to smash pci bridges into the stolen
+<span class="lineNum">     267 </span>            :                  * range. Apparently this works.
+<span class="lineNum">     268 </span>            :                  */
+<span class="lineNum">     269 </span>            :                 if (r == NULL &amp;&amp; !IS_GEN3(dev)) {
+<span class="lineNum">     270 </span>            :                         DRM_ERROR(&quot;conflict detected with stolen region: [0x%08x - 0x%08x]\n&quot;,
+<span class="lineNum">     271 </span>            :                                   base, base + (uint32_t)dev_priv-&gt;gtt.stolen_size);
+<span class="lineNum">     272 </span>            :                         base = 0;
+<span class="lineNum">     273 </span>            :                 }
+<span class="lineNum">     274 </span>            :         }
+<span class="lineNum">     275 </span>            : #endif
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span><span class="lineNoCov">          0 :         return base;</span>
+<a name="278"><span class="lineNum">     278 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span><span class="lineNoCov">          0 : void i915_gem_cleanup_stolen(struct drm_device *dev)</span>
+<span class="lineNum">     281 </span>            : {
+<span class="lineNum">     282 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     283 </span>            : 
+<span class="lineNum">     284 </span><span class="lineNoCov">          0 :         if (!drm_mm_initialized(&amp;dev_priv-&gt;mm.stolen))</span>
+<span class="lineNum">     285 </span><span class="lineNoCov">          0 :                 return;</span>
+<span class="lineNum">     286 </span>            : 
+<span class="lineNum">     287 </span><span class="lineNoCov">          0 :         drm_mm_takedown(&amp;dev_priv-&gt;mm.stolen);</span>
+<a name="288"><span class="lineNum">     288 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     289 </span>            : 
+<span class="lineNum">     290 </span><span class="lineNoCov">          0 : static void g4x_get_stolen_reserved(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">     291 </span>            :                                     unsigned long *base, unsigned long *size)
+<span class="lineNum">     292 </span>            : {
+<span class="lineNum">     293 </span><span class="lineNoCov">          0 :         uint32_t reg_val = I915_READ(IS_GM45(dev_priv) ?</span>
+<span class="lineNum">     294 </span>            :                                      CTG_STOLEN_RESERVED :
+<span class="lineNum">     295 </span>            :                                      ELK_STOLEN_RESERVED);
+<span class="lineNum">     296 </span><span class="lineNoCov">          0 :         unsigned long stolen_top = dev_priv-&gt;mm.stolen_base +</span>
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :                 dev_priv-&gt;gtt.stolen_size;</span>
+<span class="lineNum">     298 </span>            : 
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :         *base = (reg_val &amp; G4X_STOLEN_RESERVED_ADDR2_MASK) &lt;&lt; 16;</span>
+<span class="lineNum">     300 </span>            : 
+<span class="lineNum">     301 </span><span class="lineNoCov">          0 :         WARN_ON((reg_val &amp; G4X_STOLEN_RESERVED_ADDR1_MASK) &lt; *base);</span>
+<span class="lineNum">     302 </span>            : 
+<span class="lineNum">     303 </span>            :         /* On these platforms, the register doesn't have a size field, so the
+<span class="lineNum">     304 </span>            :          * size is the distance between the base and the top of the stolen
+<span class="lineNum">     305 </span>            :          * memory. We also have the genuine case where base is zero and there's
+<span class="lineNum">     306 </span>            :          * nothing reserved. */
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :         if (*base == 0)</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :                 *size = 0;</span>
+<span class="lineNum">     309 </span>            :         else
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :                 *size = stolen_top - *base;</span>
+<a name="311"><span class="lineNum">     311 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     312 </span>            : 
+<span class="lineNum">     313 </span><span class="lineNoCov">          0 : static void gen6_get_stolen_reserved(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">     314 </span>            :                                      unsigned long *base, unsigned long *size)
+<span class="lineNum">     315 </span>            : {
+<span class="lineNum">     316 </span><span class="lineNoCov">          0 :         uint32_t reg_val = I915_READ(GEN6_STOLEN_RESERVED);</span>
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span><span class="lineNoCov">          0 :         *base = reg_val &amp; GEN6_STOLEN_RESERVED_ADDR_MASK;</span>
+<span class="lineNum">     319 </span>            : 
+<span class="lineNum">     320 </span><span class="lineNoCov">          0 :         switch (reg_val &amp; GEN6_STOLEN_RESERVED_SIZE_MASK) {</span>
+<span class="lineNum">     321 </span>            :         case GEN6_STOLEN_RESERVED_1M:
+<span class="lineNum">     322 </span><span class="lineNoCov">          0 :                 *size = 1024 * 1024;</span>
+<span class="lineNum">     323 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     324 </span>            :         case GEN6_STOLEN_RESERVED_512K:
+<span class="lineNum">     325 </span><span class="lineNoCov">          0 :                 *size = 512 * 1024;</span>
+<span class="lineNum">     326 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     327 </span>            :         case GEN6_STOLEN_RESERVED_256K:
+<span class="lineNum">     328 </span><span class="lineNoCov">          0 :                 *size = 256 * 1024;</span>
+<span class="lineNum">     329 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     330 </span>            :         case GEN6_STOLEN_RESERVED_128K:
+<span class="lineNum">     331 </span><span class="lineNoCov">          0 :                 *size = 128 * 1024;</span>
+<span class="lineNum">     332 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     333 </span>            :         default:
+<span class="lineNum">     334 </span>            :                 *size = 1024 * 1024;
+<span class="lineNum">     335 </span>            :                 MISSING_CASE(reg_val &amp; GEN6_STOLEN_RESERVED_SIZE_MASK);
+<span class="lineNum">     336 </span>            :         }
+<a name="337"><span class="lineNum">     337 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     338 </span>            : 
+<span class="lineNum">     339 </span><span class="lineNoCov">          0 : static void gen7_get_stolen_reserved(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">     340 </span>            :                                      unsigned long *base, unsigned long *size)
+<span class="lineNum">     341 </span>            : {
+<span class="lineNum">     342 </span><span class="lineNoCov">          0 :         uint32_t reg_val = I915_READ(GEN6_STOLEN_RESERVED);</span>
+<span class="lineNum">     343 </span>            : 
+<span class="lineNum">     344 </span><span class="lineNoCov">          0 :         *base = reg_val &amp; GEN7_STOLEN_RESERVED_ADDR_MASK;</span>
+<span class="lineNum">     345 </span>            : 
+<span class="lineNum">     346 </span><span class="lineNoCov">          0 :         switch (reg_val &amp; GEN7_STOLEN_RESERVED_SIZE_MASK) {</span>
+<span class="lineNum">     347 </span>            :         case GEN7_STOLEN_RESERVED_1M:
+<span class="lineNum">     348 </span><span class="lineNoCov">          0 :                 *size = 1024 * 1024;</span>
+<span class="lineNum">     349 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     350 </span>            :         case GEN7_STOLEN_RESERVED_256K:
+<span class="lineNum">     351 </span><span class="lineNoCov">          0 :                 *size = 256 * 1024;</span>
+<span class="lineNum">     352 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     353 </span>            :         default:
+<span class="lineNum">     354 </span>            :                 *size = 1024 * 1024;
+<span class="lineNum">     355 </span>            :                 MISSING_CASE(reg_val &amp; GEN7_STOLEN_RESERVED_SIZE_MASK);
+<span class="lineNum">     356 </span>            :         }
+<a name="357"><span class="lineNum">     357 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     358 </span>            : 
+<span class="lineNum">     359 </span><span class="lineNoCov">          0 : static void gen8_get_stolen_reserved(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">     360 </span>            :                                      unsigned long *base, unsigned long *size)
+<span class="lineNum">     361 </span>            : {
+<span class="lineNum">     362 </span><span class="lineNoCov">          0 :         uint32_t reg_val = I915_READ(GEN6_STOLEN_RESERVED);</span>
+<span class="lineNum">     363 </span>            : 
+<span class="lineNum">     364 </span><span class="lineNoCov">          0 :         *base = reg_val &amp; GEN6_STOLEN_RESERVED_ADDR_MASK;</span>
+<span class="lineNum">     365 </span>            : 
+<span class="lineNum">     366 </span><span class="lineNoCov">          0 :         switch (reg_val &amp; GEN8_STOLEN_RESERVED_SIZE_MASK) {</span>
+<span class="lineNum">     367 </span>            :         case GEN8_STOLEN_RESERVED_1M:
+<span class="lineNum">     368 </span><span class="lineNoCov">          0 :                 *size = 1024 * 1024;</span>
+<span class="lineNum">     369 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     370 </span>            :         case GEN8_STOLEN_RESERVED_2M:
+<span class="lineNum">     371 </span><span class="lineNoCov">          0 :                 *size = 2 * 1024 * 1024;</span>
+<span class="lineNum">     372 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     373 </span>            :         case GEN8_STOLEN_RESERVED_4M:
+<span class="lineNum">     374 </span><span class="lineNoCov">          0 :                 *size = 4 * 1024 * 1024;</span>
+<span class="lineNum">     375 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     376 </span>            :         case GEN8_STOLEN_RESERVED_8M:
+<span class="lineNum">     377 </span><span class="lineNoCov">          0 :                 *size = 8 * 1024 * 1024;</span>
+<span class="lineNum">     378 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     379 </span>            :         default:
+<span class="lineNum">     380 </span>            :                 *size = 8 * 1024 * 1024;
+<span class="lineNum">     381 </span>            :                 MISSING_CASE(reg_val &amp; GEN8_STOLEN_RESERVED_SIZE_MASK);
+<span class="lineNum">     382 </span>            :         }
+<a name="383"><span class="lineNum">     383 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     384 </span>            : 
+<span class="lineNum">     385 </span><span class="lineNoCov">          0 : static void bdw_get_stolen_reserved(struct drm_i915_private *dev_priv,</span>
+<span class="lineNum">     386 </span>            :                                     unsigned long *base, unsigned long *size)
+<span class="lineNum">     387 </span>            : {
+<span class="lineNum">     388 </span><span class="lineNoCov">          0 :         uint32_t reg_val = I915_READ(GEN6_STOLEN_RESERVED);</span>
+<span class="lineNum">     389 </span>            :         unsigned long stolen_top;
+<span class="lineNum">     390 </span>            : 
+<span class="lineNum">     391 </span><span class="lineNoCov">          0 :         stolen_top = dev_priv-&gt;mm.stolen_base + dev_priv-&gt;gtt.stolen_size;</span>
+<span class="lineNum">     392 </span>            : 
+<span class="lineNum">     393 </span><span class="lineNoCov">          0 :         *base = reg_val &amp; GEN6_STOLEN_RESERVED_ADDR_MASK;</span>
+<span class="lineNum">     394 </span>            : 
+<span class="lineNum">     395 </span>            :         /* On these platforms, the register doesn't have a size field, so the
+<span class="lineNum">     396 </span>            :          * size is the distance between the base and the top of the stolen
+<span class="lineNum">     397 </span>            :          * memory. We also have the genuine case where base is zero and there's
+<span class="lineNum">     398 </span>            :          * nothing reserved. */
+<span class="lineNum">     399 </span><span class="lineNoCov">          0 :         if (*base == 0)</span>
+<span class="lineNum">     400 </span><span class="lineNoCov">          0 :                 *size = 0;</span>
+<span class="lineNum">     401 </span>            :         else
+<span class="lineNum">     402 </span><span class="lineNoCov">          0 :                 *size = stolen_top - *base;</span>
+<a name="403"><span class="lineNum">     403 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     404 </span>            : 
+<span class="lineNum">     405 </span><span class="lineNoCov">          0 : int i915_gem_init_stolen(struct drm_device *dev)</span>
+<span class="lineNum">     406 </span>            : {
+<span class="lineNum">     407 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     408 </span><span class="lineNoCov">          0 :         unsigned long reserved_total, reserved_base = 0, reserved_size;</span>
+<span class="lineNum">     409 </span>            :         unsigned long stolen_top;
+<span class="lineNum">     410 </span>            : 
+<span class="lineNum">     411 </span><span class="lineNoCov">          0 :         rw_init(&amp;dev_priv-&gt;mm.stolen_lock, &quot;stln&quot;);</span>
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span>            : #ifdef CONFIG_INTEL_IOMMU
+<span class="lineNum">     414 </span>            :         if (intel_iommu_gfx_mapped &amp;&amp; INTEL_INFO(dev)-&gt;gen &lt; 8) {
+<span class="lineNum">     415 </span>            :                 DRM_INFO(&quot;DMAR active, disabling use of stolen memory\n&quot;);
+<span class="lineNum">     416 </span>            :                 return 0;
+<span class="lineNum">     417 </span>            :         }
+<span class="lineNum">     418 </span>            : #endif
+<span class="lineNum">     419 </span>            : 
+<span class="lineNum">     420 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;gtt.stolen_size == 0)</span>
+<span class="lineNum">     421 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     422 </span>            : 
+<span class="lineNum">     423 </span><span class="lineNoCov">          0 :         dev_priv-&gt;mm.stolen_base = i915_stolen_to_physical(dev);</span>
+<span class="lineNum">     424 </span><span class="lineNoCov">          0 :         if (dev_priv-&gt;mm.stolen_base == 0)</span>
+<span class="lineNum">     425 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     426 </span>            : 
+<span class="lineNum">     427 </span><span class="lineNoCov">          0 :         stolen_top = dev_priv-&gt;mm.stolen_base + dev_priv-&gt;gtt.stolen_size;</span>
+<span class="lineNum">     428 </span>            : 
+<span class="lineNum">     429 </span><span class="lineNoCov">          0 :         switch (INTEL_INFO(dev_priv)-&gt;gen) {</span>
+<span class="lineNum">     430 </span>            :         case 2:
+<span class="lineNum">     431 </span>            :         case 3:
+<span class="lineNum">     432 </span>            :                 break;
+<span class="lineNum">     433 </span>            :         case 4:
+<span class="lineNum">     434 </span><span class="lineNoCov">          0 :                 if (IS_G4X(dev))</span>
+<span class="lineNum">     435 </span><span class="lineNoCov">          0 :                         g4x_get_stolen_reserved(dev_priv, &amp;reserved_base,</span>
+<span class="lineNum">     436 </span>            :                                                 &amp;reserved_size);
+<span class="lineNum">     437 </span>            :                 break;
+<span class="lineNum">     438 </span>            :         case 5:
+<span class="lineNum">     439 </span>            :                 /* Assume the gen6 maximum for the older platforms. */
+<span class="lineNum">     440 </span><span class="lineNoCov">          0 :                 reserved_size = 1024 * 1024;</span>
+<span class="lineNum">     441 </span><span class="lineNoCov">          0 :                 reserved_base = stolen_top - reserved_size;</span>
+<span class="lineNum">     442 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     443 </span>            :         case 6:
+<span class="lineNum">     444 </span><span class="lineNoCov">          0 :                 gen6_get_stolen_reserved(dev_priv, &amp;reserved_base,</span>
+<span class="lineNum">     445 </span>            :                                          &amp;reserved_size);
+<span class="lineNum">     446 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     447 </span>            :         case 7:
+<span class="lineNum">     448 </span><span class="lineNoCov">          0 :                 gen7_get_stolen_reserved(dev_priv, &amp;reserved_base,</span>
+<span class="lineNum">     449 </span>            :                                          &amp;reserved_size);
+<span class="lineNum">     450 </span><span class="lineNoCov">          0 :                 break;</span>
+<span class="lineNum">     451 </span>            :         default:
+<span class="lineNum">     452 </span><span class="lineNoCov">          0 :                 if (IS_BROADWELL(dev_priv) ||</span>
+<span class="lineNum">     453 </span><span class="lineNoCov">          0 :                     IS_SKYLAKE(dev_priv) || IS_KABYLAKE(dev))</span>
+<span class="lineNum">     454 </span><span class="lineNoCov">          0 :                         bdw_get_stolen_reserved(dev_priv, &amp;reserved_base,</span>
+<span class="lineNum">     455 </span>            :                                                 &amp;reserved_size);
+<span class="lineNum">     456 </span>            :                 else
+<span class="lineNum">     457 </span><span class="lineNoCov">          0 :                         gen8_get_stolen_reserved(dev_priv, &amp;reserved_base,</span>
+<span class="lineNum">     458 </span>            :                                                  &amp;reserved_size);
+<span class="lineNum">     459 </span>            :                 break;
+<span class="lineNum">     460 </span>            :         }
+<span class="lineNum">     461 </span>            : 
+<span class="lineNum">     462 </span>            :         /* It is possible for the reserved base to be zero, but the register
+<span class="lineNum">     463 </span>            :          * field for size doesn't have a zero option. */
+<span class="lineNum">     464 </span><span class="lineNoCov">          0 :         if (reserved_base == 0) {</span>
+<span class="lineNum">     465 </span><span class="lineNoCov">          0 :                 reserved_size = 0;</span>
+<span class="lineNum">     466 </span><span class="lineNoCov">          0 :                 reserved_base = stolen_top;</span>
+<span class="lineNum">     467 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     468 </span>            : 
+<span class="lineNum">     469 </span><span class="lineNoCov">          0 :         if (reserved_base &lt; dev_priv-&gt;mm.stolen_base ||</span>
+<span class="lineNum">     470 </span><span class="lineNoCov">          0 :             reserved_base + reserved_size &gt; stolen_top) {</span>
+<span class="lineNum">     471 </span>            :                 DRM_DEBUG_KMS(&quot;Stolen reserved area [0x%08lx - 0x%08lx] outside stolen memory [0x%08lx - 0x%08lx]\n&quot;,
+<span class="lineNum">     472 </span>            :                               reserved_base, reserved_base + reserved_size,
+<span class="lineNum">     473 </span>            :                               dev_priv-&gt;mm.stolen_base, stolen_top);
+<span class="lineNum">     474 </span><span class="lineNoCov">          0 :                 return 0;</span>
+<span class="lineNum">     475 </span>            :         }
+<span class="lineNum">     476 </span>            : 
+<span class="lineNum">     477 </span>            :         /* It is possible for the reserved area to end before the end of stolen
+<span class="lineNum">     478 </span>            :          * memory, so just consider the start. */
+<span class="lineNum">     479 </span><span class="lineNoCov">          0 :         reserved_total = stolen_top - reserved_base;</span>
+<span class="lineNum">     480 </span>            : 
+<span class="lineNum">     481 </span>            :         DRM_DEBUG_KMS(&quot;Memory reserved for graphics device: %zuK, usable: %luK\n&quot;,
+<span class="lineNum">     482 </span>            :                       dev_priv-&gt;gtt.stolen_size &gt;&gt; 10,
+<span class="lineNum">     483 </span>            :                       (dev_priv-&gt;gtt.stolen_size - reserved_total) &gt;&gt; 10);
+<span class="lineNum">     484 </span>            : 
+<span class="lineNum">     485 </span><span class="lineNoCov">          0 :         dev_priv-&gt;gtt.stolen_usable_size = dev_priv-&gt;gtt.stolen_size -</span>
+<span class="lineNum">     486 </span>            :                                            reserved_total;
+<span class="lineNum">     487 </span>            : 
+<span class="lineNum">     488 </span>            :         /*
+<span class="lineNum">     489 </span>            :          * Basic memrange allocator for stolen space.
+<span class="lineNum">     490 </span>            :          *
+<span class="lineNum">     491 </span>            :          * TODO: Notice that some platforms require us to not use the first page
+<span class="lineNum">     492 </span>            :          * of the stolen memory but their BIOSes may still put the framebuffer
+<span class="lineNum">     493 </span>            :          * on the first page. So we don't reserve this page for now because of
+<span class="lineNum">     494 </span>            :          * that. Our current solution is to just prevent new nodes from being
+<span class="lineNum">     495 </span>            :          * inserted on the first page - see the check we have at
+<span class="lineNum">     496 </span>            :          * i915_gem_stolen_insert_node_in_range(). We may want to fix the fbcon
+<span class="lineNum">     497 </span>            :          * problem later.
+<span class="lineNum">     498 </span>            :          */
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :         drm_mm_init(&amp;dev_priv-&gt;mm.stolen, 0, dev_priv-&gt;gtt.stolen_usable_size);</span>
+<span class="lineNum">     500 </span>            : 
+<span class="lineNum">     501 </span><span class="lineNoCov">          0 :         return 0;</span>
+<span class="lineNum">     502 </span><span class="lineNoCov">          0 : }</span>
+<a name="503"><span class="lineNum">     503 </span>            : </a>
+<span class="lineNum">     504 </span>            : static struct sg_table *
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 : i915_pages_create_for_stolen(struct drm_device *dev,</span>
+<span class="lineNum">     506 </span>            :                              u32 offset, u32 size)
+<span class="lineNum">     507 </span>            : {
+<span class="lineNum">     508 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     509 </span>            :         struct sg_table *st;
+<span class="lineNum">     510 </span>            :         struct scatterlist *sg;
+<span class="lineNum">     511 </span>            : 
+<span class="lineNum">     512 </span>            :         DRM_DEBUG_DRIVER(&quot;offset=0x%x, size=%d\n&quot;, offset, size);
+<span class="lineNum">     513 </span><span class="lineNoCov">          0 :         BUG_ON(offset &gt; dev_priv-&gt;gtt.stolen_size - size);</span>
+<span class="lineNum">     514 </span>            : 
+<span class="lineNum">     515 </span>            :         /* We hide that we have no struct page backing our stolen object
+<span class="lineNum">     516 </span>            :          * by wrapping the contiguous physical allocation with a fake
+<span class="lineNum">     517 </span>            :          * dma mapping in a single scatterlist.
+<span class="lineNum">     518 </span>            :          */
+<span class="lineNum">     519 </span>            : 
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         st = kmalloc(sizeof(*st), GFP_KERNEL);</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :         if (st == NULL)</span>
+<span class="lineNum">     522 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     523 </span>            : 
+<span class="lineNum">     524 </span><span class="lineNoCov">          0 :         if (sg_alloc_table(st, 1, GFP_KERNEL)) {</span>
+<span class="lineNum">     525 </span><span class="lineNoCov">          0 :                 kfree(st);</span>
+<span class="lineNum">     526 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     527 </span>            :         }
+<span class="lineNum">     528 </span>            : 
+<span class="lineNum">     529 </span><span class="lineNoCov">          0 :         sg = st-&gt;sgl;</span>
+<span class="lineNum">     530 </span><span class="lineNoCov">          0 :         sg-&gt;offset = 0;</span>
+<span class="lineNum">     531 </span><span class="lineNoCov">          0 :         sg-&gt;length = size;</span>
+<span class="lineNum">     532 </span>            : 
+<span class="lineNum">     533 </span><span class="lineNoCov">          0 :         sg_dma_address(sg) = (dma_addr_t)dev_priv-&gt;mm.stolen_base + offset;</span>
+<span class="lineNum">     534 </span><span class="lineNoCov">          0 :         sg_dma_len(sg) = size;</span>
+<span class="lineNum">     535 </span>            : 
+<span class="lineNum">     536 </span><span class="lineNoCov">          0 :         return st;</span>
+<a name="537"><span class="lineNum">     537 </span><span class="lineNoCov">          0 : }</span></a>
+<span class="lineNum">     538 </span>            : 
+<span class="lineNum">     539 </span><span class="lineNoCov">          0 : static int i915_gem_object_get_pages_stolen(struct drm_i915_gem_object *obj)</span>
+<span class="lineNum">     540 </span>            : {
+<span class="lineNum">     541 </span><span class="lineNoCov">          0 :         BUG();</span>
+<span class="lineNum">     542 </span>            :         return -EINVAL;
+<a name="543"><span class="lineNum">     543 </span>            : }</a>
+<span class="lineNum">     544 </span>            : 
+<span class="lineNum">     545 </span><span class="lineNoCov">          0 : static void i915_gem_object_put_pages_stolen(struct drm_i915_gem_object *obj)</span>
+<span class="lineNum">     546 </span>            : {
+<span class="lineNum">     547 </span>            :         /* Should only be called during free */
+<span class="lineNum">     548 </span><span class="lineNoCov">          0 :         sg_free_table(obj-&gt;pages);</span>
+<span class="lineNum">     549 </span><span class="lineNoCov">          0 :         kfree(obj-&gt;pages);</span>
+<span class="lineNum">     550 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     551 </span>            : 
+<a name="552"><span class="lineNum">     552 </span>            : </a>
+<span class="lineNum">     553 </span>            : static void
+<span class="lineNum">     554 </span><span class="lineNoCov">          0 : i915_gem_object_release_stolen(struct drm_i915_gem_object *obj)</span>
+<span class="lineNum">     555 </span>            : {
+<span class="lineNum">     556 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = obj-&gt;base.dev-&gt;dev_private;</span>
+<span class="lineNum">     557 </span>            : 
+<span class="lineNum">     558 </span><span class="lineNoCov">          0 :         if (obj-&gt;stolen) {</span>
+<span class="lineNum">     559 </span><span class="lineNoCov">          0 :                 i915_gem_stolen_remove_node(dev_priv, obj-&gt;stolen);</span>
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :                 kfree(obj-&gt;stolen);</span>
+<span class="lineNum">     561 </span><span class="lineNoCov">          0 :                 obj-&gt;stolen = NULL;</span>
+<span class="lineNum">     562 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     563 </span><span class="lineNoCov">          0 : }</span>
+<span class="lineNum">     564 </span>            : static const struct drm_i915_gem_object_ops i915_gem_object_stolen_ops = {
+<span class="lineNum">     565 </span>            :         .get_pages = i915_gem_object_get_pages_stolen,
+<span class="lineNum">     566 </span>            :         .put_pages = i915_gem_object_put_pages_stolen,
+<span class="lineNum">     567 </span>            :         .release = i915_gem_object_release_stolen,
+<span class="lineNum">     568 </span>            : };
+<a name="569"><span class="lineNum">     569 </span>            : </a>
+<span class="lineNum">     570 </span>            : static struct drm_i915_gem_object *
+<span class="lineNum">     571 </span><span class="lineNoCov">          0 : _i915_gem_object_create_stolen(struct drm_device *dev,</span>
+<span class="lineNum">     572 </span>            :                                struct drm_mm_node *stolen)
+<span class="lineNum">     573 </span>            : {
+<span class="lineNum">     574 </span>            :         struct drm_i915_gem_object *obj;
+<span class="lineNum">     575 </span>            : 
+<span class="lineNum">     576 </span><span class="lineNoCov">          0 :         obj = i915_gem_object_alloc(dev);</span>
+<span class="lineNum">     577 </span><span class="lineNoCov">          0 :         if (obj == NULL)</span>
+<span class="lineNum">     578 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     579 </span>            : 
+<span class="lineNum">     580 </span><span class="lineNoCov">          0 :         drm_gem_private_object_init(dev, &amp;obj-&gt;base, stolen-&gt;size);</span>
+<span class="lineNum">     581 </span><span class="lineNoCov">          0 :         i915_gem_object_init(obj, &amp;i915_gem_object_stolen_ops);</span>
+<span class="lineNum">     582 </span>            : 
+<span class="lineNum">     583 </span><span class="lineNoCov">          0 :         obj-&gt;pages = i915_pages_create_for_stolen(dev,</span>
+<span class="lineNum">     584 </span><span class="lineNoCov">          0 :                                                   stolen-&gt;start, stolen-&gt;size);</span>
+<span class="lineNum">     585 </span><span class="lineNoCov">          0 :         if (obj-&gt;pages == NULL)</span>
+<span class="lineNum">     586 </span>            :                 goto cleanup;
+<span class="lineNum">     587 </span>            : 
+<span class="lineNum">     588 </span><span class="lineNoCov">          0 :         i915_gem_object_pin_pages(obj);</span>
+<span class="lineNum">     589 </span><span class="lineNoCov">          0 :         obj-&gt;stolen = stolen;</span>
+<span class="lineNum">     590 </span>            : 
+<span class="lineNum">     591 </span><span class="lineNoCov">          0 :         obj-&gt;base.read_domains = I915_GEM_DOMAIN_CPU | I915_GEM_DOMAIN_GTT;</span>
+<span class="lineNum">     592 </span><span class="lineNoCov">          0 :         obj-&gt;cache_level = HAS_LLC(dev) ? I915_CACHE_LLC : I915_CACHE_NONE;</span>
+<span class="lineNum">     593 </span>            : 
+<span class="lineNum">     594 </span><span class="lineNoCov">          0 :         return obj;</span>
+<span class="lineNum">     595 </span>            : 
+<span class="lineNum">     596 </span>            : cleanup:
+<span class="lineNum">     597 </span><span class="lineNoCov">          0 :         i915_gem_object_free(obj);</span>
+<span class="lineNum">     598 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     599 </span><span class="lineNoCov">          0 : }</span>
+<a name="600"><span class="lineNum">     600 </span>            : </a>
+<span class="lineNum">     601 </span>            : struct drm_i915_gem_object *
+<span class="lineNum">     602 </span><span class="lineNoCov">          0 : i915_gem_object_create_stolen(struct drm_device *dev, u32 size)</span>
+<span class="lineNum">     603 </span>            : {
+<span class="lineNum">     604 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     605 </span>            :         struct drm_i915_gem_object *obj;
+<span class="lineNum">     606 </span>            :         struct drm_mm_node *stolen;
+<span class="lineNum">     607 </span>            :         int ret;
+<span class="lineNum">     608 </span>            : 
+<span class="lineNum">     609 </span><span class="lineNoCov">          0 :         if (!drm_mm_initialized(&amp;dev_priv-&gt;mm.stolen))</span>
+<span class="lineNum">     610 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     611 </span>            : 
+<span class="lineNum">     612 </span>            :         DRM_DEBUG_KMS(&quot;creating stolen object: size=%x\n&quot;, size);
+<span class="lineNum">     613 </span><span class="lineNoCov">          0 :         if (size == 0)</span>
+<span class="lineNum">     614 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     615 </span>            : 
+<span class="lineNum">     616 </span><span class="lineNoCov">          0 :         stolen = kzalloc(sizeof(*stolen), GFP_KERNEL);</span>
+<span class="lineNum">     617 </span><span class="lineNoCov">          0 :         if (!stolen)</span>
+<span class="lineNum">     618 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     619 </span>            : 
+<span class="lineNum">     620 </span><span class="lineNoCov">          0 :         ret = i915_gem_stolen_insert_node(dev_priv, stolen, size, 4096);</span>
+<span class="lineNum">     621 </span><span class="lineNoCov">          0 :         if (ret) {</span>
+<span class="lineNum">     622 </span><span class="lineNoCov">          0 :                 kfree(stolen);</span>
+<span class="lineNum">     623 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     624 </span>            :         }
+<span class="lineNum">     625 </span>            : 
+<span class="lineNum">     626 </span><span class="lineNoCov">          0 :         obj = _i915_gem_object_create_stolen(dev, stolen);</span>
+<span class="lineNum">     627 </span><span class="lineNoCov">          0 :         if (obj)</span>
+<span class="lineNum">     628 </span><span class="lineNoCov">          0 :                 return obj;</span>
+<span class="lineNum">     629 </span>            : 
+<span class="lineNum">     630 </span><span class="lineNoCov">          0 :         i915_gem_stolen_remove_node(dev_priv, stolen);</span>
+<span class="lineNum">     631 </span><span class="lineNoCov">          0 :         kfree(stolen);</span>
+<span class="lineNum">     632 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     633 </span><span class="lineNoCov">          0 : }</span>
+<a name="634"><span class="lineNum">     634 </span>            : </a>
+<span class="lineNum">     635 </span>            : struct drm_i915_gem_object *
+<span class="lineNum">     636 </span><span class="lineNoCov">          0 : i915_gem_object_create_stolen_for_preallocated(struct drm_device *dev,</span>
+<span class="lineNum">     637 </span>            :                                                u32 stolen_offset,
+<span class="lineNum">     638 </span>            :                                                u32 gtt_offset,
+<span class="lineNum">     639 </span>            :                                                u32 size)
+<span class="lineNum">     640 </span>            : {
+<span class="lineNum">     641 </span><span class="lineNoCov">          0 :         struct drm_i915_private *dev_priv = dev-&gt;dev_private;</span>
+<span class="lineNum">     642 </span><span class="lineNoCov">          0 :         struct i915_address_space *ggtt = &amp;dev_priv-&gt;gtt.base;</span>
+<span class="lineNum">     643 </span>            :         struct drm_i915_gem_object *obj;
+<span class="lineNum">     644 </span>            :         struct drm_mm_node *stolen;
+<span class="lineNum">     645 </span>            :         struct i915_vma *vma;
+<span class="lineNum">     646 </span>            :         int ret;
+<span class="lineNum">     647 </span>            : 
+<span class="lineNum">     648 </span><span class="lineNoCov">          0 :         if (!drm_mm_initialized(&amp;dev_priv-&gt;mm.stolen))</span>
+<span class="lineNum">     649 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     650 </span>            : 
+<span class="lineNum">     651 </span>            :         DRM_DEBUG_KMS(&quot;creating preallocated stolen object: stolen_offset=%x, gtt_offset=%x, size=%x\n&quot;,
+<span class="lineNum">     652 </span>            :                         stolen_offset, gtt_offset, size);
+<span class="lineNum">     653 </span>            : 
+<span class="lineNum">     654 </span>            :         /* KISS and expect everything to be page-aligned */
+<span class="lineNum">     655 </span><span class="lineNoCov">          0 :         if (WARN_ON(size == 0) || WARN_ON(size &amp; 4095) ||</span>
+<span class="lineNum">     656 </span><span class="lineNoCov">          0 :             WARN_ON(stolen_offset &amp; 4095))</span>
+<span class="lineNum">     657 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     658 </span>            : 
+<span class="lineNum">     659 </span><span class="lineNoCov">          0 :         stolen = kzalloc(sizeof(*stolen), GFP_KERNEL);</span>
+<span class="lineNum">     660 </span><span class="lineNoCov">          0 :         if (!stolen)</span>
+<span class="lineNum">     661 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     662 </span>            : 
+<span class="lineNum">     663 </span><span class="lineNoCov">          0 :         stolen-&gt;start = stolen_offset;</span>
+<span class="lineNum">     664 </span><span class="lineNoCov">          0 :         stolen-&gt;size = size;</span>
+<span class="lineNum">     665 </span><span class="lineNoCov">          0 :         mutex_lock(&amp;dev_priv-&gt;mm.stolen_lock);</span>
+<span class="lineNum">     666 </span><span class="lineNoCov">          0 :         ret = drm_mm_reserve_node(&amp;dev_priv-&gt;mm.stolen, stolen);</span>
+<span class="lineNum">     667 </span><span class="lineNoCov">          0 :         mutex_unlock(&amp;dev_priv-&gt;mm.stolen_lock);</span>
+<span class="lineNum">     668 </span><span class="lineNoCov">          0 :         if (ret) {</span>
+<span class="lineNum">     669 </span>            :                 DRM_DEBUG_KMS(&quot;failed to allocate stolen space\n&quot;);
+<span class="lineNum">     670 </span><span class="lineNoCov">          0 :                 kfree(stolen);</span>
+<span class="lineNum">     671 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     672 </span>            :         }
+<span class="lineNum">     673 </span>            : 
+<span class="lineNum">     674 </span><span class="lineNoCov">          0 :         obj = _i915_gem_object_create_stolen(dev, stolen);</span>
+<span class="lineNum">     675 </span><span class="lineNoCov">          0 :         if (obj == NULL) {</span>
+<span class="lineNum">     676 </span>            :                 DRM_DEBUG_KMS(&quot;failed to allocate stolen object\n&quot;);
+<span class="lineNum">     677 </span><span class="lineNoCov">          0 :                 i915_gem_stolen_remove_node(dev_priv, stolen);</span>
+<span class="lineNum">     678 </span><span class="lineNoCov">          0 :                 kfree(stolen);</span>
+<span class="lineNum">     679 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     680 </span>            :         }
+<span class="lineNum">     681 </span>            : 
+<span class="lineNum">     682 </span>            :         /* Some objects just need physical mem from stolen space */
+<span class="lineNum">     683 </span><span class="lineNoCov">          0 :         if (gtt_offset == I915_GTT_OFFSET_NONE)</span>
+<span class="lineNum">     684 </span><span class="lineNoCov">          0 :                 return obj;</span>
+<span class="lineNum">     685 </span>            : 
+<span class="lineNum">     686 </span><span class="lineNoCov">          0 :         vma = i915_gem_obj_lookup_or_create_vma(obj, ggtt);</span>
+<span class="lineNum">     687 </span><span class="lineNoCov">          0 :         if (IS_ERR(vma)) {</span>
+<span class="lineNum">     688 </span><span class="lineNoCov">          0 :                 ret = PTR_ERR(vma);</span>
+<span class="lineNum">     689 </span><span class="lineNoCov">          0 :                 goto err;</span>
+<span class="lineNum">     690 </span>            :         }
+<span class="lineNum">     691 </span>            : 
+<span class="lineNum">     692 </span>            :         /* To simplify the initialisation sequence between KMS and GTT,
+<span class="lineNum">     693 </span>            :          * we allow construction of the stolen object prior to
+<span class="lineNum">     694 </span>            :          * setting up the GTT space. The actual reservation will occur
+<span class="lineNum">     695 </span>            :          * later.
+<span class="lineNum">     696 </span>            :          */
+<span class="lineNum">     697 </span><span class="lineNoCov">          0 :         vma-&gt;node.start = gtt_offset;</span>
+<span class="lineNum">     698 </span><span class="lineNoCov">          0 :         vma-&gt;node.size = size;</span>
+<span class="lineNum">     699 </span><span class="lineNoCov">          0 :         if (drm_mm_initialized(&amp;ggtt-&gt;mm)) {</span>
+<span class="lineNum">     700 </span><span class="lineNoCov">          0 :                 ret = drm_mm_reserve_node(&amp;ggtt-&gt;mm, &amp;vma-&gt;node);</span>
+<span class="lineNum">     701 </span><span class="lineNoCov">          0 :                 if (ret) {</span>
+<span class="lineNum">     702 </span>            :                         DRM_DEBUG_KMS(&quot;failed to allocate stolen GTT space\n&quot;);
+<span class="lineNum">     703 </span>            :                         goto err;
+<span class="lineNum">     704 </span>            :                 }
+<span class="lineNum">     705 </span>            : 
+<span class="lineNum">     706 </span><span class="lineNoCov">          0 :                 vma-&gt;bound |= GLOBAL_BIND;</span>
+<span class="lineNum">     707 </span><span class="lineNoCov">          0 :                 __i915_vma_set_map_and_fenceable(vma);</span>
+<span class="lineNum">     708 </span><span class="lineNoCov">          0 :                 list_add_tail(&amp;vma-&gt;mm_list, &amp;ggtt-&gt;inactive_list);</span>
+<span class="lineNum">     709 </span><span class="lineNoCov">          0 :         }</span>
+<span class="lineNum">     710 </span>            : 
+<span class="lineNum">     711 </span><span class="lineNoCov">          0 :         list_add_tail(&amp;obj-&gt;global_list, &amp;dev_priv-&gt;mm.bound_list);</span>
+<span class="lineNum">     712 </span><span class="lineNoCov">          0 :         i915_gem_object_pin_pages(obj);</span>
+<span class="lineNum">     713 </span>            : 
+<span class="lineNum">     714 </span><span class="lineNoCov">          0 :         return obj;</span>
+<span class="lineNum">     715 </span>            : 
+<span class="lineNum">     716 </span>            : err:
+<span class="lineNum">     717 </span><span class="lineNoCov">          0 :         drm_gem_object_unreference(&amp;obj-&gt;base);</span>
+<span class="lineNum">     718 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     719 </span><span class="lineNoCov">          0 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>
