@@ -90,7 +90,7 @@ main(int argc, char *argv[])
 		FILE *fp = NULL;
 		if ((fp = fopen(opts.report, "w+")) == NULL)
 			return 1;
-		print_report(tests, fp, opts.directory);
+		print_report(tests, fp);
 	}
 
 	free_tests(tests);

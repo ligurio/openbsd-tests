@@ -121,9 +121,9 @@ test_discovery(const char *dir, const char *exec_file)
 			TAILQ_INSERT_TAIL(tests, t, entries);
 		}
 
-		for (i = 0 ; i < n; i++)
+		for (i = 0; i < n; i++)
 			free(namelist[i]);
-			free(namelist);
+		free(namelist);
 
 		if (fail) {
 			free_tests(tests);
