@@ -1,18 +1,19 @@
-#/usr/local/bin/env python
+#!/usr/bin/env python
 
-import helper
+from scapy.all import CDP
+from helper import chck
 import logging
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
-from scapy.all import *
 logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
+
 
 def main():
 
         # https://github.com/secdev/Scapy/blob/master/scapy/contrib/cdp.py
-        #packet = CDP()
-        #re_output = ""
-        #helper.chck(packet, re_output)
+        packet = CDP()
+        re_output = ""
+        chck(packet, re_output)
 
 
 if __name__ == "__main__":
-        main()
+    main()

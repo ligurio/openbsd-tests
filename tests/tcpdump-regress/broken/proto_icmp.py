@@ -1,18 +1,20 @@
-#/usr/local/bin/env python
+#!/usr/bin/env python
 
+import sys
+from scapy.all import *
 import helper
 import logging
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
-from scapy.all import *
 logging.getLogger("scapy.runtime").setLevel(logging.WARNING)
-import sys
+
 
 def main():
 
-        packet = IP(dst="192.168.1.1", ttl=128) / ICMP()
-        re_output = ""
-        exitcode = helper.chck(packet, re_output)
-        sys.exit(exitcode)
+    packet = IP(dst="192.168.1.1", ttl=128) / ICMP()
+    re_output = ""
+    exitcode = helper.chck(packet, re_output)
+    sys.exit(exitcode)
+
 
 if __name__ == "__main__":
-        main()
+    main()
