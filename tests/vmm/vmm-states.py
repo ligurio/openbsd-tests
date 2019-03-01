@@ -1,25 +1,8 @@
 #!/usr/bin/python
 
-# https://libvirt.org/html/libvirt-libvirt-domain.html#virDomainState
-# https://libvirt.org/docs/libvirt-appdev-guide-python/en-US/html/
 # https://wiki.libvirt.org/page/VM_lifecycle
 
-# How-to:
-# - install required RPM packages
-# - create XML config and instance disk:
-# https://libvirt.org/formatdomain.html
-# $ curl -O http://mirrors.kernel.org/centos/6.7/isos/x86_64/CentOS-6.7-x86_64-bin-DVD1.iso
-# $ virt-install --virt-type kvm --name centos-7.0 --ram 1024 --disk centos-7.0.qcow2 format=qcow2
-#    --graphics vnc password=vz7 listen=0.0.0.0 --noautoconsole--os-type=linux
-#    --os-variant=rhel6 --extra-args"console=tty0 console=ttyS0115200n8 serial"
-#    --location=CentOS-6.7-x86_64-bin-DVD1.iso --network network=Bridged
-# - pip install graphwalker
-# - create map of possible states: Undefined, Defined, Saved, Running, Paused
-#     (see actions supported by LibVirt drivers here https://libvirt.org/hvsupport.html)
-
-
 from __future__ import print_function
-import libvirt
 import sys
 
 CONN_STRING = 'qemu:///system'
