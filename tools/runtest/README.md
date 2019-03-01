@@ -2,7 +2,7 @@ RUNTEST(1) - General Commands Manual
 
 # NAME
 
-**runtest** - is a program for running regression tests.
+**runtest** - is a program for running OpenBSD regression tests.
 
 # SYNOPSIS
 
@@ -67,4 +67,4 @@ The
 utility was written by
 Sergey Bronnikov
 
-OpenBSD 6.4 - December 28, 2018
+Debian - December 28, 2018
