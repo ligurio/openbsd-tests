@@ -1,0 +1,49 @@
+// bc(1) grammar for Lark
+// https://man.openbsd.org/bc
+// Author: Sergey Bronnikov
+// https://github.com/lark-parser/lark/blob/master/examples/python2.lark
+// https://lark-parser.readthedocs.io/en/latest/grammar/
+
+single_input: _NEWLINE | simple_stmt _NEWLINE
+
+?stmt: simple_stmt
+?simple_stmt: small_stmt (";" small_stmt)* [";"] _NEWLINE
+?small_stmt: (expr_stmt | del_stmt | pass_stmt | flow_stmt | import_stmt | global_stmt | nonlocal_stmt | assert_stmt)
+?expr_stmt: testlist_star_expr (annassign | augassign (yield_expr|testlist)
+         | ("=" (yield_expr|testlist_star_expr))*)
+annassign: ":" test ["=" test]
+?testlist_star_expr: (test|star_expr) ("," (test|star_expr))* [","]
+op: ("+" | "-" | "*" | "&&" | "||" )
+
+?atom_expr: atom_expr "(" [arguments] ")"      -> funccall
+          | atom_expr "[" subscriptlist "]"  -> getitem
+          | atom_expr "." NAME               -> getattr
+          | atom
+
+?atom: "(" [yield_expr|testlist_comp] ")"
+     | "[" [testlist_comp] "]"  -> list
+     | "{" [dictorsetmaker] "}" -> dict
+
+starargs: "*" test ("," "*" test)* ("," argvalue)* ["," kwargs]
+kwargs: "**" test
+
+?argvalue: test ["=" test]
+
+number: DEC_NUMBER | HEX_NUMBER | BIN_NUMBER | OCT_NUMBER
+
+// Tokens
+
+NAME: /[a-zA-Z_]\w*/
+// are enclosed in /* and */
+// are enclosed in # and the next newline
+COMMENT: /#[^\n]*/
+_NEWLINE: ( /\r?\n[\t ]*/ | COMMENT )+
+
+DEC_NUMBER: /0|[1-9]\d*/i
+HEX_NUMBER: /0x[\da-f]*l?/i
+OCT_NUMBER: /0o?[0-7]*l?/i
+
+%ignore /[\t \f]+/  // WS
+%ignore /\\[\t \f]*\r?\n/   // LINE_CONT
+%ignore COMMENT
+%declare _INDENT _DEDENT
