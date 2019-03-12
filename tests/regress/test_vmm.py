@@ -20,3 +20,13 @@ def test_random_c_program():
     ITER_NUMBER = 100
     for i in range(0, ITER_NUMBER):
         make_random_c_program()
+
+
+def test_setup_openbsd():
+
+    # vmm_install
+
+
+def test_start_stop():
+
+    # vmm_states
