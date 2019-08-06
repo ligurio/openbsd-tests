@@ -32,21 +32,21 @@
 #include <sys/queue.h>
 
 enum test_status {
-	STATUS_OK,		/* TestAnythingProtocol	*/
-	STATUS_NOTOK,		/* TestAnythingProtocol	*/
-	STATUS_MISSING,		/* TestAnythingProtocol	*/
-	STATUS_TODO,		/* TestAnythingProtocol	*/
-	STATUS_SKIP,		/* TestAnythingProtocol	*/
+  STATUS_OK,      /* TestAnythingProtocol	*/
+  STATUS_NOTOK,   /* TestAnythingProtocol	*/
+  STATUS_MISSING, /* TestAnythingProtocol	*/
+  STATUS_TODO,    /* TestAnythingProtocol	*/
+  STATUS_SKIP,    /* TestAnythingProtocol	*/
 };
 
 struct test {
-    enum test_status status;
-    const char *path;
-    char *name;
-    const char *comment;
-    const char *system_out;
-    const char *system_err;
-    TAILQ_ENTRY(test) entries;
+  enum test_status status;
+  const char *path;
+  char *name;
+  const char *comment;
+  const char *system_out;
+  const char *system_err;
+  TAILQ_ENTRY(test) entries;
 };
 
 TAILQ_HEAD(test_list, test);
@@ -54,4 +54,4 @@ TAILQ_HEAD(test_list, test);
 void free_tests(struct test_list *tests);
 void free_test(struct test *t);
 
-#endif				/* TEST_LIST_H */
+#endif /* TEST_LIST_H */
