@@ -16,7 +16,7 @@ struct test_options {
   char *exec_file;
 };
 
-extern struct test_list *test_discovery(const char *, const char *);
+extern struct test_list *test_discovery(char *, const char *);
 extern int print_tests(struct test_list *, FILE *);
 extern int run_tests(struct test_list *, const struct test_options,
                      const char *, FILE *, FILE *);

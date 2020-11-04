@@ -1,5 +1,4 @@
 #define _GNU_SOURCE
-#include <assert.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <libgen.h>
@@ -14,7 +13,9 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-
+#include <err.h>
+#include <fnmatch.h>
+#include <fts.h>
 #include <errno.h>
 
 #include "test_list.h"
@@ -35,15 +36,18 @@ static inline char *format_time(char *strtime, size_t size) {
   return strtime;
 }
 
-struct test_list *test_discovery(const char *dir, const char *exec_file) {
+/* Compare files by name. */
+int entcmp(const FTSENT **a, const FTSENT **b)
+{
+  return strcmp((*a)->fts_name, (*b)->fts_name);
+}
+ 
+/*
+ * Print all files in the directory tree that match the glob pattern.
+ * Example: test_discovery("/usr/src/test", "Makefile");
+ */
+struct test_list *test_discovery(char *dir, const char *pattern) {
   struct test_list *tests;
-  struct stat st_buf;
-
-  int n, i;
-  struct dirent **namelist;
-  int fail;
-  int saved_errno;
-
   tests = calloc(1, sizeof(struct test_list));
   if (tests == NULL) {
     fprintf(stderr, "malloc failed");
@@ -51,79 +55,61 @@ struct test_list *test_discovery(const char *dir, const char *exec_file) {
   }
   TAILQ_INIT(tests);
 
-  do {
-    if (stat(dir, &st_buf) == -1) {
-      free_tests(tests);
-      break;
+  FTS *tree;
+  FTSENT *f;
+  char *argv[] = { dir, NULL };
+
+  /*
+   * FTS_LOGICAL follows symbolic links, including links to other
+   * directories. It detects cycles, so we never have an infinite
+   * loop. FTS_NOSTAT is because we never use f->statp. It uses
+   * our entcmp() to sort files by name.
+   */
+  tree = fts_open(argv, FTS_LOGICAL | FTS_NOSTAT, entcmp);
+  if (tree == NULL)
+    err(1, "fts_open");
+ 
+  while ((f = fts_read(tree))) {
+    switch (f->fts_info) {
+    case FTS_DNR:	/* Cannot read directory */
+    case FTS_ERR:	/* Miscellaneous error */
+    case FTS_NS:	/* stat() error */
+      /* Show error, then continue to next files. */
+      warn("%s", f->fts_path);
+      continue;
+    case FTS_DP:
+      /* Ignore post-order visit to directory. */
+      continue;
     }
 
-    if (!S_ISDIR(st_buf.st_mode)) {
-      free_tests(tests);
-      errno = EINVAL;
-      break;
-    }
-
-    n = scandir(dir, &namelist, NULL, alphasort);
-    if (n == -1) {
-      free_tests(tests);
-      break;
-    }
-
-    fail = 0;
-    for (i = 0; i < n; i++) {
-      char *run_test;
-      char *d_name = strdup(namelist[i]->d_name);
-      if (d_name == NULL) {
-        fail = 1;
-        saved_errno = errno;
-        break;
-      }
-
-      if (strcmp(d_name, ".") == 0 || strcmp(d_name, "..") == 0) {
-        free(d_name);
-        continue;
-      }
-
-      if (asprintf(&run_test, "%s/%s/%s", dir, d_name, exec_file) == -1) {
-        fail = 1;
-        saved_errno = errno;
-        free(d_name);
-        break;
-      }
-
-      if (stat(run_test, &st_buf) == -1) {
-        free(run_test);
-        free(d_name);
-        continue;
-      }
-
-      if (!S_ISREG(st_buf.st_mode)) {
-        free(run_test);
-        free(d_name);
-        continue;
-      }
-
+    if (fnmatch(pattern, f->fts_name, FNM_PERIOD) == 0) {
       struct test *t = NULL;
       t = calloc(1, sizeof(struct test));
       if (t == NULL) {
         fprintf(stderr, "malloc failed");
         break;
       }
-      t->name = run_test;
-      t->path = d_name;
+      t->name = dirname(strdup(f->fts_path));
+      t->path = strdup(f->fts_path);
       TAILQ_INSERT_TAIL(tests, t, entries);
     }
 
-    for (i = 0; i < n; i++)
-      free(namelist[i]);
-    free(namelist);
-
-    if (fail) {
-      free_tests(tests);
-      errno = saved_errno;
-      break;
+    /*
+     * A cycle happens when a symbolic link (or perhaps a
+     * hard link) puts a directory inside itself. Tell user
+     * when this happens.
+     */
+    if (f->fts_info == FTS_DC) {
+      warnx("%s: cycle in directory tree", f->fts_path);
     }
-  } while (0);
+  }
+ 
+  /* fts_read() sets errno = 0 unless it has error. */
+  if (errno != 0)
+    err(1, "fts_read");
+
+  if (fts_close(tree) < 0)
+    err(1, "fts_close");
 
   return tests;
 }
@@ -149,15 +135,15 @@ static inline void run_child(char *run_test, int fd_stdout, int fd_stderr) {
     exit(-1);
   }
 
-  char make[] = "/usr/bin/make";
+  char make_bin[] = "/usr/bin/make";
   char make_opt[] = "-C";
-  char *argv[] = {make, make_opt, dirname(strdup(run_test)), NULL};
-  execv(argv[0], argv);
+  char *argv[] = {make_bin, make_opt, run_test, NULL};
+  int rc = execv(argv[0], argv);
 
   dup2(fd_stdout, STDOUT_FILENO);
   dup2(fd_stderr, STDERR_FILENO);
 
-  exit(1);
+  exit(rc);
 }
 
 static inline int wait_child(const char *test_dir, const char *run_test,
@@ -255,7 +241,6 @@ int run_tests(struct test_list *tests, const struct test_options opts,
         rc = -1;
         break;
       }
-      dirname(test_dir);
 
       child = fork();
       if (child == -1) {
@@ -279,6 +264,14 @@ int run_tests(struct test_list *tests, const struct test_options opts,
         status = wait_child(test_dir, t->name, child, opts.timeout, fds, fps);
         if (status)
           rc += 1;
+
+        if (WIFEXITED(status)) {
+          if (WEXITSTATUS(status) != 0) {
+            t->status = STATUS_NOTOK;
+          } else {
+            t->status = STATUS_OK;
+          }
+        }
 
         fprintf(fp_stdout, "%s END: %s\n", format_time(time, TIME_BUF_SIZE),
                 test_dir);
