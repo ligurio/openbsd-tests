@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sergey Bronnikov
+// RFC 5681 §3.1: Congestion avoidance.
+//
+// After fast recovery sets ssthresh to two segments, each ACK increases
+// cwnd by MSS*MSS/cwnd instead of one MSS.
+--tolerance_usecs=100000
+
+0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+0.000 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+0.000 setsockopt(3, IPPROTO_TCP, TCP_SACK_ENABLE, [0], 4) = 0
+0.000 bind(3, ..., ...) = 0
+0.000 listen(3, 1) = 0
+
+0.100 < S 0:0(0) win 65535 <mss 1000,nop,nop,nop,wscale 7,nop,nop>
+0.100 > S. 0:0(0) ack 1 <...>
+0.100 < . 1:1(0) ack 1 win 65535
+0.100 accept(3, ..., ...) = 4
+
+0.200 write(4, ..., 4000) = 4000
+0.200 > . 1:1001(1000) ack 1 <...>
+0.200 > . 1001:2001(1000) ack 1 <...>
+0.200 > . 2001:3001(1000) ack 1 <...>
+0.200 > P. 3001:4001(1000) ack 1 <...>
+
+// Enter fast recovery and retransmit the first segment.
+0.300 < . 1:1(0) ack 1 win 65535
+0.300 < . 1:1(0) ack 1 win 65535
+0.300 < . 1:1(0) ack 1 win 65535
+0.300 > . 1:1001(1000) ack 1 <...>
+
+// Full ACK leaves recovery with ssthresh at five segments.
+0.400 < . 1:1(0) ack 4001 win 65535
+0.400 %{
+assert tcpi_snd_cwnd == 1000, tcpi_snd_cwnd
+assert tcpi_snd_ssthresh == 5000, tcpi_snd_ssthresh
+}%
+
+// Below ssthresh the window opens by one MSS per ACK.
+0.500 write(4, ..., 6000) = 6000
+0.500 > . 4001:5001(1000) ack 1 <...>
+
+0.600 < . 1:1(0) ack 5001 win 65535
+0.600 %{ assert tcpi_snd_cwnd == 2000, tcpi_snd_cwnd }%
+0.600 > . 5001:6001(1000) ack 1 <...>
+
+0.700 < . 1:1(0) ack 6001 win 65535
+0.700 %{ assert tcpi_snd_cwnd == 3000, tcpi_snd_cwnd }%
+0.700 > . 6001:7001(1000) ack 1 <...>
+
+0.800 < . 1:1(0) ack 7001 win 65535
+0.800 %{ assert tcpi_snd_cwnd == 4000, tcpi_snd_cwnd }%
+0.800 > . 7001:8001(1000) ack 1 <...>
+
+0.900 < . 1:1(0) ack 8001 win 65535
+0.900 %{ assert tcpi_snd_cwnd == 5000, tcpi_snd_cwnd }%
+0.900 > . 8001:9001(1000) ack 1 <...>
+
+// At ssthresh the ACK still opens the window by one MSS.
+1.000 < . 1:1(0) ack 9001 win 65535
+1.000 %{ assert tcpi_snd_cwnd == 6000, tcpi_snd_cwnd }%
+1.000 > P. 9001:10001(1000) ack 1 <...>
+
+// Above ssthresh the window grows by MSS*MSS/cwnd.
+1.100 < . 1:1(0) ack 10001 win 65535
+1.100 %{ assert tcpi_snd_cwnd == 6166, tcpi_snd_cwnd }%
