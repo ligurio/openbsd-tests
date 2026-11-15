@@ -109,8 +109,6 @@ Some tests cannot be written with the current packetdrill script syntax:
 * **IP fragmentation.** There is no script syntax for injecting individual
   IPv4 or IPv6 fragments, so UDP/TCP reassembly tests need a packetdrill
   extension or a different test harness.
-* **TCP PMTUD.** The parser does not accept the `[seq] icmp ...` form with
-  an embedded TCP header.  RFC 1191 tests need a parser fix first.
 * **TCP MD5.** `TCP_MD5SIG` requires IPsec security associations; the test
   fixture must configure them with `ipsecctl(8)` before running packetdrill.
 
@@ -128,15 +126,13 @@ with a `skip_reason`, so that coverage gaps remain visible.
 
 The current plan covers RFC 9293 connection management and resets, RFC 1122
 delayed ACK/Nagle/keepalive, RFC 7323 window scaling and timestamps, RFC 2018
-SACK, RFC 5681/6928 congestion-window behavior, RFC 6298 RTO, RFC 3168 ECN,
-OpenBSD-specific RFC 5961 behavior, IPv4 and IPv6 variants of the basic
-TCP and UDP paths, and ICMP/ICMPv6 error handling for TCP and connected UDP
-sockets.
+SACK, RFC 5681/6928 congestion-window behavior, RFC 6298 RTO, RFC 1191
+PMTUD, RFC 3168 ECN, OpenBSD-specific RFC 5961 behavior, IPv4 and IPv6
+variants of the basic TCP and UDP paths, and ICMP/ICMPv6 error handling for
+TCP and connected UDP sockets.
 
 Still to add:
 
-* RFC 1191 PMTUD: the packetdrill parser used here cannot parse the
-  `[seq] icmp ...` embedded-packet syntax.
 * RFC 2385 MD5: needs an IPsec SA configured outside packetdrill.
 * RFC 1948 ISN randomization: better suited to a statistical test script
   than to a single packetdrill trace.
