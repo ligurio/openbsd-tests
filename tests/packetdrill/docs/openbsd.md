@@ -92,6 +92,21 @@ unset.  Ported SACK tests must therefore use packet-level assertions or
 OpenBSD-specific fields (`tcpi_snd_cwnd`, `tcpi_snd_ssthresh`, `tcpi_rto`,
 `tcpi_rtt`, `tcpi_snd_rexmitpack`, `tcpi_rcv_ooopack`, ...).
 
+## Known packetdrill limitations
+
+Some tests cannot be written with the current packetdrill script syntax:
+
+* **UDP checksum and length errors.** `udp(payload)` always generates a
+  valid checksum and length.  Tests for a zero checksum, a bad checksum,
+  or a malformed UDP length need raw packet injection support.
+* **IP fragmentation.** There is no script syntax for injecting individual
+  IPv4 or IPv6 fragments, so UDP/TCP reassembly tests need a packetdrill
+  extension or a different test harness.
+* **TCP PMTUD.** The parser does not accept the `[seq] icmp ...` form with
+  an embedded TCP header.  RFC 1191 tests need a parser fix first.
+* **TCP MD5.** `TCP_MD5SIG` requires IPsec security associations; the test
+  fixture must configure them with `ipsecctl(8)` before running packetdrill.
+
 ## Firewall
 
 packetdrill injects traffic through `tun0`.  If `pf(4)` is enabled on the
