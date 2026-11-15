@@ -115,6 +115,10 @@ Some tests cannot be written with the current packetdrill script syntax:
 * **TCP MD5.** `TCP_MD5SIG` requires IPsec security associations; the test
   fixture must configure them with `ipsecctl(8)` before running packetdrill.
 
+* **TCP segmentation offload.** OpenBSD `tun(4)` advertises no TSO
+  capabilities, so tests expecting 10040-byte segments see 1000-byte
+  segments instead.
+
 ## Firewall
 
 packetdrill injects traffic through `tun0`.  If `pf(4)` is enabled on the
