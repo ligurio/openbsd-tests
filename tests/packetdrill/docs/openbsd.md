@@ -9,7 +9,11 @@
 
 The port is based on the nplab fork and carries the OpenBSD fixes required
 by packetdrill: `TUNSIFMODE` handling, point-to-point `tun(4)` setup,
-reading packets from the tun file descriptor, and `TCP_INFO` support.
+reading packets from the tun file descriptor, `TCP_INFO` support, and
+IPv6 point-to-point addressing.  IPv6 needs a destination address with a
+/128 prefix and a route through that peer, otherwise the kernel tries
+neighbor discovery on the tun device.  The port also drains the multicast
+listener reports queued when IPv6 addresses are configured.
 
 Install packetdrill from packages:
 
@@ -122,7 +126,8 @@ with a `skip_reason`, so that coverage gaps remain visible.
 The current plan covers RFC 9293 connection management and resets, RFC 1122
 delayed ACK/Nagle/keepalive, RFC 7323 window scaling and timestamps, RFC 2018
 SACK, RFC 5681/6928 congestion-window behavior, RFC 6298 RTO, RFC 3168 ECN,
-and OpenBSD-specific RFC 5961 behavior.
+OpenBSD-specific RFC 5961 behavior, and IPv4 and IPv6 variants of the basic
+TCP and UDP paths.
 
 Still to add:
 
