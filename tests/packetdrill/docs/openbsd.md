@@ -30,6 +30,9 @@ If the package is not available yet, install the port from `openbsd-wip`:
 doas make -C /path/to/openbsd-wip/net/packetdrill install
 ```
 
+The RFC 2385 test runs `scripts/setup-md5-sa.sh`, which installs the
+required `tcpmd5` security associations with `ipsecctl(8)`.
+
 ## Baseline sysctls
 
 `scripts/defaults-openbsd.sh` is sourced by tests that start with
@@ -127,12 +130,11 @@ with a `skip_reason`, so that coverage gaps remain visible.
 The current plan covers RFC 9293 connection management and resets, RFC 1122
 delayed ACK/Nagle/keepalive, RFC 7323 window scaling and timestamps, RFC 2018
 SACK, RFC 5681/6928 congestion-window behavior, RFC 6298 RTO, RFC 1191
-PMTUD, RFC 3168 ECN, OpenBSD-specific RFC 5961 behavior, IPv4 and IPv6
-variants of the basic TCP and UDP paths, and ICMP/ICMPv6 error handling for
-TCP and connected UDP sockets.
+PMTUD, RFC 3168 ECN, OpenBSD-specific RFC 5961 behavior, RFC 2385 TCP MD5,
+IPv4 and IPv6 variants of the basic TCP and UDP paths, and ICMP/ICMPv6 error
+handling for TCP and connected UDP sockets.
 
 Still to add:
 
-* RFC 2385 MD5: needs an IPsec SA configured outside packetdrill.
 * RFC 1948 ISN randomization: better suited to a statistical test script
   than to a single packetdrill trace.
