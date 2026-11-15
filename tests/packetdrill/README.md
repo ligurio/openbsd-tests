@@ -2,9 +2,9 @@
 
 This suite contains [packetdrill](https://github.com/nplab/packetdrill) tests
 for the OpenBSD TCP/IP stack.  Tests are grouped by the RFC that defines the
-behavior under test; the current OpenBSD plan covers RFC 9293, RFC 1122,
-RFC 7323, RFC 2018, RFC 5681, RFC 6298, RFC 6928, RFC 3168 and the
-OpenBSD-specific parts of RFC 5961.
+behavior under test; the current OpenBSD plan covers TCP RFC 9293,
+RFC 1122, RFC 7323, RFC 2018, RFC 5681, RFC 6298, RFC 6928, RFC 3168,
+the OpenBSD-specific parts of RFC 5961, and UDP RFC 768.
 
 The suite is based on
 [ligurio/packetdrill-testcases](https://github.com/ligurio/packetdrill-testcases).
@@ -16,9 +16,10 @@ for OpenBSD runs.
 
 ```
 docs/openbsd.md       OpenBSD notes, RFC matrix and packetdrill caveats
-scripts/              test runner, defaults and packetdrill installer
+scripts/              test runner and test defaults
 testplans/            testplan-openbsd.json
-testcases/tcp/        RFC-based testcases
+testcases/tcp/        RFC-based TCP testcases
+testcases/udp/        RFC-based UDP testcases
 ```
 
 See [docs/openbsd.md](docs/openbsd.md) for the supported RFCs, OpenBSD
