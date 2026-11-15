@@ -13,7 +13,8 @@ reading packets from the tun file descriptor, `TCP_INFO` support, and
 IPv6 point-to-point addressing.  IPv6 needs a destination address with a
 /128 prefix and a route through that peer, otherwise the kernel tries
 neighbor discovery on the tun device.  The port also drains the multicast
-listener reports queued when IPv6 addresses are configured.
+listener reports queued when IPv6 addresses are configured and ignores
+asynchronous MLD reports during the test.
 
 Install packetdrill from packages:
 
