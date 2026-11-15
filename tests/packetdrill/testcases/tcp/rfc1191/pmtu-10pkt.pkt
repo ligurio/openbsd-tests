@@ -1,41 +1,44 @@
 // SPDX-License-Identifier: MIT
-// RFC 1191 §3.1: TCP MSS option.
+// RFC 1191 §4: Path MTU Discovery.
 // Copyright (c) 2016 Shivansh Rai
 // Source: https://github.com/freebsd-net/TCP-IP-Regression-TestSuite
-// Test for Path MTU Discovery
 // Borrowed from https://github.com/google/packetdrill
+//
+// A large segment is sent, then an ICMP frag needed message lowers the
+// path MTU.  The data is retransmitted in 1460-byte segments.  OpenBSD
+// sends three segments at a time, so the ACKs are staged.
 --mtu=15000
---tolerance_usecs=10000
+--tolerance_usecs=100000
 
-// Clear the MTU stored in the host cache by clearing the host cache
-0.000 `sysctl -w net.inet.tcp.hostcache.purgenow=1`
-// Create a listening TCP socket
 0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
 0.000 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
 0.000 bind(3, ..., ...) = 0
 0.000 listen(3, 1) = 0
 
-// Establish the connection
 0.100 < S 0:0(0) win 65535 <mss 14960,sackOK,nop,nop,nop,wscale 7>
 0.100 > S. 0:0(0) ack 1 <...>
 0.100 < . 1:1(0) ack 1 win 65535
 0.100 accept(3, ..., ...) = 4
 
-// We send a large fragment segments
 0.200 write(4, ..., 14600) = 14600
 0.200 > P. 1:14601(14600) ack 1
 
-// Net network provides an ICMP packet indicating an PMTU of 1500 bytes
-0.250 < [1:14601(14600)] icmp unreachable frag_needed mtu 1500
+0.250 < icmp unreachable frag_needed mtu 1500 [1:14601(14600)]
+0.250 > . 1:1461(1460) ack 1
+0.250 > . 1461:2921(1460) ack 1
+0.250 > . 2921:4381(1460) ack 1
+0.250 %{ assert tcpi_snd_mss == 1460, tcpi_snd_mss }%
 
-// Retransmit the data in ten smaller segments
-0.250 >  . 1:1461(1460) ack 1
-0.250 >  . 1461:2921(1460) ack 1
-0.250 >  . 2921:4381(1460) ack 1
-0.250 >  . 4381:5841(1460) ack 1
-0.250 >  . 5841:7301(1460) ack 1
-0.250 >  . 7301:8761(1460) ack 1
-0.250 >  . 8761:10221(1460) ack 1
-0.250 >  . 10221:11681(1460) ack 1
-0.250 >  . 11681:13141(1460) ack 1
-0.250 > P. 13141:14601(1460) ack 1
+0.300 < . 1:1(0) ack 4381 win 65535
+0.300 > . 4381:5841(1460) ack 1
+0.300 > . 5841:7301(1460) ack 1
+0.300 > . 7301:8761(1460) ack 1
+
+0.400 < . 1:1(0) ack 8761 win 65535
+0.400 > . 8761:10221(1460) ack 1
+0.400 > . 10221:11681(1460) ack 1
+0.400 > . 11681:13141(1460) ack 1
+
+0.500 < . 1:1(0) ack 13141 win 65535
+0.500 > P. 13141:14601(1460) ack 1
+0.600 < . 1:1(0) ack 14601 win 65535
