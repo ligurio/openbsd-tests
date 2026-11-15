@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: MIT
+// RFC 9293 §3.5.3: Reset processing.
+// Copyright (c) 2016 Shivansh Rai
+// Source: https://github.com/freebsd-net/TCP-IP-Regression-TestSuite
+// Test for handling reset from synchronised(established) state.
+// The connection should abort immediately.
+--tolerance_usecs=100000
+
+// Create a listening TCP socket
+0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+0.000 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+0.000 bind(3, ..., ...) = 0
+0.000 listen(3, 1) = 0
+
+// Check if we revert back to passive open state
+// by establishing a connection when a valid SYN arrives.
+0.100 < S  0:0(0) win 65535 <mss 1460,sackOK,nop,nop,nop,wscale 7>
+0.100 > S. 0:0(0) ack 1 <...>
+0.100 < .  1:1(0) ack 1 win 65535
+0.100 accept(3, ..., ...) = 4
+
+// We transition to passive close
+0.110 < F. 1:1(0) ack 1 win 65535
+0.110 > .  1:1(0) ack 2 <...>
+
+// Client resets the connection.
+0.120 < R  2:2(0) ack 1 win 65535
+
+// Our application writes 1000 bytes.
+// This should produce a runtime error, since the connection has been reset.
+0.130 write(4, ..., 1000) = 1000

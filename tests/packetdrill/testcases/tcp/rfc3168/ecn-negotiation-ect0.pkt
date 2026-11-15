@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sergey Bronnikov
+// RFC 3168 §6.1: TCP.
+// Requirement: MUST
+// OpenBSD: supported; ECN is disabled by default.
+// Preconditions: net.inet.tcp.ecn=1
+//
+// The kernel is the sender.  It sets ECE and CWR on the SYN, accepts an
+// ECN-capable SYN-ACK, and marks data packets ECT(0).
+--tolerance_usecs=100000
+
+`sysctl -q net.inet.tcp.ecn=1`
+
+0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+0.000 fcntl(3, F_GETFL) = 0x2 (flags O_RDWR)
+0.000 fcntl(3, F_SETFL, O_RDWR|O_NONBLOCK) = 0
+
+0.100 connect(3, ..., ...) = -1 EINPROGRESS (Operation now in progress)
+0.100 > SEW 0:0(0) <...>
+
+0.200 < SE. 0:0(0) ack 1 win 65535 <mss 1460,sackOK,nop,nop,nop,wscale 7>
+0.200 > . 1:1(0) ack 1 <...>
+0.200 getsockopt(3, SOL_SOCKET, SO_ERROR, [0], [4]) = 0
+0.200 fcntl(3, F_SETFL, O_RDWR) = 0
+
+0.300 write(3, ..., 1000) = 1000
+0.300 > [ect0] P. 1:1001(1000) ack 1 <...>
+0.400 < . 1:1(0) ack 1001 win 65535
+
+0.500 close(3) = 0
+0.500 > F. 1001:1001(0) ack 1 <...>
+0.600 < . 1:1(0) ack 1002 win 65535
+
+`sysctl -q net.inet.tcp.ecn=0`

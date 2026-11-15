@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sergey Bronnikov
+// RFC 1122 §4.2.3.4: When to send data.
+// Requirement: SHOULD
+// OpenBSD: supported (TCP_NODELAY is off by default)
+// Preconditions: none
+//
+// A second small write is held while the first segment is unacknowledged;
+// it is sent when the ACK arrives.
+--tolerance_usecs=100000
+
+0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+0.000 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+0.000 bind(3, ..., ...) = 0
+0.000 listen(3, 1) = 0
+
+0.100 < S 0:0(0) win 65535 <mss 1000,sackOK,nop,nop,nop,wscale 7>
+0.100 > S. 0:0(0) ack 1 <...>
+0.100 < . 1:1(0) ack 1 win 65535
+0.100 accept(3, ..., ...) = 4
+
+0.200 setsockopt(4, IPPROTO_TCP, TCP_NODELAY, [0], 4) = 0
+
+0.200 write(4, ..., 100) = 100
+0.200 > P. 1:101(100) ack 1 <...>
+
+// Nagle holds the second small write until the first is ACKed.
+0.300 write(4, ..., 100) = 100
+0.400 < . 1:1(0) ack 101 win 65535
+0.400 > P. 101:201(100) ack 1 <...>

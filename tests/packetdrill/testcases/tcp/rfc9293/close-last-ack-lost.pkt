@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: MIT
+// RFC 9293 §3.6: Closing a connection.
+// Copyright (c) 2016 Shivansh Rai
+// Source: https://github.com/freebsd-net/TCP-IP-Regression-TestSuite
+// Test for checking whether we timeout and retransmit
+// a FIN in case the last ACK sent by client is lost.
+--tolerance_usecs=100000
+
+// Create a listening TCP socket
+0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+0.000 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+0.000 bind(3, ..., ...) = 0
+0.000 listen(3, 1) = 0
+
+// Establish a connection
+0.100 < S  0:0(0) win 65535 <mss 1460,sackOK,nop,nop,nop,wscale 7>
+0.100 > S. 0:0(0) ack 1 <...>
+0.100 < .  1:1(0) ack 1 win 65535
+0.100 accept(3, ..., ...) = 4
+
+// The client(packetdrill instance) initiates connection close
+0.110 < F. 1:1(0) ack 1 win 65535
+
+// We send an ACK
+0.110 > .  1:1(0) ack 2 <...>
+
+// We close the connection
+0.110 close(4) = 0
+0.110 > F. 1:1(0) ack 2 <...>
+
+// The following ACK is removed (appear as if it got lost)
+// 0.110 < .  2:2(0) ack 2 win 65535
+
+// We retransmit the FIN after timeout
+3.110 > F. 1:1(0) ack 2 <...>
+
+// Client sends an ACK and closes its connection (after 2*MSL)
+3.120 < .  2:2(0) ack 2 win 65535
+
+// We successfully close our connection on receiving ACK
+
+// Client sends a data segment
+3.130 < P. 2:1002(1000) ack 2 win 65535
+
+// We send a RESET
+3.130 > R  2:2(0) win 0
