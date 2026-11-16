@@ -112,12 +112,13 @@ Some tests cannot be written with the current packetdrill script syntax:
 * **IP fragmentation.** There is no script syntax for injecting individual
   IPv4 or IPv6 fragments, so UDP/TCP reassembly tests need a packetdrill
   extension or a different test harness.
-* **TCP MD5.** `TCP_MD5SIG` requires IPsec security associations; the test
-  fixture must configure them with `ipsecctl(8)` before running packetdrill.
+* **TCP MD5.** The RFC 2385 tests configure their security associations with
+  `ipsecctl(8)` via `scripts/setup-md5-sa.sh`.  IPv6 MD5 and SA lifecycle
+  variants are not covered.
 
 * **TCP segmentation offload.** OpenBSD `tun(4)` advertises no TSO
-  capabilities, so tests expecting 10040-byte segments see 1000-byte
-  segments instead.
+  capabilities.  Tests that expected 10040-byte TSO packets were removed;
+  the stack soft-chops data into 1000-byte segments.
 
 ## Firewall
 
@@ -128,8 +129,8 @@ duration of the run.
 ## Test plan
 
 `testplans/testplan-openbsd.json` is the authoritative list of tests that are
-expected to run on OpenBSD.  Tests that do not apply are kept in the plan
-with a `skip_reason`, so that coverage gaps remain visible.
+expected to run on OpenBSD.  It contains only applicable tests; Linux-specific
+and unsupported scenarios were removed rather than kept as permanent skips.
 
 The current plan covers RFC 9293 connection management and resets, RFC 1122
 delayed ACK/Nagle/keepalive, RFC 7323 window scaling and timestamps, RFC 2018
@@ -142,3 +143,6 @@ Still to add:
 
 * RFC 1948 ISN randomization: better suited to a statistical test script
   than to a single packetdrill trace.
+* IPv6 PMTUD / ICMPv6 Packet Too Big.
+* UDP checksum and length errors, plus IP fragmentation, which need raw
+  packet injection support.
