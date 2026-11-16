@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sergey Bronnikov
+// RFC 2018 §5: Interpreting the SACK option and retransmission strategy.
+// OpenBSD 8.0 errata 016: SACK packets could crash the kernel.
+//
+// Exercise multiple SACK holes and partial ACKs, including repeated
+// SACK-generated retransmissions.
+--tolerance_usecs=100000
+0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+0.000 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+0.000 bind(3, ..., ...) = 0
+0.000 listen(3, 1) = 0
+0.100 < S 0:0(0) win 65535 <mss 1000,sackOK,nop,nop,nop,wscale 7>
+0.100 > S. 0:0(0) ack 1 <...>
+0.100 < . 1:1(0) ack 1 win 65535
+0.100 accept(3, ..., ...) = 4
+
+0.200 write(4, ..., 10000) = 10000
+0.200 > . 1:1001(1000) ack 1 <...>
+0.200 > . 1001:2001(1000) ack 1 <...>
+0.200 > . 2001:3001(1000) ack 1 <...>
+0.200 > . 3001:4001(1000) ack 1 <...>
+0.200 > . 4001:5001(1000) ack 1 <...>
+0.200 > . 5001:6001(1000) ack 1 <...>
+0.200 > . 6001:7001(1000) ack 1 <...>
+0.200 > . 7001:8001(1000) ack 1 <...>
+0.200 > . 8001:9001(1000) ack 1 <...>
+0.200 > P. 9001:10001(1000) ack 1 <...>
+
+// Segments 1:1001, 3001:4001 and 6001:7001 are lost.
+0.300 < . 1:1(0) ack 1 win 65535 <sack 1001:3001 4001:6001 7001:10001,nop,nop>
+0.300 < . 1:1(0) ack 1 win 65535 <sack 1001:3001 4001:6001 7001:10001,nop,nop>
+0.300 < . 1:1(0) ack 1 win 65535 <sack 1001:3001 4001:6001 7001:10001,nop,nop>
+0.300 > . 1:1001(1000) ack 1 <...>
+
+0.400 < . 1:1(0) ack 1001 win 65535 <sack 1001:3001 4001:6001 7001:10001,nop,nop>
+0.400 > . 3001:4001(1000) ack 1 <...>
+
+0.500 < . 1:1(0) ack 6001 win 65535 <sack 7001:10001,nop,nop>
+0.500 > . 6001:7001(1000) ack 1 <...>
+
+0.600 < . 1:1(0) ack 10001 win 65535
