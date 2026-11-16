@@ -29,7 +29,7 @@ behavior notes and the `TCP_INFO` details.
 
 - OpenBSD 7.9 or newer.
 - Root access, or `doas`, to create `tun(4)` and set sysctls.
-- Python 3 with the `junit-xml` package.
+- Python 3 (standard library only).
 - packetdrill from the `net/packetdrill` port.
 
 Install packetdrill from packages:
@@ -42,14 +42,6 @@ If the package is not available yet, install the port from `openbsd-wip`:
 
 ```sh
 doas make -C /path/to/openbsd-wip/net/packetdrill install
-```
-
-Install the test runner:
-
-```sh
-python3 -m venv venv
-. venv/bin/activate
-pip install -r scripts/requirements.txt
 ```
 
 ## Running
