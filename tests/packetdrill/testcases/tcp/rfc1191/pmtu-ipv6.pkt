@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sergey Bronnikov
+// RFC 8201 §4: Path MTU Discovery.
+// RFC 4443 §3.2: Packet Too Big Message.
+//
+// A large IPv6 segment is sent, then an ICMPv6 Packet Too Big message
+// lowers the path MTU to 1280.  The data is retransmitted in 1220-byte
+// segments.  OpenBSD sends three segments at a time, so ACKs are staged.
+--ip_version=ipv6
+--mtu=15000
+--tolerance_usecs=100000
+
+0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+0.000 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+0.000 bind(3, ..., ...) = 0
+0.000 listen(3, 1) = 0
+
+0.100 < S 0:0(0) win 65535 <mss 14940,sackOK,nop,nop,nop,wscale 7>
+0.100 > S. 0:0(0) ack 1 <...>
+0.100 < . 1:1(0) ack 1 win 65535
+0.100 accept(3, ..., ...) = 4
+
+0.200 write(4, ..., 12200) = 12200
+0.200 > P. 1:12201(12200) ack 1
+
+0.250 < icmp packet_too_big mtu 1280 [1:12201(12200)]
+0.250 > . 1:1221(1220) ack 1
+0.250 > . 1221:2441(1220) ack 1
+0.250 > . 2441:3661(1220) ack 1
+
+0.300 < . 1:1(0) ack 3661 win 65535
+0.300 > . 3661:4881(1220) ack 1
+0.300 > . 4881:6101(1220) ack 1
+0.300 > . 6101:7321(1220) ack 1
+
+0.400 < . 1:1(0) ack 7321 win 65535
+0.400 > . 7321:8541(1220) ack 1
+0.400 > . 8541:9761(1220) ack 1
+0.400 > . 9761:10981(1220) ack 1
+
+0.500 < . 1:1(0) ack 10981 win 65535
+0.500 > P. 10981:12201(1220) ack 1
+0.600 < . 1:1(0) ack 12201 win 65535
