@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sergey Bronnikov
+// RFC 9293 §3.5: Establishing a connection.
+// OpenBSD 8.0 errata 017: a race in the TCP syn cache could crash the kernel.
+//
+// A SYN cache entry holds a reference to the route used for the handshake.
+// When the entry expires, syn_cache_timer() drops that reference from a
+// timeout context.  In this test the cached route is a PMTU host route that
+// has an rt_timer of its own, and both timers are made to expire together.
+// The kernel must hold the shared netlock across the final rtfree() so that
+// the route timer cannot use the route after it has been freed.
+// Preconditions: net.inet.tcp.keepinittime=4,
+//                net.inet.ip.mtudisctimeout=9
+// OpenBSD: supported
+--mtu=15000
+--tolerance_usecs=100000
+
+`sysctl -q net.inet.tcp.keepinittime=4
+sysctl -q net.inet.ip.mtudisctimeout=9`
+
+0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+0.000 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+0.000 bind(3, ..., ...) = 0
+0.000 listen(3, 1) = 0
+
+// Establish a connection and send one full-sized segment.
+0.100 < S 0:0(0) win 65535 <mss 1460,sackOK,nop,nop,nop,wscale 7>
+0.100 > S. 0:0(0) ack 1 <...>
+0.100 < . 1:1(0) ack 1 win 65535
+0.100 accept(3, ..., ...) = 4
+
+0.200 write(4, ..., 1460) = 1460
+0.200 > P. 1:1461(1460) ack 1 <...>
+0.200 setsockopt(4, SOL_SOCKET, SO_LINGER, {onoff=1, linger=0}, 8) = 0
+
+// The ICMP message is accepted because the advertised MTU is smaller than
+// the largest packet sent (1500 bytes).  It creates a dynamic /32 PMTU route
+// and arms ip_mtudisc_timeout_q for 9 seconds.
+0.250 < icmp unreachable frag_needed mtu 1000 [1:1461(1460)]
+
+// The unacknowledged data is retransmitted using the new MSS (960).
+0.250 > . 1:961(960) ack 1 <...>
+0.250 > P. 961:1461(500) ack 1 <...>
+
+// Closing with SO_LINGER=0 sends RST and drops the accepted socket's route
+// reference.  The routing table and the syn cache remain the only users.
+0.250 close(4) = 0
+0.250 > R. 1461:1461(0) ack 1
+
+// This SYN uses the PMTU route.  Its SYN cache entry expires 9 seconds later,
+// at the same time as the PMTU route timer.
+0.250 < S 0:0(0) win 65535 <mss 950,sackOK,nop,nop,nop,wscale 7>
+0.250 > S. 0:0(0) ack 1 <...>
+
+// First SYN-ACK retransmission.
+3.250 > S. 0:0(0) ack 1 <...>
+
+// At 9.250 the syn cache entry expires and the PMTU route timer fires.
+// A new SYN proves that the stack survived and the listener still works.
+9.500 < S 0:0(0) win 65535 <mss 1460,sackOK,nop,nop,nop,wscale 7>
+9.500 > S. 0:0(0) ack 1 <...>
+9.600 < . 1:1(0) ack 1 win 65535
+9.600 accept(3, ..., ...) = 5
+
+`sysctl -q net.inet.tcp.keepinittime=75
+sysctl -q net.inet.ip.mtudisctimeout=600`
