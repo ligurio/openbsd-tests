@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sergey Bronnikov
+// RFC 9293 §3.5: Establishing a connection.
+// OpenBSD 8.0 errata 017: a race in the TCP syn cache could crash the kernel.
+//
+// A SYN cache entry that is not acknowledged is retransmitted and then
+// dropped once it has been queued longer than net.inet.tcp.keepinittime.
+// The drop path releases the cached route from syn_cache_timer().
+// Preconditions: net.inet.tcp.keepinittime=4
+// OpenBSD: supported
+--tolerance_usecs=100000
+
+`sysctl -q net.inet.tcp.keepinittime=4`
+
+0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+0.000 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+0.000 bind(3, ..., ...) = 0
+0.000 listen(3, 1) = 0
+
+0.100 < S 0:0(0) win 65535 <mss 1460,sackOK,nop,nop,nop,wscale 7>
+0.100 > S. 0:0(0) ack 1 <...>
+
+// No ACK from the client: retransmit the SYN-ACK after 3 seconds.
+3.100 > S. 0:0(0) ack 1 <...>
+
+// After 9 seconds the entry has been queued for longer than keepinittime=4,
+// so the next timer expires it instead of retransmitting the SYN-ACK.
+// A new SYN from the same peer must create a fresh entry.
+9.500 < S 0:0(0) win 65535 <mss 1460,sackOK,nop,nop,nop,wscale 7>
+9.500 > S. 0:0(0) ack 1 <...>
+9.600 < . 1:1(0) ack 1 win 65535
+9.600 accept(3, ..., ...) = 4
+
+`sysctl -q net.inet.tcp.keepinittime=75`
